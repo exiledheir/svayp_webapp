@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: #ffffff;
+  color: #000000;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  /* Prevent pull-to-refresh on mobile browsers */
+  overscroll-behavior-y: none;
+}
+
+#__next {
+  height: 100%;
+}
+
+/* Hide scrollbar on category chips / horizontal scroll areas */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Phone-width container on large screens */
+.phone-container {
+  max-width: 430px;
+  margin: 0 auto;
+  position: relative;
+  height: 100%;
+}
+
+/* Bottom nav safe area */
+.pb-nav {
+  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Visual Search pulsing glow — matches Flutter _VisualSearchNavButton */
+@keyframes vs-pulse {
+  0%, 100% { box-shadow: 0 3px 8px rgba(240,147,251,0.30); }
+  50%       { box-shadow: 0 3px 22px rgba(240,147,251,0.65); }
+}
+.vs-pulse {
+  animation: vs-pulse 2s ease-in-out infinite;
+}
