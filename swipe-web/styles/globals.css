@@ -13,6 +13,19 @@ body {
   -webkit-font-smoothing: antialiased;
   /* Prevent pull-to-refresh on mobile browsers */
   overscroll-behavior-y: none;
+  /* Hide all scrollbars globally */
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 #__next {
@@ -49,3 +62,72 @@ body {
 .vs-pulse {
   animation: vs-pulse 2s ease-in-out infinite;
 }
+
+/* ── Custom crop handles (corner brackets like mobile visual search) ── */
+.ReactCrop__crop-selection {
+  border: 2px solid white !important;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55) !important;
+}
+.ReactCrop__drag-handle {
+  width: 20px !important;
+  height: 20px !important;
+  background: transparent !important;
+  border: none !important;
+}
+.ReactCrop__drag-handle::after {
+  content: '' !important;
+  position: absolute !important;
+  background: white !important;
+  border-radius: 2px !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3) !important;
+}
+/* Corner handles — L-shaped brackets */
+.ReactCrop__drag-handle.ord-nw::after {
+  top: 0; left: 0;
+  width: 20px; height: 20px;
+  border-top: 3.5px solid white;
+  border-left: 3.5px solid white;
+  border-radius: 3px 0 0 0;
+  background: transparent !important;
+}
+.ReactCrop__drag-handle.ord-ne::after {
+  top: 0; right: 0;
+  width: 20px; height: 20px;
+  border-top: 3.5px solid white;
+  border-right: 3.5px solid white;
+  border-radius: 0 3px 0 0;
+  background: transparent !important;
+}
+.ReactCrop__drag-handle.ord-sw::after {
+  bottom: 0; left: 0;
+  width: 20px; height: 20px;
+  border-bottom: 3.5px solid white;
+  border-left: 3.5px solid white;
+  border-radius: 0 0 0 3px;
+  background: transparent !important;
+}
+.ReactCrop__drag-handle.ord-se::after {
+  bottom: 0; right: 0;
+  width: 20px; height: 20px;
+  border-bottom: 3.5px solid white;
+  border-right: 3.5px solid white;
+  border-radius: 0 0 3px 0;
+  background: transparent !important;
+}
+/* Edge handles — subtle white bars */
+.ReactCrop__drag-handle.ord-n::after,
+.ReactCrop__drag-handle.ord-s::after {
+  width: 28px; height: 3px;
+  left: 50%; transform: translateX(-50%);
+  border-radius: 2px;
+}
+.ReactCrop__drag-handle.ord-n::after { top: -1px; }
+.ReactCrop__drag-handle.ord-s::after { bottom: -1px; }
+.ReactCrop__drag-handle.ord-e::after,
+.ReactCrop__drag-handle.ord-w::after {
+  width: 3px; height: 28px;
+  top: 50%; transform: translateY(-50%);
+  border-radius: 2px;
+}
+.ReactCrop__drag-handle.ord-e::after { right: -1px; }
+.ReactCrop__drag-handle.ord-w::after { left: -1px; }

@@ -65,3 +65,12 @@ export function addClosetItem(item: Omit<ClosetItem, 'id' | 'createdAt'>): Close
 export function deleteClosetItem(id: string): void {
   saveAll(readAll().filter((item) => item.id !== id));
 }
+
+export function updateClosetItem(id: string, updates: Partial<Pick<ClosetItem, 'category'>>): void {
+  const items = readAll();
+  const idx = items.findIndex((i) => i.id === id);
+  if (idx >= 0) {
+    items[idx] = { ...items[idx], ...updates };
+    saveAll(items);
+  }
+}

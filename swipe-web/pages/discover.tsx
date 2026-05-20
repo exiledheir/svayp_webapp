@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { Heart, ThumbsDown, RotateCcw, ShoppingCart, ShoppingBag } from 'lucide-react';
+import { Heart, ThumbsDown, RotateCcw, ShoppingBag } from 'lucide-react';
 import { getRecommendedProducts } from '@/lib/api';
 import { toggleLiked } from '@/lib/liked-storage';
 import { addToCart } from '@/lib/cart-storage';
-import BottomNav from '@/components/BottomNav';
+import BottomNav, { TopBar } from '@/components/BottomNav';
 import type { Product } from '@/types';
 
 // ─── Price formatter matching Flutter formattedPrice ────────────────────────
@@ -361,26 +361,7 @@ export default function DiscoverPage() {
     <div className="phone-container flex flex-col bg-white" style={{ height: '100dvh' }}>
 
       {/* ── Floating glass top bar (matches Flutter MainTopBar) ── */}
-      <div className="absolute top-0 left-0 right-0 z-50 px-4 pt-2 pb-1 pointer-events-none">
-        <div
-          className="flex items-center px-4 py-2.5 pointer-events-auto"
-          style={{
-            background: 'rgba(255,255,255,0.72)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderRadius: 22,
-            border: '0.5px solid rgba(0,0,0,0.16)',
-          }}
-        >
-          <span className="flex-1 text-[19px] font-bold tracking-[-0.5px]">SVΛYP</span>
-          <button onClick={() => router.push('/liked')} className="w-10 h-10 flex items-center justify-center" aria-label="Liked">
-            <Heart size={22} strokeWidth={1.8} />
-          </button>
-          <button onClick={() => router.push('/cart')} className="w-10 h-10 flex items-center justify-center" aria-label="Cart">
-            <ShoppingCart size={22} strokeWidth={1.8} />
-          </button>
-        </div>
-      </div>
+      <TopBar title="SVΛYP" />
 
       {/* ── Card area — overflow-visible so box-shadow is never clipped during drag ── */}
       <div

@@ -86,10 +86,10 @@ export default function ChatListPage() {
   useEffect(() => { load(); }, []);
 
   return (
-    <div className="phone-container flex flex-col bg-white h-screen">
-      <TopBar title="Messages" showCartLiked={false} />
+    <div className="phone-container flex flex-col bg-white" style={{ height: '100dvh' }}>
+      <TopBar title="Messages" />
 
-      <main className="flex-1 overflow-y-auto pb-nav">
+      <main className="flex-1 overflow-y-auto pb-nav" style={{ paddingTop: 64 }}>
         {loading ? (
           <div className="flex items-center justify-center h-64"><FullPageLoader /></div>
         ) : error ? (
