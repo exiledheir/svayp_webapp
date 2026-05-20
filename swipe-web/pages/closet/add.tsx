@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { ArrowLeft, Camera, Image as ImageIcon } from 'lucide-react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
-import 'react-image-crop/dist/ReactCrop.css';
 import { addClosetItem, CLOSET_CATEGORIES } from '@/lib/closet-storage';
 import type { ClosetCategory } from '@/lib/closet-storage';
 

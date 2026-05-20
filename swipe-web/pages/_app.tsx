@@ -3,6 +3,7 @@ import type { AppProps } from 'next/app';
 import { useRouter } from 'next/router';
 import { isAuthenticated } from '@/lib/auth';
 import '@/styles/globals.css';
+import 'react-image-crop/dist/ReactCrop.css';
 
 // Pages that do not require authentication
 const PUBLIC_PATHS = new Set(['/auth/phone', '/auth/otp']);
