@@ -226,7 +226,7 @@ export default function ClosetAddPage() {
               <div className="flex flex-col gap-2.5">
                 {/* Photo Library — primary action, opens native photo grid on mobile */}
                 <button
-                  onClick={() => { setShowPicker(false); fileInputRef.current?.click(); }}
+                  onClick={() => { fileInputRef.current?.click(); setShowPicker(false); }}
                   className="w-full h-14 rounded-2xl bg-gray-50 flex items-center gap-3.5 px-4 active:scale-[0.98] transition-transform"
                 >
                   <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #F5576c 100%)' }}>
@@ -239,7 +239,7 @@ export default function ClosetAddPage() {
                 </button>
                 {/* Camera */}
                 <button
-                  onClick={() => { setShowPicker(false); cameraInputRef.current?.click(); }}
+                  onClick={() => { cameraInputRef.current?.click(); setShowPicker(false); }}
                   className="w-full h-14 rounded-2xl bg-gray-50 flex items-center gap-3.5 px-4 active:scale-[0.98] transition-transform"
                 >
                   <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: '#FF9800' }}>
