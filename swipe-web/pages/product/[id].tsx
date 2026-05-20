@@ -180,6 +180,7 @@ export default function ProductDetailPage() {
         >
           {product?.images?.[0] && (
             <div className="shrink-0 overflow-hidden" style={{ width: 36, height: 36, borderRadius: 8, background: '#333' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={product.images[0]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
           )}
