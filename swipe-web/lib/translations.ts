@@ -49,6 +49,16 @@ export interface Translations {
   calDays: string;
   reachedRegenLimit: string;
   reachedItemLimit: string;
+  discoverFashion: string;
+  phoneNumber: string;
+  continueBtn: string;
+  sending: string;
+  enterAtLeast9: string;
+  enterCodeSentTo: string;
+  confirmBtn: string;
+  changeNumber: string;
+  verifying: string;
+  enterFull6Digit: string;
   cats: {
     tops: string;
     tshirts: string;
@@ -123,6 +133,16 @@ const en: Translations = {
   calDays: 'days in calendar',
   reachedRegenLimit: "You've used your {n} regenerations. Upgrade for more.",
   reachedItemLimit: 'You\'ve reached the {n} items/category limit.',
+  discoverFashion: 'Discover fashion you love',
+  phoneNumber: 'Phone number',
+  continueBtn: 'Continue',
+  sending: 'Sending…',
+  enterAtLeast9: 'Enter at least 9 digits',
+  enterCodeSentTo: 'Enter the code we sent to',
+  confirmBtn: 'Confirm',
+  changeNumber: 'Change number',
+  verifying: 'Verifying…',
+  enterFull6Digit: 'Enter the full 6-digit code',
   cats: {
     tops: 'Tops',
     tshirts: 'T-Shirts',
@@ -197,6 +217,16 @@ const ru: Translations = {
   calDays: 'дней в календаре',
   reachedRegenLimit: 'Вы использовали {n} генераций. Улучшите план для большего.',
   reachedItemLimit: 'Достигнут лимит {n} вещей на категорию.',
+  discoverFashion: 'Откройте моду, которую вы любите',
+  phoneNumber: 'Номер телефона',
+  continueBtn: 'Продолжить',
+  sending: 'Отправка…',
+  enterAtLeast9: 'Введите не менее 9 цифр',
+  enterCodeSentTo: 'Введите код, отправленный на',
+  confirmBtn: 'Подтвердить',
+  changeNumber: 'Изменить номер',
+  verifying: 'Проверка…',
+  enterFull6Digit: 'Введите полный 6-значный код',
   cats: {
     tops: 'Топы',
     tshirts: 'Футболки',
@@ -271,6 +301,16 @@ const uz: Translations = {
   calDays: 'kun kalendarda',
   reachedRegenLimit: "{n} ta re-generatsiyadan foydalandingiz. Ko'proq uchun yangilang.",
   reachedItemLimit: 'Kategoriyada {n} ta kiyim chegarasiga yetdingiz.',
+  discoverFashion: "Sevimli modangizni toping",
+  phoneNumber: 'Telefon raqam',
+  continueBtn: 'Davom etish',
+  sending: 'Yuborilmoqda…',
+  enterAtLeast9: 'Kamida 9 ta raqam kiriting',
+  enterCodeSentTo: 'Yuborilgan kodni kiriting',
+  confirmBtn: 'Tasdiqlash',
+  changeNumber: "Raqamni o'zgartirish",
+  verifying: 'Tekshirilmoqda…',
+  enterFull6Digit: "6 xonali kodni to'liq kiriting",
   cats: {
     tops: 'Tepa kiyim',
     tshirts: 'Futbolkalar',
