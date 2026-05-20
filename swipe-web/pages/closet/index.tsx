@@ -843,13 +843,24 @@ function OutfitCard({
       <div className="flex-1 relative min-h-0 px-5 pt-5 pb-3">
         {isEmpty ? (
           <div className="w-full h-full rounded-2xl flex flex-col items-center justify-center gap-3">
-            <div className="relative w-full flex-1 min-h-0">
+            <div className="relative w-full flex-1 min-h-0 flex items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/images/closet/outfitcard_empty_state.png"
                 alt="Empty outfit"
                 className="w-full h-full object-contain opacity-80"
+                onError={(e) => {
+                  const t = e.currentTarget;
+                  t.style.display = 'none';
+                  const fb = t.nextElementSibling as HTMLElement | null;
+                  if (fb) fb.style.display = 'flex';
+                }}
               />
+              <div className="hidden w-full h-full flex-col items-center justify-center gap-2 opacity-30">
+                <svg width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                  <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.57a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.57a2 2 0 0 0-1.34-2.23z"/>
+                </svg>
+              </div>
             </div>
             <p className="text-[15px] font-bold text-gray-800 text-center leading-snug pb-2">
               {t.yourStyleStartsHere}<br />
@@ -858,13 +869,24 @@ function OutfitCard({
           </div>
         ) : !canGenerateOutfit ? (
           <div className="w-full h-full rounded-2xl flex flex-col items-center justify-center gap-3">
-            <div className="relative w-full flex-1 min-h-0">
+            <div className="relative w-full flex-1 min-h-0 flex items-center justify-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/images/closet/outfitcard_empty_state.png"
                 alt="Empty outfit"
                 className="w-full h-full object-contain opacity-80"
+                onError={(e) => {
+                  const t = e.currentTarget;
+                  t.style.display = 'none';
+                  const fb = t.nextElementSibling as HTMLElement | null;
+                  if (fb) fb.style.display = 'flex';
+                }}
               />
+              <div className="hidden w-full h-full flex-col items-center justify-center gap-2 opacity-30">
+                <svg width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                  <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.57a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.57a2 2 0 0 0-1.34-2.23z"/>
+                </svg>
+              </div>
             </div>
             <p className="text-[14px] font-medium text-gray-500 text-center leading-relaxed px-4 pb-1">
               {t.addTopAndBottom}
