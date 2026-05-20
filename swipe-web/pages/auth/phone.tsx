@@ -35,7 +35,7 @@ export default function PhonePage() {
     <div className="phone-container flex flex-col items-center justify-center min-h-screen px-6 bg-white">
       <div className="w-full max-w-sm">
         {/* Logo / Brand */}
-        <h1 className="text-4xl font-bold tracking-tighter text-center mb-2">SVΛYP</h1>
+        <h1 className="text-4xl font-bold tracking-[0.12em] text-center mb-2">LIB<span style={{ color: '#F370A7' }}>Λ</span>S</h1>
         <p className="text-sm text-gray-500 text-center mb-10">Discover fashion you love</p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">

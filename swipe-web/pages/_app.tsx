@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import type { AppProps } from 'next/app';
 import { useRouter } from 'next/router';
 import { isAuthenticated } from '@/lib/auth';
+import { I18nProvider } from '@/lib/i18n';
 import '@/styles/globals.css';
 import 'react-image-crop/dist/ReactCrop.css';
 
@@ -18,5 +19,9 @@ export default function App({ Component, pageProps }: AppProps) {
     }
   }, [router.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <Component {...pageProps} />;
+  return (
+    <I18nProvider>
+      <Component {...pageProps} />
+    </I18nProvider>
+  );
 }
