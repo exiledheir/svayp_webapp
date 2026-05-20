@@ -20,7 +20,7 @@ jobs:
           port: ${{ secrets.VM_PORT }}
           script: |
             set -e
-            cd /opt/svayp_webapp
+            cd ~/svayp_webapp
             git pull origin main
             cd swipe-web
             docker compose up -d --build
