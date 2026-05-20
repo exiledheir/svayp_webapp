@@ -1,18 +1,16 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  output: 'standalone',
+  output: "standalone",
   images: {
-    remotePatterns: [
-      { protocol: 'https', hostname: '**' },
-    ],
+    remotePatterns: [{ protocol: "https", hostname: "**" }],
   },
   async rewrites() {
     return [
       {
         // Proxy all /proxy/* requests to the backend API, avoiding browser CORS.
-        source: '/proxy/:path*',
-        destination: 'https://app.svaypai.com/api/v1/:path*',
+        source: "/proxy/:path*",
+        destination: "https://app.svaypai.com/api/v1/:path*",
       },
     ];
   },
