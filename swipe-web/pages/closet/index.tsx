@@ -77,8 +77,11 @@ function usePlan() {
   const fetchPlan = useCallback(async () => {
     try {
       const data = await getUserPlan();
-      setPlan(data.tier);
-      setLimits(data.limits);
+      // Normalise: if the API returns an unknown tier fall back to FREE.
+      const knownTiers = new Set<string>(['FREE', 'TRIAL', 'PREMIUM']);
+      const tier: UserPlan = knownTiers.has(data.tier) ? data.tier : 'FREE';
+      setPlan(tier);
+      setLimits(data.limits ?? PLAN_LIMITS.FREE);
       setUsage(data.usage);
     } catch {
       // Fallback to FREE if API fails
@@ -500,12 +503,12 @@ export default function ClosetPage() {
                 onClick={() => setShowPremiumGate('generation')}
                 className="flex items-center gap-1 px-2.5 h-8 rounded-full text-[11px] font-bold active:scale-[0.95] transition-all"
                 style={{
-                  background: plan === 'FREE' ? 'rgba(0,0,0,0.05)' : PLAN_COLORS[plan].bg,
-                  color: plan === 'FREE' ? '#888' : PLAN_COLORS[plan].text,
+                  background: plan === 'FREE' ? 'rgba(0,0,0,0.05)' : (PLAN_COLORS[plan] ?? PLAN_COLORS.FREE).bg,
+                  color: plan === 'FREE' ? '#888' : (PLAN_COLORS[plan] ?? PLAN_COLORS.FREE).text,
                 }}
                 aria-label="Plan"
               >
-                <Crown size={11} strokeWidth={2} color={plan === 'FREE' ? '#aaa' : PLAN_COLORS[plan].crownColor} />
+                <Crown size={11} strokeWidth={2} color={plan === 'FREE' ? '#aaa' : (PLAN_COLORS[plan] ?? PLAN_COLORS.FREE).crownColor} />
                 <span>{plan === 'FREE' ? 'Free' : plan === 'TRIAL' ? 'Trial' : 'Pro'}</span>
               </button>
             )}
@@ -839,14 +842,14 @@ export default function ClosetPage() {
               <div
                 className="flex items-center gap-2.5 px-4 h-13 rounded-2xl"
                 style={{
-                  background: plan === 'FREE' ? '#F5F5F5' : PLAN_COLORS[plan].bg,
+                  background: plan === 'FREE' ? '#F5F5F5' : (PLAN_COLORS[plan] ?? PLAN_COLORS.FREE).bg,
                   height: 52,
                 }}
               >
-                <Crown size={17} strokeWidth={2} color={plan === 'FREE' ? '#aaa' : PLAN_COLORS[plan].crownColor} />
+                <Crown size={17} strokeWidth={2} color={plan === 'FREE' ? '#aaa' : (PLAN_COLORS[plan] ?? PLAN_COLORS.FREE).crownColor} />
                 <span
                   className="text-[14px] font-semibold"
-                  style={{ color: plan === 'FREE' ? '#888' : PLAN_COLORS[plan].text }}
+                  style={{ color: plan === 'FREE' ? '#888' : (PLAN_COLORS[plan] ?? PLAN_COLORS.FREE).text }}
                 >
                   {plan === 'FREE' ? 'Free plan' : plan === 'TRIAL' ? 'Trial' : 'Premium'}
                 </span>
