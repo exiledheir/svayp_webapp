@@ -2,11 +2,18 @@ import axios from 'axios';
 import { getToken, clearTokens } from '@/lib/auth';
 import type {
   WardrobeCategory,
+  WardrobeSubcategory,
   WardrobeUploadInitResponse,
   WardrobeUploadStatus,
   WardrobeItemResponse,
   WardrobeStats,
   PageResponse,
+  UserPlanResponse,
+  OutfitCanvasResponse,
+  OutfitCanvasItemRequest,
+  OutfitSuggestionResponse,
+  TryOnJobResponse,
+  CalendarResponse,
 } from '@/types';
 
 // All requests go to /proxy/* which Next.js rewrites to https://app.svaypai.com/api/v1/*
@@ -29,6 +36,9 @@ api.interceptors.response.use(
         window.location.href = '/auth/phone';
       }
     }
+    if (error.response?.status === 400) {
+      console.error('[API 400]', error.response?.data);
+    }
     return Promise.reject(error);
   },
 );
@@ -38,11 +48,20 @@ function unwrapData<T>(res: { data: unknown }): T {
   return (d.data ?? d) as T;
 }
 
+// ── Plan ──────────────────────────────────────────────────────────────────────
+
+export async function getUserPlan(): Promise<UserPlanResponse> {
+  const res = await api.get('/me/plan');
+  return unwrapData<UserPlanResponse>(res);
+}
+
+// ── Upload Flow ───────────────────────────────────────────────────────────────
+
 function mapUploadInitResponse(raw: Record<string, unknown>): WardrobeUploadInitResponse {
   return {
     uploadJobId: (raw.uploadJobId ?? raw.upload_job_id ?? '') as string,
     blobKey: (raw.blobKey ?? raw.blob_key ?? '') as string,
-    uploadUrl: (raw.uploadUrl ?? raw.upload_url ?? '') as string,
+    putUrl: (raw.putUrl ?? raw.put_url ?? '') as string,
     uploadUrlExpiresAt: (raw.uploadUrlExpiresAt ?? raw.upload_url_expires_at ?? '') as string,
     httpMethod: (raw.httpMethod ?? raw.http_method ?? 'PUT') as string,
   };
@@ -60,49 +79,49 @@ function mapUploadStatus(raw: Record<string, unknown>): WardrobeUploadStatus {
   };
 }
 
-// ── Upload Flow ───────────────────────────────────────────────────────────────
-
 export async function initiateUpload(
   contentType: string,
   idempotencyKey: string,
   category?: WardrobeCategory,
+  subcategory?: WardrobeSubcategory,
+  fileSizeBytes?: number,
 ): Promise<WardrobeUploadInitResponse> {
   const body: Record<string, unknown> = {
     contentType,
-    content_type: contentType,
     idempotencyKey,
-    idempotency_key: idempotencyKey,
   };
   if (category) body.category = category;
+  if (subcategory) body.subcategory = subcategory;
+  if (fileSizeBytes && fileSizeBytes > 0) body.fileSizeBytes = fileSizeBytes;
   const res = await api.post('/wardrobe/uploads', body);
   const raw = unwrapData<Record<string, unknown>>(res);
   const mapped = mapUploadInitResponse(raw);
-  if (!mapped.uploadUrl) {
-    throw new Error('Backend did not return a valid uploadUrl');
+  if (!mapped.putUrl) {
+    throw new Error('Backend did not return a valid putUrl');
   }
   return mapped;
 }
 
 export async function uploadFileToBlob(
-  uploadUrl: string,
+  putUrl: string,
   file: File | Blob,
   contentType: string,
 ): Promise<void> {
-  await axios.put(uploadUrl, file, {
-    headers: {
-      'Content-Type': contentType,
-      'x-ms-blob-type': 'BlockBlob',
-    },
-  });
+  // Proxy through Next.js API to avoid Azure Blob CORS preflight rejection
+  await axios.put(
+    `/api/blob-upload?putUrl=${encodeURIComponent(putUrl)}&contentType=${encodeURIComponent(contentType)}`,
+    file,
+    { headers: { 'Content-Type': contentType } },
+  );
 }
 
-export async function confirmUpload(uploadJobId: string): Promise<WardrobeUploadStatus> {
-  const res = await api.post(`/wardrobe/uploads/${uploadJobId}/confirm`);
+export async function confirmUpload(jobId: string): Promise<WardrobeUploadStatus> {
+  const res = await api.post(`/wardrobe/uploads/${jobId}/confirm`);
   return mapUploadStatus(unwrapData<Record<string, unknown>>(res));
 }
 
-export async function getUploadStatus(uploadJobId: string): Promise<WardrobeUploadStatus> {
-  const res = await api.get(`/wardrobe/uploads/${uploadJobId}`);
+export async function getUploadStatus(jobId: string): Promise<WardrobeUploadStatus> {
+  const res = await api.get(`/wardrobe/uploads/${jobId}`);
   return mapUploadStatus(unwrapData<Record<string, unknown>>(res));
 }
 
@@ -113,23 +132,23 @@ export async function listUploads(page = 0, size = 20): Promise<PageResponse<War
 
 // ── Polling Helper ────────────────────────────────────────────────────────────
 
-const TERMINAL_STATUSES = new Set(['READY', 'FAILED', 'REJECTED_NSFW']);
+const TERMINAL_STATUSES = new Set(['COMPLETED', 'FAILED']);
 const POLL_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
 
 function getPollingInterval(status: string): number {
-  if (status === 'UPLOADED' || status === 'NSFW_CHECKED') return 2000;
-  if (status === 'BG_REMOVED' || status === 'UPSCALED' || status === 'EMBEDDED') return 3000;
+  if (status === 'UPLOADED' || status === 'NSFW_SCAN') return 2000;
+  if (status === 'UPSCALE' || status === 'BG_REMOVE' || status === 'EMBED') return 3000;
   return 5000;
 }
 
 export async function pollUploadUntilDone(
-  uploadJobId: string,
+  jobId: string,
   onProgress?: (status: WardrobeUploadStatus) => void,
 ): Promise<WardrobeUploadStatus> {
   const startTime = Date.now();
 
   while (true) {
-    const status = await getUploadStatus(uploadJobId);
+    const status = await getUploadStatus(jobId);
     onProgress?.(status);
 
     if (TERMINAL_STATUSES.has(status.status)) {
@@ -151,6 +170,7 @@ function mapWardrobeItem(raw: Record<string, unknown>): WardrobeItemResponse {
   return {
     id: (raw.id ?? '') as string,
     category: (raw.category ?? 'OTHER') as WardrobeCategory,
+    subcategory: (raw.subcategory ?? 'ACCESSORIES') as WardrobeSubcategory,
     layer: (raw.layer ?? null) as WardrobeItemResponse['layer'],
     status: (raw.status ?? 'READY') as string,
     imageUrl: (raw.imageUrl ?? raw.image_url ?? '') as string,
@@ -158,7 +178,7 @@ function mapWardrobeItem(raw: Record<string, unknown>): WardrobeItemResponse {
     colorPrimary: (raw.colorPrimary ?? raw.color_primary ?? '') as string,
     pattern: (raw.pattern ?? '') as string,
     material: (raw.material ?? '') as string,
-    season: (raw.season ?? 'ALL_SEASON') as string,
+    season: (raw.season ?? 'ALL') as string,
     styleTags: (raw.styleTags ?? raw.style_tags ?? []) as string[],
     formalityScore: (raw.formalityScore ?? raw.formality_score ?? 3) as number,
     warmthScore: (raw.warmthScore ?? raw.warmth_score ?? 2) as number,
@@ -206,20 +226,24 @@ export async function updateWardrobeItem(
     userNotes?: string | null;
     isFavorite?: boolean;
     isClean?: boolean;
+    category?: WardrobeCategory;
+    subcategory?: WardrobeSubcategory;
   },
 ): Promise<WardrobeItemResponse> {
   const body: Record<string, unknown> = {};
-  if (updates.userLabel !== undefined) body.user_label = updates.userLabel;
-  if (updates.userNotes !== undefined) body.user_notes = updates.userNotes;
-  if (updates.isFavorite !== undefined) body.is_favorite = updates.isFavorite;
-  if (updates.isClean !== undefined) body.is_clean = updates.isClean;
+  if (updates.userLabel !== undefined) body.userLabel = updates.userLabel;
+  if (updates.userNotes !== undefined) body.userNotes = updates.userNotes;
+  if (updates.isFavorite !== undefined) body.isFavorite = updates.isFavorite;
+  if (updates.isClean !== undefined) body.isClean = updates.isClean;
+  if (updates.category !== undefined) body.category = updates.category;
+  if (updates.subcategory !== undefined) body.subcategory = updates.subcategory;
   const res = await api.patch(`/wardrobe/items/${id}`, body);
   return mapWardrobeItem(unwrapData<Record<string, unknown>>(res));
 }
 
 export async function markItemWorn(id: string): Promise<WardrobeItemResponse> {
   const res = await api.post(`/wardrobe/items/${id}/wear`);
-  return unwrapData<WardrobeItemResponse>(res);
+  return mapWardrobeItem(unwrapData<Record<string, unknown>>(res));
 }
 
 export async function deleteWardrobeItem(id: string): Promise<void> {
@@ -231,20 +255,148 @@ export async function deleteWardrobeItem(id: string): Promise<void> {
 export async function uploadWardrobeItem(
   file: File,
   category?: WardrobeCategory,
+  subcategory?: WardrobeSubcategory,
   onProgress?: (status: WardrobeUploadStatus) => void,
 ): Promise<WardrobeUploadStatus> {
   const idempotencyKey = crypto.randomUUID();
   const contentType = file.type || 'image/jpeg';
 
   // 1. Initiate upload
-  const { uploadJobId, uploadUrl } = await initiateUpload(contentType, idempotencyKey, category);
+  const { uploadJobId, putUrl } = await initiateUpload(contentType, idempotencyKey, category, subcategory, file.size);
 
   // 2. Upload file to Azure blob
-  await uploadFileToBlob(uploadUrl, file, contentType);
+  await uploadFileToBlob(putUrl, file, contentType);
 
   // 3. Confirm upload → start AI pipeline
   await confirmUpload(uploadJobId);
 
   // 4. Poll until done
   return pollUploadUntilDone(uploadJobId, onProgress);
+}
+
+// ── Outfit Canvases ───────────────────────────────────────────────────────────
+
+export async function getOutfitCanvases(
+  params: { page?: number; size?: number } = {},
+): Promise<PageResponse<OutfitCanvasResponse>> {
+  const res = await api.get('/outfits/canvases', {
+    params: { page: params.page ?? 0, size: params.size ?? 20 },
+  });
+  return unwrapData<PageResponse<OutfitCanvasResponse>>(res);
+}
+
+export async function getOutfitCanvas(id: string): Promise<OutfitCanvasResponse> {
+  const res = await api.get(`/outfits/canvases/${id}`);
+  return unwrapData<OutfitCanvasResponse>(res);
+}
+
+export async function createOutfitCanvas(data: {
+  name?: string;
+  occasion?: string;
+  thumbnailUrl?: string;
+  items: OutfitCanvasItemRequest[];
+}): Promise<OutfitCanvasResponse> {
+  const res = await api.post('/outfits/canvases', data);
+  return unwrapData<OutfitCanvasResponse>(res);
+}
+
+export async function updateOutfitCanvas(
+  id: string,
+  data: {
+    name?: string;
+    occasion?: string;
+    thumbnailUrl?: string;
+    items: OutfitCanvasItemRequest[];
+  },
+): Promise<OutfitCanvasResponse> {
+  const res = await api.put(`/outfits/canvases/${id}`, data);
+  return unwrapData<OutfitCanvasResponse>(res);
+}
+
+export async function deleteOutfitCanvas(id: string): Promise<void> {
+  await api.delete(`/outfits/canvases/${id}`);
+}
+
+// ── Outfit Suggestions ────────────────────────────────────────────────────────
+
+export async function getOutfitSuggestions(
+  params: { page?: number; size?: number } = {},
+): Promise<PageResponse<OutfitSuggestionResponse>> {
+  const res = await api.get('/outfits/suggestions', {
+    params: { page: params.page ?? 0, size: params.size ?? 20 },
+  });
+  return unwrapData<PageResponse<OutfitSuggestionResponse>>(res);
+}
+
+export async function getOutfitSuggestionByDate(date: string): Promise<OutfitSuggestionResponse[]> {
+  const res = await api.get('/outfits/suggestions/by-date', { params: { date } });
+  return unwrapData<OutfitSuggestionResponse[]>(res);
+}
+
+export async function getOutfitSuggestion(id: string): Promise<OutfitSuggestionResponse> {
+  const res = await api.get(`/outfits/suggestions/${id}`);
+  return unwrapData<OutfitSuggestionResponse>(res);
+}
+
+export async function generateOutfitSuggestions(count = 3): Promise<{ queued: boolean; count: number }> {
+  const res = await api.post('/outfits/generate', null, { params: { count } });
+  return unwrapData<{ queued: boolean; count: number }>(res);
+}
+
+export async function rateOutfitSuggestion(id: string, rating: number): Promise<void> {
+  await api.post(`/outfits/suggestions/${id}/rate`, null, { params: { rating } });
+}
+
+export async function wearOutfitSuggestion(id: string): Promise<void> {
+  await api.post(`/outfits/suggestions/${id}/wear`);
+}
+
+export async function dismissOutfitSuggestion(id: string): Promise<void> {
+  await api.delete(`/outfits/suggestions/${id}`);
+}
+
+// ── Virtual Try-On ────────────────────────────────────────────────────────────
+
+export async function createTryOnJob(data: {
+  canvasId?: string;
+  wardrobeItemIds: string[];
+  modelImageUrl?: string;
+}): Promise<TryOnJobResponse> {
+  const res = await api.post('/outfits/try-on', data);
+  return unwrapData<TryOnJobResponse>(res);
+}
+
+export async function getTryOnJob(id: string): Promise<TryOnJobResponse> {
+  const res = await api.get(`/outfits/try-on/${id}`);
+  return unwrapData<TryOnJobResponse>(res);
+}
+
+export async function pollTryOnUntilDone(
+  jobId: string,
+  onProgress?: (job: TryOnJobResponse) => void,
+): Promise<TryOnJobResponse> {
+  const startTime = Date.now();
+  const TIMEOUT_MS = 2 * 60 * 1000;
+
+  while (true) {
+    const job = await getTryOnJob(jobId);
+    onProgress?.(job);
+
+    if (job.status === 'COMPLETED' || job.status === 'FAILED') {
+      return job;
+    }
+
+    if (Date.now() - startTime > TIMEOUT_MS) {
+      throw new Error('Try-on processing timed out after 2 minutes');
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+}
+
+// ── Outfit Calendar ───────────────────────────────────────────────────────────
+
+export async function getOutfitCalendar(from: string, to: string): Promise<CalendarResponse> {
+  const res = await api.get('/outfits/calendar', { params: { from, to } });
+  return unwrapData<CalendarResponse>(res);
 }

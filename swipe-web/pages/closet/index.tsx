@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { Plus, X, Sparkles, Sun, CalendarDays, TreePine, Camera, Image as ImageIcon, Loader2, Globe, Crown, Lock, RefreshCw } from 'lucide-react';
+import { Plus, X, Sparkles, Sun, CalendarDays, TreePine, Camera, Image as ImageIcon, Loader2, Crown, Lock, RefreshCw, User } from 'lucide-react';
+import { getUser } from '@/lib/auth';
+import { FEATURES } from '@/lib/feature-flags';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
-import { fetchClosetItems, addClosetItemFromFile, removeClosetItem, getClosetItems, addClosetItem, deleteClosetItem, updateClosetItem, CLOSET_CATEGORIES } from '@/lib/closet-storage';
+import { fetchClosetItems, addClosetItemFromFile, removeClosetItem, updateClosetItemApi, getClosetItems, addClosetItem, deleteClosetItem, updateClosetItem, CLOSET_CATEGORIES } from '@/lib/closet-storage';
 import type { ClosetItem, ClosetCategory } from '@/lib/closet-storage';
-import type { WardrobeUploadStatus } from '@/types';
+import type { WardrobeUploadStatus, PlanTier, PlanLimits, PlanUsage, TryOnJobResponse } from '@/types';
+import { getUserPlan, generateOutfitSuggestions, createTryOnJob, pollTryOnUntilDone, getOutfitCalendar, createOutfitCanvas, updateOutfitCanvas, deleteOutfitCanvas, getOutfitCanvases, getOutfitCanvas } from '@/lib/wardrobe-api';
 import { useI18n } from '@/lib/i18n';
 import type { Locale } from '@/lib/translations';
 
@@ -52,58 +55,49 @@ const OCCASION_CONFIG = [
 ];
 
 // ─── Plan system ────────────────────────────────────────────────────────────────
-type UserPlan = 'free' | 'pro' | 'premium';
+type UserPlan = PlanTier;
 
-const PLAN_LIMITS: Record<UserPlan, { itemsPerCategory: number; outfitCanvases: number; tryItOns: number; regenerations: number; calendarDays: number }> = {
-  free:    { itemsPerCategory: 2,  outfitCanvases: 1,  tryItOns: 2,  regenerations: 5,  calendarDays: 2 },
-  pro:     { itemsPerCategory: 10, outfitCanvases: 3,  tryItOns: 10, regenerations: 15, calendarDays: 7 },
-  premium: { itemsPerCategory: 20, outfitCanvases: 7,  tryItOns: 30, regenerations: 50, calendarDays: 7 },
+const PLAN_LIMITS: Record<UserPlan, PlanLimits> = {
+  FREE:    { wardrobeItems: 20,  canvases: 1,  tryOnPerMonth: 2,  regenPerMonth: 5,  calendarDays: 2 },
+  TRIAL:   { wardrobeItems: 50,  canvases: 3,  tryOnPerMonth: 10, regenPerMonth: 15, calendarDays: 7 },
+  PREMIUM: { wardrobeItems: 999, canvases: 7,  tryOnPerMonth: 30, regenPerMonth: 50, calendarDays: 7 },
 };
 
 const PLAN_COLORS: Record<UserPlan, { bg: string; text: string; crownColor: string }> = {
-  free:    { bg: '#F5F5F5', text: '#888', crownColor: '#aaa' },
-  pro:     { bg: 'linear-gradient(135deg, #F370A7 0%, #e0559a 100%)', text: '#fff', crownColor: '#fbb6d0' },
-  premium: { bg: 'linear-gradient(135deg, #B8860B 0%, #8B6914 100%)', text: '#fff', crownColor: '#FFD700' },
+  FREE:    { bg: '#F5F5F5', text: '#888', crownColor: '#aaa' },
+  TRIAL:   { bg: 'linear-gradient(135deg, #F370A7 0%, #e0559a 100%)', text: '#fff', crownColor: '#fbb6d0' },
+  PREMIUM: { bg: 'linear-gradient(135deg, #B8860B 0%, #8B6914 100%)', text: '#fff', crownColor: '#FFD700' },
 };
 
 function usePlan() {
-  const [plan, setPlan] = useState<UserPlan>('free');
-  const [genCount, setGenCount] = useState(0);
-  const [tryOnCount, setTryOnCount] = useState(0);
+  const [plan, setPlan] = useState<UserPlan>('FREE');
+  const [limits, setLimits] = useState<PlanLimits>(PLAN_LIMITS.FREE);
+  const [usage, setUsage] = useState<PlanUsage>({ wardrobeItems: 0, canvases: 0, tryOnThisMonth: 0, regenThisMonth: 0 });
 
-  useEffect(() => {
+  const fetchPlan = useCallback(async () => {
     try {
-      const stored = localStorage.getItem('svayp_plan') as UserPlan | null;
-      if (stored && (stored === 'free' || stored === 'pro' || stored === 'premium')) setPlan(stored);
-      setGenCount(Number(localStorage.getItem('svayp_gen_count') ?? '0'));
-      setTryOnCount(Number(localStorage.getItem('svayp_try_on_count') ?? '0'));
-    } catch { /* ignore */ }
+      const data = await getUserPlan();
+      setPlan(data.tier);
+      setLimits(data.limits);
+      setUsage(data.usage);
+    } catch {
+      // Fallback to FREE if API fails
+      setPlan('FREE');
+      setLimits(PLAN_LIMITS.FREE);
+    }
   }, []);
 
-  function incrementGen() {
-    const next = genCount + 1;
-    setGenCount(next);
-    try { localStorage.setItem('svayp_gen_count', String(next)); } catch { /* ignore */ }
-  }
-
-  function incrementTryOn() {
-    const next = tryOnCount + 1;
-    setTryOnCount(next);
-    try { localStorage.setItem('svayp_try_on_count', String(next)); } catch { /* ignore */ }
-  }
-
-  const limits = PLAN_LIMITS[plan];
+  useEffect(() => { fetchPlan(); }, [fetchPlan]);
 
   return {
     plan,
-    genCount,
-    incrementGen,
-    tryOnCount,
-    incrementTryOn,
     limits,
-    canGenerate: genCount < limits.regenerations,
-    canTryOn: tryOnCount < limits.tryItOns,
-    canAddItemInCategory: (categoryItemCount: number) => categoryItemCount < limits.itemsPerCategory,
+    usage,
+    fetchPlan,
+    canGenerate: usage.regenThisMonth < limits.regenPerMonth,
+    canTryOn: usage.tryOnThisMonth < limits.tryOnPerMonth,
+    canAddItem: usage.wardrobeItems < limits.wardrobeItems,
+    canAddCanvas: usage.canvases < limits.canvases,
     calendarDays: limits.calendarDays,
   };
 }
@@ -113,6 +107,12 @@ export default function ClosetPage() {
   const router = useRouter();
   const { t, locale, setLocale } = useI18n();
   const [showLangPicker, setShowLangPicker] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [userInfo, setUserInfo] = useState<{ name?: string; phoneNumber?: string } | null>(null);
+  useEffect(() => {
+    const u = getUser();
+    if (u) setUserInfo({ name: u.name as string | undefined, phoneNumber: (u.phoneNumber ?? u.phone_number) as string | undefined });
+  }, []);
   const [items, setItems] = useState<ClosetItem[]>([]);
   const [upperFilter, setUpperFilter] = useState<ClosetCategory | null>(null);
   const [lowerFilter, setLowerFilter] = useState<ClosetCategory | null>(null);
@@ -121,19 +121,46 @@ export default function ClosetPage() {
   const [canvasData, setCanvasData] = useState<{ upper: ClosetItem[]; lower: ClosetItem[]; shoes: ClosetItem[]; acc: ClosetItem[] } | null>(null);
   const [savedLayout, setSavedLayout] = useState<SavedCanvasLayout | null>(null);
   const [canvasInitialLayout, setCanvasInitialLayout] = useState<SavedCanvasLayout | null>(null);
+  const [savedCanvasId, setSavedCanvasId] = useState<string | null>(null);
   const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | null>(null);
-  const { plan, genCount, incrementGen, canGenerate, canAddItemInCategory, limits, calendarDays, tryOnCount, incrementTryOn, canTryOn } = usePlan();
+  const { plan, limits, usage, fetchPlan, canGenerate, canTryOn, canAddItem, canAddCanvas, calendarDays } = usePlan();
 
-  // Load saved layout from localStorage on mount
+  // Load saved layout from backend (or fallback to localStorage)
   useEffect(() => {
-    try {
-      const s = localStorage.getItem('svayp_saved_layout');
-      if (s) setSavedLayout(JSON.parse(s));
-    } catch { /* ignore */ }
+    getOutfitCanvases({ page: 0, size: 1 })
+      .then((page) => {
+        if (page.content.length > 0) {
+          const canvas = page.content[0];
+          setSavedCanvasId(canvas.id);
+          const layout: SavedCanvasLayout = canvas.items.map((item) => ({
+            id: item.wardrobeItemId,
+            x: item.x,
+            y: item.y,
+            scale: item.scale,
+            zIndex: item.zIndex,
+            group: (item.itemGroup || 'upper') as SavedCanvasEntry['group'],
+          }));
+          setSavedLayout(layout);
+          setCanvasInitialLayout(layout);
+          localStorage.setItem('svayp_saved_layout', JSON.stringify(layout));
+        } else {
+          // No backend canvas, try localStorage
+          const s = localStorage.getItem('svayp_saved_layout');
+          if (s) setSavedLayout(JSON.parse(s));
+        }
+      })
+      .catch(() => {
+        // Fallback to localStorage
+        try {
+          const s = localStorage.getItem('svayp_saved_layout');
+          if (s) setSavedLayout(JSON.parse(s));
+        } catch { /* ignore */ }
+      });
   }, []);
 
   const [outfitSheet, setOutfitSheet] = useState<{ title: string; days: Date[] } | null>(null);
   const [editItem, setEditItem] = useState<ClosetItem | null>(null);
+  const [tryOnState, setTryOnState] = useState<{ status: 'loading' | 'processing' | 'completed' | 'failed'; resultUrl?: string; failureReason?: string } | null>(null);
 
   // ── Inline add flow ──────────────────────────────────────────────────────────
   const [addGroup, setAddGroup] = useState<string>('upper');
@@ -143,16 +170,15 @@ export default function ClosetPage() {
   const [addCrop, setAddCrop] = useState<Crop>();
   const [addCompletedCrop, setAddCompletedCrop] = useState<PixelCrop>();
   const [addSaving, setAddSaving] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<WardrobeUploadStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [pendingUploads, setPendingUploads] = useState<Map<string, { category: ClosetCategory; imageData: string; step: string; progress: number }>>(new Map());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const cropImgRef = useRef<HTMLImageElement>(null);
   const addFileRef = useRef<File | null>(null);
 
   function openAdd(group: string, category: ClosetCategory) {
-    const categoryCount = items.filter((i) => i.category === category).length;
-    if (!canAddItemInCategory(categoryCount)) {
+    if (FEATURES.plansEnabled && !canAddItem) {
       setShowPremiumGate('items');
       return;
     }
@@ -171,6 +197,7 @@ export default function ClosetPage() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       setAddRawImage(ev.target?.result as string);
+      // Pre-select full image so corner handles are visible immediately (crop is optional)
       setAddCrop({ unit: '%', x: 0, y: 0, width: 100, height: 100 });
       setAddCompletedCrop(undefined);
     };
@@ -181,52 +208,77 @@ export default function ClosetPage() {
   async function handleAddSave() {
     if (!addRawImage) return;
     setAddSaving(true);
-    setUploadProgress(null);
 
-    try {
-      // If we have the original file, upload via API
-      if (addFileRef.current) {
-        let fileToUpload = addFileRef.current;
+    // Prepare file + image before closing sheet
+    let fileToUpload = addFileRef.current;
+    let previewImage = addRawImage;
 
-        // If cropped, convert crop to blob
-        if (addCompletedCrop && cropImgRef.current) {
-          const croppedDataUrl = await getCroppedImage(addRawImage, addCompletedCrop, cropImgRef.current.width, cropImgRef.current.height);
-          const response = await fetch(croppedDataUrl);
-          const blob = await response.blob();
-          fileToUpload = new File([blob], addFileRef.current.name, { type: 'image/jpeg' });
-        }
-
-        await addClosetItemFromFile(fileToUpload, addCategory, (status) => {
-          setUploadProgress(status);
-        });
-      } else {
-        // Fallback: save locally if no file reference
-        let imageToSave = addRawImage;
-        if (addCompletedCrop && cropImgRef.current) {
-          imageToSave = await getCroppedImage(addRawImage, addCompletedCrop, cropImgRef.current.width, cropImgRef.current.height);
-        }
-        addClosetItem({ category: addCategory, imageData: imageToSave });
+    if (addCompletedCrop && cropImgRef.current) {
+      const croppedDataUrl = await getCroppedImage(addRawImage, addCompletedCrop, cropImgRef.current.width, cropImgRef.current.height);
+      previewImage = croppedDataUrl;
+      if (fileToUpload) {
+        const response = await fetch(croppedDataUrl);
+        const blob = await response.blob();
+        fileToUpload = new File([blob], fileToUpload.name, { type: 'image/jpeg' });
       }
-
-      setAddRawImage('');
-      addFileRef.current = null;
-      setUploadProgress(null);
-      await load();
-    } catch (err) {
-      console.error('Failed to upload item:', err);
-      // Fallback to local save on error
-      let imageToSave = addRawImage;
-      if (addCompletedCrop && cropImgRef.current) {
-        imageToSave = await getCroppedImage(addRawImage, addCompletedCrop, cropImgRef.current.width, cropImgRef.current.height);
-      }
-      addClosetItem({ category: addCategory, imageData: imageToSave });
-      setAddRawImage('');
-      addFileRef.current = null;
-      setUploadProgress(null);
-      await load();
-    } finally {
-      setAddSaving(false);
     }
+
+    const pendingId = `pending_${Date.now()}`;
+    const category = addCategory;
+
+    // Immediately close the add sheet and show placeholder in grid
+    setPendingUploads((prev) => new Map(prev).set(pendingId, { category, imageData: previewImage, step: 'Uploading...', progress: 0 }));
+    setAddRawImage('');
+    setShowAddPicker(false);
+    addFileRef.current = null;
+    setAddSaving(false);
+
+    // Run upload in background
+    if (fileToUpload) {
+      try {
+        await addClosetItemFromFile(fileToUpload, category, (status) => {
+          setPendingUploads((prev) => {
+            const next = new Map(prev);
+            const existing = next.get(pendingId);
+            if (existing) {
+              next.set(pendingId, { ...existing, step: formatStep(status.currentStep), progress: status.progressPercent });
+            }
+            return next;
+          });
+        });
+        // Upload complete — remove pending, reload items
+        setPendingUploads((prev) => { const next = new Map(prev); next.delete(pendingId); return next; });
+        await load();
+        fetchPlan();
+      } catch (err) {
+        console.error('Failed to upload item:', err);
+        // Fallback: keep as local item
+        addClosetItem({ category, imageData: previewImage });
+        setPendingUploads((prev) => { const next = new Map(prev); next.delete(pendingId); return next; });
+        await load();
+      }
+    } else {
+      // No file — save locally
+      addClosetItem({ category, imageData: previewImage });
+      setPendingUploads((prev) => { const next = new Map(prev); next.delete(pendingId); return next; });
+      await load();
+    }
+  }
+
+  function formatStep(step: string): string {
+    const STEP_LABELS: Record<string, string> = {
+      UPLOADED: 'Processing...',
+      NSFW_SCAN: 'Checking image...',
+      nfsm_passed: 'Checking image...',
+      UPSCALE: 'Enhancing...',
+      BG_REMOVE: 'Removing background...',
+      bg_removed: 'Removing background...',
+      EMBED: 'Analyzing style...',
+      visual_embedded: 'Analyzing style...',
+      ANALYZE: 'Almost done...',
+      COMPLETED: 'Done!',
+    };
+    return STEP_LABELS[step] ?? 'Processing...';
   }
 
   const load = useCallback(async () => {
@@ -259,12 +311,25 @@ export default function ClosetPage() {
   }
 
   function handleUpdateCategory(id: string, category: ClosetCategory) {
-    updateClosetItem(id, { category });
+    if (id.startsWith('local_')) {
+      updateClosetItem(id, { category });
+    } else {
+      updateClosetItemApi(id, { category }).catch(() => {
+        // Fallback to local update
+        updateClosetItem(id, { category });
+      });
+    }
     load();
   }
 
   function itemsFor(cats: ClosetCategory[], filter: ClosetCategory | null) {
     return items.filter((i) => cats.includes(i.category) && (filter === null || i.category === filter));
+  }
+
+  function pendingFor(cats: ClosetCategory[]) {
+    return Array.from(pendingUploads.entries())
+      .filter(([, p]) => cats.includes(p.category))
+      .map(([id, p]) => ({ id, ...p }));
   }
 
   function openViewAll(title: string, cats: ClosetCategory[]) {
@@ -303,23 +368,87 @@ export default function ClosetPage() {
       return;
     }
     if (!canGenerate) {
-      setShowPremiumGate('generation');
-      return;
+      if (FEATURES.plansEnabled) { setShowPremiumGate('generation'); return; }
     }
-    incrementGen();
+    // Call backend to generate outfit suggestions
+    generateOutfitSuggestions(1).then(() => {
+      fetchPlan(); // Refresh usage after generation
+    }).catch(() => { /* handled by 402 error */ });
+    // Meanwhile use local random as optimistic UI
     const randomLayout = generateRandomOutfit();
     setSavedLayout(randomLayout);
     try { localStorage.setItem('svayp_saved_layout', JSON.stringify(randomLayout)); } catch { /* ignore */ }
     setCanvasInitialLayout(randomLayout);
-    // Does NOT open the canvas — just updates the outfit card display
+    // Save to backend
+    saveCanvasToBackend(randomLayout);
+  }
+
+  async function saveCanvasToBackend(layout: SavedCanvasLayout) {
+    // Only save items that are real backend items (not local_)
+    const apiItems = layout
+      .filter((e) => !e.id.startsWith('local_') && !e.id.startsWith('pending_'))
+      .map((e) => ({
+        wardrobeItemId: e.id,
+        x: e.x,
+        y: e.y,
+        scale: e.scale,
+        zIndex: e.zIndex,
+        itemGroup: e.group,
+      }));
+
+    if (apiItems.length === 0) return;
+
+    try {
+      if (savedCanvasId) {
+        // Update existing canvas
+        await updateOutfitCanvas(savedCanvasId, { items: apiItems });
+      } else {
+        // Create new canvas
+        const canvas = await createOutfitCanvas({ name: 'My Outfit', items: apiItems });
+        setSavedCanvasId(canvas.id);
+      }
+    } catch (err) {
+      console.error('Failed to save canvas to backend:', err);
+    }
   }
 
   function handleTryItOn() {
-    if (!canTryOn) {
+    if (FEATURES.plansEnabled && !canTryOn) {
       setShowPremiumGate('generation');
       return;
     }
-    incrementTryOn();
+    // Collect item IDs from current outfit layout
+    const itemIds = (savedLayout ?? []).map((e) => e.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
+    if (itemIds.length === 0) return;
+
+    // Show loading modal
+    setTryOnState({ status: 'loading' });
+
+    createTryOnJob({ wardrobeItemIds: itemIds, canvasId: savedCanvasId ?? undefined })
+      .then((job) => {
+        setTryOnState({ status: 'processing' });
+        fetchPlan();
+        return pollTryOnUntilDone(job.id, (progress) => {
+          if (progress.status === 'PROCESSING') {
+            setTryOnState({ status: 'processing' });
+          }
+        });
+      })
+      .then((result) => {
+        if (result.status === 'COMPLETED' && result.resultImageUrl) {
+          setTryOnState({ status: 'completed', resultUrl: result.resultImageUrl });
+        } else {
+          setTryOnState({ status: 'failed', failureReason: result.failureReason ?? 'Try-on failed. Please try again.' });
+        }
+      })
+      .catch((err) => {
+        if (err?.response?.status === 402) {
+          setTryOnState(null);
+          setShowPremiumGate('generation');
+        } else {
+          setTryOnState({ status: 'failed', failureReason: 'Something went wrong. Please try again.' });
+        }
+      });
   }
 
   function showOutfitsForPeriod(key: 'today' | 'weekend') {
@@ -333,41 +462,72 @@ export default function ClosetPage() {
 
   return (
     <div className="phone-container flex flex-col bg-white" style={{ height: '100dvh' }}>
-      {/* Header with logo + occasion buttons */}
-      <header className="shrink-0 flex items-center justify-between px-5 pt-5 pb-0" style={{ minHeight: 56 }}>
-        <h1 className="text-[22px] font-bold tracking-[0.12em]">LIB<span style={{ color: '#F370A7' }}>Λ</span>S</h1>
-        <div className="flex items-center gap-1.5">
-          {OCCASION_CONFIG.map((occ) => (
+      {/* Header — mobile glass-morphism style */}
+      <header className="shrink-0 bg-white px-4 pt-3 pb-2">
+        <div
+          className="flex items-center justify-between px-3"
+          style={{
+            background: 'rgba(255, 255, 255, 0.85)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderRadius: 22,
+            border: '0.5px solid rgba(0, 0, 0, 0.10)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+            minHeight: 52,
+          }}
+        >
+          {/* Left: LIBΛS logo */}
+          <h1 className="text-[20px] font-bold tracking-[0.12em]">LIB<span style={{ color: '#F370A7' }}>Λ</span>S</h1>
+
+          {/* Right: action buttons + profile */}
+          <div className="flex items-center gap-1.5">
+            {/* Calendar with text */}
+            {OCCASION_CONFIG.map((occ) => (
+              <button
+                key={occ.key}
+                onClick={() => showOutfitsForPeriod(occ.key)}
+                className="flex items-center gap-1 px-2.5 h-8 rounded-full text-[11px] font-semibold active:scale-[0.95] transition-transform"
+                style={{ background: 'rgba(0,0,0,0.05)', color: '#555' }}
+                aria-label="Calendar"
+              >
+                <occ.Icon size={12} strokeWidth={1.8} color={occ.iconColor} />
+                {t.calendar}
+              </button>
+            ))}
+            {/* Plan with text — hidden when plans are disabled */}
+            {FEATURES.plansEnabled && (
+              <button
+                onClick={() => setShowPremiumGate('generation')}
+                className="flex items-center gap-1 px-2.5 h-8 rounded-full text-[11px] font-bold active:scale-[0.95] transition-all"
+                style={{
+                  background: plan === 'FREE' ? 'rgba(0,0,0,0.05)' : PLAN_COLORS[plan].bg,
+                  color: plan === 'FREE' ? '#888' : PLAN_COLORS[plan].text,
+                }}
+                aria-label="Plan"
+              >
+                <Crown size={11} strokeWidth={2} color={plan === 'FREE' ? '#aaa' : PLAN_COLORS[plan].crownColor} />
+                <span>{plan === 'FREE' ? 'Free' : plan === 'TRIAL' ? 'Trial' : 'Pro'}</span>
+              </button>
+            )}
+            {/* Language: flag emoji */}
             <button
-              key={occ.key}
-              onClick={() => showOutfitsForPeriod(occ.key)}
-              className="flex items-center gap-1.5 px-3 h-8 rounded-full text-[12px] font-semibold text-gray-700 active:scale-[0.97] transition-transform"
-              style={{ background: '#F5F5F5' }}
+              onClick={() => setShowLangPicker(true)}
+              className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
+              style={{ background: 'rgba(0,0,0,0.05)' }}
+              aria-label="Select language"
             >
-              <occ.Icon size={13} strokeWidth={1.8} color={occ.iconColor} />
-              {t.calendar}
+              <span className="text-[18px] leading-none">{locale === 'uz' ? '🇺🇿' : locale === 'ru' ? '🇷🇺' : '🇬🇧'}</span>
             </button>
-          ))}
-          <button
-            onClick={() => setShowPremiumGate('generation')}
-            className="flex items-center gap-1 px-2.5 h-8 rounded-full text-[11px] font-bold active:scale-[0.97] transition-all"
-            style={{
-              background: PLAN_COLORS[plan].bg,
-              color: PLAN_COLORS[plan].text,
-            }}
-            aria-label="User plan"
-          >
-            <Crown size={11} strokeWidth={2} color={PLAN_COLORS[plan].crownColor} />
-            <span>{plan === 'free' ? 'Free' : plan === 'pro' ? 'Pro' : 'Premium'}</span>
-          </button>
-          <button
-            onClick={() => setShowLangPicker(true)}
-            className="w-8 h-8 rounded-full flex items-center justify-center active:scale-[0.97] transition-transform"
-            style={{ background: '#F5F5F5' }}
-            aria-label="Select language"
-          >
-            <Globe size={15} strokeWidth={1.8} className="text-gray-600" />
-          </button>
+            {/* Profile icon */}
+            <button
+              onClick={() => setShowProfile(true)}
+              className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
+              style={{ background: 'rgba(0,0,0,0.05)' }}
+              aria-label="Profile"
+            >
+              <User size={17} strokeWidth={1.8} className="text-gray-600" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -378,9 +538,9 @@ export default function ClosetPage() {
           savedLayout={savedLayout}
           plan={plan}
           canGenerate={canGenerate}
-          genCount={genCount}
+          genCount={usage.regenThisMonth}
           limits={limits}
-          tryOnCount={tryOnCount}
+          tryOnCount={usage.tryOnThisMonth}
           onViewItems={() => {
             setCanvasInitialLayout(savedLayout);
             setCanvasData({
@@ -402,7 +562,8 @@ export default function ClosetPage() {
           filter={upperFilter}
           items={itemsFor(UPPER_CATS, upperFilter)}
           totalCount={items.filter((i) => UPPER_CATS.includes(i.category)).length}
-          maxCount={limits.itemsPerCategory}
+          maxCount={limits.wardrobeItems}
+          pendingItems={pendingFor(UPPER_CATS)}
           onFilterChange={setUpperFilter}
           onTapItem={setEditItem}
           onViewAll={() => openViewAll(t.upperBody, UPPER_CATS)}
@@ -415,7 +576,8 @@ export default function ClosetPage() {
           filter={lowerFilter}
           items={itemsFor(LOWER_CATS, lowerFilter)}
           totalCount={items.filter((i) => LOWER_CATS.includes(i.category)).length}
-          maxCount={limits.itemsPerCategory}
+          maxCount={limits.wardrobeItems}
+          pendingItems={pendingFor(LOWER_CATS)}
           onFilterChange={setLowerFilter}
           onTapItem={setEditItem}
           onViewAll={() => openViewAll(t.lowerBody, LOWER_CATS)}
@@ -428,7 +590,8 @@ export default function ClosetPage() {
           filter={null}
           items={itemsFor(SHOES_CATS, null)}
           totalCount={items.filter((i) => SHOES_CATS.includes(i.category)).length}
-          maxCount={limits.itemsPerCategory}
+          maxCount={limits.wardrobeItems}
+          pendingItems={pendingFor(SHOES_CATS)}
           onFilterChange={() => {}}
           onTapItem={setEditItem}
           onViewAll={() => openViewAll(t.shoes, SHOES_CATS)}
@@ -441,7 +604,8 @@ export default function ClosetPage() {
           filter={accFilter}
           items={itemsFor(ACC_CATS, accFilter)}
           totalCount={items.filter((i) => ACC_CATS.includes(i.category)).length}
-          maxCount={limits.itemsPerCategory}
+          maxCount={limits.wardrobeItems}
+          pendingItems={pendingFor(ACC_CATS)}
           onFilterChange={setAccFilter}
           onTapItem={setEditItem}
           onViewAll={() => openViewAll(t.accessories, ACC_CATS)}
@@ -479,6 +643,8 @@ export default function ClosetPage() {
             setCanvasInitialLayout(layout);
             localStorage.setItem('svayp_saved_layout', JSON.stringify(layout));
             setCanvasData(null);
+            // Save to backend
+            saveCanvasToBackend(layout);
           }}
           onRegenerate={handleNewOutfit}
           onShowPlans={() => setShowPremiumGate('generation')}
@@ -508,8 +674,8 @@ export default function ClosetPage() {
         />
       )}
 
-      {/* ── Premium Gate Sheet ── */}
-      {showPremiumGate && (
+      {/* ── Premium Gate Sheet — only when plans feature is enabled ── */}
+      {FEATURES.plansEnabled && showPremiumGate && (
         <PremiumGateSheet
           reason={showPremiumGate}
           currentPlan={plan}
@@ -517,8 +683,19 @@ export default function ClosetPage() {
         />
       )}
 
+      {/* ── Try-On Modal ── */}
+      {tryOnState && (
+        <TryOnModal
+          status={tryOnState.status}
+          resultUrl={tryOnState.resultUrl}
+          failureReason={tryOnState.failureReason}
+          onClose={() => setTryOnState(null)}
+          onRetry={handleTryItOn}
+        />
+      )}
+
       {/* ── Floating Add Button ── */}
-      <div className="absolute right-6 z-50" style={{ bottom: 'calc(64px + env(safe-area-inset-bottom, 0px) + 16px)' }}>
+      <div className="absolute right-6 z-50" style={{ bottom: '20px' }}>
         <span className="absolute inset-0 rounded-full animate-ping" style={{ backgroundColor: '#F370A7', opacity: 0.35 }} />
         <button
           onClick={() => openAdd('', 'tops')}
@@ -590,10 +767,11 @@ export default function ClosetPage() {
             <span className="text-[15px] font-semibold text-gray-900">{t.addToCloset}</span>
           </header>
           <div className="flex-1 overflow-y-auto px-4 pb-8 flex flex-col gap-5 pt-2">
-            <div className="rounded-2xl overflow-hidden bg-gray-50 flex justify-center">
+            {/* Crop area — crop is optional, handles shown as hint */}
+            <div className="rounded-2xl bg-gray-100 flex justify-center" style={{ padding: '14px 14px 10px' }}>
               <ReactCrop crop={addCrop} onChange={(c) => setAddCrop(c)} onComplete={(c) => setAddCompletedCrop(c)}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img ref={cropImgRef} src={addRawImage} alt="Crop" style={{ maxHeight: '45vh', maxWidth: '100%', display: 'block', margin: '0 auto' }} />
+                <img ref={cropImgRef} src={addRawImage} alt="Crop" style={{ maxHeight: '55vh', maxWidth: '100%', display: 'block', margin: '0 auto', borderRadius: 12 }} />
               </ReactCrop>
             </div>
             <div className="flex flex-col gap-3">
@@ -627,12 +805,53 @@ export default function ClosetPage() {
               disabled={addSaving}
               className="w-full py-3.5 rounded-full bg-black text-white text-[13px] font-semibold disabled:opacity-30 active:scale-[0.97] transition-transform"
             >
-              {addSaving
-                ? uploadProgress
-                  ? `${uploadProgress.currentStep} (${uploadProgress.progressPercent}%)`
-                  : t.uploading
-                : t.saveToCloset}
+              {addSaving ? t.uploading : t.saveToCloset}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Profile Sheet ── */}
+      {showProfile && (
+        <div
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-black/30 backdrop-blur-sm"
+          onClick={() => setShowProfile(false)}
+        >
+          <div className="w-full max-w-[430px] rounded-t-3xl bg-white" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-9 h-1 rounded-full bg-gray-200" />
+            </div>
+            <div className="px-5 pb-10">
+              {/* Avatar + name + phone */}
+              <div className="flex items-center gap-4 mb-5">
+                <div
+                  className="w-14 h-14 rounded-full flex items-center justify-center text-white text-[22px] font-bold shrink-0"
+                  style={{ background: 'linear-gradient(135deg, #F370A7 0%, #e0559a 100%)' }}
+                >
+                  {userInfo?.name ? userInfo.name.trim()[0].toUpperCase() : <User size={24} strokeWidth={2} color="white" />}
+                </div>
+                <div>
+                  <div className="text-[17px] font-bold text-gray-900">{userInfo?.name || '—'}</div>
+                  <div className="text-[13px] text-gray-400 mt-0.5">{userInfo?.phoneNumber || t.phoneNumber}</div>
+                </div>
+              </div>
+              {/* Plan badge */}
+              <div
+                className="flex items-center gap-2.5 px-4 h-13 rounded-2xl"
+                style={{
+                  background: plan === 'FREE' ? '#F5F5F5' : PLAN_COLORS[plan].bg,
+                  height: 52,
+                }}
+              >
+                <Crown size={17} strokeWidth={2} color={plan === 'FREE' ? '#aaa' : PLAN_COLORS[plan].crownColor} />
+                <span
+                  className="text-[14px] font-semibold"
+                  style={{ color: plan === 'FREE' ? '#888' : PLAN_COLORS[plan].text }}
+                >
+                  {plan === 'FREE' ? 'Free plan' : plan === 'TRIAL' ? 'Trial' : 'Premium'}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -658,10 +877,13 @@ export default function ClosetPage() {
                       locale === l ? 'bg-black text-white' : 'bg-gray-50 text-gray-800'
                     }`}
                   >
-                    <span className="text-[14px] font-semibold">
-                      {l === 'en' ? 'English' : l === 'ru' ? 'Русский' : "O'zbek"}
-                    </span>
-                    {locale === l && <span className="text-[12px] font-medium opacity-70">✓</span>}
+                    <div className="flex items-center gap-3">
+                        <span className="text-[22px] leading-none">{l === 'uz' ? '🇺🇿' : l === 'ru' ? '🇷🇺' : '🇬🇧'}</span>
+                        <span className="text-[14px] font-semibold">
+                          {l === 'en' ? 'English' : l === 'ru' ? 'Русский' : "O'zbek"}
+                        </span>
+                      </div>
+                      {locale === l && <span className="text-[12px] font-medium opacity-70">✓</span>}
                   </button>
                 ))}
               </div>
@@ -681,7 +903,7 @@ function OutfitSection({ allItems, savedLayout, plan, canGenerate, genCount, lim
   plan: UserPlan;
   canGenerate: boolean;
   genCount: number;
-  limits: typeof PLAN_LIMITS['free'];
+  limits: PlanLimits;
   tryOnCount: number;
   onViewItems: () => void;
   onRegenerate: () => void;
@@ -706,10 +928,10 @@ function OutfitSection({ allItems, savedLayout, plan, canGenerate, genCount, lim
           onRegenerate={onRegenerate}
           canRegenerate={canGenerate}
           genCount={genCount}
-          regenLimit={limits.regenerations}
+          regenLimit={limits.regenPerMonth}
           onTryItOn={onTryItOn}
           tryOnCount={tryOnCount}
-          tryOnLimit={limits.tryItOns}
+          tryOnLimit={limits.tryOnPerMonth}
         />
 
         {/* New outfit card — always opens plans popup, premium gold style */}
@@ -905,25 +1127,28 @@ function OutfitCard({
             </div>
           </div>
         ) : (
-          <div className="w-full h-full relative overflow-hidden isolate">
-            {displayEntries.map((entry, idx) => (
-              <div
-                key={entry.item.id}
-                className="absolute origin-center overflow-hidden transition-all duration-500 ease-in-out"
-                style={{
-                  left: `${entry.x}%`,
-                  top: `${entry.y}%`,
-                  width: '35%',
-                  aspectRatio: '1',
-                  transform: `scale(${entry.scale})`,
-                  zIndex: entry.zIndex,
-                }}
-              >
-                <div className="relative w-full h-full">
-                  <Image src={entry.item.imageData} alt={entry.item.category} fill className="object-contain" unoptimized />
+          <div className="w-full h-full flex items-center justify-center overflow-hidden isolate">
+            {/* Inner container matches InteractiveCanvas aspect ratio (3:4) so positions are identical */}
+            <div className="relative h-full" style={{ aspectRatio: '3 / 4', maxWidth: '100%' }}>
+              {displayEntries.map((entry, idx) => (
+                <div
+                  key={entry.item.id}
+                  className="absolute origin-center overflow-hidden transition-all duration-500 ease-in-out"
+                  style={{
+                    left: `${entry.x}%`,
+                    top: `${entry.y}%`,
+                    width: '35%',
+                    aspectRatio: '1',
+                    transform: `scale(${entry.scale})`,
+                    zIndex: entry.zIndex,
+                  }}
+                >
+                  <div className="relative w-full h-full">
+                    <Image src={entry.item.imageData} alt={entry.item.category} fill className="object-contain" unoptimized />
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -1221,15 +1446,17 @@ function InteractiveCanvas({
           <span className="text-[15px] font-semibold text-gray-900">{t.myOutfits}</span>
         </div>
         <div className="flex items-center gap-2">
-          {/* Plans button */}
-          <button
-            onClick={(e) => { e.stopPropagation(); onShowPlans(); }}
-            className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
-            style={{ background: 'linear-gradient(135deg, #B8860B, #8B6914)', boxShadow: '0 2px 8px rgba(184,134,11,0.25)' }}
-            title="View plans"
-          >
-            <Crown size={14} strokeWidth={2} color="#FFD700" />
-          </button>
+          {/* Plans button — only when plans feature is enabled */}
+          {FEATURES.plansEnabled && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onShowPlans(); }}
+              className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
+              style={{ background: 'linear-gradient(135deg, #B8860B, #8B6914)', boxShadow: '0 2px 8px rgba(184,134,11,0.25)' }}
+              title="View plans"
+            >
+              <Crown size={14} strokeWidth={2} color="#FFD700" />
+            </button>
+          )}
           <button onClick={handleSave} className="px-4 py-2 rounded-full text-[13px] font-semibold text-white" style={{ backgroundColor: '#F370A7' }}>
             {t.save}
           </button>
@@ -1238,8 +1465,7 @@ function InteractiveCanvas({
 
       {/* Canvas area */}
       <div
-        ref={containerRef}
-        className="flex-1 relative overflow-hidden bg-white touch-none"
+        className="flex-1 relative overflow-hidden bg-white touch-none flex items-center justify-center"
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
@@ -1247,6 +1473,8 @@ function InteractiveCanvas({
         onTouchEnd={handleTouchEnd}
         onClick={handleCanvasTap}
       >
+        {/* Inner canvas with fixed aspect ratio — matches preview card */}
+        <div ref={containerRef} className="relative h-full" style={{ aspectRatio: '3 / 4', maxWidth: '100%', maxHeight: '100%' }}>
         {canvasItems.map((ci, idx) => (
           <div
             key={`${ci.group}-${idx}-${ci.item.id}`}
@@ -1269,6 +1497,7 @@ function InteractiveCanvas({
             </div>
           </div>
         ))}
+        </div>
 
         {/* Action buttons - always visible on right side */}
         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[9999]">
@@ -1388,12 +1617,13 @@ interface ClothingSectionProps {
   items: ClosetItem[];
   totalCount: number;
   maxCount: number;
+  pendingItems?: { id: string; category: ClosetCategory; imageData: string; step: string; progress: number }[];
   onFilterChange: (cat: ClosetCategory | null) => void;
   onTapItem: (item: ClosetItem) => void;
   onViewAll: () => void;
 }
 
-function ClothingSection({ title, cats, filter, items, totalCount, maxCount, onFilterChange, onTapItem, onViewAll }: ClothingSectionProps) {
+function ClothingSection({ title, cats, filter, items, totalCount, maxCount, pendingItems = [], onFilterChange, onTapItem, onViewAll }: ClothingSectionProps) {
   const { t } = useI18n();
   return (
     <div className="mt-9">
@@ -1427,6 +1657,16 @@ function ClothingSection({ title, cats, filter, items, totalCount, maxCount, onF
 
       {/* Horizontal scroll row */}
       <div className="flex gap-2.5 overflow-x-auto hide-scrollbar px-4">
+        {pendingItems.map((p) => (
+          <ClothingItemCard
+            key={p.id}
+            item={{ id: p.id, category: p.category, imageData: p.imageData, createdAt: '' }}
+            onTap={() => {}}
+            isProcessing
+            processingStep={p.step}
+            processingProgress={p.progress}
+          />
+        ))}
         {items.map((item) => (
           <ClothingItemCard key={item.id} item={item} onTap={() => onTapItem(item)} />
         ))}
@@ -1450,24 +1690,38 @@ function FilterChip({ label, selected, onClick }: { label: string; selected: boo
   );
 }
 
-function ClothingItemCard({ item, onTap }: { item: ClosetItem; onTap: () => void }) {
+function ClothingItemCard({ item, onTap, isProcessing, processingStep, processingProgress }: { item: ClosetItem; onTap: () => void; isProcessing?: boolean; processingStep?: string; processingProgress?: number }) {
   const { t } = useI18n();
   return (
     <div
-      className="shrink-0 w-[120px] h-[168px] rounded-2xl overflow-hidden relative cursor-pointer
-                 active:scale-[0.97] transition-transform"
+      className={`shrink-0 w-[120px] h-[168px] rounded-2xl overflow-hidden relative cursor-pointer
+                 active:scale-[0.97] transition-transform ${isProcessing ? 'pointer-events-none' : ''}`}
       onClick={onTap}
     >
       <div className="relative w-full h-full">
-        <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized />
+        <Image src={item.imageData} alt={item.category} fill className={`object-contain ${isProcessing ? 'opacity-50' : ''}`} unoptimized />
       </div>
+      {/* Processing overlay */}
+      {isProcessing && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 backdrop-blur-[2px]">
+          <div className="w-8 h-8 mb-1.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+          <span className="text-[9px] font-medium text-white text-center px-2 leading-tight">{processingStep}</span>
+          {(processingProgress ?? 0) > 0 && (
+            <div className="w-[70%] h-1 mt-1.5 rounded-full bg-white/20 overflow-hidden">
+              <div className="h-full bg-white rounded-full transition-all duration-500" style={{ width: `${processingProgress}%` }} />
+            </div>
+          )}
+        </div>
+      )}
       {/* Category label */}
-      <div className="absolute bottom-0 left-0 right-0 px-2.5 py-2"
-           style={{ background: 'linear-gradient(transparent, rgba(0,0,0,0.4))' }}>
-        <span className="text-[10px] font-medium text-white/90 uppercase tracking-wide">
-          {catLabel(item.category, t.cats)}
-        </span>
-      </div>
+      {!isProcessing && (
+        <div className="absolute bottom-0 left-0 right-0 px-2.5 py-2"
+             style={{ background: 'linear-gradient(transparent, rgba(0,0,0,0.4))' }}>
+          <span className="text-[10px] font-medium text-white/90 uppercase tracking-wide">
+            {catLabel(item.category, t.cats)}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -1650,8 +1904,8 @@ function OutfitDaysSheet({
                       <MiniOutfitSlot item={shoe} flex />
                       {acc && <MiniOutfitSlot item={acc} />}
 
-                      {/* Blur overlay for locked days */}
-                      {!isUnlocked && (
+                      {/* Blur overlay for locked days — only when plans feature is enabled */}
+                      {!isUnlocked && FEATURES.plansEnabled && (
                         <div
                           className="absolute inset-0 flex items-center justify-center cursor-pointer active:scale-[0.97] transition-transform"
                           style={{
@@ -1829,6 +2083,127 @@ function ItemEditSheet({
   );
 }
 
+// ─── Try-On Modal ───────────────────────────────────────────────────────────────
+function TryOnModal({
+  status,
+  resultUrl,
+  failureReason,
+  onClose,
+  onRetry,
+}: {
+  status: 'loading' | 'processing' | 'completed' | 'failed';
+  resultUrl?: string;
+  failureReason?: string;
+  onClose: () => void;
+  onRetry: () => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-[90%] max-w-[380px] rounded-3xl bg-white overflow-hidden shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Result area */}
+        <div className="relative w-full" style={{ minHeight: status === 'completed' ? 420 : 300 }}>
+          {(status === 'loading' || status === 'processing') && (
+            <div className="w-full h-[300px] flex flex-col items-center justify-center gap-4">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full border-[3px] border-gray-200 border-t-[#F370A7] animate-spin" />
+                <Sparkles size={20} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[#F370A7]" />
+              </div>
+              <div className="text-center px-6">
+                <p className="text-[15px] font-semibold text-gray-900">
+                  {status === 'loading' ? 'Starting try-on...' : 'Generating your look...'}
+                </p>
+                <p className="text-[12px] text-gray-400 mt-1">
+                  {status === 'loading' ? 'Sending outfit to AI' : 'This may take a moment'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {status === 'completed' && resultUrl && (
+            <div className="relative w-full h-[420px]">
+              <Image src={resultUrl} alt="Try-on result" fill className="object-contain" unoptimized />
+            </div>
+          )}
+
+          {status === 'failed' && (
+            <div className="w-full h-[300px] flex flex-col items-center justify-center gap-4 px-8">
+              <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center">
+                <X size={24} className="text-red-500" />
+              </div>
+              <div className="text-center">
+                <p className="text-[15px] font-semibold text-gray-900">Try-on failed</p>
+                <p className="text-[12px] text-gray-400 mt-1">{failureReason}</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom actions */}
+        <div className="px-5 pb-6 pt-4 flex gap-3">
+          {status === 'completed' && (
+            <>
+              <button
+                onClick={onClose}
+                className="flex-1 h-12 rounded-full bg-gray-100 text-gray-700 text-[13px] font-semibold"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  if (resultUrl) {
+                    const a = document.createElement('a');
+                    a.href = resultUrl;
+                    a.download = `tryon-${Date.now()}.png`;
+                    a.target = '_blank';
+                    a.click();
+                  }
+                }}
+                className="flex-1 h-12 rounded-full bg-black text-white text-[13px] font-semibold flex items-center justify-center gap-1.5"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Save
+              </button>
+            </>
+          )}
+          {status === 'failed' && (
+            <>
+              <button
+                onClick={onClose}
+                className="flex-1 h-12 rounded-full bg-gray-100 text-gray-700 text-[13px] font-semibold"
+              >
+                Close
+              </button>
+              <button
+                onClick={onRetry}
+                className="flex-1 h-12 rounded-full bg-black text-white text-[13px] font-semibold flex items-center justify-center gap-1.5"
+              >
+                <RefreshCw size={13} />
+                Retry
+              </button>
+            </>
+          )}
+          {(status === 'loading' || status === 'processing') && (
+            <button
+              onClick={onClose}
+              className="flex-1 h-12 rounded-full bg-gray-100 text-gray-500 text-[13px] font-semibold"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Premium Gate Sheet ─────────────────────────────────────────────────────────
 function PremiumGateSheet({
   reason,
@@ -1852,7 +2227,7 @@ function PremiumGateSheet({
     gradient: string;
   }[] = [
     {
-      key: 'free',
+      key: 'FREE',
       label: 'Free',
       monthlyPrice: 0,
       yearlyPrice: 0,
@@ -1861,16 +2236,16 @@ function PremiumGateSheet({
       gradient: '#f3f4f6',
     },
     {
-      key: 'pro',
-      label: 'Pro',
-      monthlyPrice: 19_000,
-      yearlyPrice: 182_400,
-      yearlyOriginal: 228_000,
+      key: 'TRIAL',
+      label: 'Trial',
+      monthlyPrice: 0,
+      yearlyPrice: 0,
+      yearlyOriginal: 0,
       color: '#F370A7',
       gradient: 'linear-gradient(135deg, #F370A7 0%, #e0559a 100%)',
     },
     {
-      key: 'premium',
+      key: 'PREMIUM',
       label: 'Premium',
       monthlyPrice: 39_000,
       yearlyPrice: 374_400,
@@ -1919,8 +2294,8 @@ function PremiumGateSheet({
           <h2 className="text-[18px] font-bold text-gray-900 text-center mb-1">{t.choosePlan}</h2>
           <p className="text-[11px] text-gray-500 text-center mb-4 leading-relaxed">
             {reason === 'generation'
-              ? t.reachedRegenLimit.replace('{n}', String(PLAN_LIMITS[currentPlan].regenerations))
-              : t.reachedItemLimit.replace('{n}', String(PLAN_LIMITS[currentPlan].itemsPerCategory))}
+              ? t.reachedRegenLimit.replace('{n}', String(PLAN_LIMITS[currentPlan].regenPerMonth))
+              : t.reachedItemLimit.replace('{n}', String(PLAN_LIMITS[currentPlan].wardrobeItems))}
           </p>
 
           {/* Monthly / Yearly toggle */}
@@ -1955,7 +2330,7 @@ function PremiumGateSheet({
               const isCurrent = currentPlan === p.key;
               const price = yearly ? p.yearlyPrice : p.monthlyPrice;
               const originalYearly = p.yearlyOriginal;
-              const isFree = p.key === 'free';
+              const isFree = p.key === 'FREE';
 
               return (
                 <div
@@ -2001,10 +2376,10 @@ function PremiumGateSheet({
 
                   {/* Features */}
                   <div className="flex flex-col gap-1 mb-3 flex-1">
-                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS[p.key].itemsPerCategory} {t.itemsPerCat}</span>
-                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS[p.key].outfitCanvases} {t.outfitCanvases}</span>
-                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS[p.key].regenerations} {t.regens}</span>
-                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS[p.key].tryItOns} {t.tryOns}</span>
+                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS[p.key].wardrobeItems} {t.itemsPerCat}</span>
+                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS[p.key].canvases} {t.outfitCanvases}</span>
+                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS[p.key].regenPerMonth} {t.regens}</span>
+                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS[p.key].tryOnPerMonth} {t.tryOns}</span>
                     <span className="text-[9px] text-gray-600">{PLAN_LIMITS[p.key].calendarDays} {t.calDays}</span>
                   </div>
 

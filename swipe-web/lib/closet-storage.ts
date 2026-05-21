@@ -1,4 +1,4 @@
-import type { WardrobeCategory, WardrobeItemResponse, WardrobeUploadStatus } from '@/types';
+import type { WardrobeCategory, WardrobeSubcategory, WardrobeItemResponse, WardrobeUploadStatus } from '@/types';
 import {
   getWardrobeItems,
   deleteWardrobeItem,
@@ -49,30 +49,64 @@ export interface ClosetItem {
 }
 
 // ── Category mapping ──────────────────────────────────────────────────────────
+// Backend uses WardrobeSubcategory (uppercase) directly matching our local categories
 
-const API_TO_LOCAL_CATEGORY: Record<WardrobeCategory, ClosetCategory> = {
+const SUBCATEGORY_TO_LOCAL: Record<WardrobeSubcategory, ClosetCategory> = {
   TOPS: 'tops',
   TSHIRTS: 'tshirts',
-  SHIRTS: 'blouses',
-  PANTS: 'pants',
-  JEANS: 'jeans',
-  SKIRTS: 'skirts',
+  BLOUSES: 'blouses',
   DRESSES: 'dresses',
+  JUMPSUITS: 'jumpsuits',
+  JACKETS: 'jackets',
+  SKIRTS: 'skirts',
+  JEANS: 'jeans',
+  PANTS: 'pants',
+  SHORTS: 'shorts',
   SHOES: 'shoes',
+  SNEAKERS: 'sneakers',
+  HEELS: 'heels',
+  BOOTS: 'boots',
+  SANDALS: 'sandals',
+  FLATS: 'flats',
   BAGS: 'bags',
   ACCESSORIES: 'accessories',
-  HIJAB_SCARVES: 'shawl',
-  OUTERWEAR: 'jackets',
-  OTHER: 'accessories',
+  SHAWL: 'shawl',
+  JEWELRY: 'jewelry',
+  UNDERWEAR: 'underwear',
 };
 
-const LOCAL_TO_API_CATEGORY: Record<ClosetCategory, WardrobeCategory> = {
+const LOCAL_TO_SUBCATEGORY: Record<ClosetCategory, WardrobeSubcategory> = {
   tops: 'TOPS',
   tshirts: 'TSHIRTS',
-  blouses: 'SHIRTS',
+  blouses: 'BLOUSES',
   dresses: 'DRESSES',
-  jumpsuits: 'DRESSES',
-  jackets: 'OUTERWEAR',
+  jumpsuits: 'JUMPSUITS',
+  jackets: 'JACKETS',
+  skirts: 'SKIRTS',
+  jeans: 'JEANS',
+  pants: 'PANTS',
+  shorts: 'SHORTS',
+  shoes: 'SHOES',
+  sneakers: 'SNEAKERS',
+  heels: 'HEELS',
+  boots: 'BOOTS',
+  sandals: 'SANDALS',
+  flats: 'FLATS',
+  bags: 'BAGS',
+  accessories: 'ACCESSORIES',
+  shawl: 'SHAWL',
+  jewelry: 'JEWELRY',
+  underwear: 'UNDERWEAR',
+};
+
+// Parent category mapping for upload init
+const LOCAL_TO_CATEGORY: Record<ClosetCategory, WardrobeCategory> = {
+  tops: 'TOPS',
+  tshirts: 'TOPS',
+  blouses: 'TOPS',
+  dresses: 'DRESSES',
+  jumpsuits: 'JUMPSUITS',
+  jackets: 'JACKETS',
   skirts: 'SKIRTS',
   jeans: 'JEANS',
   pants: 'PANTS',
@@ -85,23 +119,27 @@ const LOCAL_TO_API_CATEGORY: Record<ClosetCategory, WardrobeCategory> = {
   flats: 'SHOES',
   bags: 'BAGS',
   accessories: 'ACCESSORIES',
-  shawl: 'HIJAB_SCARVES',
+  shawl: 'SHAWL',
   jewelry: 'ACCESSORIES',
-  underwear: 'OTHER',
+  underwear: 'UNDERWEAR',
 };
 
-export function toLocalCategory(apiCategory: WardrobeCategory): ClosetCategory {
-  return API_TO_LOCAL_CATEGORY[apiCategory] ?? 'accessories';
+export function toLocalCategory(subcategory: WardrobeSubcategory): ClosetCategory {
+  return SUBCATEGORY_TO_LOCAL[subcategory] ?? 'accessories';
+}
+
+export function toApiSubcategory(localCategory: ClosetCategory): WardrobeSubcategory {
+  return LOCAL_TO_SUBCATEGORY[localCategory] ?? 'ACCESSORIES';
 }
 
 export function toApiCategory(localCategory: ClosetCategory): WardrobeCategory {
-  return LOCAL_TO_API_CATEGORY[localCategory] ?? 'OTHER';
+  return LOCAL_TO_CATEGORY[localCategory] ?? 'OTHER';
 }
 
 function mapApiItemToClosetItem(item: WardrobeItemResponse): ClosetItem {
   return {
     id: item.id,
-    category: toLocalCategory(item.category),
+    category: toLocalCategory(item.subcategory),
     imageData: item.thumbnailUrl || item.imageUrl,
     thumbnailUrl: item.thumbnailUrl,
     brand: item.material || undefined,
@@ -125,7 +163,8 @@ export async function addClosetItemFromFile(
   onProgress?: (status: WardrobeUploadStatus) => void,
 ): Promise<WardrobeUploadStatus> {
   const apiCategory = toApiCategory(category);
-  return uploadWardrobeItem(file, apiCategory, onProgress);
+  const apiSubcategory = toApiSubcategory(category);
+  return uploadWardrobeItem(file, apiCategory, apiSubcategory, onProgress);
 }
 
 export async function removeClosetItem(id: string): Promise<void> {
@@ -134,9 +173,18 @@ export async function removeClosetItem(id: string): Promise<void> {
 
 export async function updateClosetItemApi(
   id: string,
-  updates: { userLabel?: string | null; userNotes?: string | null; isFavorite?: boolean; isClean?: boolean },
+  updates: { userLabel?: string | null; userNotes?: string | null; isFavorite?: boolean; isClean?: boolean; category?: ClosetCategory },
 ): Promise<void> {
-  await updateWardrobeItem(id, updates);
+  const apiUpdates: Parameters<typeof updateWardrobeItem>[1] = {};
+  if (updates.userLabel !== undefined) apiUpdates.userLabel = updates.userLabel;
+  if (updates.userNotes !== undefined) apiUpdates.userNotes = updates.userNotes;
+  if (updates.isFavorite !== undefined) apiUpdates.isFavorite = updates.isFavorite;
+  if (updates.isClean !== undefined) apiUpdates.isClean = updates.isClean;
+  if (updates.category !== undefined) {
+    apiUpdates.category = toApiCategory(updates.category);
+    apiUpdates.subcategory = toApiSubcategory(updates.category);
+  }
+  await updateWardrobeItem(id, apiUpdates);
 }
 
 // ── Legacy localStorage functions (kept for offline/fallback) ─────────────────

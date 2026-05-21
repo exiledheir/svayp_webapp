@@ -85,7 +85,7 @@ export default function ClosetAddPage() {
     reader.onload = (ev) => {
       const data = ev.target?.result as string;
       setRawImage(data);
-      // Set initial crop to full image — user can optionally crop
+      // Pre-select full image so corner handles are visible immediately (crop is optional)
       setCrop({ unit: '%', x: 0, y: 0, width: 100, height: 100 });
       setCompletedCrop(undefined);
     };
@@ -142,7 +142,7 @@ export default function ClosetAddPage() {
         {rawImage ? (
           <div className="flex flex-col gap-5 pt-2">
             {/* Crop area + category on same screen */}
-            <div className="rounded-2xl overflow-hidden bg-gray-50 flex justify-center">
+            <div className="rounded-2xl bg-gray-100 flex justify-center" style={{ padding: '14px 14px 10px' }}>
               <ReactCrop
                 crop={crop}
                 onChange={(c) => setCrop(c)}
@@ -153,7 +153,7 @@ export default function ClosetAddPage() {
                   ref={imgRef}
                   src={rawImage}
                   alt="Crop"
-                  style={{ maxHeight: '45vh', maxWidth: '100%', display: 'block', margin: '0 auto' }}
+                  style={{ maxHeight: '55vh', maxWidth: '100%', display: 'block', margin: '0 auto', borderRadius: 12 }}
                 />
               </ReactCrop>
             </div>

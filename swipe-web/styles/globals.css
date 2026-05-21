@@ -65,8 +65,8 @@ body::-webkit-scrollbar,
 
 /* ── Custom crop handles (corner brackets like mobile visual search) ── */
 .ReactCrop__crop-selection {
-  border: 2px solid white !important;
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55) !important;
+  border: 2px solid rgba(255,255,255,0.9) !important;
+  /* No full-page shadow — it bleeds outside the container */
 }
 .ReactCrop__drag-handle {
   width: 20px !important;

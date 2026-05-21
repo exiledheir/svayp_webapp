@@ -75,18 +75,25 @@ export interface ChatMessage {
 // ── Wardrobe ──────────────────────────────────────────────────────────────────
 
 export type WardrobeCategory =
-  | 'TOPS' | 'TSHIRTS' | 'SHIRTS' | 'PANTS' | 'JEANS' | 'SKIRTS'
-  | 'DRESSES' | 'SHOES' | 'BAGS' | 'ACCESSORIES' | 'HIJAB_SCARVES'
-  | 'OUTERWEAR' | 'OTHER';
+  | 'TOPS' | 'TSHIRTS' | 'BLOUSES' | 'DRESSES' | 'JUMPSUITS' | 'JACKETS'
+  | 'SKIRTS' | 'JEANS' | 'PANTS' | 'SHORTS'
+  | 'SHOES' | 'SNEAKERS' | 'HEELS' | 'BOOTS' | 'SANDALS' | 'FLATS'
+  | 'BAGS' | 'ACCESSORIES' | 'SHAWL' | 'JEWELRY' | 'UNDERWEAR';
+
+export type WardrobeSubcategory =
+  | 'TOPS' | 'TSHIRTS' | 'BLOUSES' | 'DRESSES' | 'JUMPSUITS' | 'JACKETS'
+  | 'SKIRTS' | 'JEANS' | 'PANTS' | 'SHORTS'
+  | 'SHOES' | 'SNEAKERS' | 'HEELS' | 'BOOTS' | 'SANDALS' | 'FLATS'
+  | 'BAGS' | 'ACCESSORIES' | 'SHAWL' | 'JEWELRY' | 'UNDERWEAR';
 
 export type UploadJobStatus =
-  | 'UPLOADED' | 'NSFW_CHECKED' | 'BG_REMOVED' | 'UPSCALED'
-  | 'EMBEDDED' | 'ANALYZED' | 'READY' | 'FAILED' | 'REJECTED_NSFW';
+  | 'UPLOADED' | 'NSFW_SCAN' | 'UPSCALE' | 'BG_REMOVE'
+  | 'EMBED' | 'ANALYZE' | 'COMPLETED' | 'FAILED';
 
 export interface WardrobeUploadInitResponse {
   uploadJobId: string;
   blobKey: string;
-  uploadUrl: string;
+  putUrl: string;
   uploadUrlExpiresAt: string;
   httpMethod: string;
 }
@@ -104,7 +111,8 @@ export interface WardrobeUploadStatus {
 export interface WardrobeItemResponse {
   id: string;
   category: WardrobeCategory;
-  layer: 'INNER' | 'MID' | 'OUTER' | null;
+  subcategory: WardrobeSubcategory;
+  layer: 'BASE' | 'MID' | 'OUTER' | null;
   status: string;
   imageUrl: string;
   thumbnailUrl: string;
@@ -130,6 +138,7 @@ export interface WardrobeStats {
   failed: number;
   archived: number;
   total: number;
+  itemCountByCategory: Record<string, number>;
 }
 
 export interface PageResponse<T> {
@@ -138,4 +147,116 @@ export interface PageResponse<T> {
   totalPages: number;
   number: number;
   size: number;
+}
+
+// ── Plan ──────────────────────────────────────────────────────────────────────
+
+export type PlanTier = 'FREE' | 'TRIAL' | 'PREMIUM';
+
+export interface PlanLimits {
+  wardrobeItems: number;
+  canvases: number;
+  tryOnPerMonth: number;
+  regenPerMonth: number;
+  calendarDays: number;
+}
+
+export interface PlanUsage {
+  wardrobeItems: number;
+  canvases: number;
+  tryOnThisMonth: number;
+  regenThisMonth: number;
+}
+
+export interface UserPlanResponse {
+  tier: PlanTier;
+  trialEndsAt: string | null;
+  premiumEndsAt: string | null;
+  limits: PlanLimits;
+  usage: PlanUsage;
+}
+
+// ── Outfit Canvases ───────────────────────────────────────────────────────────
+
+export interface OutfitCanvasItemRequest {
+  wardrobeItemId: string;
+  x: number;
+  y: number;
+  scale: number;
+  zIndex: number;
+  itemGroup: string;
+}
+
+export interface OutfitCanvasItemResponse {
+  id: string;
+  wardrobeItemId: string;
+  imageUrl: string;
+  x: number;
+  y: number;
+  scale: number;
+  zIndex: number;
+  itemGroup: string;
+}
+
+export interface OutfitCanvasResponse {
+  id: string;
+  name: string;
+  occasion: string | null;
+  thumbnailUrl: string | null;
+  items: OutfitCanvasItemResponse[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Outfit Suggestions ────────────────────────────────────────────────────────
+
+export interface OutfitSuggestionResponse {
+  id: string;
+  userId: string;
+  coreItemIds: string[];
+  optionalItemIds: string[];
+  scoreTotal: number;
+  scoreColor: number;
+  scoreStyle: number;
+  scoreFit: number;
+  scoreDiversity: number;
+  silhouetteType: string | null;
+  colorStoryType: string | null;
+  seasonTarget: string | null;
+  weatherTarget: string | null;
+  temperatureC: number | null;
+  targetDate: string | null;
+  hasHijabLayer: boolean;
+  generatedBy: string | null;
+  collagePreviewUrl: string | null;
+  createdAt: string;
+}
+
+// ── Try-On ────────────────────────────────────────────────────────────────────
+
+export type TryOnStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+
+export interface TryOnJobResponse {
+  id: string;
+  canvasId: string | null;
+  wardrobeItemIds: string[];
+  status: TryOnStatus;
+  modelImageUrl: string | null;
+  resultImageUrl: string | null;
+  failureReason: string | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+// ── Calendar ──────────────────────────────────────────────────────────────────
+
+export interface CalendarDayEntry {
+  date: string;
+  outfits: OutfitSuggestionResponse[];
+}
+
+export interface CalendarResponse {
+  from: string;
+  to: string;
+  days: CalendarDayEntry[];
 }
