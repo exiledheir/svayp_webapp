@@ -151,29 +151,29 @@ export interface PageResponse<T> {
 
 // ── Plan ──────────────────────────────────────────────────────────────────────
 
-export type PlanTier = 'FREE' | 'TRIAL' | 'PREMIUM';
+export type PlanTier = 'free' | 'pro' | 'premium';
 
 export interface PlanLimits {
-  wardrobeItems: number;
-  canvases: number;
-  tryOnPerMonth: number;
-  regenPerMonth: number;
+  itemsPerCategory: number;
+  outfitCanvases: number;
+  tryItOns: number;
+  regenerations: number;
   calendarDays: number;
 }
 
 export interface PlanUsage {
-  wardrobeItems: number;
-  canvases: number;
-  tryOnThisMonth: number;
-  regenThisMonth: number;
+  regenerationsUsed: number;
+  tryItOnsUsed: number;
+  itemCountByCategory: Record<string, number>;
 }
 
 export interface UserPlanResponse {
-  tier: PlanTier;
-  trialEndsAt: string | null;
-  premiumEndsAt: string | null;
+  userId: string;
+  plan: PlanTier;
   limits: PlanLimits;
   usage: PlanUsage;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
 }
 
 // ── Outfit Canvases ───────────────────────────────────────────────────────────
