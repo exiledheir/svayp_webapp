@@ -37,4 +37,14 @@ export const FEATURES = {
    *  - OutfitSection regenerate button has no usage counter
    */
   plansEnabled: envFlag('NEXT_PUBLIC_FF_PLANS_ENABLED', false),
+
+  /**
+   * profileEnabled
+   * When FALSE:
+   *  - Profile icon button in the closet header is hidden
+   *  - Profile sheet cannot be opened
+   *
+   * Toggle via env var: NEXT_PUBLIC_FF_PROFILE_ENABLED=false
+   */
+  profileEnabled: envFlag('NEXT_PUBLIC_FF_PROFILE_ENABLED', true),
 } as const;

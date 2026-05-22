@@ -41,10 +41,9 @@ body::-webkit-scrollbar,
   scrollbar-width: none;
 }
 
-/* Phone-width container on large screens */
+/* Full-width container — fills the WebView on any screen size */
 .phone-container {
-  max-width: 430px;
-  margin: 0 auto;
+  width: 100%;
   position: relative;
   height: 100%;
 }

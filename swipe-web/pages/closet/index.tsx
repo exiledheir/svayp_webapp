@@ -522,14 +522,16 @@ export default function ClosetPage() {
               <span className="text-[18px] leading-none">{locale === 'uz' ? '🇺🇿' : locale === 'ru' ? '🇷🇺' : '🇬🇧'}</span>
             </button>
             {/* Profile icon */}
-            <button
-              onClick={() => setShowProfile(true)}
-              className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
-              style={{ background: 'rgba(0,0,0,0.05)' }}
-              aria-label="Profile"
-            >
-              <User size={17} strokeWidth={1.8} className="text-gray-600" />
-            </button>
+            {FEATURES.profileEnabled && (
+              <button
+                onClick={() => setShowProfile(true)}
+                className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
+                style={{ background: 'rgba(0,0,0,0.05)' }}
+                aria-label="Profile"
+              >
+                <User size={17} strokeWidth={1.8} className="text-gray-600" />
+              </button>
+            )}
           </div>
         </div>
       </header>
