@@ -57,50 +57,49 @@ const OCCASION_CONFIG = [
 // ─── Plan system ────────────────────────────────────────────────────────────────
 type UserPlan = PlanTier;
 
-const PLAN_LIMITS: Record<UserPlan, PlanLimits> = {
-  FREE:    { wardrobeItems: 20,  canvases: 1,  tryOnPerMonth: 2,  regenPerMonth: 5,  calendarDays: 2 },
-  TRIAL:   { wardrobeItems: 50,  canvases: 3,  tryOnPerMonth: 10, regenPerMonth: 15, calendarDays: 7 },
-  PREMIUM: { wardrobeItems: 999, canvases: 7,  tryOnPerMonth: 30, regenPerMonth: 50, calendarDays: 7 },
+const PLAN_LIMITS_FALLBACK: Record<UserPlan, PlanLimits> = {
+  free:    { itemsPerCategory: 2,  outfitCanvases: 1, tryItOns: 2,  regenerations: 5,  calendarDays: 2 },
+  pro:     { itemsPerCategory: 10, outfitCanvases: 3, tryItOns: 10, regenerations: 15, calendarDays: 7 },
+  premium: { itemsPerCategory: 20, outfitCanvases: 7, tryItOns: 30, regenerations: 50, calendarDays: 7 },
 };
 
 const PLAN_COLORS: Record<UserPlan, { bg: string; text: string; crownColor: string }> = {
-  FREE:    { bg: '#F5F5F5', text: '#888', crownColor: '#aaa' },
-  TRIAL:   { bg: 'linear-gradient(135deg, #F370A7 0%, #e0559a 100%)', text: '#fff', crownColor: '#fbb6d0' },
-  PREMIUM: { bg: 'linear-gradient(135deg, #B8860B 0%, #8B6914 100%)', text: '#fff', crownColor: '#FFD700' },
+  free:    { bg: '#F5F5F5', text: '#888', crownColor: '#aaa' },
+  pro:     { bg: 'linear-gradient(135deg, #F370A7 0%, #e0559a 100%)', text: '#fff', crownColor: '#fbb6d0' },
+  premium: { bg: 'linear-gradient(135deg, #B8860B 0%, #8B6914 100%)', text: '#fff', crownColor: '#FFD700' },
 };
 
 function usePlan() {
-  const [plan, setPlan] = useState<UserPlan>('FREE');
-  const [limits, setLimits] = useState<PlanLimits>(PLAN_LIMITS.FREE);
-  const [usage, setUsage] = useState<PlanUsage>({ wardrobeItems: 0, canvases: 0, tryOnThisMonth: 0, regenThisMonth: 0 });
+  const [plan, setPlan] = useState<UserPlan>('free');
+  const [limits, setLimits] = useState<PlanLimits>(PLAN_LIMITS_FALLBACK.free);
+  const [usage, setUsage] = useState<PlanUsage>({ regenerationsUsed: 0, tryItOnsUsed: 0, itemCountByCategory: {} });
 
   const fetchPlan = useCallback(async () => {
     try {
       const data = await getUserPlan();
-      // Normalise: if the API returns an unknown tier fall back to FREE.
-      const knownTiers = new Set<string>(['FREE', 'TRIAL', 'PREMIUM']);
-      const tier: UserPlan = knownTiers.has(data.tier) ? data.tier : 'FREE';
-      setPlan(tier);
-      setLimits(data.limits ?? PLAN_LIMITS.FREE);
+
+      setPlan(data.plan);
+      setLimits(data.limits);
       setUsage(data.usage);
     } catch {
-      // Fallback to FREE if API fails
-      setPlan('FREE');
-      setLimits(PLAN_LIMITS.FREE);
+      setPlan('free');
+      setLimits(PLAN_LIMITS_FALLBACK.free);
     }
   }, []);
 
   useEffect(() => { fetchPlan(); }, [fetchPlan]);
+
+  const totalItems = Object.values(usage.itemCountByCategory ?? {}).reduce((s, n) => s + n, 0);
 
   return {
     plan,
     limits,
     usage,
     fetchPlan,
-    canGenerate: usage.regenThisMonth < limits.regenPerMonth,
-    canTryOn: usage.tryOnThisMonth < limits.tryOnPerMonth,
-    canAddItem: usage.wardrobeItems < limits.wardrobeItems,
-    canAddCanvas: usage.canvases < limits.canvases,
+    canGenerate: usage.regenerationsUsed < limits.regenerations,
+    canTryOn: usage.tryItOnsUsed < limits.tryItOns,
+    canAddItem: totalItems < limits.itemsPerCategory * 10,
+    canAddCanvas: true,
     calendarDays: limits.calendarDays,
   };
 }
@@ -503,13 +502,14 @@ export default function ClosetPage() {
                 onClick={() => setShowPremiumGate('generation')}
                 className="flex items-center gap-1 px-2.5 h-8 rounded-full text-[11px] font-bold active:scale-[0.95] transition-all"
                 style={{
-                  background: plan === 'FREE' ? 'rgba(0,0,0,0.05)' : (PLAN_COLORS[plan] ?? PLAN_COLORS.FREE).bg,
-                  color: plan === 'FREE' ? '#888' : (PLAN_COLORS[plan] ?? PLAN_COLORS.FREE).text,
+
+                  background: plan === 'free' ? 'rgba(0,0,0,0.05)' : PLAN_COLORS[plan].bg,
+                  color: plan === 'free' ? '#888' : PLAN_COLORS[plan].text,
                 }}
                 aria-label="Plan"
               >
-                <Crown size={11} strokeWidth={2} color={plan === 'FREE' ? '#aaa' : (PLAN_COLORS[plan] ?? PLAN_COLORS.FREE).crownColor} />
-                <span>{plan === 'FREE' ? 'Free' : plan === 'TRIAL' ? 'Trial' : 'Pro'}</span>
+                <Crown size={11} strokeWidth={2} color={plan === 'free' ? '#aaa' : PLAN_COLORS[plan].crownColor} />
+                <span>{plan === 'free' ? 'Free' : plan === 'pro' ? 'Trial' : 'Pro'}</span>
               </button>
             )}
             {/* Language: flag emoji */}
@@ -543,9 +543,9 @@ export default function ClosetPage() {
           savedLayout={savedLayout}
           plan={plan}
           canGenerate={canGenerate}
-          genCount={usage.regenThisMonth}
+          genCount={usage.regenerationsUsed}
           limits={limits}
-          tryOnCount={usage.tryOnThisMonth}
+          tryOnCount={usage.tryItOnsUsed}
           onViewItems={() => {
             setCanvasInitialLayout(savedLayout);
             setCanvasData({
@@ -567,7 +567,7 @@ export default function ClosetPage() {
           filter={upperFilter}
           items={itemsFor(UPPER_CATS, upperFilter)}
           totalCount={items.filter((i) => UPPER_CATS.includes(i.category)).length}
-          maxCount={limits.wardrobeItems}
+          maxCount={limits.itemsPerCategory}
           pendingItems={pendingFor(UPPER_CATS)}
           onFilterChange={setUpperFilter}
           onTapItem={setEditItem}
@@ -581,7 +581,7 @@ export default function ClosetPage() {
           filter={lowerFilter}
           items={itemsFor(LOWER_CATS, lowerFilter)}
           totalCount={items.filter((i) => LOWER_CATS.includes(i.category)).length}
-          maxCount={limits.wardrobeItems}
+          maxCount={limits.itemsPerCategory}
           pendingItems={pendingFor(LOWER_CATS)}
           onFilterChange={setLowerFilter}
           onTapItem={setEditItem}
@@ -595,7 +595,7 @@ export default function ClosetPage() {
           filter={null}
           items={itemsFor(SHOES_CATS, null)}
           totalCount={items.filter((i) => SHOES_CATS.includes(i.category)).length}
-          maxCount={limits.wardrobeItems}
+          maxCount={limits.itemsPerCategory}
           pendingItems={pendingFor(SHOES_CATS)}
           onFilterChange={() => {}}
           onTapItem={setEditItem}
@@ -609,7 +609,7 @@ export default function ClosetPage() {
           filter={accFilter}
           items={itemsFor(ACC_CATS, accFilter)}
           totalCount={items.filter((i) => ACC_CATS.includes(i.category)).length}
-          maxCount={limits.wardrobeItems}
+          maxCount={limits.itemsPerCategory}
           pendingItems={pendingFor(ACC_CATS)}
           onFilterChange={setAccFilter}
           onTapItem={setEditItem}
@@ -844,16 +844,17 @@ export default function ClosetPage() {
               <div
                 className="flex items-center gap-2.5 px-4 h-13 rounded-2xl"
                 style={{
-                  background: plan === 'FREE' ? '#F5F5F5' : (PLAN_COLORS[plan] ?? PLAN_COLORS.FREE).bg,
+
+                  background: plan === 'free' ? '#F5F5F5' : PLAN_COLORS[plan].bg,
                   height: 52,
                 }}
               >
-                <Crown size={17} strokeWidth={2} color={plan === 'FREE' ? '#aaa' : (PLAN_COLORS[plan] ?? PLAN_COLORS.FREE).crownColor} />
+                <Crown size={17} strokeWidth={2} color={plan === 'free' ? '#aaa' : PLAN_COLORS[plan].crownColor} />
                 <span
                   className="text-[14px] font-semibold"
-                  style={{ color: plan === 'FREE' ? '#888' : (PLAN_COLORS[plan] ?? PLAN_COLORS.FREE).text }}
+                  style={{ color: plan === 'free' ? '#888' : PLAN_COLORS[plan].text }}
                 >
-                  {plan === 'FREE' ? 'Free plan' : plan === 'TRIAL' ? 'Trial' : 'Premium'}
+                  {plan === 'free' ? 'Free plan' : plan === 'pro' ? 'Trial' : 'Premium'}
                 </span>
               </div>
             </div>
@@ -933,10 +934,10 @@ function OutfitSection({ allItems, savedLayout, plan, canGenerate, genCount, lim
           onRegenerate={onRegenerate}
           canRegenerate={canGenerate}
           genCount={genCount}
-          regenLimit={limits.regenPerMonth}
+          regenLimit={limits.regenerations}
           onTryItOn={onTryItOn}
           tryOnCount={tryOnCount}
-          tryOnLimit={limits.tryOnPerMonth}
+          tryOnLimit={limits.tryItOns}
         />
 
         {/* New outfit card — always opens plans popup, premium gold style */}
@@ -2232,7 +2233,7 @@ function PremiumGateSheet({
     gradient: string;
   }[] = [
     {
-      key: 'FREE',
+      key: 'free' as UserPlan,
       label: 'Free',
       monthlyPrice: 0,
       yearlyPrice: 0,
@@ -2241,7 +2242,7 @@ function PremiumGateSheet({
       gradient: '#f3f4f6',
     },
     {
-      key: 'TRIAL',
+      key: 'pro' as UserPlan,
       label: 'Trial',
       monthlyPrice: 0,
       yearlyPrice: 0,
@@ -2250,7 +2251,7 @@ function PremiumGateSheet({
       gradient: 'linear-gradient(135deg, #F370A7 0%, #e0559a 100%)',
     },
     {
-      key: 'PREMIUM',
+      key: 'premium' as UserPlan,
       label: 'Premium',
       monthlyPrice: 39_000,
       yearlyPrice: 374_400,
@@ -2299,8 +2300,8 @@ function PremiumGateSheet({
           <h2 className="text-[18px] font-bold text-gray-900 text-center mb-1">{t.choosePlan}</h2>
           <p className="text-[11px] text-gray-500 text-center mb-4 leading-relaxed">
             {reason === 'generation'
-              ? t.reachedRegenLimit.replace('{n}', String(PLAN_LIMITS[currentPlan].regenPerMonth))
-              : t.reachedItemLimit.replace('{n}', String(PLAN_LIMITS[currentPlan].wardrobeItems))}
+              ? t.reachedRegenLimit.replace('{n}', String(PLAN_LIMITS_FALLBACK[currentPlan].regenerations))
+              : t.reachedItemLimit.replace('{n}', String(PLAN_LIMITS_FALLBACK[currentPlan].itemsPerCategory))}
           </p>
 
           {/* Monthly / Yearly toggle */}
@@ -2335,7 +2336,7 @@ function PremiumGateSheet({
               const isCurrent = currentPlan === p.key;
               const price = yearly ? p.yearlyPrice : p.monthlyPrice;
               const originalYearly = p.yearlyOriginal;
-              const isFree = p.key === 'FREE';
+              const isFree = p.key === 'free';
 
               return (
                 <div
@@ -2381,11 +2382,11 @@ function PremiumGateSheet({
 
                   {/* Features */}
                   <div className="flex flex-col gap-1 mb-3 flex-1">
-                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS[p.key].wardrobeItems} {t.itemsPerCat}</span>
-                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS[p.key].canvases} {t.outfitCanvases}</span>
-                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS[p.key].regenPerMonth} {t.regens}</span>
-                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS[p.key].tryOnPerMonth} {t.tryOns}</span>
-                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS[p.key].calendarDays} {t.calDays}</span>
+                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS_FALLBACK[p.key].itemsPerCategory} {t.itemsPerCat}</span>
+                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS_FALLBACK[p.key].outfitCanvases} {t.outfitCanvases}</span>
+                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS_FALLBACK[p.key].regenerations} {t.regens}</span>
+                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS_FALLBACK[p.key].tryItOns} {t.tryOns}</span>
+                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS_FALLBACK[p.key].calendarDays} {t.calDays}</span>
                   </div>
 
                   {/* CTA */}
