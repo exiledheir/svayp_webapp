@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { Plus, X, Sparkles, Sun, CalendarDays, TreePine, Camera, Image as ImageIcon, Loader2, Crown, Lock, RefreshCw, User } from 'lucide-react';
+import { Plus, X, Sparkles, Sun, CalendarDays, TreePine, Camera, Image as ImageIcon, Loader2, Crown, Lock, RefreshCw, User, Images } from 'lucide-react';
 import { getUser } from '@/lib/auth';
 import { FEATURES } from '@/lib/feature-flags';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
@@ -11,6 +11,7 @@ import type { WardrobeUploadStatus, PlanTier, PlanLimits, PlanUsage, TryOnJobRes
 import { getUserPlan, generateOutfitSuggestions, createTryOnJob, pollTryOnUntilDone, getOutfitCalendar, createOutfitCanvas, updateOutfitCanvas, deleteOutfitCanvas, getOutfitCanvases, getOutfitCanvas } from '@/lib/wardrobe-api';
 import { useI18n } from '@/lib/i18n';
 import type { Locale } from '@/lib/translations';
+import { saveTryOnResult, getTryOnHistory, deleteTryOnRecord, type TryOnRecord } from '@/lib/tryon-history';
 
 const ADD_GROUPS: Record<string, ClosetCategory[]> = {
   upper: ['tops', 'dresses', 'jackets', 'blouses', 'jumpsuits', 'tshirts'],
@@ -163,6 +164,10 @@ export default function ClosetPage() {
   const [outfitSheet, setOutfitSheet] = useState<{ title: string; days: Date[] } | null>(null);
   const [editItem, setEditItem] = useState<ClosetItem | null>(null);
   const [tryOnState, setTryOnState] = useState<{ status: 'loading' | 'processing' | 'completed' | 'failed'; resultUrl?: string; failureReason?: string } | null>(null);
+  const [showTryOnConfirm, setShowTryOnConfirm] = useState(false);
+  const [showMyLooks, setShowMyLooks] = useState(false);
+  const [myLooksHistory, setMyLooksHistory] = useState<TryOnRecord[]>([]);
+  const tryOnCancelRef = useRef(false);
 
   // ── Inline add flow ──────────────────────────────────────────────────────────
   const [addGroup, setAddGroup] = useState<string>('upper');
@@ -191,6 +196,20 @@ export default function ClosetPage() {
     setAddCompletedCrop(undefined);
     setShowAddPicker(true);
   }
+
+  // Open add picker when arriving from onboarding with ?addItem=true
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (router.query.addItem === 'true') {
+      openAdd('', 'tops');
+      router.replace('/closet', undefined, { shallow: true });
+    }
+  }, [router.isReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load history whenever the My Looks sheet opens
+  useEffect(() => {
+    if (showMyLooks) setMyLooksHistory(getTryOnHistory());
+  }, [showMyLooks]);
 
   function handleAddFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -414,36 +433,35 @@ export default function ClosetPage() {
     }
   }
 
-  function handleTryItOn() {
-    if (FEATURES.plansEnabled && !canTryOn) {
-      setShowPremiumGate('generation');
-      return;
-    }
-    // Collect item IDs from current outfit layout
+  function startTryOn() {
+    tryOnCancelRef.current = false;
     const itemIds = (savedLayout ?? []).map((e) => e.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
     if (itemIds.length === 0) return;
 
-    // Show loading modal
     setTryOnState({ status: 'loading' });
 
     createTryOnJob({ wardrobeItemIds: itemIds, canvasId: savedCanvasId ?? undefined })
       .then((job) => {
+        if (tryOnCancelRef.current) return;
         setTryOnState({ status: 'processing' });
         fetchPlan();
         return pollTryOnUntilDone(job.id, (progress) => {
-          if (progress.status === 'PROCESSING') {
+          if (!tryOnCancelRef.current && progress.status === 'PROCESSING') {
             setTryOnState({ status: 'processing' });
           }
         });
       })
       .then((result) => {
+        if (tryOnCancelRef.current || !result) return;
         if (result.status === 'COMPLETED' && result.resultImageUrl) {
           setTryOnState({ status: 'completed', resultUrl: result.resultImageUrl });
+          saveTryOnResult(result.resultImageUrl);
         } else {
           setTryOnState({ status: 'failed', failureReason: result.failureReason ?? 'Try-on failed. Please try again.' });
         }
       })
       .catch((err) => {
+        if (tryOnCancelRef.current) return;
         if (err?.response?.status === 402) {
           setTryOnState(null);
           setShowPremiumGate('generation');
@@ -451,6 +469,21 @@ export default function ClosetPage() {
           setTryOnState({ status: 'failed', failureReason: 'Something went wrong. Please try again.' });
         }
       });
+  }
+
+  function handleTryItOn() {
+    if (FEATURES.plansEnabled && !canTryOn) {
+      setShowPremiumGate('generation');
+      return;
+    }
+    const itemIds = (savedLayout ?? []).map((e) => e.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
+    if (itemIds.length === 0) return;
+    setShowTryOnConfirm(true);
+  }
+
+  function handleCancelTryOn() {
+    tryOnCancelRef.current = true;
+    setTryOnState(null);
   }
 
   function showOutfitsForPeriod(key: 'today' | 'weekend') {
@@ -512,6 +545,15 @@ export default function ClosetPage() {
                 <span>{plan === 'free' ? 'Free' : plan === 'pro' ? 'Trial' : 'Pro'}</span>
               </button>
             )}
+            {/* Language: flag emoji */}
+            <button
+              onClick={() => setShowMyLooks(true)}
+              className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
+              style={{ background: 'rgba(0,0,0,0.05)' }}
+              aria-label="My Looks"
+            >
+              <Images size={17} strokeWidth={1.8} className="text-gray-600" />
+            </button>
             {/* Language: flag emoji */}
             <button
               onClick={() => setShowLangPicker(true)}
@@ -625,7 +667,7 @@ export default function ClosetPage() {
           title={viewAll.title}
           items={viewAll.items}
           onClose={() => setViewAll(null)}
-          showDelete={viewAll.title !== 'Outfit Items'}
+          showDelete={false}
           onDelete={(id) => {
             handleDelete(id);
             setViewAll((v) => v ? { ...v, items: v.items.filter((i) => i.id !== id) } : null);
@@ -688,6 +730,16 @@ export default function ClosetPage() {
         />
       )}
 
+      {/* ── Try-On Confirm Sheet ── */}
+      {showTryOnConfirm && (
+        <TryOnConfirmModal
+          savedLayout={savedLayout}
+          items={items}
+          onConfirm={() => { setShowTryOnConfirm(false); startTryOn(); }}
+          onCancel={() => setShowTryOnConfirm(false)}
+        />
+      )}
+
       {/* ── Try-On Modal ── */}
       {tryOnState && (
         <TryOnModal
@@ -695,7 +747,8 @@ export default function ClosetPage() {
           resultUrl={tryOnState.resultUrl}
           failureReason={tryOnState.failureReason}
           onClose={() => setTryOnState(null)}
-          onRetry={handleTryItOn}
+          onRetry={startTryOn}
+          onCancel={handleCancelTryOn}
         />
       )}
 
@@ -780,17 +833,46 @@ export default function ClosetPage() {
               </ReactCrop>
             </div>
             <div className="flex flex-col gap-3">
-              <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">{t.category}</label>
-              {[
-                { key: 'upper', label: t.upperBody, cats: ADD_GROUPS.upper },
-                { key: 'lower', label: t.lowerBody, cats: ADD_GROUPS.lower },
-                { key: 'shoes', label: t.shoes,     cats: ADD_GROUPS.shoes },
-                { key: 'acc',   label: t.accessories, cats: ADD_GROUPS.acc },
-              ].map((group) => (
-                <div key={group.key}>
-                  <p className="text-[11px] font-semibold text-gray-400 mb-1.5">{group.label}</p>
+              {addGroup === '' ? (
+                <>
+                  <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">{t.category}</label>
+                  <div className="flex flex-col gap-2">
+                    {[
+                      { key: 'upper', label: t.upperBody },
+                      { key: 'lower', label: t.lowerBody },
+                      { key: 'shoes', label: t.shoes },
+                      { key: 'acc',   label: t.accessories },
+                    ].map((group) => (
+                      <button
+                        key={group.key}
+                        onClick={() => {
+                          setAddGroup(group.key);
+                          setAddCategory(ADD_GROUPS[group.key][0]);
+                        }}
+                        className="w-full h-12 rounded-2xl bg-gray-50 text-[14px] font-semibold text-gray-800 text-left px-4 active:scale-[0.98] transition-transform"
+                      >
+                        {group.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setAddGroup('')}
+                      className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center shrink-0"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M15 18l-6-6 6-6"/>
+                      </svg>
+                    </button>
+                    <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                      {addGroup === 'upper' ? t.upperBody : addGroup === 'lower' ? t.lowerBody : addGroup === 'shoes' ? t.shoes : t.accessories}
+                    </label>
+                  </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {group.cats.map((cat) => (
+                    {ADD_GROUPS[addGroup]?.map((cat) => (
                       <button
                         key={cat}
                         onClick={() => setAddCategory(cat)}
@@ -802,8 +884,8 @@ export default function ClosetPage() {
                       </button>
                     ))}
                   </div>
-                </div>
-              ))}
+                </>
+              )}
             </div>
             <button
               onClick={handleAddSave}
@@ -814,6 +896,18 @@ export default function ClosetPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* ── My Looks Sheet ─────────────────────────────────────────────── */}
+      {showMyLooks && (
+        <MyLooksSheet
+          history={myLooksHistory}
+          onClose={() => setShowMyLooks(false)}
+          onDelete={(id) => {
+            deleteTryOnRecord(id);
+            setMyLooksHistory((prev) => prev.filter((r) => r.id !== id));
+          }}
+        />
       )}
 
       {/* ── Profile Sheet ── */}
@@ -1510,7 +1604,7 @@ function InteractiveCanvas({
           {[
             {
               label: 'Swap',
-              icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>,
+              icon: <RefreshCw size={16} />,
               action: () => { if (selectedIdx !== null) setSwapTarget(selectedIdx); },
               needsSelection: true,
             },
@@ -2041,11 +2135,15 @@ function ItemEditSheet({
           <div className="w-9 h-1 rounded-full bg-gray-200" />
         </div>
 
-        {/* Image + current category */}
-        <div className="flex items-center gap-3.5 px-5 py-3">
-          <div className="w-[60px] h-[60px] rounded-xl overflow-hidden relative shrink-0">
+        {/* Image preview */}
+        <div className="px-5 pt-1 pb-2">
+          <div className="w-full rounded-2xl overflow-hidden relative bg-gray-50" style={{ aspectRatio: '1/1' }}>
             <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized />
           </div>
+        </div>
+
+        {/* Current category label */}
+        <div className="px-5 pb-1">
           <span className="text-[15px] font-semibold text-gray-900">{catLabel(selectedCat, t.cats)}</span>
         </div>
 
@@ -2089,6 +2187,181 @@ function ItemEditSheet({
   );
 }
 
+// ─── Try-On Confirm Modal ──────────────────────────────────────────────────────
+function TryOnConfirmModal({
+  savedLayout,
+  items,
+  onConfirm,
+  onCancel,
+}: {
+  savedLayout: SavedCanvasLayout | null;
+  items: ClosetItem[];
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const { t } = useI18n();
+  const displayEntries = React.useMemo(() => {
+    if (!savedLayout || savedLayout.length === 0) return [];
+    return savedLayout
+      .map((entry) => {
+        const item = items.find((i) => i.id === entry.id);
+        if (!item) return null;
+        return { item, x: entry.x, y: entry.y, scale: entry.scale, zIndex: entry.zIndex };
+      })
+      .filter(Boolean) as { item: ClosetItem; x: number; y: number; scale: number; zIndex: number }[];
+  }, [savedLayout, items]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 backdrop-blur-sm"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-[430px] rounded-t-3xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Drag handle */}
+        <div className="flex justify-center pt-3 pb-2">
+          <div className="w-9 h-1 rounded-full bg-gray-200" />
+        </div>
+
+        {/* Outfit preview */}
+        <div
+          className="mx-5 rounded-2xl overflow-hidden bg-gray-50 flex items-center justify-center"
+          style={{ height: 260 }}
+        >
+          <div className="relative h-full" style={{ aspectRatio: '3 / 4', maxWidth: '100%' }}>
+            {displayEntries.map((entry, idx) => (
+              <div
+                key={`${entry.item.id}-${idx}`}
+                className="absolute origin-center"
+                style={{
+                  left: `${entry.x}%`,
+                  top: `${entry.y}%`,
+                  width: '35%',
+                  aspectRatio: '1',
+                  transform: `scale(${entry.scale})`,
+                  zIndex: entry.zIndex,
+                }}
+              >
+                <div className="relative w-full h-full">
+                  <Image src={entry.item.imageData} alt={entry.item.category} fill className="object-contain" unoptimized />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Title */}
+        <div className="px-5 pt-4 pb-2 text-center">
+          <h3 className="text-[16px] font-bold text-gray-900">{t.tryOnConfirmTitle}</h3>
+          <p className="text-[13px] text-gray-400 mt-1">{t.tryOnConfirmBody}</p>
+        </div>
+
+        {/* Buttons */}
+        <div className="flex gap-3 px-5 pt-3 pb-8">
+          <button
+            onClick={onCancel}
+            className="flex-1 h-12 rounded-full bg-gray-100 text-gray-700 text-[13px] font-semibold"
+          >
+            {t.tryOnCancel}
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 h-12 rounded-full text-white text-[13px] font-semibold flex items-center justify-center gap-1.5"
+            style={{ background: 'linear-gradient(135deg, #1a1a1a, #000)' }}
+          >
+            <Sparkles size={12} />
+            {t.tryOnConfirm}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Shared download helper ───────────────────────────────────────────────────────────
+async function downloadWithWatermark(resultUrl: string): Promise<void> {
+  const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(resultUrl)}`;
+  const img = new window.Image();
+  img.crossOrigin = 'anonymous';
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error('load failed'));
+    img.src = proxyUrl;
+  });
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(img, 0, 0);
+
+  const scale = Math.max(img.naturalWidth / 400, 1);
+  const fontSize = Math.round(14 * scale);
+  ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
+  ctx.textBaseline = 'middle';
+  const margin = Math.round(14 * scale);
+  const textY = margin + fontSize / 2 + Math.round(16 * scale);
+
+  ctx.shadowColor = 'rgba(255,255,255,0.6)';
+  ctx.shadowBlur = Math.round(4 * scale);
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = '#000000';
+  ctx.fillText('LIB', margin, textY);
+  const libW = ctx.measureText('LIB').width;
+  ctx.fillStyle = '#F370A7';
+  ctx.fillText('Λ', margin + libW, textY);
+  const lambdaW = ctx.measureText('Λ').width;
+  ctx.fillStyle = '#000000';
+  ctx.fillText('S', margin + libW + lambdaW, textY);
+
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+
+  return new Promise<void>((resolve) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `libas-tryon-${Date.now()}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      }
+      resolve();
+    }, 'image/jpeg', 0.95);
+  });
+}
+
+// ─── Try-On Tips ───────────────────────────────────────────────────────────────
+const TRYON_TIPS = [
+  "The 'capsule wardrobe' concept: just 33 versatile pieces can create over 100 distinct outfits.",
+  "Fit is everything — a well-tailored outfit in simple fabrics always looks more polished than a badly fitted designer piece.",
+  "Neutral colors like white, black, navy, and beige pair effortlessly with almost anything in your wardrobe.",
+  "The rule of three: limit an outfit to three colors or patterns for a naturally balanced, intentional look.",
+  "Layering adds depth and dimension — a light jacket or cardigan over a basic tee can elevate the whole look.",
+  "Clothes that fit your shoulders perfectly are the key — shoulders are the hardest thing to alter.",
+  "A monochrome outfit (one color head-to-toe) creates a sleek, elongating silhouette.",
+  "Tucking in your shirt — even just at the front — instantly gives any outfit a more intentional, styled feel.",
+  "Proportion matters: pair oversized tops with fitted bottoms, and wide-leg trousers with a slim top.",
+  "Accessories can shift the same outfit between casual, smart, and formal — it's the fastest way to restyle.",
+  "Dark denim is more formal than light wash — swapping shades can dress an outfit up or down easily.",
+  "Pattern mixing works best when one pattern is large-scale and the other is smaller, with a shared color.",
+  "White sneakers are the most versatile shoe ever made — they pair with everything from suits to sundresses.",
+  "Wearing the darkest shade at the bottom grounds your silhouette and makes you look taller.",
+  "A belt in the same color as your shoes creates a polished, pulled-together look without much effort.",
+  "Natural fabrics like cotton, linen, and wool breathe better and tend to age more gracefully than synthetics.",
+  "Rolling up your sleeves adds a relaxed, approachable energy to any smart or semi-formal outfit.",
+  "Think 'cost per wear' — a $150 jacket worn 150 times costs $1 per wear, making it a better value than cheap items worn twice.",
+  "Color blocking (two bold solid colors together) looks most striking when the colors are complementary or opposite on the color wheel.",
+  "Building your wardrobe around 5 core colors you love means every piece you own will mix and match effortlessly.",
+];
+
 // ─── Try-On Modal ───────────────────────────────────────────────────────────────
 function TryOnModal({
   status,
@@ -2096,14 +2369,43 @@ function TryOnModal({
   failureReason,
   onClose,
   onRetry,
+  onCancel,
 }: {
   status: 'loading' | 'processing' | 'completed' | 'failed';
   resultUrl?: string;
   failureReason?: string;
   onClose: () => void;
   onRetry: () => void;
+  onCancel: () => void;
 }) {
   const { t } = useI18n();
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [tipIndex, setTipIndex] = useState(() => Math.floor(Math.random() * TRYON_TIPS.length));
+  const [tipFading, setTipFading] = useState(false);
+
+  useEffect(() => {
+    if (status !== 'loading' && status !== 'processing') return;
+    const interval = setInterval(() => {
+      setTipFading(true);
+      setTimeout(() => {
+        setTipIndex((i) => (i + 1) % TRYON_TIPS.length);
+        setTipFading(false);
+      }, 350);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [status]);
+
+  async function downloadWithLogo() {
+    if (!resultUrl || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      await downloadWithWatermark(resultUrl);
+    } catch {
+      window.open(resultUrl, '_blank');
+    } finally {
+      setIsDownloading(false);
+    }
+  }
 
   return (
     <div
@@ -2117,18 +2419,24 @@ function TryOnModal({
         {/* Result area */}
         <div className="relative w-full" style={{ minHeight: status === 'completed' ? 420 : 300 }}>
           {(status === 'loading' || status === 'processing') && (
-            <div className="w-full h-[300px] flex flex-col items-center justify-center gap-4">
+            <div className="w-full flex flex-col items-center justify-center gap-4 px-5 pt-8 pb-6">
               <div className="relative">
                 <div className="w-16 h-16 rounded-full border-[3px] border-gray-200 border-t-[#F370A7] animate-spin" />
                 <Sparkles size={20} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[#F370A7]" />
               </div>
-              <div className="text-center px-6">
+              <div className="text-center">
                 <p className="text-[15px] font-semibold text-gray-900">
-                  {status === 'loading' ? 'Starting try-on...' : 'Generating your look...'}
+                  {status === 'loading' ? t.tryOnStarting : t.tryOnGenerating}
                 </p>
-                <p className="text-[12px] text-gray-400 mt-1">
-                  {status === 'loading' ? 'Sending outfit to AI' : 'This may take a moment'}
-                </p>
+              </div>
+              {/* Rotating style tip */}
+              <div className="w-full">
+                <div className="bg-gray-50 rounded-2xl px-4 py-3">
+                  <p className="text-[10px] font-semibold text-[#F370A7] uppercase tracking-wider mb-1.5">✦ {t.tryOnStyleTip}</p>
+                  <div style={{ opacity: tipFading ? 0 : 1, transition: 'opacity 0.35s ease', minHeight: '3.5em' }}>
+                    <p className="text-[12px] text-gray-600 leading-relaxed">{TRYON_TIPS[tipIndex]}</p>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -2136,6 +2444,12 @@ function TryOnModal({
           {status === 'completed' && resultUrl && (
             <div className="relative w-full h-[420px]">
               <Image src={resultUrl} alt="Try-on result" fill className="object-contain" unoptimized />
+              {/* Logo watermark — visible on screenshots */}
+              <div className="absolute top-7 left-3 z-10 pointer-events-none">
+                <p className="text-[13px] font-bold tracking-[0.5px]" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.18)' }}>
+                  <span className="text-black">LIB</span><span style={{ color: '#F370A7' }}>Λ</span><span className="text-black">S</span>
+                </p>
+              </div>
             </div>
           )}
 
@@ -2145,7 +2459,7 @@ function TryOnModal({
                 <X size={24} className="text-red-500" />
               </div>
               <div className="text-center">
-                <p className="text-[15px] font-semibold text-gray-900">Try-on failed</p>
+                <p className="text-[15px] font-semibold text-gray-900">{t.tryOnFailedTitle}</p>
                 <p className="text-[12px] text-gray-400 mt-1">{failureReason}</p>
               </div>
             </div>
@@ -2160,22 +2474,19 @@ function TryOnModal({
                 onClick={onClose}
                 className="flex-1 h-12 rounded-full bg-gray-100 text-gray-700 text-[13px] font-semibold"
               >
-                Close
+                {t.close}
               </button>
               <button
-                onClick={() => {
-                  if (resultUrl) {
-                    const a = document.createElement('a');
-                    a.href = resultUrl;
-                    a.download = `tryon-${Date.now()}.png`;
-                    a.target = '_blank';
-                    a.click();
-                  }
-                }}
-                className="flex-1 h-12 rounded-full bg-black text-white text-[13px] font-semibold flex items-center justify-center gap-1.5"
+                onClick={downloadWithLogo}
+                disabled={isDownloading}
+                className="flex-1 h-12 rounded-full bg-black text-white text-[13px] font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                Save
+                {isDownloading ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                )}
+                {t.save}
               </button>
             </>
           )}
@@ -2185,23 +2496,23 @@ function TryOnModal({
                 onClick={onClose}
                 className="flex-1 h-12 rounded-full bg-gray-100 text-gray-700 text-[13px] font-semibold"
               >
-                Close
+                {t.close}
               </button>
               <button
                 onClick={onRetry}
                 className="flex-1 h-12 rounded-full bg-black text-white text-[13px] font-semibold flex items-center justify-center gap-1.5"
               >
                 <RefreshCw size={13} />
-                Retry
+                {t.retry}
               </button>
             </>
           )}
           {(status === 'loading' || status === 'processing') && (
             <button
-              onClick={onClose}
+              onClick={onCancel}
               className="flex-1 h-12 rounded-full bg-gray-100 text-gray-500 text-[13px] font-semibold"
             >
-              Cancel
+              {t.tryOnCancel}
             </button>
           )}
         </div>
@@ -2412,6 +2723,162 @@ function PremiumGateSheet({
 
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── My Looks Sheet ──────────────────────────────────────────────────────────
+function formatLookDate(timestamp: number, t: { justNow: string; minutesAgo: string; today: string; yesterday: string }): string {
+  const diff = Date.now() - timestamp;
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return t.justNow;
+  if (mins < 60) return t.minutesAgo.replace('{n}', String(mins));
+  const date = new Date(timestamp);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (date.toDateString() === today.toDateString()) return `${t.today}, ${timeStr}`;
+  if (date.toDateString() === yesterday.toDateString()) return `${t.yesterday}, ${timeStr}`;
+  return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${timeStr}`;
+}
+
+function MyLooksSheet({
+  history,
+  onClose,
+  onDelete,
+}: {
+  history: TryOnRecord[];
+  onClose: () => void;
+  onDelete: (id: string) => void;
+}) {
+  const [viewingItem, setViewingItem] = useState<TryOnRecord | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const { t } = useI18n();
+
+  async function handleDownload(url: string) {
+    if (isDownloading) return;
+    setIsDownloading(true);
+    try {
+      await downloadWithWatermark(url);
+    } catch {
+      window.open(url, '_blank');
+    } finally {
+      setIsDownloading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[90] bg-white flex flex-col">
+      {/* Header */}
+      <div className="shrink-0 flex items-center justify-between px-4 h-14 border-b border-gray-100">
+        <div>
+          <h2 className="text-[16px] font-bold text-gray-900">{t.myLooks}</h2>
+          {history.length > 0 && (
+            <p className="text-[11px] text-gray-400 leading-none">{history.length} {t.myLooksSaved}</p>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center"
+        >
+          <X size={17} strokeWidth={2} className="text-gray-600" />
+        </button>
+      </div>
+
+      {/* Content */}
+      {history.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 px-8 text-center">
+          <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+            <Images size={28} className="text-gray-400" />
+          </div>
+          <div>
+            <p className="text-[15px] font-semibold text-gray-700">{t.myLooksEmpty}</p>
+            <p className="text-[12px] text-gray-400 mt-1">{t.myLooksEmptyHint}</p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto px-3 py-3">
+          <div className="grid grid-cols-2 gap-2">
+            {history.map((record) => (
+              <div key={record.id} className="relative rounded-2xl overflow-hidden bg-gray-100">
+                <button
+                  className="w-full block relative"
+                  style={{ aspectRatio: '3/4' }}
+                  onClick={() => setViewingItem(record)}
+                >
+                  <Image
+                    src={record.resultUrl}
+                    alt="Generated look"
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                  {/* Logo overlay on thumbnail */}
+                  <div className="absolute top-2 left-2 z-10 pointer-events-none">
+                    <p className="text-[10px] font-bold tracking-[0.4px]" style={{ textShadow: '0 0 4px rgba(255,255,255,0.9), 0 1px 3px rgba(0,0,0,0.35)' }}>
+                      <span className="text-black">LIB</span><span style={{ color: '#F370A7' }}>Λ</span><span className="text-black">S</span>
+                    </p>
+                  </div>
+                </button>
+                <div className="px-2 py-1.5">
+                  <p className="text-[10px] text-gray-400">{formatLookDate(record.timestamp, t)}</p>
+                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(record.id); }}
+                  className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/40 flex items-center justify-center"
+                >
+                  <X size={10} color="white" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Full-screen viewer */}
+      {viewingItem && (
+        <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+          <div className="shrink-0 flex items-center justify-between px-4 h-14">
+            <p className="text-white/60 text-[12px]">{formatLookDate(viewingItem.timestamp, t)}</p>
+            <button
+              onClick={() => setViewingItem(null)}
+              className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center"
+            >
+              <X size={17} color="white" />
+            </button>
+          </div>
+          <div className="flex-1 flex items-center justify-center bg-black overflow-hidden">
+            <div className="relative" style={{ display: 'inline-flex' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={viewingItem.resultUrl}
+                alt="Generated look"
+                style={{ maxHeight: 'calc(100dvh - 168px)', maxWidth: '100vw', display: 'block' }}
+              />
+              <div className="absolute top-3 left-3 z-10 pointer-events-none">
+                <p className="text-[13px] font-bold tracking-[0.5px]" style={{ textShadow: '0 0 5px rgba(255,255,255,0.85), 0 1px 4px rgba(0,0,0,0.3)' }}>
+                  <span className="text-black">LIB</span><span style={{ color: '#F370A7' }}>Λ</span><span className="text-black">S</span>
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="shrink-0 px-5 pb-10 pt-4">
+            <button
+              onClick={() => handleDownload(viewingItem.resultUrl)}
+              disabled={isDownloading}
+              className="w-full h-12 rounded-full bg-white text-black text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isDownloading ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              )}
+              {t.myLooksSaveLook}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { verifyOtp } from '@/lib/api';
 import { saveTokens, saveUser } from '@/lib/auth';
+import { isOnboardingComplete } from '@/lib/onboarding-storage';
 import { useI18n } from '@/lib/i18n';
 
 const CODE_LENGTH = 6;
@@ -58,7 +59,7 @@ export default function OtpPage() {
       const result = await verifyOtp(phone, code);
       saveTokens(result.accessToken, result.refreshToken);
       if (result.user) saveUser(result.user);
-      router.replace('/closet');
+      router.replace(isOnboardingComplete() ? '/closet' : '/onboarding');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : t.enterFull6Digit;
       setError(msg);
