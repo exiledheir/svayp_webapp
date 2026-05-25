@@ -93,7 +93,6 @@ export interface Translations {
   myLooksSaveLook: string;
   justNow: string;
   minutesAgo: string;
-  today: string;
   yesterday: string;
   cats: {
     tops: string;
@@ -213,7 +212,6 @@ const en: Translations = {
   myLooksSaveLook: 'Save Look',
   justNow: 'Just now',
   minutesAgo: '{n}m ago',
-  today: 'Today',
   yesterday: 'Yesterday',
   cats: {
     tops: 'Tops',
@@ -333,7 +331,6 @@ const ru: Translations = {
   myLooksSaveLook: 'Сохранить образ',
   justNow: 'Только что',
   minutesAgo: '{n} мин назад',
-  today: 'Сегодня',
   yesterday: 'Вчера',
   cats: {
     tops: 'Топы',
@@ -451,7 +448,6 @@ const uz: Translations = {
   myLooksSaveLook: "Obrazni saqlash",
   justNow: 'Hozirgina',
   minutesAgo: '{n} daqiqa oldin',
-  today: 'Bugun',
   yesterday: 'Kecha',
   cats: {
     tops: 'Tepa kiyim',
