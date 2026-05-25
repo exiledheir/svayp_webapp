@@ -1,10 +1,27 @@
 import axios from 'axios';
-import { getToken, clearTokens } from '@/lib/auth';
+import { getToken, getRefreshToken, saveTokens, clearTokens } from '@/lib/auth';
 import type { Product, ChatSummary, ChatMessage } from '@/types';
 
 // All requests go to /proxy/* which Next.js rewrites to https://app.svaypai.com/api/v1/*
 // This avoids browser CORS restrictions.
 const api = axios.create({ baseURL: '/proxy' });
+
+// ── Token refresh state ───────────────────────────────────────────────────────
+
+let isRefreshing = false;
+let refreshQueue: Array<(token: string) => void> = [];
+
+function processQueue(newToken: string) {
+  refreshQueue.forEach((resolve) => resolve(newToken));
+  refreshQueue = [];
+}
+
+function redirectToLogin() {
+  clearTokens();
+  if (typeof window !== 'undefined') {
+    window.location.href = '/auth/phone';
+  }
+}
 
 // ── Interceptors ──────────────────────────────────────────────────────────────
 
@@ -18,14 +35,57 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (res) => res,
-  (error) => {
-    if (error.response?.status === 401) {
-      clearTokens();
-      if (typeof window !== 'undefined') {
-        window.location.href = '/auth/phone';
-      }
+  async (error) => {
+    const original = error.config;
+
+    if (error.response?.status !== 401 || original._retry) {
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) {
+      redirectToLogin();
+      return Promise.reject(error);
+    }
+
+    // If a refresh is already in progress, queue this request
+    if (isRefreshing) {
+      return new Promise((resolve, reject) => {
+        refreshQueue.push((newToken: string) => {
+          original.headers.Authorization = `Bearer ${newToken}`;
+          resolve(api(original));
+        });
+        // If refresh ultimately fails, reject queued requests too
+        const originalReject = reject;
+        refreshQueue.push(() => originalReject(error));
+      });
+    }
+
+    original._retry = true;
+    isRefreshing = true;
+
+    try {
+      const res = await axios.post('/proxy/auth/token/refresh', {
+        refresh_token: refreshToken,
+      });
+
+      const data = res.data?.data ?? res.data;
+      const newAccess: string = data.access_token;
+      const newRefresh: string = data.refresh_token ?? refreshToken;
+
+      saveTokens(newAccess, newRefresh);
+      api.defaults.headers.common.Authorization = `Bearer ${newAccess}`;
+
+      processQueue(newAccess);
+      original.headers.Authorization = `Bearer ${newAccess}`;
+      return api(original);
+    } catch {
+      refreshQueue = [];
+      redirectToLogin();
+      return Promise.reject(error);
+    } finally {
+      isRefreshing = false;
+    }
   }
 );
 

@@ -27,6 +27,8 @@ RUN addgroup -g 1001 -S nodejs && adduser -u 1001 -S nextjs -G nodejs
 # standalone output contains only what's needed at runtime
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# public/ is NOT included in standalone output — must be copied explicitly
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 USER nextjs
 
