@@ -590,6 +590,17 @@ export default function ClosetPage() {
           tryOnCount={usage.tryItOnsUsed}
           onViewItems={() => {
             setCanvasInitialLayout(savedLayout);
+            // Eagerly preload canvas images the moment the button is tapped,
+            // before the component mounts, so they are already in-flight / cached.
+            if (savedLayout) {
+              savedLayout.forEach((entry) => {
+                const item = items.find((i) => i.id === entry.id);
+                if (item?.imageData && !item.imageData.startsWith('data:')) {
+                  const preload = new window.Image();
+                  preload.src = item.imageData;
+                }
+              });
+            }
             setCanvasData({
               upper: items.filter((i) => UPPER_CATS.includes(i.category)),
               lower: items.filter((i) => LOWER_CATS.includes(i.category)),
@@ -1227,9 +1238,9 @@ function OutfitCard({
             </div>
           </div>
         ) : (
-          <div className="w-full h-full flex items-center justify-center overflow-hidden isolate">
+          <div className="w-full h-full flex items-center justify-center overflow-hidden isolate" style={{ containerType: 'size' }}>
             {/* Inner container matches InteractiveCanvas aspect ratio (3:4) so positions are identical */}
-            <div className="relative h-full" style={{ aspectRatio: '3 / 4', maxWidth: '100%' }}>
+            <div className="relative" style={{ aspectRatio: '3 / 4', width: 'min(75cqh, 100cqw)' }}>
               {displayEntries.map((entry, idx) => (
                 <div
                   key={entry.item.id}
@@ -1566,6 +1577,7 @@ function InteractiveCanvas({
       {/* Canvas area */}
       <div
         className="flex-1 relative overflow-hidden bg-white touch-none flex items-center justify-center"
+        style={{ containerType: 'size' }}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
@@ -1573,8 +1585,8 @@ function InteractiveCanvas({
         onTouchEnd={handleTouchEnd}
         onClick={handleCanvasTap}
       >
-        {/* Inner canvas with fixed aspect ratio — matches preview card */}
-        <div ref={containerRef} className="relative h-full" style={{ aspectRatio: '3 / 4', maxWidth: '100%', maxHeight: '100%' }}>
+        {/* Inner canvas with fixed aspect ratio — matches preview card. Uses container-query units so 3:4 is always maintained on all viewport sizes. */}
+        <div ref={containerRef} className="relative" style={{ aspectRatio: '3 / 4', width: 'min(75cqh, 100cqw)' }}>
         {canvasItems.map((ci, idx) => (
           <div
             key={`${ci.group}-${idx}-${ci.item.id}`}
@@ -1593,7 +1605,9 @@ function InteractiveCanvas({
             onClick={(e) => { e.stopPropagation(); handleSelect(idx); }}
           >
             <div className="relative w-full h-full rounded-xl overflow-hidden cursor-grab active:cursor-grabbing">
-              <Image src={ci.item.imageData} alt={ci.item.category} fill className="object-contain" unoptimized />
+              {/* Use plain img so images load eagerly with synchronous decoding — avoids the one-by-one stagger on mobile */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={ci.item.imageData} alt={ci.item.category} className="absolute inset-0 w-full h-full object-contain" decoding="sync" />
             </div>
           </div>
         ))}
@@ -2338,30 +2352,6 @@ async function downloadWithWatermark(resultUrl: string): Promise<void> {
   });
 }
 
-// ─── Try-On Tips ───────────────────────────────────────────────────────────────
-const TRYON_TIPS = [
-  "The 'capsule wardrobe' concept: just 33 versatile pieces can create over 100 distinct outfits.",
-  "Fit is everything — a well-tailored outfit in simple fabrics always looks more polished than a badly fitted designer piece.",
-  "Neutral colors like white, black, navy, and beige pair effortlessly with almost anything in your wardrobe.",
-  "The rule of three: limit an outfit to three colors or patterns for a naturally balanced, intentional look.",
-  "Layering adds depth and dimension — a light jacket or cardigan over a basic tee can elevate the whole look.",
-  "Clothes that fit your shoulders perfectly are the key — shoulders are the hardest thing to alter.",
-  "A monochrome outfit (one color head-to-toe) creates a sleek, elongating silhouette.",
-  "Tucking in your shirt — even just at the front — instantly gives any outfit a more intentional, styled feel.",
-  "Proportion matters: pair oversized tops with fitted bottoms, and wide-leg trousers with a slim top.",
-  "Accessories can shift the same outfit between casual, smart, and formal — it's the fastest way to restyle.",
-  "Dark denim is more formal than light wash — swapping shades can dress an outfit up or down easily.",
-  "Pattern mixing works best when one pattern is large-scale and the other is smaller, with a shared color.",
-  "White sneakers are the most versatile shoe ever made — they pair with everything from suits to sundresses.",
-  "Wearing the darkest shade at the bottom grounds your silhouette and makes you look taller.",
-  "A belt in the same color as your shoes creates a polished, pulled-together look without much effort.",
-  "Natural fabrics like cotton, linen, and wool breathe better and tend to age more gracefully than synthetics.",
-  "Rolling up your sleeves adds a relaxed, approachable energy to any smart or semi-formal outfit.",
-  "Think 'cost per wear' — a $150 jacket worn 150 times costs $1 per wear, making it a better value than cheap items worn twice.",
-  "Color blocking (two bold solid colors together) looks most striking when the colors are complementary or opposite on the color wheel.",
-  "Building your wardrobe around 5 core colors you love means every piece you own will mix and match effortlessly.",
-];
-
 // ─── Try-On Modal ───────────────────────────────────────────────────────────────
 function TryOnModal({
   status,
@@ -2380,7 +2370,7 @@ function TryOnModal({
 }) {
   const { t } = useI18n();
   const [isDownloading, setIsDownloading] = useState(false);
-  const [tipIndex, setTipIndex] = useState(() => Math.floor(Math.random() * TRYON_TIPS.length));
+  const [tipIndex, setTipIndex] = useState(() => Math.floor(Math.random() * 20));
   const [tipFading, setTipFading] = useState(false);
 
   useEffect(() => {
@@ -2388,7 +2378,7 @@ function TryOnModal({
     const interval = setInterval(() => {
       setTipFading(true);
       setTimeout(() => {
-        setTipIndex((i) => (i + 1) % TRYON_TIPS.length);
+        setTipIndex((i) => (i + 1) % t.tryOnTips.length);
         setTipFading(false);
       }, 350);
     }, 5000);
@@ -2434,7 +2424,7 @@ function TryOnModal({
                 <div className="bg-gray-50 rounded-2xl px-4 py-3">
                   <p className="text-[10px] font-semibold text-[#F370A7] uppercase tracking-wider mb-1.5">✦ {t.tryOnStyleTip}</p>
                   <div style={{ opacity: tipFading ? 0 : 1, transition: 'opacity 0.35s ease', minHeight: '3.5em' }}>
-                    <p className="text-[12px] text-gray-600 leading-relaxed">{TRYON_TIPS[tipIndex]}</p>
+                    <p className="text-[12px] text-gray-600 leading-relaxed">{t.tryOnTips[tipIndex]}</p>
                   </div>
                 </div>
               </div>

@@ -169,7 +169,14 @@ function SlideEditOutfit() {
           className="relative w-full rounded-2xl overflow-hidden bg-gray-100"
           style={{ aspectRatio: '9/16', maxHeight: '52vh' }}
         >
-          {/* Video will be placed here once uploaded */}
+          <video
+            src="/video/closet/outfit_edit.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+          />
         </div>
       </div>
       <SlideText title={t.onboarding_slide4_title} body={t.onboarding_slide4_body} />
