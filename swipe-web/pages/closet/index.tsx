@@ -59,9 +59,9 @@ const OCCASION_CONFIG = [
 type UserPlan = PlanTier;
 
 const PLAN_LIMITS_FALLBACK: Record<UserPlan, PlanLimits> = {
-  free:    { itemsPerCategory: 2,  outfitCanvases: 1, tryItOns: 2,  regenerations: 5,  calendarDays: 2 },
-  pro:     { itemsPerCategory: 10, outfitCanvases: 3, tryItOns: 10, regenerations: 15, calendarDays: 7 },
-  premium: { itemsPerCategory: 20, outfitCanvases: 7, tryItOns: 30, regenerations: 50, calendarDays: 7 },
+  free:    { itemsPerCategory: 20,  outfitCanvases: 1, tryItOns: 2,  regenerations: 5,  calendarDays: 2 },
+  pro:     { itemsPerCategory: 50,  outfitCanvases: 3, tryItOns: 10, regenerations: 15, calendarDays: 7 },
+  premium: { itemsPerCategory: 999, outfitCanvases: 7, tryItOns: 30, regenerations: 50, calendarDays: 7 },
 };
 
 const PLAN_COLORS: Record<UserPlan, { bg: string; text: string; crownColor: string }> = {
@@ -99,7 +99,7 @@ function usePlan() {
     fetchPlan,
     canGenerate: usage.regenerationsUsed < limits.regenerations,
     canTryOn: usage.tryItOnsUsed < limits.tryItOns,
-    canAddItem: totalItems < limits.itemsPerCategory * 10,
+    canAddItem: totalItems < limits.itemsPerCategory,
     canAddCanvas: true,
     calendarDays: limits.calendarDays,
   };
@@ -542,7 +542,7 @@ export default function ClosetPage() {
                 aria-label="Plan"
               >
                 <Crown size={11} strokeWidth={2} color={plan === 'free' ? '#aaa' : PLAN_COLORS[plan].crownColor} />
-                <span>{plan === 'free' ? 'Free' : plan === 'pro' ? 'Trial' : 'Pro'}</span>
+                <span>{plan === 'free' ? 'Free' : plan === 'pro' ? 'Pro' : 'Premium'}</span>
               </button>
             )}
             {/* Language: flag emoji */}
@@ -959,7 +959,7 @@ export default function ClosetPage() {
                   className="text-[14px] font-semibold"
                   style={{ color: plan === 'free' ? '#888' : PLAN_COLORS[plan].text }}
                 >
-                  {plan === 'free' ? 'Free plan' : plan === 'pro' ? 'Trial' : 'Premium'}
+                  {plan === 'free' ? 'Free plan' : plan === 'pro' ? 'Pro' : 'Premium'}
                 </span>
               </div>
             </div>
@@ -2544,10 +2544,10 @@ function PremiumGateSheet({
     },
     {
       key: 'pro' as UserPlan,
-      label: 'Trial',
-      monthlyPrice: 0,
-      yearlyPrice: 0,
-      yearlyOriginal: 0,
+      label: 'Pro',
+      monthlyPrice: 19_000,
+      yearlyPrice: 182_400,
+      yearlyOriginal: 228_000,
       color: '#F370A7',
       gradient: 'linear-gradient(135deg, #F370A7 0%, #e0559a 100%)',
     },
