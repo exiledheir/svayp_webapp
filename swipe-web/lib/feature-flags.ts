@@ -36,7 +36,7 @@ export const FEATURES = {
    *  - PremiumGate / upgrade modals never open
    *  - OutfitSection regenerate button has no usage counter
    */
-  plansEnabled: envFlag('NEXT_PUBLIC_FF_PLANS_ENABLED', true),
+  plansEnabled: envFlag('NEXT_PUBLIC_FF_PLANS_ENABLED', false),
 
   /**
    * profileEnabled
