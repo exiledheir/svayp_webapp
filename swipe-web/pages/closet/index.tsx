@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { Plus, X, Sparkles, Sun, CalendarDays, TreePine, Camera, Image as ImageIcon, Loader2, Crown, Lock, RefreshCw, User, Images } from 'lucide-react';
+import { Plus, X, Sparkles, Sun, CalendarDays, TreePine, Camera, Image as ImageIcon, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2 } from 'lucide-react';
 import { getUser } from '@/lib/auth';
 import { FEATURES } from '@/lib/feature-flags';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
@@ -78,10 +78,11 @@ function usePlan() {
   const fetchPlan = useCallback(async () => {
     try {
       const data = await getUserPlan();
-
-      setPlan(data.plan);
-      setLimits(data.limits);
-      setUsage(data.usage);
+      // mapPlanResponse in wardrobe-api guarantees all fields are present,
+      // but guard here too in case of unexpected nulls.
+      setPlan(data.plan ?? 'free');
+      setLimits({ ...PLAN_LIMITS_FALLBACK.free, ...data.limits });
+      setUsage({ ...{ regenerationsUsed: 0, tryItOnsUsed: 0, itemCountByCategory: {} }, ...data.usage });
     } catch {
       setPlan('free');
       setLimits(PLAN_LIMITS_FALLBACK.free);
@@ -100,7 +101,6 @@ function usePlan() {
     canGenerate: usage.regenerationsUsed < limits.regenerations,
     canTryOn: usage.tryItOnsUsed < limits.tryItOns,
     canAddItem: totalItems < limits.itemsPerCategory,
-    canAddCanvas: true,
     calendarDays: limits.calendarDays,
   };
 }
@@ -122,44 +122,52 @@ export default function ClosetPage() {
   const [accFilter, setAccFilter] = useState<ClosetCategory | null>(null);
   const [viewAll, setViewAll] = useState<{ title: string; items: ClosetItem[] } | null>(null);
   const [canvasData, setCanvasData] = useState<{ upper: ClosetItem[]; lower: ClosetItem[]; shoes: ClosetItem[]; acc: ClosetItem[] } | null>(null);
-  const [savedLayout, setSavedLayout] = useState<SavedCanvasLayout | null>(null);
+  // Multi-canvas state: each board has a backend id + layout
+  const [canvases, setCanvases] = useState<{ id: string | null; layout: SavedCanvasLayout }[]>([]);
+  const [editingCanvasIdx, setEditingCanvasIdx] = useState<number | null>(null);
   const [canvasInitialLayout, setCanvasInitialLayout] = useState<SavedCanvasLayout | null>(null);
-  const [savedCanvasId, setSavedCanvasId] = useState<string | null>(null);
   const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | null>(null);
-  const { plan, limits, usage, fetchPlan, canGenerate, canTryOn, canAddItem, canAddCanvas, calendarDays } = usePlan();
+  const { plan, limits, usage, fetchPlan, canGenerate, canTryOn, canAddItem, calendarDays } = usePlan();
 
-  // Load saved layout from backend (or fallback to localStorage)
+  // Load all canvases from backend
   useEffect(() => {
-    getOutfitCanvases({ page: 0, size: 1 })
+    getOutfitCanvases({ page: 0, size: 20, sort: 'updatedAt,desc' })
       .then((page) => {
         if (page.content.length > 0) {
-          const canvas = page.content[0];
-          setSavedCanvasId(canvas.id);
-          const layout: SavedCanvasLayout = canvas.items.map((item) => ({
-            id: item.wardrobeItemId,
-            x: item.x,
-            y: item.y,
-            scale: item.scale,
-            zIndex: item.zIndex,
-            group: (item.itemGroup || 'upper') as SavedCanvasEntry['group'],
+          // Backend should already return sorted by updatedAt desc,
+          // but sort client-side as a safety net.
+          const sorted = [...page.content].sort(
+            (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+          );
+          const loaded = sorted.map((canvas) => ({
+            id: canvas.id as string | null,
+            layout: canvas.items.map((item) => ({
+              id: item.wardrobeItemId,
+              x: item.x,
+              y: item.y,
+              scale: item.scale,
+              zIndex: item.zIndex,
+              group: (item.itemGroup || 'upper') as SavedCanvasEntry['group'],
+            })),
           }));
-          setSavedLayout(layout);
-          setCanvasInitialLayout(layout);
-          localStorage.setItem('svayp_saved_layout', JSON.stringify(layout));
+          setCanvases(loaded);
         } else {
-          // No backend canvas, try localStorage
-          const s = localStorage.getItem('svayp_saved_layout');
-          if (s) setSavedLayout(JSON.parse(s));
+          // Fallback to localStorage for the first canvas
+          try {
+            const s = localStorage.getItem('svayp_saved_layout');
+            if (s) setCanvases([{ id: null, layout: JSON.parse(s) }]);
+          } catch { /* ignore */ }
         }
       })
       .catch(() => {
-        // Fallback to localStorage
         try {
           const s = localStorage.getItem('svayp_saved_layout');
-          if (s) setSavedLayout(JSON.parse(s));
+          if (s) setCanvases([{ id: null, layout: JSON.parse(s) }]);
         } catch { /* ignore */ }
       });
   }, []);
+
+  const canAddCanvas = canvases.length < limits.outfitCanvases;
 
   const [outfitSheet, setOutfitSheet] = useState<{ title: string; days: Date[] } | null>(null);
   const [editItem, setEditItem] = useState<ClosetItem | null>(null);
@@ -167,6 +175,7 @@ export default function ClosetPage() {
   const [showTryOnConfirm, setShowTryOnConfirm] = useState(false);
   const [showMyLooks, setShowMyLooks] = useState(false);
   const [myLooksHistory, setMyLooksHistory] = useState<TryOnRecord[]>([]);
+  const [saveFailed, setSaveFailed] = useState(false);
   const tryOnCancelRef = useRef(false);
 
   // ── Inline add flow ──────────────────────────────────────────────────────────
@@ -381,7 +390,7 @@ export default function ClosetPage() {
     return layout;
   }
 
-  function handleNewOutfit() {
+  function handleNewOutfit(canvasIdx = 0) {
     const hasUpper = items.some((i) => UPPER_CATS.includes(i.category));
     const hasLowerOrShoes = items.some((i) => LOWER_CATS.includes(i.category) || SHOES_CATS.includes(i.category));
     if (!hasUpper || !hasLowerOrShoes) {
@@ -397,14 +406,19 @@ export default function ClosetPage() {
     }).catch(() => { /* handled by 402 error */ });
     // Meanwhile use local random as optimistic UI
     const randomLayout = generateRandomOutfit();
-    setSavedLayout(randomLayout);
+    setCanvases((prev) => {
+      const updated = [...prev];
+      if (canvasIdx >= updated.length) updated.push({ id: null, layout: randomLayout });
+      else updated[canvasIdx] = { ...updated[canvasIdx], layout: randomLayout };
+      return updated;
+    });
     try { localStorage.setItem('svayp_saved_layout', JSON.stringify(randomLayout)); } catch { /* ignore */ }
     setCanvasInitialLayout(randomLayout);
     // Save to backend
-    saveCanvasToBackend(randomLayout);
+    saveCanvasToBackend(randomLayout, canvasIdx);
   }
 
-  async function saveCanvasToBackend(layout: SavedCanvasLayout) {
+  async function saveCanvasToBackend(layout: SavedCanvasLayout, canvasIdx: number) {
     // Only save items that are real backend items (not local_)
     const apiItems = layout
       .filter((e) => !e.id.startsWith('local_') && !e.id.startsWith('pending_'))
@@ -417,30 +431,43 @@ export default function ClosetPage() {
         itemGroup: e.group,
       }));
 
-    if (apiItems.length === 0) return;
+    // Backend requires at least 2 items; defer save until user adds more
+    if (apiItems.length < 2) return;
+
+    const existingId = canvases[canvasIdx]?.id ?? null;
 
     try {
-      if (savedCanvasId) {
+      if (existingId) {
         // Update existing canvas
-        await updateOutfitCanvas(savedCanvasId, { items: apiItems });
+        await updateOutfitCanvas(existingId, { items: apiItems });
       } else {
         // Create new canvas
-        const canvas = await createOutfitCanvas({ name: 'My Outfit', items: apiItems });
-        setSavedCanvasId(canvas.id);
+        const canvasName = `Outfit ${canvasIdx + 1}`;
+        const canvas = await createOutfitCanvas({ name: canvasName, items: apiItems });
+        setCanvases((prev) => {
+          const updated = [...prev];
+          if (updated[canvasIdx]) updated[canvasIdx] = { ...updated[canvasIdx], id: canvas.id };
+          return updated;
+        });
       }
     } catch (err) {
       console.error('Failed to save canvas to backend:', err);
+      setSaveFailed(true);
+      setTimeout(() => setSaveFailed(false), 4000);
     }
   }
 
+  const tryOnCanvasIdxRef = useRef(0);
+
   function startTryOn() {
     tryOnCancelRef.current = false;
-    const itemIds = (savedLayout ?? []).map((e) => e.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
+    const targetCanvas = canvases[tryOnCanvasIdxRef.current];
+    const itemIds = (targetCanvas?.layout ?? []).map((e) => e.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
     if (itemIds.length === 0) return;
 
     setTryOnState({ status: 'loading' });
 
-    createTryOnJob({ wardrobeItemIds: itemIds, canvasId: savedCanvasId ?? undefined })
+    createTryOnJob({ wardrobeItemIds: itemIds, canvasId: targetCanvas?.id ?? undefined })
       .then((job) => {
         if (tryOnCancelRef.current) return;
         setTryOnState({ status: 'processing' });
@@ -471,14 +498,26 @@ export default function ClosetPage() {
       });
   }
 
-  function handleTryItOn() {
+  function handleTryItOn(canvasIdx = 0) {
     if (FEATURES.plansEnabled && !canTryOn) {
       setShowPremiumGate('generation');
       return;
     }
-    const itemIds = (savedLayout ?? []).map((e) => e.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
+    const targetCanvas = canvases[canvasIdx];
+    const itemIds = (targetCanvas?.layout ?? []).map((e) => e.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
     if (itemIds.length === 0) return;
+    tryOnCanvasIdxRef.current = canvasIdx;
     setShowTryOnConfirm(true);
+  }
+
+  async function handleDeleteCanvas(canvasIdx: number) {
+    const canvas = canvases[canvasIdx];
+    if (!canvas) return;
+    // Delete from backend if it has an id
+    if (canvas.id) {
+      try { await deleteOutfitCanvas(canvas.id); } catch { /* ignore */ }
+    }
+    setCanvases((prev) => prev.filter((_, i) => i !== canvasIdx));
   }
 
   function handleCancelTryOn() {
@@ -497,6 +536,12 @@ export default function ClosetPage() {
 
   return (
     <div className="phone-container flex flex-col bg-white" style={{ height: '100dvh' }}>
+      {/* Save-failed toast */}
+      {saveFailed && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[999] px-4 py-2.5 rounded-full bg-red-500 text-white text-[13px] font-semibold shadow-lg">
+          Failed to save outfit. Please try again.
+        </div>
+      )}
       {/* Header — mobile glass-morphism style */}
       <header className="shrink-0 bg-white px-4 pt-3 pb-2">
         <div
@@ -582,18 +627,19 @@ export default function ClosetPage() {
         {/* ── My Outfits ────────────────────────────────────────── */}
         <OutfitSection
           allItems={items}
-          savedLayout={savedLayout}
+          canvases={canvases}
           plan={plan}
           canGenerate={canGenerate}
           genCount={usage.regenerationsUsed}
           limits={limits}
           tryOnCount={usage.tryItOnsUsed}
-          onViewItems={() => {
-            setCanvasInitialLayout(savedLayout);
-            // Eagerly preload canvas images the moment the button is tapped,
-            // before the component mounts, so they are already in-flight / cached.
-            if (savedLayout) {
-              savedLayout.forEach((entry) => {
+          onViewItems={(idx) => {
+            const layout = canvases[idx]?.layout ?? null;
+            setEditingCanvasIdx(idx);
+            setCanvasInitialLayout(layout);
+            // Eagerly preload canvas images
+            if (layout) {
+              layout.forEach((entry) => {
                 const item = items.find((i) => i.id === entry.id);
                 if (item?.imageData && !item.imageData.startsWith('data:')) {
                   const preload = new window.Image();
@@ -608,9 +654,20 @@ export default function ClosetPage() {
               acc: items.filter((i) => ACC_CATS.includes(i.category)),
             });
           }}
-          onRegenerate={handleNewOutfit}
+          canAddCanvas={canAddCanvas}
+          onAddCanvas={() => {
+            // Create a new empty canvas at the end of the list
+            const newIdx = canvases.length;
+            setCanvases((prev) => [...prev, { id: null, layout: [] }]);
+            setEditingCanvasIdx(newIdx);
+            setCanvasInitialLayout(null);
+            // Pass empty arrays so the canvas starts blank
+            setCanvasData({ upper: [], lower: [], shoes: [], acc: [] });
+          }}
+          onRegenerate={(idx) => handleNewOutfit(idx)}
           onShowPlans={() => setShowPremiumGate('generation')}
-          onTryItOn={handleTryItOn}
+          onTryItOn={(idx) => handleTryItOn(idx)}
+          onDeleteCanvas={handleDeleteCanvas}
         />
 
         {/* ── Upper Body ────────────────────────────────────────── */}
@@ -695,14 +752,32 @@ export default function ClosetPage() {
           acc={canvasData.acc}
           initialLayout={canvasInitialLayout}
           allItems={items}
-          onClose={() => setCanvasData(null)}
-          onSave={(layout) => {
-            setSavedLayout(layout);
-            setCanvasInitialLayout(layout);
-            localStorage.setItem('svayp_saved_layout', JSON.stringify(layout));
+          onClose={() => {
+            // If this was a brand-new canvas with no items saved yet, remove the empty entry
+            if (editingCanvasIdx !== null) {
+              const c = canvases[editingCanvasIdx];
+              if (c && !c.id && c.layout.length === 0) {
+                setCanvases((prev) => prev.filter((_, i) => i !== editingCanvasIdx));
+              }
+            }
+            setEditingCanvasIdx(null);
             setCanvasData(null);
-            // Save to backend
-            saveCanvasToBackend(layout);
+          }}
+          onSave={(layout) => {
+            if (editingCanvasIdx !== null) {
+              setCanvases((prev) => {
+                const updated = [...prev];
+                updated[editingCanvasIdx] = { ...updated[editingCanvasIdx], layout };
+                return updated;
+              });
+              setCanvasInitialLayout(layout);
+              setCanvasData(null);
+              // Save to backend
+              saveCanvasToBackend(layout, editingCanvasIdx);
+            } else {
+              setCanvasData(null);
+            }
+            setEditingCanvasIdx(null);
           }}
           onRegenerate={handleNewOutfit}
           onShowPlans={() => setShowPremiumGate('generation')}
@@ -744,7 +819,7 @@ export default function ClosetPage() {
       {/* ── Try-On Confirm Sheet ── */}
       {showTryOnConfirm && (
         <TryOnConfirmModal
-          savedLayout={savedLayout}
+          savedLayout={canvases[tryOnCanvasIdxRef.current]?.layout ?? null}
           items={items}
           onConfirm={() => { setShowTryOnConfirm(false); startTryOn(); }}
           onCancel={() => setShowTryOnConfirm(false)}
@@ -1008,18 +1083,21 @@ export default function ClosetPage() {
 }
 
 // ─── My Outfits ─────────────────────────────────────────────────────────────────
-function OutfitSection({ allItems, savedLayout, plan, canGenerate, genCount, limits, tryOnCount, onViewItems, onRegenerate, onShowPlans, onTryItOn }: {
+function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas }: {
   allItems: ClosetItem[];
-  savedLayout: SavedCanvasLayout | null;
+  canvases: { id: string | null; layout: SavedCanvasLayout }[];
   plan: UserPlan;
   canGenerate: boolean;
   genCount: number;
   limits: PlanLimits;
   tryOnCount: number;
-  onViewItems: () => void;
-  onRegenerate: () => void;
+  canAddCanvas: boolean;
+  onViewItems: (idx: number) => void;
+  onRegenerate: (idx: number) => void;
+  onAddCanvas: () => void;
   onShowPlans: () => void;
-  onTryItOn: () => void;
+  onTryItOn: (idx: number) => void;
+  onDeleteCanvas: (idx: number) => void;
 }) {
   const { t } = useI18n();
   const isEmpty = allItems.length === 0;
@@ -1030,47 +1108,92 @@ function OutfitSection({ allItems, savedLayout, plan, canGenerate, genCount, lim
         <h2 className="text-[18px] font-bold text-gray-900 tracking-tight">{t.myOutfits}</h2>
       </div>
       <div className={`flex gap-3 hide-scrollbar py-2 ${isEmpty ? 'justify-center px-4' : 'overflow-x-auto pl-4'}`}>
-        {/* Single auto-generated outfit card */}
-        <OutfitCard
-          allItems={allItems}
-          isEmpty={isEmpty}
-          savedLayout={savedLayout}
-          onViewItems={onViewItems}
-          onRegenerate={onRegenerate}
-          canRegenerate={canGenerate}
-          genCount={genCount}
-          regenLimit={limits.regenerations}
-          onTryItOn={onTryItOn}
-          tryOnCount={tryOnCount}
-          tryOnLimit={limits.tryItOns}
-        />
+        {/* Render all canvas cards */}
+        {canvases.length > 0 ? canvases.map((canvas, idx) => (
+          <OutfitCard
+            key={canvas.id ?? `canvas-${idx}`}
+            allItems={allItems}
+            isEmpty={isEmpty}
+            savedLayout={canvas.layout.length > 0 ? canvas.layout : null}
+            onViewItems={() => onViewItems(idx)}
+            onRegenerate={() => onRegenerate(idx)}
+            canRegenerate={canGenerate}
+            genCount={genCount}
+            regenLimit={limits.regenerations}
+            onTryItOn={() => onTryItOn(idx)}
+            tryOnCount={tryOnCount}
+            tryOnLimit={limits.tryItOns}
+            onDelete={idx > 0 ? () => onDeleteCanvas(idx) : undefined}
+          />
+        )) : (
+          <OutfitCard
+            allItems={allItems}
+            isEmpty={isEmpty}
+            savedLayout={null}
+            onViewItems={() => onViewItems(0)}
+            onRegenerate={() => onRegenerate(0)}
+            canRegenerate={canGenerate}
+            genCount={genCount}
+            regenLimit={limits.regenerations}
+            onTryItOn={() => onTryItOn(0)}
+            tryOnCount={tryOnCount}
+            tryOnLimit={limits.tryItOns}
+          />
+        )}
 
-        {/* New outfit card — always opens plans popup, premium gold style */}
+        {/* New outfit card — add board if plan allows, otherwise upgrade prompt */}
         {!isEmpty && (
-          <button
-            onClick={onShowPlans}
-            className="shrink-0 rounded-[28px] flex flex-col items-center justify-center gap-3 border-2 border-dashed active:scale-[0.98] transition-transform"
-            style={{
-              width: 'min(82vw, 340px)',
-              height: 440,
-              borderColor: '#B8860B',
-              background: 'linear-gradient(160deg, rgba(184,134,11,0.04), rgba(139,105,20,0.08))',
-            }}
-          >
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center"
+          canAddCanvas ? (
+            <button
+              onClick={onAddCanvas}
+              className="shrink-0 rounded-[28px] flex flex-col items-center justify-center gap-3 border-2 border-dashed active:scale-[0.98] transition-transform"
               style={{
-                background: 'linear-gradient(135deg, #FFF8DC, #FFD700)',
-                boxShadow: '0 4px 20px rgba(184,134,11,0.25)',
+                width: 'min(82vw, 340px)',
+                height: 440,
+                borderColor: '#D1D5DB',
+                background: 'rgba(249,250,251,0.8)',
               }}
             >
-              <Plus size={26} strokeWidth={2} style={{ color: '#8B6914' }} />
-            </div>
-            <div className="text-center px-6">
-              <p className="text-[14px] font-bold text-gray-700">{t.newOutfit}</p>
-              <p className="text-[12px] font-semibold mt-0.5" style={{ color: '#8B6914' }}>{t.upgradeToGetMore}</p>
-            </div>
-          </button>
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center"
+                style={{
+                  background: '#F3F4F6',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                }}
+              >
+                <Plus size={26} strokeWidth={2} className="text-gray-500" />
+              </div>
+              <div className="text-center px-6">
+                <p className="text-[14px] font-bold text-gray-700">{t.newOutfit}</p>
+                <p className="text-[12px] text-gray-400 mt-0.5">{limits.outfitCanvases - canvases.length} more available</p>
+              </div>
+            </button>
+          ) : (
+            <button
+              onClick={onShowPlans}
+              className="shrink-0 rounded-[28px] flex flex-col items-center justify-center gap-3 border-2 border-dashed active:scale-[0.98] transition-transform"
+              style={{
+                width: 'min(82vw, 340px)',
+                height: 440,
+                borderColor: '#B8860B',
+                background: 'linear-gradient(160deg, rgba(184,134,11,0.04), rgba(139,105,20,0.08))',
+              }}
+            >
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center"
+                style={{
+                  background: 'linear-gradient(135deg, #FFF8DC, #FFD700)',
+                  boxShadow: '0 4px 20px rgba(184,134,11,0.25)',
+                }}
+              >
+                <Plus size={26} strokeWidth={2} style={{ color: '#8B6914' }} />
+              </div>
+              <div className="text-center px-6">
+                <p className="text-[14px] font-bold text-gray-700">{t.newOutfit}</p>
+                <p className="text-[12px] font-semibold mt-0.5" style={{ color: '#8B6914' }}>{t.upgradeToGetMore}</p>
+              </div>
+            </button>
+          )
         )}
 
         <div className="w-6 shrink-0" />
@@ -1091,18 +1214,20 @@ function OutfitCard({
   onTryItOn,
   tryOnCount,
   tryOnLimit,
+  onDelete,
 }: {
   allItems: ClosetItem[];
   isEmpty: boolean;
   savedLayout: SavedCanvasLayout | null;
   onViewItems: () => void;
-  onRegenerate: () => void;
+  onRegenerate?: () => void;
   canRegenerate: boolean;
   genCount: number;
   regenLimit: number;
-  onTryItOn: () => void;
+  onTryItOn?: () => void;
   tryOnCount: number;
   tryOnLimit: number;
+  onDelete?: () => void;
 }) {
   const { t } = useI18n();
 
@@ -1153,22 +1278,38 @@ function OutfitCard({
         boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
       }}
     >
-      {/* Top-right regenerate button + counter */}
+      {/* Top-left delete button */}
+      {onDelete && (
+        <button
+          onClick={onDelete}
+          className="absolute top-3.5 left-3.5 z-10 w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
+          style={{ background: 'rgba(239,68,68,0.08)' }}
+          title="Delete"
+        >
+          <Trash2 size={14} strokeWidth={2.2} className="text-red-400" />
+        </button>
+      )}
+
+      {/* Top-right action buttons */}
       {canGenerateOutfit && (
-        <div className="absolute top-3.5 right-3.5 flex flex-col items-center gap-0.5 z-10">
-          <button
-            onClick={onRegenerate}
-            className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
-            style={{ background: 'rgba(0,0,0,0.06)' }}
-            title="Regenerate"
-          >
-            <RefreshCw
-              size={14}
-              strokeWidth={2.2}
-              className={canRegenerate ? 'text-gray-600' : 'text-gray-300'}
-            />
-          </button>
-          <span className="text-[9px] font-semibold text-gray-400 leading-none">{genCount}/{regenLimit}</span>
+        <div className="absolute top-3.5 right-3.5 flex flex-col items-center gap-1.5 z-10">
+          {onRegenerate && (
+            <div className="flex flex-col items-center gap-0.5">
+              <button
+                onClick={onRegenerate}
+                className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
+                style={{ background: 'rgba(0,0,0,0.06)' }}
+                title="Regenerate"
+              >
+                <RefreshCw
+                  size={14}
+                  strokeWidth={2.2}
+                  className={canRegenerate ? 'text-gray-600' : 'text-gray-300'}
+                />
+              </button>
+              <span className="text-[9px] font-semibold text-gray-400 leading-none">{genCount}/{regenLimit}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -1274,6 +1415,7 @@ function OutfitCard({
         >
           {t.viewItems}
         </button>
+        {onTryItOn && (
         <button
           onClick={onTryItOn}
           className="flex-1 h-[44px] rounded-full flex items-center justify-center gap-1.5 text-[12px] font-semibold text-white tracking-wide"
@@ -1283,6 +1425,7 @@ function OutfitCard({
           <span>{t.tryItOn}</span>
           <span className="opacity-60 text-[10px]">{tryOnCount}/{tryOnLimit}</span>
         </button>
+        )}
       </div>
       )}
     </div>
@@ -1384,20 +1527,21 @@ function InteractiveCanvas({
   const [dragStart, setDragStart] = useState<{ x: number; y: number; itemX: number; itemY: number }>({ x: 0, y: 0, itemX: 0, itemY: 0 });
   const [swapTarget, setSwapTarget] = useState<number | null>(null);
   const [addPicker, setAddPicker] = useState(false);
+  const [saveWarning, setSaveWarning] = useState(false);
   // Pinch zoom state
   const pinchRef = useRef<{ initialDist: number; initialScale: number } | null>(null);
 
   function getGroupItems(group: 'upper' | 'lower' | 'shoes' | 'acc'): ClosetItem[] {
     switch (group) {
-      case 'upper': return upper;
-      case 'lower': return lower;
-      case 'shoes': return shoes;
-      case 'acc': return acc;
+      case 'upper': return allItems.filter((i) => UPPER_CATS.includes(i.category));
+      case 'lower': return allItems.filter((i) => LOWER_CATS.includes(i.category));
+      case 'shoes': return allItems.filter((i) => SHOES_CATS.includes(i.category));
+      case 'acc': return allItems.filter((i) => ACC_CATS.includes(i.category));
     }
   }
 
   function getAllItems(): ClosetItem[] {
-    return [...upper, ...lower, ...shoes, ...acc];
+    return allItems;
   }
 
   function getGroupLabel(group: 'upper' | 'lower' | 'shoes' | 'acc'): string {
@@ -1528,6 +1672,15 @@ function InteractiveCanvas({
 
   // Save — deduplicate by item ID (keep last occurrence = most recent position)
   function handleSave() {
+    // Validate: need at least 1 upper + 1 lower/shoes
+    const hasUpper = canvasItems.some((ci) => ci.group === 'upper');
+    const hasLowerOrShoes = canvasItems.some((ci) => ci.group === 'lower' || ci.group === 'shoes');
+    if (!hasUpper || !hasLowerOrShoes) {
+      setSaveWarning(true);
+      setTimeout(() => setSaveWarning(false), 4000);
+      return;
+    }
+
     const seen = new Set<string>();
     const deduped: SavedCanvasLayout = [];
     // Iterate in reverse so the last (top) occurrence wins
@@ -1548,6 +1701,12 @@ function InteractiveCanvas({
 
   return (
     <div className="fixed inset-0 z-[65] flex flex-col bg-white">
+      {/* Save warning toast */}
+      {saveWarning && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[999] px-4 py-2.5 rounded-full bg-amber-500 text-white text-[13px] font-semibold shadow-lg text-center max-w-[90vw]">
+          {t.addTopAndBottom}
+        </div>
+      )}
       {/* Header */}
       <header className="shrink-0 flex items-center justify-between px-4 h-14 border-b border-gray-100">
         <div className="flex items-center gap-3">
@@ -1568,7 +1727,12 @@ function InteractiveCanvas({
               <Crown size={14} strokeWidth={2} color="#FFD700" />
             </button>
           )}
-          <button onClick={handleSave} className="px-4 py-2 rounded-full text-[13px] font-semibold text-white" style={{ backgroundColor: '#F370A7' }}>
+          <button
+            onClick={handleSave}
+            disabled={!canvasItems.some((ci) => ci.group === 'upper') || !canvasItems.some((ci) => ci.group === 'lower' || ci.group === 'shoes')}
+            className="px-4 py-2 rounded-full text-[13px] font-semibold text-white disabled:opacity-40 transition-opacity"
+            style={{ backgroundColor: '#F370A7' }}
+          >
             {t.save}
           </button>
         </div>

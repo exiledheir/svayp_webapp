@@ -4,7 +4,7 @@ import type { Product, ChatSummary, ChatMessage } from '@/types';
 
 // All requests go to /proxy/* which Next.js rewrites to https://app.svaypai.com/api/v1/*
 // This avoids browser CORS restrictions.
-const api = axios.create({ baseURL: '/proxy' });
+export const api = axios.create({ baseURL: '/proxy' });
 
 // ── Token refresh state ───────────────────────────────────────────────────────
 

@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { getToken, clearTokens } from '@/lib/auth';
+import { api } from '@/lib/api';
 import type {
   WardrobeCategory,
   WardrobeSubcategory,
@@ -15,33 +14,10 @@ import type {
   TryOnJobResponse,
   CalendarResponse,
 } from '@/types';
+import type { PlanTier } from '@/types';
 
-// All requests go to /proxy/* which Next.js rewrites to https://app.svaypai.com/api/v1/*
-const api = axios.create({ baseURL: '/proxy' });
-
-api.interceptors.request.use((config) => {
-  const token = getToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-api.interceptors.response.use(
-  (res) => res,
-  (error) => {
-    if (error.response?.status === 401) {
-      clearTokens();
-      if (typeof window !== 'undefined') {
-        window.location.href = '/auth/phone';
-      }
-    }
-    if (error.response?.status === 400) {
-      console.error('[API 400]', error.response?.data);
-    }
-    return Promise.reject(error);
-  },
-);
+// wardrobe-api uses the shared axios instance from lib/api.ts which has
+// automatic token refresh on 401. Do not create a separate instance here.
 
 function unwrapData<T>(res: { data: unknown }): T {
   const d = res.data as Record<string, unknown>;
@@ -50,9 +26,38 @@ function unwrapData<T>(res: { data: unknown }): T {
 
 // ── Plan ──────────────────────────────────────────────────────────────────────
 
+// Map the backend plan response (field names differ from frontend types).
+// Backend: { tier: "FREE"|"TRIAL"|"PREMIUM", limits: { wardrobeItems, canvases, tryOnPerMonth, regenPerMonth }, usage: { wardrobeItems, tryOnThisMonth, regenThisMonth } }
+// Frontend: { plan: "free"|"pro"|"premium", limits: { itemsPerCategory, outfitCanvases, tryItOns, regenerations }, usage: { regenerationsUsed, tryItOnsUsed, itemCountByCategory } }
+function mapPlanResponse(raw: Record<string, unknown>): UserPlanResponse {
+  const tierMap: Record<string, PlanTier> = { FREE: 'free', TRIAL: 'pro', PREMIUM: 'premium' };
+  const tier = ((raw.tier ?? raw.plan ?? 'FREE') as string).toUpperCase();
+  const limits = (raw.limits ?? {}) as Record<string, unknown>;
+  const usage = (raw.usage ?? {}) as Record<string, unknown>;
+  return {
+    userId: (raw.userId ?? '') as string,
+    plan: tierMap[tier] ?? 'free',
+    limits: {
+      itemsPerCategory: (limits.wardrobeItems ?? limits.itemsPerCategory ?? 20) as number,
+      outfitCanvases:   (limits.canvases ?? limits.outfitCanvases ?? 1) as number,
+      tryItOns:         (limits.tryOnPerMonth ?? limits.tryItOns ?? 2) as number,
+      regenerations:    (limits.regenPerMonth ?? limits.regenerations ?? 5) as number,
+      calendarDays:     (limits.calendarDays ?? 2) as number,
+    },
+    usage: {
+      regenerationsUsed:    (usage.regenThisMonth ?? usage.regenerationsUsed ?? 0) as number,
+      tryItOnsUsed:         (usage.tryOnThisMonth ?? usage.tryItOnsUsed ?? 0) as number,
+      itemCountByCategory:  (usage.itemCountByCategory ?? {}) as Record<string, number>,
+    },
+    billingPeriodStart: (raw.billingPeriodStart ?? '') as string,
+    billingPeriodEnd:   (raw.billingPeriodEnd ?? '') as string,
+  };
+}
+
 export async function getUserPlan(): Promise<UserPlanResponse> {
   const res = await api.get('/me/plan');
-  return unwrapData<UserPlanResponse>(res);
+  const raw = unwrapData<Record<string, unknown>>(res);
+  return mapPlanResponse(raw);
 }
 
 // ── Upload Flow ───────────────────────────────────────────────────────────────
@@ -277,10 +282,10 @@ export async function uploadWardrobeItem(
 // ── Outfit Canvases ───────────────────────────────────────────────────────────
 
 export async function getOutfitCanvases(
-  params: { page?: number; size?: number } = {},
+  params: { page?: number; size?: number; sort?: string } = {},
 ): Promise<PageResponse<OutfitCanvasResponse>> {
   const res = await api.get('/outfits/canvases', {
-    params: { page: params.page ?? 0, size: params.size ?? 20 },
+    params: { page: params.page ?? 0, size: params.size ?? 20, sort: params.sort ?? 'updatedAt,desc' },
   });
   return unwrapData<PageResponse<OutfitCanvasResponse>>(res);
 }
@@ -296,8 +301,20 @@ export async function createOutfitCanvas(data: {
   thumbnailUrl?: string;
   items: OutfitCanvasItemRequest[];
 }): Promise<OutfitCanvasResponse> {
-  const res = await api.post('/outfits/canvases', data);
-  return unwrapData<OutfitCanvasResponse>(res);
+  const payload = {
+    name: data.name || 'My Outfit',
+    items: data.items,
+    ...(data.occasion ? { occasion: data.occasion } : {}),
+    ...(data.thumbnailUrl ? { thumbnailUrl: data.thumbnailUrl } : {}),
+  };
+  try {
+    const res = await api.post('/outfits/canvases', payload);
+    return unwrapData<OutfitCanvasResponse>(res);
+  } catch (err: unknown) {
+    const axErr = err as { response?: { data?: unknown } };
+    console.error('createOutfitCanvas failed — payload:', JSON.stringify(payload, null, 2), 'response:', axErr?.response?.data);
+    throw err;
+  }
 }
 
 export async function updateOutfitCanvas(
