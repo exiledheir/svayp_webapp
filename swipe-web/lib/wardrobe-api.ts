@@ -113,7 +113,7 @@ export async function uploadFileToBlob(
   contentType: string,
 ): Promise<void> {
   // Proxy through Next.js API to avoid Azure Blob CORS preflight rejection
-  await axios.put(
+  await api.put(
     `/api/blob-upload?putUrl=${encodeURIComponent(putUrl)}&contentType=${encodeURIComponent(contentType)}`,
     file,
     { headers: { 'Content-Type': contentType } },
