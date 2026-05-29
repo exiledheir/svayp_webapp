@@ -539,7 +539,7 @@ export default function ClosetPage() {
       {/* Save-failed toast */}
       {saveFailed && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[999] px-4 py-2.5 rounded-full bg-red-500 text-white text-[13px] font-semibold shadow-lg">
-          Failed to save outfit. Please try again.
+          {t.saveFailed}
         </div>
       )}
       {/* Header — mobile glass-morphism style */}
@@ -1165,7 +1165,7 @@ function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits
               </div>
               <div className="text-center px-6">
                 <p className="text-[14px] font-bold text-gray-700">{t.newOutfit}</p>
-                <p className="text-[12px] text-gray-400 mt-0.5">{limits.outfitCanvases - canvases.length} more available</p>
+                <p className="text-[12px] text-gray-400 mt-0.5">{limits.outfitCanvases - canvases.length} {t.moreAvailable}</p>
               </div>
             </button>
           ) : (

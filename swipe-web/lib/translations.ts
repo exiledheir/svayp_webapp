@@ -32,6 +32,8 @@ export interface Translations {
   noItemsYet: string;
   language: string;
   upgradeToGetMore: string;
+  moreAvailable: string;
+  saveFailed: string;
   addItemsFirst: string;
   items: string;
   calendar: string;
@@ -152,6 +154,8 @@ const en: Translations = {
   noItemsYet: 'No items yet',
   language: 'Language',
   upgradeToGetMore: 'Upgrade to unlock',
+  moreAvailable: 'more available',
+  saveFailed: 'Failed to save outfit. Please try again.',
   addItemsFirst: 'Add items to your closet first',
   items: 'items',
   calendar: 'Calendar',
@@ -293,6 +297,8 @@ const ru: Translations = {
   noItemsYet: 'Пока нет вещей',
   language: 'Язык',
   upgradeToGetMore: 'Нужен план',
+  moreAvailable: 'ещё доступно',
+  saveFailed: 'Не удалось сохранить образ. Попробуйте снова.',
   addItemsFirst: 'Сначала добавьте вещи в гардероб',
   items: 'вещей',
   calendar: 'Календарь',
@@ -434,6 +440,8 @@ const uz: Translations = {
   noItemsYet: "Hali narsalar yo'q",
   language: 'Til',
   upgradeToGetMore: "Qo'shish uchun yangilang",
+  moreAvailable: 'ta joy mavjud',
+  saveFailed: "Obrazni saqlashda xatolik. Qaytadan urinib ko'ring.",
   addItemsFirst: "Avval garderobingizga kiyim qo'shing",
   items: 'ta kiyim',
   calendar: 'Kalendar',
