@@ -112,12 +112,19 @@ export async function uploadFileToBlob(
   file: File | Blob,
   contentType: string,
 ): Promise<void> {
-  // Proxy through Next.js API to avoid Azure Blob CORS preflight rejection
-  await api.put(
-    `/api/blob-upload?putUrl=${encodeURIComponent(putUrl)}&contentType=${encodeURIComponent(contentType)}`,
-    file,
-    { headers: { 'Content-Type': contentType } },
-  );
+  // Proxy through Next.js API to avoid Azure Blob CORS preflight rejection.
+  // Use a plain fetch (not the `api` instance) — /api/blob-upload is a
+  // Next.js local route, not a backend endpoint, so it must NOT go through
+  // the /proxy base URL.
+  const url = `/api/blob-upload?putUrl=${encodeURIComponent(putUrl)}&contentType=${encodeURIComponent(contentType)}`;
+  const res = await fetch(url, {
+    method: 'PUT',
+    body: file,
+    headers: { 'Content-Type': contentType },
+  });
+  if (!res.ok) {
+    throw new Error(`Blob upload failed: ${res.status} ${res.statusText}`);
+  }
 }
 
 export async function confirmUpload(jobId: string): Promise<WardrobeUploadStatus> {
