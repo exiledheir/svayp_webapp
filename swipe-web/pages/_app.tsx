@@ -3,6 +3,7 @@ import axios from 'axios';
 import type { AppProps } from 'next/app';
 import { useRouter } from 'next/router';
 import { isAuthenticated, saveTokens, getRefreshFromCloud } from '@/lib/auth';
+import { restoreOnboardingFromCloud } from '@/lib/onboarding-storage';
 import { I18nProvider } from '@/lib/i18n';
 import '@/styles/globals.css';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -36,7 +37,7 @@ export default function App({ Component, pageProps }: AppProps) {
 
     // Public pages and already-authenticated sessions are ready immediately.
     if (PUBLIC_PATHS.has(router.pathname) || isAuthenticated()) {
-      setReady(true);
+      restoreOnboardingFromCloud().finally(() => setReady(true));
       return;
     }
 
@@ -51,6 +52,7 @@ export default function App({ Component, pageProps }: AppProps) {
           const data = res.data?.data ?? res.data;
           if (data?.access_token) {
             saveTokens(data.access_token, data.refresh_token ?? rt);
+            await restoreOnboardingFromCloud();
             setReady(true);
             return; // Restored — no OTP needed
           }
