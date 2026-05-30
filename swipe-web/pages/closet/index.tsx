@@ -11,6 +11,7 @@ import type { WardrobeUploadStatus, PlanTier, PlanLimits, PlanUsage, TryOnJobRes
 import { getUserPlan, generateOutfitSuggestions, createTryOnJob, pollTryOnUntilDone, getOutfitCalendar, createOutfitCanvas, updateOutfitCanvas, deleteOutfitCanvas, getOutfitCanvases, getOutfitCanvas } from '@/lib/wardrobe-api';
 import { useI18n } from '@/lib/i18n';
 import type { Locale } from '@/lib/translations';
+import { isOnboardingComplete } from '@/lib/onboarding-storage';
 import { saveTryOnResult, getTryOnHistory, deleteTryOnRecord, type TryOnRecord } from '@/lib/tryon-history';
 
 const ADD_GROUPS: Record<string, ClosetCategory[]> = {
@@ -112,6 +113,14 @@ export default function ClosetPage() {
   const [showLangPicker, setShowLangPicker] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [userInfo, setUserInfo] = useState<{ name?: string; phoneNumber?: string } | null>(null);
+
+  // Redirect to onboarding on first-ever visit (before any other effects run)
+  useEffect(() => {
+    if (!isOnboardingComplete()) {
+      router.replace('/onboarding');
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const u = getUser();
     if (u) setUserInfo({ name: u.name as string | undefined, phoneNumber: (u.phoneNumber ?? u.phone_number) as string | undefined });
