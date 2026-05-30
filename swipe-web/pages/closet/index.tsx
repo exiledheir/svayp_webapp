@@ -2735,10 +2735,8 @@ function PremiumGateSheet({
     },
   ];
 
-  function handleUpgrade(planKey: UserPlan) {
-    const period = yearly ? 'yearly' : 'monthly';
-    const msg = encodeURIComponent(`Hi! I want to upgrade to ${planKey} plan (${period}). My username: `);
-    window.open(`https://t.me/erkinov19?text=${msg}`, '_blank');
+  function handleUpgrade(_planKey: UserPlan) {
+    window.open('https://t.me/erkinov19', '_blank');
   }
 
   function formatPrice(price: number) {
