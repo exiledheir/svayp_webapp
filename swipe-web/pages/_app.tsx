@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { isAuthenticated, saveTokens, getRefreshFromCloud } from '@/lib/auth';
 import { restoreOnboardingFromCloud } from '@/lib/onboarding-storage';
 import { I18nProvider } from '@/lib/i18n';
+import { FeatureFlagsProvider } from '@/lib/feature-flags-context';
 import '@/styles/globals.css';
 import 'react-image-crop/dist/ReactCrop.css';
 
@@ -68,8 +69,10 @@ export default function App({ Component, pageProps }: AppProps) {
   if (!ready) return null;
 
   return (
-    <I18nProvider>
-      <Component {...pageProps} />
-    </I18nProvider>
+    <FeatureFlagsProvider>
+      <I18nProvider>
+        <Component {...pageProps} />
+      </I18nProvider>
+    </FeatureFlagsProvider>
   );
 }
