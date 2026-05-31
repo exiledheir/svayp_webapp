@@ -38,13 +38,6 @@ export const FEATURES = {
    */
   plansEnabled: envFlag('NEXT_PUBLIC_FF_PLANS_ENABLED', true),
 
-  /**
-   * profileEnabled
-   * When FALSE:
-   *  - Profile icon button in the closet header is hidden
-   *  - Profile sheet cannot be opened
-   *
-   * Toggle via env var: NEXT_PUBLIC_FF_PROFILE_ENABLED=false
-   */
-  profileEnabled: envFlag('NEXT_PUBLIC_FF_PROFILE_ENABLED', true),
+  // profileEnabled is no longer a static flag — it is fetched at runtime from
+  // GET /api/v1/app/premium-enabled.  See lib/feature-flags-context.tsx.
 } as const;

@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { Plus, X, Sparkles, Sun, CalendarDays, TreePine, Camera, Image as ImageIcon, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2 } from 'lucide-react';
 import { getUser } from '@/lib/auth';
-import { FEATURES } from '@/lib/feature-flags';
+import { useFeatureFlags } from '@/lib/feature-flags-context';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import { fetchClosetItems, addClosetItemFromFile, removeClosetItem, updateClosetItemApi, getClosetItems, addClosetItem, deleteClosetItem, updateClosetItem, CLOSET_CATEGORIES } from '@/lib/closet-storage';
 import type { ClosetItem, ClosetCategory } from '@/lib/closet-storage';
@@ -110,6 +110,7 @@ function usePlan() {
 export default function ClosetPage() {
   const router = useRouter();
   const { t, locale, setLocale } = useI18n();
+  const { plansEnabled, profileEnabled } = useFeatureFlags();
   const [showLangPicker, setShowLangPicker] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [userInfo, setUserInfo] = useState<{ name?: string; phoneNumber?: string } | null>(null);
@@ -203,7 +204,7 @@ export default function ClosetPage() {
   const addFileRef = useRef<File | null>(null);
 
   function openAdd(group: string, category: ClosetCategory) {
-    if (FEATURES.plansEnabled && !canAddItem) {
+    if (plansEnabled && !canAddItem) {
       setShowPremiumGate('items');
       return;
     }
@@ -407,7 +408,7 @@ export default function ClosetPage() {
       return;
     }
     if (!canGenerate) {
-      if (FEATURES.plansEnabled) { setShowPremiumGate('generation'); return; }
+      if (plansEnabled) { setShowPremiumGate('generation'); return; }
     }
     // Call backend to generate outfit suggestions
     generateOutfitSuggestions(1).then(() => {
@@ -508,7 +509,7 @@ export default function ClosetPage() {
   }
 
   function handleTryItOn(canvasIdx = 0) {
-    if (FEATURES.plansEnabled && !canTryOn) {
+    if (plansEnabled && !canTryOn) {
       setShowPremiumGate('generation');
       return;
     }
@@ -584,7 +585,7 @@ export default function ClosetPage() {
               </button>
             ))}
             {/* Plan with text — hidden when plans are disabled */}
-            {FEATURES.plansEnabled && (
+            {plansEnabled && (
               <button
                 onClick={() => setShowPremiumGate('generation')}
                 className="flex items-center gap-1 px-2.5 h-8 rounded-full text-[11px] font-bold active:scale-[0.95] transition-all"
@@ -618,7 +619,7 @@ export default function ClosetPage() {
               <span className="text-[18px] leading-none">{locale === 'uz' ? '🇺🇿' : locale === 'ru' ? '🇷🇺' : '🇬🇧'}</span>
             </button>
             {/* Profile icon */}
-            {FEATURES.profileEnabled && (
+            {profileEnabled && (
               <button
                 onClick={() => setShowProfile(true)}
                 className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
@@ -817,7 +818,7 @@ export default function ClosetPage() {
       )}
 
       {/* ── Premium Gate Sheet — only when plans feature is enabled ── */}
-      {FEATURES.plansEnabled && showPremiumGate && (
+      {plansEnabled && showPremiumGate && (
         <PremiumGateSheet
           reason={showPremiumGate}
           currentPlan={plan}
@@ -1726,7 +1727,7 @@ function InteractiveCanvas({
         </div>
         <div className="flex items-center gap-2">
           {/* Plans button — only when plans feature is enabled */}
-          {FEATURES.plansEnabled && (
+          {plansEnabled && (
             <button
               onClick={(e) => { e.stopPropagation(); onShowPlans(); }}
               className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
@@ -2192,7 +2193,7 @@ function OutfitDaysSheet({
                       {acc && <MiniOutfitSlot item={acc} />}
 
                       {/* Blur overlay for locked days — only when plans feature is enabled */}
-                      {!isUnlocked && FEATURES.plansEnabled && (
+                      {!isUnlocked && plansEnabled && (
                         <div
                           className="absolute inset-0 flex items-center justify-center cursor-pointer active:scale-[0.97] transition-transform"
                           style={{
