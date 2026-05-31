@@ -792,6 +792,7 @@ export default function ClosetPage() {
           onRegenerate={handleNewOutfit}
           onShowPlans={() => setShowPremiumGate('generation')}
           canRegenerate={canGenerate}
+          plansEnabled={plansEnabled}
         />
       )}
 
@@ -804,6 +805,7 @@ export default function ClosetPage() {
           calendarDays={calendarDays}
           onClose={() => setOutfitSheet(null)}
           onShowPlans={() => setShowPremiumGate('generation')}
+          plansEnabled={plansEnabled}
         />
       )}
 
@@ -1473,6 +1475,7 @@ function InteractiveCanvas({
   onRegenerate,
   onShowPlans,
   canRegenerate,
+  plansEnabled,
 }: {
   upper: ClosetItem[];
   lower: ClosetItem[];
@@ -1485,6 +1488,7 @@ function InteractiveCanvas({
   onRegenerate: () => void;
   onShowPlans: () => void;
   canRegenerate: boolean;
+  plansEnabled: boolean;
 }) {
   const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -2103,6 +2107,7 @@ function OutfitDaysSheet({
   calendarDays,
   onClose,
   onShowPlans,
+  plansEnabled,
 }: {
   title: string;
   days: Date[];
@@ -2110,6 +2115,7 @@ function OutfitDaysSheet({
   calendarDays: number;
   onClose: () => void;
   onShowPlans: () => void;
+  plansEnabled: boolean;
 }) {
   const { t } = useI18n();
   const [selectedDayIdx, setSelectedDayIdx] = useState<number | null>(null);
