@@ -97,6 +97,9 @@ export interface Translations {
   justNow: string;
   minutesAgo: string;
   yesterday: string;
+  promoBannerTitle: string;
+  promoBannerBody: string;
+  promoBannerCta: string;
   cats: {
     tops: string;
     tshirts: string;
@@ -240,6 +243,9 @@ const en: Translations = {
   justNow: 'Just now',
   minutesAgo: '{n}m ago',
   yesterday: 'Yesterday',
+  promoBannerTitle: 'Limited offer: 1+1 deal!',
+  promoBannerBody: 'Buy 1 month of Libas AI Wardrobe subscription and get another month completely free. Limited offer!',
+  promoBannerCta: 'Get offer',
   cats: {
     tops: 'Tops',
     tshirts: 'T-Shirts',
@@ -383,6 +389,9 @@ const ru: Translations = {
   justNow: 'Только что',
   minutesAgo: '{n} мин назад',
   yesterday: 'Вчера',
+  promoBannerTitle: 'Только сейчас: акция 1+1!',
+  promoBannerBody: 'Оформите подписку Libas AI Гардероб на 1 месяц и получите ещё 1 месяц совершенно бесплатно. Предложение ограничено!',
+  promoBannerCta: 'Получить',
   cats: {
     tops: 'Топы',
     tshirts: 'Футболки',
@@ -447,7 +456,7 @@ const uz: Translations = {
   calendar: 'Kalendar',
   choosePlan: 'Rejani tanlang',
   currentPlan: 'Joriy',
-  upgrade: 'Yangilash',
+  upgrade: 'Faollashtirish',
   monthly: 'Oylik',
   yearly: 'Yillik',
   sumPerMo: "so'm/oy",
@@ -524,6 +533,9 @@ const uz: Translations = {
   justNow: 'Hozirgina',
   minutesAgo: '{n} daqiqa oldin',
   yesterday: 'Kecha',
+  promoBannerTitle: 'Faqat hozir: 1+1 aksiya!',
+  promoBannerBody: 'Libas AI Garderob obunasini 1 oyga oling va yana 1 oy mutlaqo bepul foydalaning. Taklif cheklangan!',
+  promoBannerCta: 'Taklifni olish',
   cats: {
     tops: 'Tepa kiyim',
     tshirts: 'Futbolkalar',
