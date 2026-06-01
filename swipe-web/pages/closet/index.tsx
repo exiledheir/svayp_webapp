@@ -635,7 +635,8 @@ export default function ClosetPage() {
 
       {/* ── Promo Banner: 1+1 Aksiya ─────────────────────────────── */}
       <div
-        className="shrink-0 mx-3 mb-2 rounded-2xl overflow-hidden select-none"
+        onClick={() => setShowPremiumGate('generation')}
+        className="shrink-0 mx-3 mb-2 rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform select-none"
         style={{
           background: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 50%, #f7971e 100%)',
           boxShadow: '0 4px 18px rgba(255,75,43,0.4)',
@@ -659,7 +660,7 @@ export default function ClosetPage() {
 
           {/* CTA button */}
           <button
-            onClick={() => setShowPremiumGate('generation')}
+            onClick={(e) => { e.stopPropagation(); setShowPremiumGate('generation'); }}
             className="shrink-0 px-3 py-1.5 rounded-full bg-white text-[11px] font-bold active:scale-[0.95] transition-transform whitespace-nowrap"
             style={{ color: '#ff4b2b' }}
           >
