@@ -8,11 +8,11 @@ import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import { fetchClosetItems, addClosetItemFromFile, removeClosetItem, updateClosetItemApi, getClosetItems, addClosetItem, deleteClosetItem, updateClosetItem, CLOSET_CATEGORIES } from '@/lib/closet-storage';
 import type { ClosetItem, ClosetCategory } from '@/lib/closet-storage';
 import type { WardrobeUploadStatus, PlanTier, PlanLimits, PlanUsage, TryOnJobResponse } from '@/types';
-import { getUserPlan, generateOutfitSuggestions, createTryOnJob, pollTryOnUntilDone, getOutfitCalendar, createOutfitCanvas, updateOutfitCanvas, deleteOutfitCanvas, getOutfitCanvases, getOutfitCanvas } from '@/lib/wardrobe-api';
+import { getUserPlan, generateOutfitSuggestions, createTryOnJob, pollTryOnUntilDone, getOutfitCalendar, createOutfitCanvas, updateOutfitCanvas, deleteOutfitCanvas, getOutfitCanvases, getOutfitCanvas, listUploads, pollUploadUntilDone, getTryOnJob } from '@/lib/wardrobe-api';
 import { useI18n } from '@/lib/i18n';
 import type { Locale } from '@/lib/translations';
 import { isOnboardingComplete } from '@/lib/onboarding-storage';
-import { saveTryOnResult, getTryOnHistory, deleteTryOnRecord, type TryOnRecord } from '@/lib/tryon-history';
+import { saveTryOnResult, getTryOnHistory, getTryOnHistoryWithCloud, deleteTryOnRecord, saveActiveTryOnJob, getActiveTryOnJobWithCloud, clearActiveTryOnJob, type TryOnRecord } from '@/lib/tryon-history';
 
 const ADD_GROUPS: Record<string, ClosetCategory[]> = {
   upper: ['tops', 'dresses', 'jackets', 'blouses', 'jumpsuits', 'tshirts'],
@@ -187,6 +187,9 @@ export default function ClosetPage() {
   const [myLooksHistory, setMyLooksHistory] = useState<TryOnRecord[]>([]);
   const [saveFailed, setSaveFailed] = useState(false);
   const tryOnCancelRef = useRef(false);
+  const dismissedUploadJobsRef = useRef<Set<string>>((() => {
+    try { return new Set(JSON.parse(localStorage.getItem('libas_dismissed_uploads') ?? '[]')); } catch { return new Set<string>(); }
+  })());
 
   // ── Inline add flow ──────────────────────────────────────────────────────────
   const [addGroup, setAddGroup] = useState<string>('upper');
@@ -225,7 +228,10 @@ export default function ClosetPage() {
     }
   }, [router.isReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load history whenever the My Looks sheet opens
+  // Load history on mount (with CloudStorage fallback) and whenever the My Looks sheet opens
+  useEffect(() => {
+    getTryOnHistoryWithCloud().then(setMyLooksHistory);
+  }, []);
   useEffect(() => {
     if (showMyLooks) setMyLooksHistory(getTryOnHistory());
   }, [showMyLooks]);
@@ -337,6 +343,96 @@ export default function ClosetPage() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
+  // Resume polling for any uploads that were in progress when the page was closed
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const page = await listUploads(0, 20);
+        const inProgress = page.content.filter(
+          (u) => u.status !== 'COMPLETED' && u.status !== 'FAILED' && !dismissedUploadJobsRef.current.has(u.uploadJobId)
+        );
+        if (cancelled || inProgress.length === 0) return;
+        for (const job of inProgress) {
+          const pid = `resume_${job.uploadJobId}`;
+          const jobId = job.uploadJobId;
+          setPendingUploads((prev) => {
+            if (prev.has(pid)) return prev;
+            const next = new Map(prev);
+            next.set(pid, { category: 'tops', imageData: '', step: formatStep(job.currentStep), progress: job.progressPercent });
+            return next;
+          });
+          pollUploadUntilDone(jobId, (status) => {
+            if (cancelled || dismissedUploadJobsRef.current.has(jobId)) return;
+            setPendingUploads((prev) => {
+              const next = new Map(prev);
+              const existing = next.get(pid);
+              if (existing) next.set(pid, { ...existing, step: formatStep(status.currentStep), progress: status.progressPercent });
+              return next;
+            });
+          }).then(() => {
+            if (cancelled || dismissedUploadJobsRef.current.has(jobId)) return;
+            setPendingUploads((prev) => { const next = new Map(prev); next.delete(pid); return next; });
+            load();
+            fetchPlan();
+          }).catch(() => {
+            if (cancelled || dismissedUploadJobsRef.current.has(jobId)) return;
+            setPendingUploads((prev) => { const next = new Map(prev); next.delete(pid); return next; });
+            load();
+          });
+        }
+      } catch { /* ignore — non-critical */ }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Resume try-on if there was an active job when the page was closed
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const savedJobId = await getActiveTryOnJobWithCloud();
+      if (!savedJobId || cancelled) return;
+      try {
+        const job = await getTryOnJob(savedJobId);
+        if (cancelled) return;
+        if (job.status === 'COMPLETED' && job.resultImageUrl) {
+          clearActiveTryOnJob();
+          setTryOnState({ status: 'completed', resultUrl: job.resultImageUrl });
+          saveTryOnResult(job.resultImageUrl);
+          return;
+        }
+        if (job.status === 'FAILED') {
+          clearActiveTryOnJob();
+          setTryOnState({ status: 'failed', failureReason: job.failureReason ?? 'Try-on failed.' });
+          return;
+        }
+        // Still processing — show modal and resume polling
+        setTryOnState({ status: 'processing' });
+        const result = await pollTryOnUntilDone(savedJobId, (progress) => {
+          if (!cancelled && progress.status === 'PROCESSING') {
+            setTryOnState({ status: 'processing' });
+          }
+        });
+        clearActiveTryOnJob();
+        if (cancelled) return;
+        if (result.status === 'COMPLETED' && result.resultImageUrl) {
+          setTryOnState({ status: 'completed', resultUrl: result.resultImageUrl });
+          saveTryOnResult(result.resultImageUrl);
+        } else {
+          setTryOnState({ status: 'failed', failureReason: result.failureReason ?? 'Try-on failed.' });
+        }
+      } catch {
+        if (!cancelled) {
+          clearActiveTryOnJob();
+          setTryOnState(null);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleDelete(id: string) {
     try {
       if (!id.startsWith('local_')) {
@@ -370,6 +466,18 @@ export default function ClosetPage() {
     return Array.from(pendingUploads.entries())
       .filter(([, p]) => cats.includes(p.category))
       .map(([id, p]) => ({ id, ...p }));
+  }
+
+  function removePendingUpload(id: string) {
+    setPendingUploads((prev) => { const next = new Map(prev); next.delete(id); return next; });
+    // For resumed jobs, persist the dismissal so they are skipped on reload
+    if (id.startsWith('resume_')) {
+      const jobId = id.slice('resume_'.length);
+      dismissedUploadJobsRef.current.add(jobId);
+      try {
+        localStorage.setItem('libas_dismissed_uploads', JSON.stringify([...dismissedUploadJobsRef.current]));
+      } catch {}
+    }
   }
 
   function openViewAll(title: string, cats: ClosetCategory[]) {
@@ -468,18 +576,55 @@ export default function ClosetPage() {
   }
 
   const tryOnCanvasIdxRef = useRef(0);
+  const tryOnOverrideRef = useRef<{ itemIds: string[]; layout: SavedCanvasLayout } | null>(null);
+
+  function handleTryItOnFromItems(calItems: ClosetItem[]) {
+    if (plansEnabled && !canTryOn) { setShowPremiumGate('generation'); return; }
+    const itemIds = calItems.map((i) => i.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
+    if (itemIds.length === 0) return;
+
+    const upperItem  = calItems.find((i) => UPPER_CATS.includes(i.category)) ?? null;
+    const lowerItem  = calItems.find((i) => LOWER_CATS.includes(i.category)) ?? null;
+    const shoeItem   = calItems.find((i) => SHOES_CATS.includes(i.category)) ?? null;
+    const accAll     = calItems.filter((i) => ACC_CATS.includes(i.category));
+    const shawlItem  = accAll.find((a) => a.category === 'shawl') ?? null;
+    const sideAccItem = accAll.find((a) => a.category !== 'shawl') ?? null;
+    const hasShawl = shawlItem !== null;
+    const itemScale = hasShawl ? 0.88 : 1;
+
+    const entries: SavedCanvasLayout = [];
+    if (upperItem)   entries.push({ id: upperItem.id,   x: 32, y: hasShawl ? 19 : 4,  scale: itemScale, zIndex: 1,  group: 'upper' });
+    if (lowerItem)   entries.push({ id: lowerItem.id,   x: 32, y: hasShawl ? 48 : 37, scale: itemScale, zIndex: 2,  group: 'lower' });
+    if (shoeItem)    entries.push({ id: shoeItem.id,    x: 32, y: hasShawl ? 73 : 68, scale: hasShawl ? 0.65 : 0.72, zIndex: 3, group: 'shoes' });
+    if (shawlItem)   entries.push({ id: shawlItem.id,   x: 32, y: -5,                 scale: 0.55, zIndex: 10, group: 'acc' });
+    if (sideAccItem) entries.push({ id: sideAccItem.id, x: 63, y: hasShawl ? 20 : 5,  scale: 0.6,  zIndex: 4,  group: 'acc' });
+
+    tryOnOverrideRef.current = { itemIds, layout: entries };
+    setShowTryOnConfirm(true);
+  }
 
   function startTryOn() {
     tryOnCancelRef.current = false;
-    const targetCanvas = canvases[tryOnCanvasIdxRef.current];
-    const itemIds = (targetCanvas?.layout ?? []).map((e) => e.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
+    let itemIds: string[];
+    let canvasId: string | undefined;
+    if (tryOnOverrideRef.current) {
+      itemIds = tryOnOverrideRef.current.itemIds;
+      canvasId = undefined;
+    } else {
+      const targetCanvas = canvases[tryOnCanvasIdxRef.current];
+      itemIds = (targetCanvas?.layout ?? []).map((e) => e.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
+      canvasId = targetCanvas?.id ?? undefined;
+    }
+    tryOnOverrideRef.current = null;
     if (itemIds.length === 0) return;
 
     setTryOnState({ status: 'loading' });
 
-    createTryOnJob({ wardrobeItemIds: itemIds, canvasId: targetCanvas?.id ?? undefined })
+    createTryOnJob({ wardrobeItemIds: itemIds, canvasId })
       .then((job) => {
         if (tryOnCancelRef.current) return;
+        // Persist job ID so we can resume after reload
+        saveActiveTryOnJob(job.id);
         setTryOnState({ status: 'processing' });
         fetchPlan();
         return pollTryOnUntilDone(job.id, (progress) => {
@@ -489,6 +634,7 @@ export default function ClosetPage() {
         });
       })
       .then((result) => {
+        clearActiveTryOnJob();
         if (tryOnCancelRef.current || !result) return;
         if (result.status === 'COMPLETED' && result.resultImageUrl) {
           setTryOnState({ status: 'completed', resultUrl: result.resultImageUrl });
@@ -498,6 +644,7 @@ export default function ClosetPage() {
         }
       })
       .catch((err) => {
+        clearActiveTryOnJob();
         if (tryOnCancelRef.current) return;
         if (err?.response?.status === 402) {
           setTryOnState(null);
@@ -532,6 +679,7 @@ export default function ClosetPage() {
 
   function handleCancelTryOn() {
     tryOnCancelRef.current = true;
+    clearActiveTryOnJob();
     setTryOnState(null);
   }
 
@@ -604,19 +752,10 @@ export default function ClosetPage() {
             <button
               onClick={() => setShowMyLooks(true)}
               className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
-              style={{ background: 'rgba(0,0,0,0.05)' }}
+              style={{ background: myLooksHistory.length > 0 ? 'rgba(243,112,167,0.12)' : 'rgba(0,0,0,0.05)' }}
               aria-label="My Looks"
             >
-              <Images size={17} strokeWidth={1.8} className="text-gray-600" />
-            </button>
-            {/* Language: flag emoji */}
-            <button
-              onClick={() => setShowLangPicker(true)}
-              className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
-              style={{ background: 'rgba(0,0,0,0.05)' }}
-              aria-label="Select language"
-            >
-              <span className="text-[18px] leading-none">{locale === 'uz' ? '🇺🇿' : locale === 'ru' ? '🇷🇺' : '🇬🇧'}</span>
+              <Images size={17} strokeWidth={1.8} style={{ color: myLooksHistory.length > 0 ? '#F370A7' : '#4b5563' }} />
             </button>
             {/* Profile icon */}
             {profileEnabled && (
@@ -740,6 +879,7 @@ export default function ClosetPage() {
           onFilterChange={setUpperFilter}
           onTapItem={setEditItem}
           onViewAll={() => openViewAll(t.upperBody, UPPER_CATS)}
+          onRemovePending={removePendingUpload}
         />
 
         {/* ── Lower Body ────────────────────────────────────────── */}
@@ -754,6 +894,7 @@ export default function ClosetPage() {
           onFilterChange={setLowerFilter}
           onTapItem={setEditItem}
           onViewAll={() => openViewAll(t.lowerBody, LOWER_CATS)}
+          onRemovePending={removePendingUpload}
         />
 
         {/* ── Shoes ─────────────────────────────────────────────── */}
@@ -768,6 +909,7 @@ export default function ClosetPage() {
           onFilterChange={() => {}}
           onTapItem={setEditItem}
           onViewAll={() => openViewAll(t.shoes, SHOES_CATS)}
+          onRemovePending={removePendingUpload}
         />
 
         {/* ── Accessories ───────────────────────────────────────── */}
@@ -782,6 +924,7 @@ export default function ClosetPage() {
           onFilterChange={setAccFilter}
           onTapItem={setEditItem}
           onViewAll={() => openViewAll(t.accessories, ACC_CATS)}
+          onRemovePending={removePendingUpload}
         />
 
         <div className="h-12" />
@@ -854,6 +997,10 @@ export default function ClosetPage() {
           onClose={() => setOutfitSheet(null)}
           onShowPlans={() => setShowPremiumGate('generation')}
           plansEnabled={plansEnabled}
+          onTryItOn={handleTryItOnFromItems}
+          canTryOn={canTryOn}
+          tryOnCount={usage.tryItOnsUsed}
+          tryOnLimit={limits.tryItOns}
         />
       )}
 
@@ -879,7 +1026,7 @@ export default function ClosetPage() {
       {/* ── Try-On Confirm Sheet ── */}
       {showTryOnConfirm && (
         <TryOnConfirmModal
-          savedLayout={canvases[tryOnCanvasIdxRef.current]?.layout ?? null}
+          savedLayout={tryOnOverrideRef.current?.layout ?? canvases[tryOnCanvasIdxRef.current]?.layout ?? null}
           items={items}
           onConfirm={() => { setShowTryOnConfirm(false); startTryOn(); }}
           onCancel={() => setShowTryOnConfirm(false)}
@@ -1096,6 +1243,25 @@ export default function ClosetPage() {
                 >
                   {plan === 'free' ? 'Free plan' : plan === 'pro' ? 'Pro' : 'Premium'}
                 </span>
+              </div>
+
+              {/* Language selector */}
+              <div className="mt-4">
+                <p className="text-[12px] font-semibold text-gray-400 uppercase tracking-wider mb-2">{t.language}</p>
+                <div className="flex gap-2">
+                  {(['uz', 'ru', 'en'] as Locale[]).map((l) => (
+                    <button
+                      key={l}
+                      onClick={() => setLocale(l)}
+                      className={`flex-1 h-11 rounded-2xl flex items-center justify-center gap-1.5 transition-colors ${
+                        locale === l ? 'bg-black text-white' : 'bg-gray-50 text-gray-700'
+                      }`}
+                    >
+                      <span className="text-[18px] leading-none">{l === 'uz' ? '🇺🇿' : l === 'ru' ? '🇷🇺' : '🇬🇧'}</span>
+                      <span className="text-[12px] font-semibold">{l === 'en' ? 'EN' : l === 'ru' ? 'RU' : 'UZ'}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -1961,9 +2127,10 @@ interface ClothingSectionProps {
   onFilterChange: (cat: ClosetCategory | null) => void;
   onTapItem: (item: ClosetItem) => void;
   onViewAll: () => void;
+  onRemovePending?: (id: string) => void;
 }
 
-function ClothingSection({ title, cats, filter, items, totalCount, maxCount, pendingItems = [], onFilterChange, onTapItem, onViewAll }: ClothingSectionProps) {
+function ClothingSection({ title, cats, filter, items, totalCount, maxCount, pendingItems = [], onFilterChange, onTapItem, onViewAll, onRemovePending }: ClothingSectionProps) {
   const { t } = useI18n();
   return (
     <div className="mt-9">
@@ -2005,6 +2172,7 @@ function ClothingSection({ title, cats, filter, items, totalCount, maxCount, pen
             isProcessing
             processingStep={p.step}
             processingProgress={p.progress}
+            onRemove={onRemovePending ? () => onRemovePending(p.id) : undefined}
           />
         ))}
         {items.map((item) => (
@@ -2030,13 +2198,13 @@ function FilterChip({ label, selected, onClick }: { label: string; selected: boo
   );
 }
 
-function ClothingItemCard({ item, onTap, isProcessing, processingStep, processingProgress }: { item: ClosetItem; onTap: () => void; isProcessing?: boolean; processingStep?: string; processingProgress?: number }) {
+function ClothingItemCard({ item, onTap, isProcessing, processingStep, processingProgress, onRemove }: { item: ClosetItem; onTap: () => void; isProcessing?: boolean; processingStep?: string; processingProgress?: number; onRemove?: () => void }) {
   const { t } = useI18n();
   return (
     <div
       className={`shrink-0 w-[120px] h-[168px] rounded-2xl overflow-hidden relative cursor-pointer
-                 active:scale-[0.97] transition-transform ${isProcessing ? 'pointer-events-none' : ''}`}
-      onClick={onTap}
+                 active:scale-[0.97] transition-transform`}
+      onClick={isProcessing ? undefined : onTap}
     >
       <div className="relative w-full h-full">
         <Image src={item.imageData} alt={item.category} fill className={`object-contain ${isProcessing ? 'opacity-50' : ''}`} unoptimized />
@@ -2044,6 +2212,14 @@ function ClothingItemCard({ item, onTap, isProcessing, processingStep, processin
       {/* Processing overlay */}
       {isProcessing && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 backdrop-blur-[2px]">
+          {onRemove && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onRemove(); }}
+              className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full bg-black/50 flex items-center justify-center active:bg-black/70 transition-colors"
+            >
+              <X size={13} className="text-white" />
+            </button>
+          )}
           <div className="w-8 h-8 mb-1.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
           <span className="text-[9px] font-medium text-white text-center px-2 leading-tight">{processingStep}</span>
           {(processingProgress ?? 0) > 0 && (
@@ -2156,6 +2332,10 @@ function OutfitDaysSheet({
   onClose,
   onShowPlans,
   plansEnabled,
+  onTryItOn,
+  canTryOn,
+  tryOnCount,
+  tryOnLimit,
 }: {
   title: string;
   days: Date[];
@@ -2164,6 +2344,10 @@ function OutfitDaysSheet({
   onClose: () => void;
   onShowPlans: () => void;
   plansEnabled: boolean;
+  onTryItOn: (items: ClosetItem[]) => void;
+  canTryOn: boolean;
+  tryOnCount: number;
+  tryOnLimit: number;
 }) {
   const { t } = useI18n();
   const [selectedDayIdx, setSelectedDayIdx] = useState<number | null>(null);
@@ -2244,7 +2428,7 @@ function OutfitDaysSheet({
                       <MiniOutfitSlot item={upper} flex />
                       <MiniOutfitSlot item={lower} flex />
                       <MiniOutfitSlot item={shoe} flex />
-                      {acc && <MiniOutfitSlot item={acc} />}
+                      {acc && <MiniOutfitSlot item={acc} flex />}
 
                       {/* Blur overlay for locked days — only when plans feature is enabled */}
                       {!isUnlocked && plansEnabled && (
@@ -2266,6 +2450,22 @@ function OutfitDaysSheet({
                         </div>
                       )}
                     </div>
+
+                    {/* Try it on button — unlocked days only */}
+                    {isUnlocked && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const dayItems = [upper, lower, shoe, acc].filter(Boolean) as ClosetItem[];
+                          onTryItOn(dayItems);
+                        }}
+                        className="w-full h-8 rounded-full flex items-center justify-center gap-1 text-[10px] font-semibold text-white active:scale-[0.95] transition-transform"
+                        style={{ background: 'linear-gradient(135deg, #1a1a1a, #000)' }}
+                      >
+                        <Sparkles size={10} />
+                        <span>{t.tryItOn}</span>
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -2314,12 +2514,28 @@ function OutfitDaysSheet({
                 {/* Outfit */}
                 <div
                   className="relative w-full flex flex-col"
-                  style={{ height: 'min(72vh, 480px)' }}
+                  style={{ height: 'min(60vh, 400px)' }}
                 >
                   <MiniOutfitSlot item={selUpper} flex />
                   <MiniOutfitSlot item={selLower} flex />
                   <MiniOutfitSlot item={selShoe} flex />
-                  {selAcc && <MiniOutfitSlot item={selAcc} />}
+                  {selAcc && <MiniOutfitSlot item={selAcc} flex />}
+                </div>
+                {/* Try it on button */}
+                <div className="w-full px-5 py-3">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const dayItems = [selUpper, selLower, selShoe, selAcc].filter(Boolean) as ClosetItem[];
+                      onTryItOn(dayItems);
+                    }}
+                    className="w-full h-11 rounded-full flex items-center justify-center gap-1.5 text-[13px] font-semibold text-white active:scale-[0.97] transition-transform"
+                    style={{ background: 'linear-gradient(135deg, #1a1a1a, #000)' }}
+                  >
+                    <Sparkles size={13} />
+                    <span>{t.tryItOn}</span>
+                    <span className="opacity-50 text-[11px]">{tryOnCount}/{tryOnLimit}</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -2469,8 +2685,8 @@ function TryOnConfirmModal({
 
         {/* Outfit preview */}
         <div
-          className="mx-5 rounded-2xl overflow-hidden bg-gray-50 flex items-center justify-center"
-          style={{ height: 260 }}
+          className="mx-5 rounded-2xl overflow-hidden bg-white flex items-center justify-center"
+          style={{ height: 260, border: '1px solid #f3f4f6' }}
         >
           <div className="relative h-full" style={{ aspectRatio: '3 / 4', maxWidth: '100%' }}>
             {displayEntries.map((entry, idx) => (
@@ -2598,7 +2814,7 @@ function TryOnModal({
 }) {
   const { t } = useI18n();
   const [isDownloading, setIsDownloading] = useState(false);
-  const [tipIndex, setTipIndex] = useState(() => Math.floor(Math.random() * 20));
+  const [tipIndex, setTipIndex] = useState(() => Math.floor(Math.random() * 49));
   const [tipFading, setTipFading] = useState(false);
 
   useEffect(() => {
@@ -2609,7 +2825,7 @@ function TryOnModal({
         setTipIndex((i) => (i + 1) % t.tryOnTips.length);
         setTipFading(false);
       }, 350);
-    }, 5000);
+    }, 6000);
     return () => clearInterval(interval);
   }, [status]);
 
@@ -3015,7 +3231,7 @@ function MyLooksSheet({
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto px-3 py-3">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {history.map((record) => (
               <div key={record.id} className="relative rounded-2xl overflow-hidden bg-gray-100">
                 <button
