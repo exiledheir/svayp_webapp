@@ -633,6 +633,54 @@ export default function ClosetPage() {
         </div>
       </header>
 
+      {/* ── Promo Banner: 1+1 Aksiya ─────────────────────────────── */}
+      <div
+        onClick={() => window.open('https://t.me/erkinov19', '_blank')}
+        className="shrink-0 mx-3 mb-2 rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform select-none"
+        style={{
+          background: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 50%, #f7971e 100%)',
+          boxShadow: '0 4px 18px rgba(255,75,43,0.4)',
+        }}
+        role="button"
+        aria-label="1+1 Aksiya"
+      >
+        <div className="relative px-4 py-3 flex items-center gap-3">
+          {/* Icon */}
+          <div className="shrink-0 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-[22px] leading-none">
+            🔥
+          </div>
+
+          {/* Text */}
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-extrabold text-[13px] leading-snug">
+              Faqat hozir: <span className="bg-white/25 rounded-md px-1.5 py-0.5">1+1 aksiya!</span>
+            </p>
+            <p className="text-white/90 text-[10.5px] font-medium leading-snug mt-0.5 line-clamp-2">
+              Libas AI Garderob obunasini 1 oyga oling va yana 1 oy mutlaqo bepul foydalaning. Taklif cheklangan!
+            </p>
+          </div>
+
+          {/* Arrow */}
+          <div className="shrink-0 w-7 h-7 rounded-full bg-white/20 flex items-center justify-center">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M2.5 6.5H10.5M10.5 6.5L7 3M10.5 6.5L7 10" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+        </div>
+
+        {/* Shimmer strip */}
+        <div
+          className="h-[3px] w-full"
+          style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%)', backgroundSize: '200% 100%', animation: 'shimmer 2s infinite linear' }}
+        />
+      </div>
+      <style jsx>{`
+        @keyframes shimmer {
+          0%   { background-position: -200% 0; }
+          100% { background-position:  200% 0; }
+        }
+      `}</style>
+
       <main className="flex-1 overflow-y-auto pb-4" style={{ paddingTop: 0 }}>
         {/* ── My Outfits ────────────────────────────────────────── */}
         <OutfitSection
