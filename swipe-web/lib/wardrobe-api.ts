@@ -367,6 +367,17 @@ export async function generateOutfitSuggestions(count = 3): Promise<{ queued: bo
   return unwrapData<{ queued: boolean; count: number }>(res);
 }
 
+export interface AiCanvasSuggestResponse {
+  itemIds: string[];
+  occasion: string;
+  tipRu: string;
+}
+
+export async function fetchAiCanvasSuggest(): Promise<AiCanvasSuggestResponse> {
+  const res = await api.post('/outfits/canvases/ai-suggest');
+  return unwrapData<AiCanvasSuggestResponse>(res);
+}
+
 export async function rateOutfitSuggestion(id: string, rating: number): Promise<void> {
   await api.post(`/outfits/suggestions/${id}/rate`, null, { params: { rating } });
 }

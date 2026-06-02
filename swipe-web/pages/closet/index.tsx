@@ -8,7 +8,7 @@ import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import { fetchClosetItems, addClosetItemFromFile, removeClosetItem, updateClosetItemApi, getClosetItems, addClosetItem, deleteClosetItem, updateClosetItem, CLOSET_CATEGORIES } from '@/lib/closet-storage';
 import type { ClosetItem, ClosetCategory } from '@/lib/closet-storage';
 import type { WardrobeUploadStatus, PlanTier, PlanLimits, PlanUsage, TryOnJobResponse } from '@/types';
-import { getUserPlan, generateOutfitSuggestions, createTryOnJob, pollTryOnUntilDone, getOutfitCalendar, createOutfitCanvas, updateOutfitCanvas, deleteOutfitCanvas, getOutfitCanvases, getOutfitCanvas, listUploads, pollUploadUntilDone, getTryOnJob } from '@/lib/wardrobe-api';
+import { getUserPlan, generateOutfitSuggestions, fetchAiCanvasSuggest, createTryOnJob, pollTryOnUntilDone, getOutfitCalendar, createOutfitCanvas, updateOutfitCanvas, deleteOutfitCanvas, getOutfitCanvases, getOutfitCanvas, listUploads, pollUploadUntilDone, getTryOnJob } from '@/lib/wardrobe-api';
 import { useI18n } from '@/lib/i18n';
 import type { Locale } from '@/lib/translations';
 import { isOnboardingComplete } from '@/lib/onboarding-storage';
@@ -508,7 +508,36 @@ export default function ClosetPage() {
     return layout;
   }
 
-  function handleNewOutfit(canvasIdx = 0) {
+  const [aiSuggestingIdx, setAiSuggestingIdx] = useState<number | null>(null);
+
+  function _buildLayoutFromIds(aiItemIds: string[]): SavedCanvasLayout {
+    const byId = new Map(items.map((i) => [i.id, i]));
+    const matched = aiItemIds.map((id) => byId.get(id)).filter(Boolean) as typeof items;
+    if (!matched.length) return generateRandomOutfit();
+
+    const hasShawl = matched.some((i) => i.category === 'shawl');
+    const scale = hasShawl ? 0.88 : 1;
+    const layout: SavedCanvasLayout = [];
+    let yOffset = hasShawl ? 0 : -15;
+
+    for (const item of matched) {
+      if (UPPER_CATS.includes(item.category)) {
+        layout.push({ id: item.id, x: 32, y: hasShawl ? 19 : 4, scale, zIndex: 1, group: 'upper' });
+      } else if (LOWER_CATS.includes(item.category)) {
+        layout.push({ id: item.id, x: 32, y: hasShawl ? 48 : 37, scale, zIndex: 2, group: 'lower' });
+      } else if (SHOES_CATS.includes(item.category)) {
+        layout.push({ id: item.id, x: 32, y: hasShawl ? 73 : 68, scale: hasShawl ? 0.65 : 0.72, zIndex: 3, group: 'shoes' });
+      } else if (item.category === 'shawl') {
+        layout.push({ id: item.id, x: 32, y: -5, scale: 0.55, zIndex: 10, group: 'acc' });
+      } else {
+        yOffset += 15;
+        layout.push({ id: item.id, x: 63, y: (hasShawl ? 20 : 5) + yOffset, scale: 0.6, zIndex: 4, group: 'acc' });
+      }
+    }
+    return layout.length ? layout : generateRandomOutfit();
+  }
+
+  async function handleNewOutfit(canvasIdx = 0) {
     const hasUpper = items.some((i) => UPPER_CATS.includes(i.category));
     const hasLowerOrShoes = items.some((i) => LOWER_CATS.includes(i.category) || SHOES_CATS.includes(i.category));
     if (!hasUpper || !hasLowerOrShoes) {
@@ -518,22 +547,32 @@ export default function ClosetPage() {
     if (!canGenerate) {
       if (plansEnabled) { setShowPremiumGate('generation'); return; }
     }
-    // Call backend to generate outfit suggestions
+
+    setAiSuggestingIdx(canvasIdx);
+    let layout: SavedCanvasLayout;
+    try {
+      const aiResult = await fetchAiCanvasSuggest();
+      layout = _buildLayoutFromIds(aiResult.itemIds);
+    } catch {
+      // AI unavailable — fall back to random
+      layout = generateRandomOutfit();
+    } finally {
+      setAiSuggestingIdx(null);
+    }
+
     generateOutfitSuggestions(1).then(() => {
-      fetchPlan(); // Refresh usage after generation
+      fetchPlan();
     }).catch(() => { /* handled by 402 error */ });
-    // Meanwhile use local random as optimistic UI
-    const randomLayout = generateRandomOutfit();
+
     setCanvases((prev) => {
       const updated = [...prev];
-      if (canvasIdx >= updated.length) updated.push({ id: null, layout: randomLayout });
-      else updated[canvasIdx] = { ...updated[canvasIdx], layout: randomLayout };
+      if (canvasIdx >= updated.length) updated.push({ id: null, layout });
+      else updated[canvasIdx] = { ...updated[canvasIdx], layout };
       return updated;
     });
-    try { localStorage.setItem('svayp_saved_layout', JSON.stringify(randomLayout)); } catch { /* ignore */ }
-    setCanvasInitialLayout(randomLayout);
-    // Save to backend
-    saveCanvasToBackend(randomLayout, canvasIdx);
+    try { localStorage.setItem('svayp_saved_layout', JSON.stringify(layout)); } catch { /* ignore */ }
+    setCanvasInitialLayout(layout);
+    saveCanvasToBackend(layout, canvasIdx);
   }
 
   async function saveCanvasToBackend(layout: SavedCanvasLayout, canvasIdx: number) {
@@ -830,6 +869,7 @@ export default function ClosetPage() {
           genCount={usage.regenerationsUsed}
           limits={limits}
           tryOnCount={usage.tryItOnsUsed}
+          aiSuggestingIdx={aiSuggestingIdx}
           onViewItems={(idx) => {
             const layout = canvases[idx]?.layout ?? null;
             setEditingCanvasIdx(idx);
@@ -1309,7 +1349,7 @@ export default function ClosetPage() {
 }
 
 // ─── My Outfits ─────────────────────────────────────────────────────────────────
-function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas }: {
+function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx }: {
   allItems: ClosetItem[];
   canvases: { id: string | null; layout: SavedCanvasLayout }[];
   plan: UserPlan;
@@ -1323,7 +1363,8 @@ function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits
   onAddCanvas: () => void;
   onShowPlans: () => void;
   onTryItOn: (idx: number) => void;
-  onDeleteCanvas: (idx: number) => void;
+  onDeleteCanvas: (idx: number) => void | Promise<void>;
+  aiSuggestingIdx?: number | null;
 }) {
   const { t } = useI18n();
   const isEmpty = allItems.length === 0;
@@ -1344,6 +1385,7 @@ function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits
             onViewItems={() => onViewItems(idx)}
             onRegenerate={() => onRegenerate(idx)}
             canRegenerate={canGenerate}
+            isAiSuggesting={aiSuggestingIdx === idx}
             genCount={genCount}
             regenLimit={limits.regenerations}
             onTryItOn={() => onTryItOn(idx)}
@@ -1359,6 +1401,7 @@ function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits
             onViewItems={() => onViewItems(0)}
             onRegenerate={() => onRegenerate(0)}
             canRegenerate={canGenerate}
+            isAiSuggesting={aiSuggestingIdx === 0}
             genCount={genCount}
             regenLimit={limits.regenerations}
             onTryItOn={() => onTryItOn(0)}
@@ -1435,6 +1478,7 @@ function OutfitCard({
   onViewItems,
   onRegenerate,
   canRegenerate,
+  isAiSuggesting,
   genCount,
   regenLimit,
   onTryItOn,
@@ -1448,12 +1492,13 @@ function OutfitCard({
   onViewItems: () => void;
   onRegenerate?: () => void;
   canRegenerate: boolean;
+  isAiSuggesting?: boolean;
   genCount: number;
   regenLimit: number;
   onTryItOn?: () => void;
   tryOnCount: number;
   tryOnLimit: number;
-  onDelete?: () => void;
+  onDelete?: () => void | Promise<void>;
 }) {
   const { t } = useI18n();
 
@@ -1522,18 +1567,25 @@ function OutfitCard({
           {onRegenerate && (
             <div className="flex flex-col items-center gap-0.5">
               <button
-                onClick={onRegenerate}
-                className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
-                style={{ background: 'rgba(0,0,0,0.06)' }}
-                title="Regenerate"
+                onClick={isAiSuggesting ? undefined : onRegenerate}
+                disabled={isAiSuggesting}
+                className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform disabled:opacity-60"
+                style={{ background: isAiSuggesting ? 'rgba(99,102,241,0.12)' : 'rgba(0,0,0,0.06)' }}
+                title={isAiSuggesting ? 'AI is thinking…' : 'Regenerate with AI'}
               >
-                <RefreshCw
-                  size={14}
-                  strokeWidth={2.2}
-                  className={canRegenerate ? 'text-gray-600' : 'text-gray-300'}
-                />
+                {isAiSuggesting ? (
+                  <Loader2 size={14} strokeWidth={2.2} className="text-indigo-500 animate-spin" />
+                ) : (
+                  <RefreshCw
+                    size={14}
+                    strokeWidth={2.2}
+                    className={canRegenerate ? 'text-gray-600' : 'text-gray-300'}
+                  />
+                )}
               </button>
-              <span className="text-[9px] font-semibold text-gray-400 leading-none">{genCount}/{regenLimit}</span>
+              <span className="text-[9px] font-semibold leading-none" style={{ color: isAiSuggesting ? '#6366f1' : '#9ca3af' }}>
+                {isAiSuggesting ? 'AI…' : `${genCount}/${regenLimit}`}
+              </span>
             </div>
           )}
         </div>
