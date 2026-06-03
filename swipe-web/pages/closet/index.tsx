@@ -1658,6 +1658,12 @@ function OutfitCard({
         return { item, x: entry.x, y: entry.y, scale: entry.scale, zIndex: entry.zIndex, group: entry.group };
       })
       .filter(Boolean) as { item: ClosetItem; x: number; y: number; scale: number; zIndex: number; group: string }[];
+    // Validate layout forms a real outfit (same rule as canGenerateOutfit).
+    // Stale layouts with only accessories/shoes won't pass and show "tap ↻" instead.
+    const hasDressInLayout = resolved.some((e) => FULL_BODY_CATS.includes(e.item.category as ClosetCategory));
+    const hasUpperInLayout = resolved.some((e) => UPPER_CATS.includes(e.item.category as ClosetCategory));
+    const hasLowerInLayout = resolved.some((e) => LOWER_CATS.includes(e.item.category as ClosetCategory));
+    if (!hasDressInLayout && !(hasUpperInLayout && hasLowerInLayout)) return [];
     return resolved;
   }, [savedLayout, allItems, canGenerateOutfit]);
 
