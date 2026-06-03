@@ -1646,46 +1646,19 @@ function OutfitCard({
   const hasShoes = allItems.some((i) => SHOES_CATS.includes(i.category));
   const canGenerateOutfit = hasDress || (hasTop && hasLower);
 
-  // Build display entries: saved layout or default auto-generated
+  // Build display entries: only from saved layout (set after tapping Regenerate).
+  // Canvas stays empty until the user explicitly requests an outfit.
   const displayEntries = React.useMemo(() => {
     if (!canGenerateOutfit) return [];
-    if (savedLayout && savedLayout.length > 0) {
-      const resolved = savedLayout
-        .map((entry) => {
-          const item = allItems.find((i) => i.id === entry.id);
-          if (!item) return null;
-          return { item, x: entry.x, y: entry.y, scale: entry.scale, zIndex: entry.zIndex, group: entry.group };
-        })
-        .filter(Boolean) as { item: ClosetItem; x: number; y: number; scale: number; zIndex: number; group: string }[];
-      // Only use saved layout if at least one item resolved — otherwise fall through to defaults
-      if (resolved.length > 0) return resolved;
-    }
-    // Default positions
-    const upperAll = allItems.filter((i) => UPPER_CATS.includes(i.category));
-    const lowerAll = allItems.filter((i) => LOWER_CATS.includes(i.category));
-    const shoesAll = allItems.filter((i) => SHOES_CATS.includes(i.category));
-    const accAll = allItems.filter((i) => ACC_CATS.includes(i.category));
-    const shawlItem = accAll.find((a) => a.category === 'shawl') ?? null;
-    const sideAccItem = accAll.find((a) => a.category !== 'shawl') ?? null;
-    const hasShawl = shawlItem !== null;
-    const entries: { item: ClosetItem; x: number; y: number; scale: number; zIndex: number; group: string }[] = [];
-    const itemScale = hasShawl ? 0.88 : 1;
-
-    // When there are no bottoms, prefer full-body items (dresses/jumpsuits) over regular tops
-    const fullBodyCats: ClosetCategory[] = ['dresses', 'jumpsuits'];
-    const hasNoBottoms = lowerAll.length === 0;
-    const upperItem = hasNoBottoms
-      ? (upperAll.find((i) => fullBodyCats.includes(i.category)) ?? upperAll[0])
-      : upperAll[0];
-
-    // Only show a top in the default layout if there's a bottom to pair it with
-    const showTop = upperItem && (!hasNoBottoms || fullBodyCats.includes(upperItem.category));
-    if (showTop) entries.push({ item: upperItem, x: 32, y: hasShawl ? 19 : 4, scale: itemScale, zIndex: 1, group: 'upper' });
-    if (lowerAll.length) entries.push({ item: lowerAll[0], x: 32, y: hasShawl ? 48 : 37, scale: itemScale, zIndex: 2, group: 'lower' });
-    if (shoesAll.length) entries.push({ item: shoesAll[0], x: 32, y: hasShawl ? 73 : 68, scale: hasShawl ? 0.65 : 0.72, zIndex: 3, group: 'shoes' });
-    if (shawlItem) entries.push({ item: shawlItem, x: 32, y: -5, scale: 0.55, zIndex: 10, group: 'acc' });
-    if (sideAccItem) entries.push({ item: sideAccItem, x: 63, y: hasShawl ? 20 : 5, scale: 0.6, zIndex: 4, group: 'acc' });
-    return entries;
+    if (!savedLayout || savedLayout.length === 0) return [];
+    const resolved = savedLayout
+      .map((entry) => {
+        const item = allItems.find((i) => i.id === entry.id);
+        if (!item) return null;
+        return { item, x: entry.x, y: entry.y, scale: entry.scale, zIndex: entry.zIndex, group: entry.group };
+      })
+      .filter(Boolean) as { item: ClosetItem; x: number; y: number; scale: number; zIndex: number; group: string }[];
+    return resolved;
   }, [savedLayout, allItems, canGenerateOutfit]);
 
   return (
@@ -1809,6 +1782,16 @@ function OutfitCard({
                 <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 text-[11px] font-semibold">+ {t.shoes}</span>
               )}
             </div>
+          </div>
+        ) : canGenerateOutfit && displayEntries.length === 0 ? (
+          // Wardrobe has enough clothes but no outfit has been generated yet — prompt user to tap ↻
+          <div className="w-full h-full rounded-2xl flex flex-col items-center justify-center gap-3 px-6">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.04)' }}>
+              <RefreshCw size={28} strokeWidth={1.5} className="text-gray-400" />
+            </div>
+            <p className="text-[13px] font-medium text-gray-400 text-center leading-relaxed">
+              {t.tapRegeneratePrompt}
+            </p>
           </div>
         ) : (
           <div className="w-full h-full flex items-center justify-center overflow-hidden isolate" style={{ containerType: 'size' }}>

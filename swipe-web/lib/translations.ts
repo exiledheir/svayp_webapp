@@ -11,6 +11,7 @@ export interface Translations {
   tryItOn: string;
   yourStyleStartsHere: string;
   tapPlusToAddFirstPiece: string;
+  tapRegeneratePrompt: string;
   addTopAndBottom: string;
   upperBody: string;
   lowerBody: string;
@@ -137,6 +138,7 @@ const en: Translations = {
   tryItOn: 'Try it on',
   yourStyleStartsHere: 'Your style starts here.',
   tapPlusToAddFirstPiece: 'Tap + to add your first piece.',
+  tapRegeneratePrompt: 'Tap ↻ to generate your first outfit',
   addTopAndBottom: 'Add a top + bottom (pants, skirt) or a dress to generate outfits.',
   upperBody: 'Upper Body',
   lowerBody: 'Lower Body',
@@ -314,6 +316,7 @@ const ru: Translations = {
   tryItOn: 'Примерить',
   yourStyleStartsHere: 'Здесь начинается ваш стиль.',
   tapPlusToAddFirstPiece: 'Нажмите + чтобы добавить вещь.',
+  tapRegeneratePrompt: 'Нажмите ↻ чтобы сгенерировать образ',
   addTopAndBottom: 'Добавьте верх + низ (брюки, юбку) или платье, чтобы ИИ создал образы.',
   upperBody: 'Верх',
   lowerBody: 'Низ',
@@ -490,7 +493,8 @@ const uz: Translations = {
   viewItems: "O'zgartirish",
   tryItOn: "Kiyib ko'ring",
   yourStyleStartsHere: 'Uslubingiz shu yerdan.',
-  tapPlusToAddFirstPiece: "+ bosib birinchi narsani qo'shing.",
+  tapPlusToAddFirstPiece: "+  bosib birinchi narsani qo'shing.",
+  tapRegeneratePrompt: 'Obrazingizni yaratish uchun ↻ bosing',
   addTopAndBottom: "Outfit yaratish uchun kamida bitta yuqori va bitta quyi kiyim yoki oyoq kiyim qo'shing.",
   upperBody: 'Yuqori kiyim',
   lowerBody: 'Quyi kiyim',
