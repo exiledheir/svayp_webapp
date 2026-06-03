@@ -248,6 +248,30 @@ export interface TryOnJobResponse {
   completedAt: string | null;
 }
 
+// ── SSE ───────────────────────────────────────────────────────────────────────
+
+export interface SseHandle {
+  close: () => void;
+}
+
+export interface UploadProgressEvent {
+  type: 'upload.progress';
+  uploadJobId: string;
+  status: UploadJobStatus;
+  progressPercent: number;
+  currentStep: string;
+  wardrobeItemId: string | null;
+  failureReason: string | null;
+}
+
+export interface TryOnProgressEvent {
+  type: 'tryon.progress';
+  jobId: string;
+  status: TryOnStatus;
+  resultImageUrl: string | null;
+  failureReason: string | null;
+}
+
 // ── Calendar ──────────────────────────────────────────────────────────────────
 
 export interface CalendarDayEntry {

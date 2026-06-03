@@ -8,7 +8,8 @@ import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import { fetchClosetItems, addClosetItemFromFile, removeClosetItem, updateClosetItemApi, getClosetItems, addClosetItem, deleteClosetItem, updateClosetItem, CLOSET_CATEGORIES } from '@/lib/closet-storage';
 import type { ClosetItem, ClosetCategory } from '@/lib/closet-storage';
 import type { WardrobeUploadStatus, PlanTier, PlanLimits, PlanUsage, TryOnJobResponse } from '@/types';
-import { getUserPlan, generateOutfitSuggestions, fetchAiCanvasSuggest, createTryOnJob, pollTryOnUntilDone, getOutfitCalendar, createOutfitCanvas, updateOutfitCanvas, deleteOutfitCanvas, getOutfitCanvases, getOutfitCanvas, listUploads, pollUploadUntilDone, getTryOnJob } from '@/lib/wardrobe-api';
+import { getUserPlan, generateOutfitSuggestions, fetchAiCanvasSuggest, createTryOnJob, watchTryOnUntilDone, getOutfitCalendar, createOutfitCanvas, updateOutfitCanvas, deleteOutfitCanvas, getOutfitCanvases, getOutfitCanvas, listUploads, watchUploadUntilDone, getTryOnJob } from '@/lib/wardrobe-api';
+import type { SseHandle } from '@/types';
 import { useI18n } from '@/lib/i18n';
 import type { Locale } from '@/lib/translations';
 import { isOnboardingComplete } from '@/lib/onboarding-storage';
@@ -186,7 +187,11 @@ export default function ClosetPage() {
   const [showMyLooks, setShowMyLooks] = useState(false);
   const [myLooksHistory, setMyLooksHistory] = useState<TryOnRecord[]>([]);
   const [saveFailed, setSaveFailed] = useState(false);
+  const [outfitToastMsg, setOutfitToastMsg] = useState<string | null>(null);
+  const [outfitBlockedModal, setOutfitBlockedModal] = useState<{ title: string; body: string } | null>(null);
   const tryOnCancelRef = useRef(false);
+  const activeTryOnHandleRef = useRef<SseHandle | null>(null);
+  const loadSeqRef = useRef(0);
   const dismissedUploadJobsRef = useRef<Set<string>>((() => {
     try { return new Set(JSON.parse(localStorage.getItem('libas_dismissed_uploads') ?? '[]')); } catch { return new Set<string>(); }
   })());
@@ -328,31 +333,31 @@ export default function ClosetPage() {
   }
 
   const load = useCallback(async () => {
+    const seq = ++loadSeqRef.current;
     setIsLoading(true);
     try {
       const apiItems = await fetchClosetItems();
-      // Merge with any local-only items
       const localItems = getClosetItems().filter((li) => li.id.startsWith('local_'));
-      setItems([...apiItems, ...localItems]);
+      if (seq === loadSeqRef.current) setItems([...apiItems, ...localItems]);
     } catch {
-      // Fallback to localStorage if API fails
-      setItems(getClosetItems());
+      if (seq === loadSeqRef.current) setItems(getClosetItems());
     } finally {
-      setIsLoading(false);
+      if (seq === loadSeqRef.current) setIsLoading(false);
     }
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  // Resume polling for any uploads that were in progress when the page was closed
+  // Resume watching any uploads that were in progress when the page was closed
   useEffect(() => {
-    let cancelled = false;
+    const handles: SseHandle[] = [];
+    let unmounted = false;
     (async () => {
       try {
         const page = await listUploads(0, 20);
         const inProgress = page.content.filter(
           (u) => u.status !== 'COMPLETED' && u.status !== 'FAILED' && !dismissedUploadJobsRef.current.has(u.uploadJobId)
         );
-        if (cancelled || inProgress.length === 0) return;
+        if (unmounted || inProgress.length === 0) return;
         for (const job of inProgress) {
           const pid = `resume_${job.uploadJobId}`;
           const jobId = job.uploadJobId;
@@ -362,28 +367,37 @@ export default function ClosetPage() {
             next.set(pid, { category: 'tops', imageData: '', step: formatStep(job.currentStep), progress: job.progressPercent });
             return next;
           });
-          pollUploadUntilDone(jobId, (status) => {
-            if (cancelled || dismissedUploadJobsRef.current.has(jobId)) return;
-            setPendingUploads((prev) => {
-              const next = new Map(prev);
-              const existing = next.get(pid);
-              if (existing) next.set(pid, { ...existing, step: formatStep(status.currentStep), progress: status.progressPercent });
-              return next;
-            });
-          }).then(() => {
-            if (cancelled || dismissedUploadJobsRef.current.has(jobId)) return;
-            setPendingUploads((prev) => { const next = new Map(prev); next.delete(pid); return next; });
-            load();
-            fetchPlan();
-          }).catch(() => {
-            if (cancelled || dismissedUploadJobsRef.current.has(jobId)) return;
-            setPendingUploads((prev) => { const next = new Map(prev); next.delete(pid); return next; });
-            load();
-          });
+          const handle = watchUploadUntilDone(
+            jobId,
+            (status) => {
+              if (unmounted || dismissedUploadJobsRef.current.has(jobId)) return;
+              setPendingUploads((prev) => {
+                const next = new Map(prev);
+                const existing = next.get(pid);
+                if (existing) next.set(pid, { ...existing, step: formatStep(status.currentStep), progress: status.progressPercent });
+                return next;
+              });
+            },
+            () => {
+              if (unmounted || dismissedUploadJobsRef.current.has(jobId)) return;
+              setPendingUploads((prev) => { const next = new Map(prev); next.delete(pid); return next; });
+              load();
+              fetchPlan();
+            },
+            () => {
+              if (unmounted || dismissedUploadJobsRef.current.has(jobId)) return;
+              setPendingUploads((prev) => { const next = new Map(prev); next.delete(pid); return next; });
+              load();
+            },
+          );
+          handles.push(handle);
         }
       } catch { /* ignore — non-critical */ }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      unmounted = true;
+      handles.forEach((h) => h.close());
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -407,21 +421,29 @@ export default function ClosetPage() {
           setTryOnState({ status: 'failed', failureReason: job.failureReason ?? 'Try-on failed.' });
           return;
         }
-        // Still processing — show modal and resume polling
+        // Still processing — show modal and resume watching
         setTryOnState({ status: 'processing' });
-        const result = await pollTryOnUntilDone(savedJobId, (progress) => {
-          if (!cancelled && progress.status === 'PROCESSING') {
-            setTryOnState({ status: 'processing' });
-          }
-        });
-        clearActiveTryOnJob();
-        if (cancelled) return;
-        if (result.status === 'COMPLETED' && result.resultImageUrl) {
-          setTryOnState({ status: 'completed', resultUrl: result.resultImageUrl });
-          saveTryOnResult(result.resultImageUrl);
-        } else {
-          setTryOnState({ status: 'failed', failureReason: result.failureReason ?? 'Try-on failed.' });
-        }
+        let resumeHandle: SseHandle | null = null;
+        resumeHandle = watchTryOnUntilDone(
+          savedJobId,
+          (progress) => {
+            if (!cancelled && progress.status === 'PROCESSING') setTryOnState({ status: 'processing' });
+          },
+          (result) => {
+            clearActiveTryOnJob();
+            if (cancelled) return;
+            if (result.status === 'COMPLETED' && result.resultImageUrl) {
+              setTryOnState({ status: 'completed', resultUrl: result.resultImageUrl });
+              saveTryOnResult(result.resultImageUrl);
+            } else {
+              setTryOnState({ status: 'failed', failureReason: result.failureReason ?? 'Try-on failed.' });
+            }
+          },
+          () => {
+            if (!cancelled) { clearActiveTryOnJob(); setTryOnState(null); }
+          },
+        );
+        activeTryOnHandleRef.current = resumeHandle;
       } catch {
         if (!cancelled) {
           clearActiveTryOnJob();
@@ -429,7 +451,11 @@ export default function ClosetPage() {
         }
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      activeTryOnHandleRef.current?.close();
+      activeTryOnHandleRef.current = null;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -549,30 +575,57 @@ export default function ClosetPage() {
     }
 
     setAiSuggestingIdx(canvasIdx);
-    let layout: SavedCanvasLayout;
+    let layout: SavedCanvasLayout | null = null;
     try {
-      const aiResult = await fetchAiCanvasSuggest();
+      // Pass items from ALL canvases so backend skips outfits already shown on any canvas
+      const allCanvasIds = [...new Set(canvases.flatMap((c) => (c.layout ?? []).map((e) => e.id)))];
+      const aiResult = await fetchAiCanvasSuggest(allCanvasIds);
       layout = _buildLayoutFromIds(aiResult.itemIds);
-    } catch {
-      // AI unavailable — fall back to random
+    } catch (err: unknown) {
+      const errData = (err as { response?: { data?: { error?: { code?: string; message?: string }; code?: string } } })?.response?.data;
+      const code = errData?.error?.code ?? errData?.code;
+      if (code === 'NOT_ENOUGH_CLOTHES') {
+        const apiMsg = errData?.error?.message;
+        setOutfitBlockedModal({
+          title: 'Недостаточно одежды',
+          body: apiMsg ?? 'Добавьте больше вещей в гардероб, чтобы ИИ мог подобрать образ.',
+        });
+        return;
+      }
+      if (code === 'OUTFITS_EXHAUSTED') {
+        const apiMsg = errData?.error?.message;
+        // If message mentions wardrobe variety → user has too few items for new combos
+        const isTooFewItems = apiMsg && apiMsg.includes('мало одежды');
+        setOutfitBlockedModal({
+          title: isTooFewItems ? 'Мало одежды для новых образов' : 'Генерируем образы',
+          body: isTooFewItems
+            ? (apiMsg ?? 'Добавьте больше одежды, чтобы ИИ создал разнообразные образы.')
+            : 'ИИ подбирает новые образы. Нажмите «Изменить» через 30–60 секунд.',
+        });
+        return;
+      }
+      if (code === 'QUOTA_EXCEEDED') {
+        fetchPlan();
+        if (plansEnabled) { setShowPremiumGate('generation'); return; }
+        return;
+      }
       layout = generateRandomOutfit();
     } finally {
       setAiSuggestingIdx(null);
     }
 
-    generateOutfitSuggestions(1).then(() => {
-      fetchPlan();
-    }).catch(() => { /* handled by 402 error */ });
+    if (!layout) return;
 
     setCanvases((prev) => {
       const updated = [...prev];
-      if (canvasIdx >= updated.length) updated.push({ id: null, layout });
-      else updated[canvasIdx] = { ...updated[canvasIdx], layout };
+      if (canvasIdx >= updated.length) updated.push({ id: null, layout: layout! });
+      else updated[canvasIdx] = { ...updated[canvasIdx], layout: layout! };
       return updated;
     });
     try { localStorage.setItem('svayp_saved_layout', JSON.stringify(layout)); } catch { /* ignore */ }
     setCanvasInitialLayout(layout);
     saveCanvasToBackend(layout, canvasIdx);
+    fetchPlan();
   }
 
   async function saveCanvasToBackend(layout: SavedCanvasLayout, canvasIdx: number) {
@@ -593,21 +646,42 @@ export default function ClosetPage() {
 
     const existingId = canvases[canvasIdx]?.id ?? null;
 
+    const doCreate = async () => {
+      const canvasName = `Outfit ${canvasIdx + 1}`;
+      const canvas = await createOutfitCanvas({ name: canvasName, items: apiItems });
+      setCanvases((prev) => {
+        const updated = [...prev];
+        if (updated[canvasIdx]) updated[canvasIdx] = { ...updated[canvasIdx], id: canvas.id };
+        return updated;
+      });
+    };
+
     try {
       if (existingId) {
-        // Update existing canvas
-        await updateOutfitCanvas(existingId, { items: apiItems });
+        try {
+          await updateOutfitCanvas(existingId, { items: apiItems });
+        } catch (updateErr: unknown) {
+          const status = (updateErr as { response?: { status?: number } })?.response?.status;
+          if (status === 404) {
+            // Canvas was deleted on backend — create a new one
+            setCanvases((prev) => {
+              const updated = [...prev];
+              if (updated[canvasIdx]) updated[canvasIdx] = { ...updated[canvasIdx], id: null };
+              return updated;
+            });
+            await doCreate();
+          } else {
+            throw updateErr;
+          }
+        }
       } else {
-        // Create new canvas
-        const canvasName = `Outfit ${canvasIdx + 1}`;
-        const canvas = await createOutfitCanvas({ name: canvasName, items: apiItems });
-        setCanvases((prev) => {
-          const updated = [...prev];
-          if (updated[canvasIdx]) updated[canvasIdx] = { ...updated[canvasIdx], id: canvas.id };
-          return updated;
-        });
+        await doCreate();
       }
     } catch (err) {
+      const errCode = (err as { response?: { data?: { error?: { code?: string } } } })
+        ?.response?.data?.error?.code;
+      // Silently ignore composition errors — the outfit is shown to user but not persisted
+      if (errCode === 'INVALID_OUTFIT_COMPOSITION') return;
       console.error('Failed to save canvas to backend:', err);
       setSaveFailed(true);
       setTimeout(() => setSaveFailed(false), 4000);
@@ -662,25 +736,39 @@ export default function ClosetPage() {
     createTryOnJob({ wardrobeItemIds: itemIds, canvasId })
       .then((job) => {
         if (tryOnCancelRef.current) return;
-        // Persist job ID so we can resume after reload
         saveActiveTryOnJob(job.id);
         setTryOnState({ status: 'processing' });
         fetchPlan();
-        return pollTryOnUntilDone(job.id, (progress) => {
-          if (!tryOnCancelRef.current && progress.status === 'PROCESSING') {
-            setTryOnState({ status: 'processing' });
-          }
-        });
-      })
-      .then((result) => {
-        clearActiveTryOnJob();
-        if (tryOnCancelRef.current || !result) return;
-        if (result.status === 'COMPLETED' && result.resultImageUrl) {
-          setTryOnState({ status: 'completed', resultUrl: result.resultImageUrl });
-          saveTryOnResult(result.resultImageUrl);
-        } else {
-          setTryOnState({ status: 'failed', failureReason: result.failureReason ?? 'Try-on failed. Please try again.' });
-        }
+        activeTryOnHandleRef.current = watchTryOnUntilDone(
+          job.id,
+          (progress) => {
+            if (!tryOnCancelRef.current && progress.status === 'PROCESSING') {
+              setTryOnState({ status: 'processing' });
+            }
+          },
+          (result) => {
+            clearActiveTryOnJob();
+            activeTryOnHandleRef.current = null;
+            if (tryOnCancelRef.current) return;
+            if (result.status === 'COMPLETED' && result.resultImageUrl) {
+              setTryOnState({ status: 'completed', resultUrl: result.resultImageUrl });
+              saveTryOnResult(result.resultImageUrl);
+            } else {
+              setTryOnState({ status: 'failed', failureReason: result.failureReason ?? 'Try-on failed. Please try again.' });
+            }
+          },
+          (err) => {
+            clearActiveTryOnJob();
+            activeTryOnHandleRef.current = null;
+            if (tryOnCancelRef.current) return;
+            if ((err as { status?: number }).status === 402) {
+              setTryOnState(null);
+              setShowPremiumGate('generation');
+            } else {
+              setTryOnState({ status: 'failed', failureReason: 'Something went wrong. Please try again.' });
+            }
+          },
+        );
       })
       .catch((err) => {
         clearActiveTryOnJob();
@@ -718,6 +806,8 @@ export default function ClosetPage() {
 
   function handleCancelTryOn() {
     tryOnCancelRef.current = true;
+    activeTryOnHandleRef.current?.close();
+    activeTryOnHandleRef.current = null;
     clearActiveTryOnJob();
     setTryOnState(null);
   }
@@ -737,6 +827,12 @@ export default function ClosetPage() {
       {saveFailed && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[999] px-4 py-2.5 rounded-full bg-red-500 text-white text-[13px] font-semibold shadow-lg">
           {t.saveFailed}
+        </div>
+      )}
+      {/* Outfit generation toast */}
+      {outfitToastMsg && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[999] px-4 py-2.5 rounded-full bg-gray-800 text-white text-[13px] font-semibold shadow-lg whitespace-nowrap">
+          {outfitToastMsg}
         </div>
       )}
       {/* Header — mobile glass-morphism style */}
@@ -1061,6 +1157,41 @@ export default function ClosetPage() {
           currentPlan={plan}
           onClose={() => setShowPremiumGate(null)}
         />
+      )}
+
+      {/* ── Outfit Blocked Modal ── */}
+      {outfitBlockedModal && (
+        <div className="fixed inset-0 z-[200] flex items-end justify-center" onClick={() => setOutfitBlockedModal(null)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative w-full max-w-sm mx-auto bg-white rounded-t-3xl px-6 pt-6 pb-10 flex flex-col items-center gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-1 rounded-full bg-gray-200 mb-1" />
+            <div className="w-16 h-16 rounded-full bg-pink-50 flex items-center justify-center text-3xl">
+              👗
+            </div>
+            <div className="text-center">
+              <p className="text-[17px] font-bold text-gray-900 mb-1">{outfitBlockedModal.title}</p>
+              <p className="text-[14px] text-gray-500 leading-snug">{outfitBlockedModal.body}</p>
+            </div>
+            {outfitBlockedModal.title === 'Недостаточно одежды' && (
+              <button
+                className="w-full py-3.5 rounded-2xl text-[15px] font-semibold text-white"
+                style={{ background: 'linear-gradient(135deg, #F370A7 0%, #d946a8 100%)' }}
+                onClick={() => { setOutfitBlockedModal(null); openAdd('', 'tops'); }}
+              >
+                Добавить одежду
+              </button>
+            )}
+            <button
+              className="w-full py-3 rounded-2xl text-[15px] font-semibold text-gray-500 bg-gray-100"
+              onClick={() => setOutfitBlockedModal(null)}
+            >
+              Закрыть
+            </button>
+          </div>
+        </div>
       )}
 
       {/* ── Try-On Confirm Sheet ── */}
@@ -1502,10 +1633,13 @@ function OutfitCard({
 }) {
   const { t } = useI18n();
 
-  // Check if we have minimum items for an outfit (1 top + 1 bottom or shoes)
-  const hasUpper = allItems.some((i) => UPPER_CATS.includes(i.category));
-  const hasLowerOrShoes = allItems.some((i) => LOWER_CATS.includes(i.category) || SHOES_CATS.includes(i.category));
-  const canGenerateOutfit = hasUpper && hasLowerOrShoes;
+  // Valid outfit requires: dress/jumpsuit OR (top + bottom). Shoes alone or top+shoes is not enough.
+  const FULL_BODY_CATS: ClosetCategory[] = ['dresses', 'jumpsuits'];
+  const hasTop = allItems.some((i) => UPPER_CATS.includes(i.category));
+  const hasLower = allItems.some((i) => LOWER_CATS.includes(i.category));
+  const hasDress = allItems.some((i) => FULL_BODY_CATS.includes(i.category));
+  const hasShoes = allItems.some((i) => SHOES_CATS.includes(i.category));
+  const canGenerateOutfit = hasDress || (hasTop && hasLower);
 
   // Build display entries: saved layout or default auto-generated
   const displayEntries = React.useMemo(() => {
@@ -1531,7 +1665,17 @@ function OutfitCard({
     const hasShawl = shawlItem !== null;
     const entries: { item: ClosetItem; x: number; y: number; scale: number; zIndex: number; group: string }[] = [];
     const itemScale = hasShawl ? 0.88 : 1;
-    if (upperAll.length) entries.push({ item: upperAll[0], x: 32, y: hasShawl ? 19 : 4, scale: itemScale, zIndex: 1, group: 'upper' });
+
+    // When there are no bottoms, prefer full-body items (dresses/jumpsuits) over regular tops
+    const fullBodyCats: ClosetCategory[] = ['dresses', 'jumpsuits'];
+    const hasNoBottoms = lowerAll.length === 0;
+    const upperItem = hasNoBottoms
+      ? (upperAll.find((i) => fullBodyCats.includes(i.category)) ?? upperAll[0])
+      : upperAll[0];
+
+    // Only show a top in the default layout if there's a bottom to pair it with
+    const showTop = upperItem && (!hasNoBottoms || fullBodyCats.includes(upperItem.category));
+    if (showTop) entries.push({ item: upperItem, x: 32, y: hasShawl ? 19 : 4, scale: itemScale, zIndex: 1, group: 'upper' });
     if (lowerAll.length) entries.push({ item: lowerAll[0], x: 32, y: hasShawl ? 48 : 37, scale: itemScale, zIndex: 2, group: 'lower' });
     if (shoesAll.length) entries.push({ item: shoesAll[0], x: 32, y: hasShawl ? 73 : 68, scale: hasShawl ? 0.65 : 0.72, zIndex: 3, group: 'shoes' });
     if (shawlItem) entries.push({ item: shawlItem, x: 32, y: -5, scale: 0.55, zIndex: 10, group: 'acc' });
@@ -1644,15 +1788,20 @@ function OutfitCard({
               {t.addTopAndBottom}
             </p>
             <div className="flex gap-2 pb-2">
-              {hasUpper ? (
+              {(hasTop || hasDress) ? (
                 <span className="px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-[11px] font-semibold">✓ {t.upperBody}</span>
               ) : (
                 <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 text-[11px] font-semibold">+ {t.upperBody}</span>
               )}
-              {hasLowerOrShoes ? (
-                <span className="px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-[11px] font-semibold">✓ {t.lowerBody}/{t.shoes}</span>
+              {(hasDress || hasLower) ? (
+                <span className="px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-[11px] font-semibold">✓ {t.lowerBody}</span>
               ) : (
-                <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 text-[11px] font-semibold">+ {t.lowerBody}/{t.shoes}</span>
+                <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 text-[11px] font-semibold">+ {t.lowerBody}</span>
+              )}
+              {hasShoes ? (
+                <span className="px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-[11px] font-semibold">✓ {t.shoes}</span>
+              ) : (
+                <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 text-[11px] font-semibold">+ {t.shoes}</span>
               )}
             </div>
           </div>
@@ -3059,7 +3208,7 @@ function PremiumGateSheet({
   ];
 
   function handleUpgrade(_planKey: UserPlan) {
-    window.open('https://t.me/erkinov19', '_blank');
+    window.open('https://t.me/libasai_admin', '_blank');
   }
 
   function formatPrice(price: number) {

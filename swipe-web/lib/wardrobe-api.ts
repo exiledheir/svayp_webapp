@@ -1,4 +1,5 @@
 import { api } from '@/lib/api';
+import { watchWithSse } from '@/lib/sse-client';
 import type {
   WardrobeCategory,
   WardrobeSubcategory,
@@ -13,6 +14,7 @@ import type {
   OutfitSuggestionResponse,
   TryOnJobResponse,
   CalendarResponse,
+  SseHandle,
 } from '@/types';
 import type { PlanTier } from '@/types';
 
@@ -176,6 +178,42 @@ export async function pollUploadUntilDone(
   }
 }
 
+export function watchUploadUntilDone(
+  jobId: string,
+  onProgress: (status: WardrobeUploadStatus) => void,
+  onDone: (status: WardrobeUploadStatus) => void,
+  onError: (err: Error) => void,
+): SseHandle {
+  return watchWithSse<WardrobeUploadStatus, WardrobeUploadStatus>({
+    sseUrl: `/wardrobe/uploads/${jobId}/stream`,
+    fallbackPoll: () => pollUploadUntilDone(jobId, onProgress),
+    onProgress,
+    onDone,
+    onError,
+    isTerminal: (s) => TERMINAL_STATUSES.has(s.status),
+    toFinal: (s) => s,
+    timeoutMs: POLL_TIMEOUT_MS,
+  });
+}
+
+export function watchTryOnUntilDone(
+  jobId: string,
+  onProgress: (job: TryOnJobResponse) => void,
+  onDone: (job: TryOnJobResponse) => void,
+  onError: (err: Error) => void,
+): SseHandle {
+  return watchWithSse<TryOnJobResponse, TryOnJobResponse>({
+    sseUrl: `/outfits/try-on/${jobId}/stream`,
+    fallbackPoll: () => pollTryOnUntilDone(jobId, onProgress),
+    onProgress,
+    onDone,
+    onError,
+    isTerminal: (j) => j.status === 'COMPLETED' || j.status === 'FAILED',
+    toFinal: (j) => j,
+    timeoutMs: 5 * 60 * 1000,
+  });
+}
+
 // ── Wardrobe Items ────────────────────────────────────────────────────────────
 
 function mapWardrobeItem(raw: Record<string, unknown>): WardrobeItemResponse {
@@ -282,8 +320,10 @@ export async function uploadWardrobeItem(
   // 3. Confirm upload → start AI pipeline
   await confirmUpload(uploadJobId);
 
-  // 4. Poll until done
-  return pollUploadUntilDone(uploadJobId, onProgress);
+  // 4. Watch until done (SSE with polling fallback)
+  return new Promise<WardrobeUploadStatus>((resolve, reject) => {
+    watchUploadUntilDone(uploadJobId, onProgress ?? (() => {}), resolve, reject);
+  });
 }
 
 // ── Outfit Canvases ───────────────────────────────────────────────────────────
@@ -373,8 +413,8 @@ export interface AiCanvasSuggestResponse {
   tipRu: string;
 }
 
-export async function fetchAiCanvasSuggest(): Promise<AiCanvasSuggestResponse> {
-  const res = await api.post('/outfits/canvases/ai-suggest');
+export async function fetchAiCanvasSuggest(excludeIds: string[] = []): Promise<AiCanvasSuggestResponse> {
+  const res = await api.post('/outfits/canvases/ai-suggest', { excludeIds });
   return unwrapData<AiCanvasSuggestResponse>(res);
 }
 
@@ -411,7 +451,7 @@ export async function pollTryOnUntilDone(
   onProgress?: (job: TryOnJobResponse) => void,
 ): Promise<TryOnJobResponse> {
   const startTime = Date.now();
-  const TIMEOUT_MS = 2 * 60 * 1000;
+  const TIMEOUT_MS = 5 * 60 * 1000;
 
   while (true) {
     const job = await getTryOnJob(jobId);
