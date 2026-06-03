@@ -1916,27 +1916,9 @@ function InteractiveCanvas({
         return result;
       }
     }
-    // Default positions
-    const result: CanvasItem[] = [];
-    const u = upper.length ? upper[0] : null;
-    const l = lower.length ? lower[0] : null;
-    const s = shoes.length ? shoes[0] : null;
-    const shawlItem = acc.find((a) => a.category === 'shawl') ?? null;
-    const sideAccItem = acc.find((a) => a.category !== 'shawl') ?? null;
-    const hasShawl = shawlItem !== null;
-
-    // When shawl present, reduce item scales and shift down so all fit without cropping
-    const itemScale = hasShawl ? 0.88 : 1;
-    if (u) result.push({ item: u, x: 32, y: hasShawl ? 19 : 4, scale: itemScale, zIndex: 1, group: 'upper' });
-    if (l) result.push({ item: l, x: 32, y: hasShawl ? 48 : 37, scale: itemScale, zIndex: 2, group: 'lower' });
-    if (s) result.push({ item: s, x: 32, y: hasShawl ? 73 : 68, scale: hasShawl ? 0.65 : 0.72, zIndex: 3, group: 'shoes' });
-    // Scarf: small, sits at top with just a collar-area touch on the shirt
-    if (shawlItem) result.push({ item: shawlItem, x: 32, y: -5, scale: 0.55, zIndex: 10, group: 'acc' });
-    // Side accessory (bag, jewelry, etc.) sits to the right at shirt level
-    if (sideAccItem) result.push({ item: sideAccItem, x: 63, y: hasShawl ? 20 : 5, scale: 0.6, zIndex: 4, group: 'acc' });
-    nextZ.current = result.length + 5;
-    return result;
-  }, [upper, lower, shoes, acc, initialLayout, allItems]);
+    // No saved layout — start with empty canvas, user builds manually
+    return [];
+  }, [initialLayout, allItems]);
 
   const [canvasItems, setCanvasItems] = useState<CanvasItem[]>(buildInitialItems);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
@@ -2089,14 +2071,7 @@ function InteractiveCanvas({
 
   // Save — deduplicate by item ID (keep last occurrence = most recent position)
   function handleSave() {
-    // Validate: need at least 1 upper + 1 lower/shoes
-    const hasUpper = canvasItems.some((ci) => ci.group === 'upper');
-    const hasLowerOrShoes = canvasItems.some((ci) => ci.group === 'lower' || ci.group === 'shoes');
-    if (!hasUpper || !hasLowerOrShoes) {
-      setSaveWarning(true);
-      setTimeout(() => setSaveWarning(false), 4000);
-      return;
-    }
+    if (canvasItems.length === 0) return;
 
     const seen = new Set<string>();
     const deduped: SavedCanvasLayout = [];
