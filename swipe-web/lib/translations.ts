@@ -51,6 +51,7 @@ export interface Translations {
   calDays: string;
   reachedRegenLimit: string;
   reachedItemLimit: string;
+  categoryFullError: string;
   discoverFashion: string;
   phoneNumber: string;
   continueBtn: string;
@@ -176,6 +177,8 @@ const en: Translations = {
   calDays: 'days in calendar',
   reachedRegenLimit: "You've used your {n} regenerations. Upgrade for more.",
   reachedItemLimit: 'You\'ve reached the {n} items/category limit.',
+  categoryFullError: 'This category is full ({n}/{n}). Try another category or upgrade for more slots.',
+
   discoverFashion: 'Discover fashion you love',
   phoneNumber: 'Phone number',
   continueBtn: 'Continue',
@@ -351,6 +354,8 @@ const ru: Translations = {
   calDays: 'дней в календаре',
   reachedRegenLimit: 'Вы использовали {n} генераций. Улучшите план для большего.',
   reachedItemLimit: 'Достигнут лимит {n} вещей на категорию.',
+  categoryFullError: 'Эта категория заполнена ({n}/{n}). Добавьте в другую или улучшите план.',
+
   discoverFashion: 'Откройте моду, которую вы любите',
   phoneNumber: 'Номер телефона',
   continueBtn: 'Продолжить',
@@ -526,6 +531,8 @@ const uz: Translations = {
   calDays: 'kun kalendarda',
   reachedRegenLimit: "{n} ta re-generatsiyadan foydalandingiz. Ko'proq uchun yangilang.",
   reachedItemLimit: 'Kategoriyada {n} ta kiyim chegarasiga yetdingiz.',
+  categoryFullError: "Bu kategoriya to'lgan ({n}/{n}). Boshqasiga qo'shing yoki rejani yangilang.",
+
   discoverFashion: "Sevimli modangizni toping",
   phoneNumber: 'Telefon raqam',
   continueBtn: 'Davom etish',

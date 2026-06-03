@@ -61,9 +61,9 @@ const OCCASION_CONFIG = [
 type UserPlan = PlanTier;
 
 const PLAN_LIMITS_FALLBACK: Record<UserPlan, PlanLimits> = {
-  free:    { itemsPerCategory: 20,  outfitCanvases: 1, tryItOns: 2,  regenerations: 5,  calendarDays: 2 },
-  pro:     { itemsPerCategory: 50,  outfitCanvases: 3, tryItOns: 10, regenerations: 15, calendarDays: 7 },
-  premium: { itemsPerCategory: 999, outfitCanvases: 7, tryItOns: 30, regenerations: 50, calendarDays: 7 },
+  free:    { itemsPerCategory: 5,   outfitCanvases: 1, tryItOns: 2,  regenerations: 5,  calendarDays: 2 },
+  pro:     { itemsPerCategory: 15,  outfitCanvases: 3, tryItOns: 10, regenerations: 15, calendarDays: 7 },
+  premium: { itemsPerCategory: 50,  outfitCanvases: 7, tryItOns: 30, regenerations: 50, calendarDays: 7 },
 };
 
 const PLAN_COLORS: Record<UserPlan, { bg: string; text: string; crownColor: string }> = {
@@ -95,6 +95,10 @@ function usePlan() {
 
   const totalItems = Object.values(usage.itemCountByCategory ?? {}).reduce((s, n) => s + n, 0);
 
+  function canAddToCategory(cat: string): boolean {
+    return (usage.itemCountByCategory?.[cat] ?? 0) < limits.itemsPerCategory;
+  }
+
   return {
     plan,
     limits,
@@ -102,8 +106,9 @@ function usePlan() {
     fetchPlan,
     canGenerate: usage.regenerationsUsed < limits.regenerations,
     canTryOn: usage.tryItOnsUsed < limits.tryItOns,
-    canAddItem: totalItems < limits.itemsPerCategory,
+    canAddToCategory,
     calendarDays: limits.calendarDays,
+    totalItems,
   };
 }
 
@@ -137,8 +142,8 @@ export default function ClosetPage() {
   const [canvases, setCanvases] = useState<{ id: string | null; layout: SavedCanvasLayout }[]>([]);
   const [editingCanvasIdx, setEditingCanvasIdx] = useState<number | null>(null);
   const [canvasInitialLayout, setCanvasInitialLayout] = useState<SavedCanvasLayout | null>(null);
-  const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | null>(null);
-  const { plan, limits, usage, fetchPlan, canGenerate, canTryOn, canAddItem, calendarDays } = usePlan();
+  const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | 'categoryFull' | null>(null);
+  const { plan, limits, usage, fetchPlan, canGenerate, canTryOn, canAddToCategory, calendarDays } = usePlan();
 
   // Load all canvases from backend
   useEffect(() => {
@@ -212,8 +217,8 @@ export default function ClosetPage() {
   const addFileRef = useRef<File | null>(null);
 
   function openAdd(group: string, category: ClosetCategory) {
-    if (plansEnabled && !canAddItem) {
-      setShowPremiumGate('items');
+    if (plansEnabled && !canAddToCategory(category)) {
+      setShowPremiumGate('categoryFull');
       return;
     }
     setAddGroup(group);
@@ -3162,7 +3167,7 @@ function PremiumGateSheet({
   currentPlan,
   onClose,
 }: {
-  reason: 'generation' | 'items';
+  reason: 'generation' | 'items' | 'categoryFull';
   currentPlan: UserPlan;
   onClose: () => void;
 }) {
@@ -3245,6 +3250,8 @@ function PremiumGateSheet({
           <p className="text-[11px] text-gray-500 text-center mb-4 leading-relaxed">
             {reason === 'generation'
               ? t.reachedRegenLimit.replace('{n}', String(PLAN_LIMITS_FALLBACK[currentPlan].regenerations))
+              : reason === 'categoryFull'
+              ? t.categoryFullError.replace(/\{n\}/g, String(PLAN_LIMITS_FALLBACK[currentPlan].itemsPerCategory))
               : t.reachedItemLimit.replace('{n}', String(PLAN_LIMITS_FALLBACK[currentPlan].itemsPerCategory))}
           </p>
 
