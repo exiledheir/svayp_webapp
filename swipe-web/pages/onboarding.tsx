@@ -305,9 +305,9 @@ export default function OnboardingPage() {
     setCurrent(SLIDE_COUNT - 1);
   }
 
-  function finish(addItem: boolean) {
+  function finish() {
     setOnboardingComplete();
-    router.replace(addItem ? '/closet?addItem=true' : '/closet');
+    router.replace('/closet');
   }
 
   function handleTouchStart(e: React.TouchEvent) {
@@ -375,14 +375,14 @@ export default function OnboardingPage() {
         {isCta ? (
           <div className="flex flex-col gap-3">
             <button
-              onClick={() => finish(true)}
+              onClick={() => finish()}
               className="w-full py-4 rounded-2xl text-white font-semibold text-base active:opacity-80"
               style={{ background: '#F370A7' }}
             >
               {t.onboarding_btn_add_item}
             </button>
             <button
-              onClick={() => finish(false)}
+              onClick={() => finish()}
               className="w-full py-2 text-gray-400 text-sm active:opacity-60"
             >
               {t.onboarding_btn_skip}
