@@ -1892,15 +1892,15 @@ function OutfitCard({
       )}
 
       {/* Top-right action buttons */}
-      {canGenerateOutfit && (
+      {(canGenerateOutfit || isEmpty) && (
         <div className="absolute top-3.5 right-3.5 flex flex-col items-center gap-1.5 z-10">
           {onRegenerate && (
             <div className="flex flex-col items-center gap-0.5">
               <button
                 data-coach="regen"
-                onClick={isAiSuggesting ? undefined : onRegenerate}
-                disabled={isAiSuggesting}
-                className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform disabled:opacity-60"
+                onClick={isAiSuggesting || isEmpty ? undefined : onRegenerate}
+                disabled={isAiSuggesting || isEmpty}
+                className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform disabled:opacity-40"
                 style={{ background: isAiSuggesting ? 'rgba(99,102,241,0.12)' : 'rgba(0,0,0,0.06)' }}
                 title={isAiSuggesting ? t.aiThinking : t.regenerateWithAI}
               >
@@ -1925,30 +1925,14 @@ function OutfitCard({
       {/* Flat-lay Canvas */}
       <div className="flex-1 relative min-h-0 px-5 pt-5 pb-3">
         {isEmpty ? (
-          <div className="w-full h-full rounded-2xl flex flex-col items-center justify-center gap-3">
-            <div className="relative flex items-center justify-center" style={{ maxHeight: 200, width: '100%' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/images/closet/outfitcard_empty_state.png"
-                alt="Empty outfit"
-                className="max-h-[200px] w-auto object-contain opacity-80"
-                onError={(e) => {
-                  const t = e.currentTarget;
-                  t.style.display = 'none';
-                  const fb = t.nextElementSibling as HTMLElement | null;
-                  if (fb) fb.style.display = 'flex';
-                }}
-              />
-              <div className="hidden flex-col items-center justify-center gap-2 opacity-30">
-                <svg width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
-                  <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.57a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.57a2 2 0 0 0-1.34-2.23z"/>
-                </svg>
-              </div>
-            </div>
-            <p className="text-[15px] font-bold text-gray-800 text-center leading-snug pb-2">
-              {t.yourStyleStartsHere}<br />
-              <span className="text-[13px] font-medium text-gray-400">{t.tapPlusToAddFirstPiece}</span>
-            </p>
+          <div className="w-full h-full flex items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/closet/outfitcard_empty_state.png"
+              alt="Empty outfit"
+              className="w-full h-full object-contain opacity-80"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
           </div>
         ) : isAiSuggesting && displayEntries.length === 0 ? (
           <div className="w-full h-full flex flex-col items-center justify-center gap-3">
@@ -2071,10 +2055,11 @@ function OutfitCard({
         >
           {t.viewItems}
         </button>
-        {onTryItOn && canGenerateOutfit && (
+        {onTryItOn && (canGenerateOutfit || isEmpty) && (
         <button
           data-coach="try-on"
-          onClick={onTryItOn}
+          onClick={isEmpty ? undefined : onTryItOn}
+          disabled={isEmpty}
           className="flex-1 h-[44px] rounded-full flex items-center justify-center gap-1.5 text-[12px] font-bold text-white tracking-wide active:scale-[0.97] transition-transform"
           style={{
             background: 'linear-gradient(135deg, #F370A7 0%, #e0409a 50%, #F370A7 100%)',
