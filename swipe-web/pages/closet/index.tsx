@@ -320,14 +320,7 @@ export default function ClosetPage() {
     setShowAddPicker(true);
   }
 
-  // Open add picker when arriving from onboarding with ?addItem=true
-  useEffect(() => {
-    if (!router.isReady) return;
-    if (router.query.addItem === 'true') {
-      openAdd('', 'tops');
-      router.replace('/closet', undefined, { shallow: true });
-    }
-  }, [router.isReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   // Load history on mount (with CloudStorage fallback) and whenever the My Looks sheet opens
   useEffect(() => {
@@ -1014,26 +1007,24 @@ export default function ClosetPage() {
                 <span>{plan === 'free' ? 'Free' : plan === 'pro' ? 'Pro' : 'Premium'}</span>
               </button>
             )}
-            {/* My Looks button with label */}
+            {/* My Looks button */}
             <button
               onClick={() => setShowMyLooks(true)}
-              className="flex flex-col items-center justify-center gap-0.5 px-2 h-9 rounded-full active:scale-[0.95] transition-transform"
+              className="flex items-center justify-center px-2 h-9 rounded-full active:scale-[0.95] transition-transform"
               style={{ background: myLooksHistory.length > 0 ? 'rgba(243,112,167,0.12)' : 'rgba(0,0,0,0.05)', minWidth: 38 }}
               aria-label="My Looks"
             >
               <Images size={14} strokeWidth={1.8} style={{ color: myLooksHistory.length > 0 ? '#F370A7' : '#4b5563' }} />
-              <span className="text-[8px] font-medium leading-none whitespace-nowrap" style={{ color: myLooksHistory.length > 0 ? '#F370A7' : '#9ca3af' }}>{t.myLooks}</span>
             </button>
-            {/* Profile icon with label */}
+            {/* Profile icon */}
             {profileEnabled && (
               <button
                 onClick={() => setShowProfile(true)}
-                className="flex flex-col items-center justify-center gap-0.5 px-2 h-9 rounded-full active:scale-[0.95] transition-transform"
+                className="flex items-center justify-center px-2 h-9 rounded-full active:scale-[0.95] transition-transform"
                 style={{ background: 'rgba(0,0,0,0.05)', minWidth: 38 }}
                 aria-label="Profile"
               >
                 <User size={14} strokeWidth={1.8} className="text-gray-600" />
-                <span className="text-[8px] font-medium leading-none text-gray-400">{t.profile}</span>
               </button>
             )}
           </div>
@@ -1935,12 +1926,12 @@ function OutfitCard({
       <div className="flex-1 relative min-h-0 px-5 pt-5 pb-3">
         {isEmpty ? (
           <div className="w-full h-full rounded-2xl flex flex-col items-center justify-center gap-3">
-            <div className="relative w-full flex-1 min-h-0 flex items-center justify-center">
+            <div className="relative flex items-center justify-center" style={{ maxHeight: 200, width: '100%' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/images/closet/outfitcard_empty_state.png"
                 alt="Empty outfit"
-                className="w-full h-full object-contain opacity-80"
+                className="max-h-[200px] w-auto object-contain opacity-80"
                 onError={(e) => {
                   const t = e.currentTarget;
                   t.style.display = 'none';
@@ -1948,7 +1939,7 @@ function OutfitCard({
                   if (fb) fb.style.display = 'flex';
                 }}
               />
-              <div className="hidden w-full h-full flex-col items-center justify-center gap-2 opacity-30">
+              <div className="hidden flex-col items-center justify-center gap-2 opacity-30">
                 <svg width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
                   <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.57a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.57a2 2 0 0 0-1.34-2.23z"/>
                 </svg>
@@ -2069,8 +2060,8 @@ function OutfitCard({
         )}
       </div>
 
-      {/* Bottom action bar — only when outfit can be generated */}
-      {canGenerateOutfit && (
+      {/* Bottom action bar — shown when outfit can be generated OR when closet is empty */}
+      {(canGenerateOutfit || isEmpty) && (
       <div className="flex gap-2.5 px-5 pb-5">
         <button
           data-coach="view-items"
@@ -2080,7 +2071,7 @@ function OutfitCard({
         >
           {t.viewItems}
         </button>
-        {onTryItOn && (
+        {onTryItOn && canGenerateOutfit && (
         <button
           data-coach="try-on"
           onClick={onTryItOn}
