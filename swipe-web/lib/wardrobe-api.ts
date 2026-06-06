@@ -62,6 +62,19 @@ export async function getUserPlan(): Promise<UserPlanResponse> {
   return mapPlanResponse(raw);
 }
 
+export async function getUserProfile(): Promise<{ name?: string; phoneNumber?: string }> {
+  const res = await api.get('/me');
+  const raw = unwrapData<Record<string, unknown>>(res);
+  const name = (
+    raw.name ?? raw.firstName ?? raw.first_name ??
+    raw.username ?? raw.fullName ?? raw.full_name ?? raw.displayName ?? raw.display_name
+  ) as string | undefined;
+  const phoneNumber = (
+    raw.phoneNumber ?? raw.phone_number ?? raw.phone
+  ) as string | undefined;
+  return { name: name || undefined, phoneNumber: phoneNumber || undefined };
+}
+
 // ── Upload Flow ───────────────────────────────────────────────────────────────
 
 function mapUploadInitResponse(raw: Record<string, unknown>): WardrobeUploadInitResponse {

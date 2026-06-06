@@ -2,17 +2,18 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { Plus, X, Sparkles, Sun, CalendarDays, TreePine, Camera, Image as ImageIcon, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2 } from 'lucide-react';
-import { getUser } from '@/lib/auth';
+import { getUser, clearTokens } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags-context';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import { fetchClosetItems, addClosetItemFromFile, removeClosetItem, updateClosetItemApi, getClosetItems, addClosetItem, deleteClosetItem, updateClosetItem, CLOSET_CATEGORIES } from '@/lib/closet-storage';
 import type { ClosetItem, ClosetCategory } from '@/lib/closet-storage';
 import type { WardrobeUploadStatus, PlanTier, PlanLimits, PlanUsage, TryOnJobResponse } from '@/types';
-import { getUserPlan, generateOutfitSuggestions, fetchAiCanvasSuggest, createTryOnJob, watchTryOnUntilDone, getOutfitCalendar, createOutfitCanvas, updateOutfitCanvas, deleteOutfitCanvas, getOutfitCanvases, getOutfitCanvas, listUploads, watchUploadUntilDone, getTryOnJob } from '@/lib/wardrobe-api';
+import { getUserPlan, generateOutfitSuggestions, fetchAiCanvasSuggest, createTryOnJob, watchTryOnUntilDone, getOutfitCalendar, createOutfitCanvas, updateOutfitCanvas, deleteOutfitCanvas, getOutfitCanvases, getOutfitCanvas, listUploads, watchUploadUntilDone, getTryOnJob, getUserProfile } from '@/lib/wardrobe-api';
 import type { SseHandle } from '@/types';
 import { useI18n } from '@/lib/i18n';
 import type { Locale } from '@/lib/translations';
-import { isOnboardingComplete } from '@/lib/onboarding-storage';
+import { isOnboardingComplete, isClosetTourDone, setClosetTourDone, clearClosetTour, isCanvasHintSeen, setCanvasHintSeen } from '@/lib/onboarding-storage';
+import ClosetCoachMark from '@/components/ClosetCoachMark';
 import { saveTryOnResult, getTryOnHistory, getTryOnHistoryWithCloud, deleteTryOnRecord, saveActiveTryOnJob, getActiveTryOnJobWithCloud, clearActiveTryOnJob, type TryOnRecord } from '@/lib/tryon-history';
 
 const ADD_GROUPS: Record<string, ClosetCategory[]> = {
@@ -44,6 +45,29 @@ const UPPER_CATS: ClosetCategory[] = ['tops', 'dresses', 'jackets', 'blouses', '
 const LOWER_CATS: ClosetCategory[] = ['skirts', 'jeans', 'pants', 'shorts'];
 const SHOES_CATS: ClosetCategory[] = ['shoes', 'sneakers', 'heels', 'boots', 'sandals', 'flats'];
 const ACC_CATS: ClosetCategory[] = ['accessories', 'bags', 'shawl', 'jewelry', 'underwear'];
+
+// ── Demo items shown to new users with empty wardrobes ───────────────────────
+// IDs are the real backend UUIDs so that try-on and other API features work.
+const DEMO_ITEM_IDS = new Set([
+  '0d1b6b18-bd57-4a3e-a4c4-5aac9ca5fa5e',
+  'd101c8a6-35fa-4cba-9a7c-e7288947f3b2',
+  'da66eb48-1cd7-4087-8a1f-16a011bcae3e',
+  'fb18130c-1192-4d32-aa84-0d5a837a3bcd',
+]);
+
+const DEMO_ITEMS: ClosetItem[] = [
+  { id: '0d1b6b18-bd57-4a3e-a4c4-5aac9ca5fa5e', category: 'tops',   imageData: 'https://svaypimages2.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2F4f7dbf50-c725-418c-b9ca-4a7f14eef80a.thumb.png',  createdAt: '2024-01-01T00:00:00Z' },
+  { id: 'd101c8a6-35fa-4cba-9a7c-e7288947f3b2', category: 'skirts', imageData: 'https://svaypimages2.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2Fd44bec44-ad12-41ad-a08c-ce90b863d0f3.thumb.png', createdAt: '2024-01-01T00:00:00Z' },
+  { id: 'da66eb48-1cd7-4087-8a1f-16a011bcae3e', category: 'shoes',  imageData: 'https://svaypimages2.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2F8d912326-ee36-41bf-988f-0cde9bbedce3.thumb.png',  createdAt: '2024-01-01T00:00:00Z' },
+  { id: 'fb18130c-1192-4d32-aa84-0d5a837a3bcd', category: 'bags',   imageData: 'https://svaypimages2.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2F32150c11-a5f4-4b32-98b1-49c8ed2a952a.thumb.png',  createdAt: '2024-01-01T00:00:00Z' },
+];
+
+const DEMO_CANVAS_LAYOUT: SavedCanvasLayout = [
+  { id: '0d1b6b18-bd57-4a3e-a4c4-5aac9ca5fa5e', x: 32, y: 17, scale: 1,    zIndex: 1, group: 'upper' },
+  { id: 'd101c8a6-35fa-4cba-9a7c-e7288947f3b2', x: 32, y: 39, scale: 1,    zIndex: 2, group: 'lower' },
+  { id: 'da66eb48-1cd7-4087-8a1f-16a011bcae3e', x: 32, y: 58, scale: 0.72, zIndex: 3, group: 'shoes' },
+  { id: 'fb18130c-1192-4d32-aa84-0d5a837a3bcd', x: 63, y: 17, scale: 0.6,  zIndex: 4, group: 'acc'   },
+];
 
 function catLabel(cat: ClosetCategory, cats?: Record<string, string>): string {
   return cats?.[cat] ?? CLOSET_CATEGORIES.find((c) => c.value === cat)?.label ?? cat;
@@ -128,9 +152,59 @@ export default function ClosetPage() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── In-page coach marks tour ──────────────────────────────────────────────────
+  const COACH_SELECTORS = ['[data-coach="fab"]', '[data-coach="regen"]', '[data-coach="view-items"]', '[data-coach="try-on"]'];
+  // Fallback selectors used when the primary target isn't in the DOM yet (e.g. no items added)
+  const COACH_FALLBACKS = ['[data-coach="fab"]', '[data-coach="outfit-card"]', '[data-coach="outfit-card"]', '[data-coach="outfit-card"]'];
+  const [tourStep, setTourStep] = useState<number | null>(null);
+  const [tourTargetRect, setTourTargetRect] = useState<DOMRect | null>(null);
+
   useEffect(() => {
+    if (!isClosetTourDone()) {
+      setTourStep(0);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (tourStep === null) return;
+    const primary = document.querySelector(COACH_SELECTORS[tourStep]);
+    const fallback = COACH_FALLBACKS[tourStep] ? document.querySelector(COACH_FALLBACKS[tourStep]) : null;
+    const el = primary ?? fallback;
+    setTourTargetRect(el ? el.getBoundingClientRect() : null);
+  }, [tourStep]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleTourDismiss() {
+    const nextStep = (tourStep ?? 0) + 1;
+    if (nextStep >= COACH_SELECTORS.length) {
+      setTourStep(null);
+      setClosetTourDone();
+    } else {
+      setTourStep(nextStep);
+    }
+  }
+
+  useEffect(() => {
+    // Immediately show whatever is in localStorage (prevents flicker)
     const u = getUser();
-    if (u) setUserInfo({ name: u.name as string | undefined, phoneNumber: (u.phoneNumber ?? u.phone_number) as string | undefined });
+    if (u) {
+      const name = (
+        u.name ?? u.firstName ?? u.first_name ??
+        u.username ?? u.fullName ?? u.full_name ?? u.displayName ?? u.display_name
+      ) as string | undefined;
+      const phoneNumber = (u.phoneNumber ?? u.phone_number ?? u.phone) as string | undefined;
+      setUserInfo({ name: name || undefined, phoneNumber: phoneNumber || undefined });
+    }
+    // Then fetch fresh profile from the API
+    getUserProfile()
+      .then((profile) => {
+        if (profile.name || profile.phoneNumber) {
+          setUserInfo((prev) => ({
+            name: profile.name ?? prev?.name,
+            phoneNumber: profile.phoneNumber ?? prev?.phoneNumber,
+          }));
+        }
+      })
+      .catch(() => { /* silently ignore — we already have the localStorage fallback */ });
   }, []);
   const [items, setItems] = useState<ClosetItem[]>([]);
   const [upperFilter, setUpperFilter] = useState<ClosetCategory | null>(null);
@@ -185,6 +259,13 @@ export default function ClosetPage() {
 
   const canAddCanvas = canvases.length < limits.outfitCanvases;
 
+  // Demo mode: true when ALL items in the wardrobe are the placeholder demo items
+  const hasDemoItems = items.length > 0 && items.every((i) => DEMO_ITEM_IDS.has(i.id));
+  // In demo mode always show the pre-built canvas — ignore any stale localStorage canvases
+  const displayCanvases: typeof canvases = hasDemoItems
+    ? [{ id: null, layout: DEMO_CANVAS_LAYOUT }]
+    : canvases;
+
   const [outfitSheet, setOutfitSheet] = useState<{ title: string; days: Date[] } | null>(null);
   const [editItem, setEditItem] = useState<ClosetItem | null>(null);
   const [tryOnState, setTryOnState] = useState<{ status: 'loading' | 'processing' | 'completed' | 'failed'; resultUrl?: string; failureReason?: string } | null>(null);
@@ -200,6 +281,16 @@ export default function ClosetPage() {
   const dismissedUploadJobsRef = useRef<Set<string>>((() => {
     try { return new Set(JSON.parse(localStorage.getItem('libas_dismissed_uploads') ?? '[]')); } catch { return new Set<string>(); }
   })());
+
+  // Track demo items the user has explicitly deleted so they don't reappear on reload
+  const DEMO_DISMISSED_KEY = 'svayp_dismissed_demo_ids';
+  function getDismissedDemoIds(): Set<string> {
+    try { return new Set(JSON.parse(localStorage.getItem(DEMO_DISMISSED_KEY) ?? '[]')); } catch { return new Set<string>(); }
+  }
+  function dismissDemoId(id: string) {
+    const s = getDismissedDemoIds(); s.add(id);
+    try { localStorage.setItem(DEMO_DISMISSED_KEY, JSON.stringify([...s])); } catch {}
+  }
 
   // ── Inline add flow ──────────────────────────────────────────────────────────
   const [addGroup, setAddGroup] = useState<string>('upper');
@@ -283,7 +374,7 @@ export default function ClosetPage() {
     const category = addCategory;
 
     // Immediately close the add sheet and show placeholder in grid
-    setPendingUploads((prev) => new Map(prev).set(pendingId, { category, imageData: previewImage, step: 'Uploading...', progress: 0 }));
+    setPendingUploads((prev) => new Map(prev).set(pendingId, { category, imageData: previewImage, step: t.uploading, progress: 0 }));
     setAddRawImage('');
     setShowAddPicker(false);
     addFileRef.current = null;
@@ -343,9 +434,27 @@ export default function ClosetPage() {
     try {
       const apiItems = await fetchClosetItems();
       const localItems = getClosetItems().filter((li) => li.id.startsWith('local_'));
-      if (seq === loadSeqRef.current) setItems([...apiItems, ...localItems]);
+      const allFetched = [...apiItems, ...localItems];
+      if (seq === loadSeqRef.current) {
+        if (allFetched.length > 0) {
+          setItems(allFetched);
+        } else {
+          const dismissed = getDismissedDemoIds();
+          const demoToShow = DEMO_ITEMS.filter((i) => !dismissed.has(i.id));
+          setItems(demoToShow.length > 0 ? demoToShow : []);
+        }
+      }
     } catch {
-      if (seq === loadSeqRef.current) setItems(getClosetItems());
+      const localItems = getClosetItems();
+      if (seq === loadSeqRef.current) {
+        if (localItems.length > 0) {
+          setItems(localItems);
+        } else {
+          const dismissed = getDismissedDemoIds();
+          const demoToShow = DEMO_ITEMS.filter((i) => !dismissed.has(i.id));
+          setItems(demoToShow.length > 0 ? demoToShow : []);
+        }
+      }
     } finally {
       if (seq === loadSeqRef.current) setIsLoading(false);
     }
@@ -465,6 +574,12 @@ export default function ClosetPage() {
   }, []);
 
   async function handleDelete(id: string) {
+    if (DEMO_ITEM_IDS.has(id)) {
+      // Demo items don't belong to the user's wardrobe — just hide them locally
+      dismissDemoId(id);
+      setItems((prev) => prev.filter((i) => i.id !== id));
+      return;
+    }
     try {
       if (!id.startsWith('local_')) {
         await removeClosetItem(id);
@@ -478,6 +593,7 @@ export default function ClosetPage() {
   }
 
   function handleUpdateCategory(id: string, category: ClosetCategory) {
+    if (DEMO_ITEM_IDS.has(id)) return;
     if (id.startsWith('local_')) {
       updateClosetItem(id, { category });
     } else {
@@ -531,11 +647,11 @@ export default function ClosetPage() {
     const hasShawl = shawlItem !== null;
     const itemScale = hasShawl ? 0.88 : 1;
     const layout: SavedCanvasLayout = [];
-    if (u) layout.push({ id: u.id, x: 32, y: hasShawl ? 19 : 4, scale: itemScale, zIndex: 1, group: 'upper' });
-    if (l) layout.push({ id: l.id, x: 32, y: hasShawl ? 48 : 37, scale: itemScale, zIndex: 2, group: 'lower' });
-    if (s) layout.push({ id: s.id, x: 32, y: hasShawl ? 73 : 68, scale: hasShawl ? 0.65 : 0.72, zIndex: 3, group: 'shoes' });
+    if (u) layout.push({ id: u.id, x: 32, y: hasShawl ? 32 : 17, scale: itemScale, zIndex: 1, group: 'upper' });
+    if (l) layout.push({ id: l.id, x: 32, y: hasShawl ? 50 : 39, scale: itemScale, zIndex: 2, group: 'lower' });
+    if (s) layout.push({ id: s.id, x: 32, y: hasShawl ? 63 : 58, scale: hasShawl ? 0.65 : 0.72, zIndex: 3, group: 'shoes' });
     if (shawlItem) layout.push({ id: shawlItem.id, x: 32, y: -5, scale: 0.55, zIndex: 10, group: 'acc' });
-    if (sideAccItem) layout.push({ id: sideAccItem.id, x: 63, y: hasShawl ? 20 : 5, scale: 0.6, zIndex: 4, group: 'acc' });
+    if (sideAccItem) layout.push({ id: sideAccItem.id, x: 63, y: hasShawl ? 20 : 17, scale: 0.6, zIndex: 4, group: 'acc' });
     return layout;
   }
 
@@ -553,25 +669,29 @@ export default function ClosetPage() {
 
     for (const item of matched) {
       if (UPPER_CATS.includes(item.category)) {
-        layout.push({ id: item.id, x: 32, y: hasShawl ? 19 : 4, scale, zIndex: 1, group: 'upper' });
+        layout.push({ id: item.id, x: 32, y: hasShawl ? 32 : 17, scale, zIndex: 1, group: 'upper' });
       } else if (LOWER_CATS.includes(item.category)) {
-        layout.push({ id: item.id, x: 32, y: hasShawl ? 48 : 37, scale, zIndex: 2, group: 'lower' });
+        layout.push({ id: item.id, x: 32, y: hasShawl ? 50 : 39, scale, zIndex: 2, group: 'lower' });
       } else if (SHOES_CATS.includes(item.category)) {
-        layout.push({ id: item.id, x: 32, y: hasShawl ? 73 : 68, scale: hasShawl ? 0.65 : 0.72, zIndex: 3, group: 'shoes' });
+        layout.push({ id: item.id, x: 32, y: hasShawl ? 63 : 58, scale: hasShawl ? 0.65 : 0.72, zIndex: 3, group: 'shoes' });
       } else if (item.category === 'shawl') {
         layout.push({ id: item.id, x: 32, y: -5, scale: 0.55, zIndex: 10, group: 'acc' });
       } else {
         yOffset += 15;
-        layout.push({ id: item.id, x: 63, y: (hasShawl ? 20 : 5) + yOffset, scale: 0.6, zIndex: 4, group: 'acc' });
+        layout.push({ id: item.id, x: 63, y: (hasShawl ? 20 : 17) + yOffset, scale: 0.6, zIndex: 4, group: 'acc' });
       }
     }
     return layout.length ? layout : generateRandomOutfit();
   }
 
   async function handleNewOutfit(canvasIdx = 0) {
+    if (hasDemoItems) {
+      setOutfitBlockedModal({ title: t.demoAddTitle, body: t.demoAddBody });
+      return;
+    }
     const hasUpper = items.some((i) => UPPER_CATS.includes(i.category));
-    const hasLowerOrShoes = items.some((i) => LOWER_CATS.includes(i.category) || SHOES_CATS.includes(i.category));
-    if (!hasUpper || !hasLowerOrShoes) {
+    const hasLower = items.some((i) => LOWER_CATS.includes(i.category));
+    if (!hasUpper || !hasLower) {
       openAdd('', 'tops');
       return;
     }
@@ -711,11 +831,11 @@ export default function ClosetPage() {
     const itemScale = hasShawl ? 0.88 : 1;
 
     const entries: SavedCanvasLayout = [];
-    if (upperItem)   entries.push({ id: upperItem.id,   x: 32, y: hasShawl ? 19 : 4,  scale: itemScale, zIndex: 1,  group: 'upper' });
-    if (lowerItem)   entries.push({ id: lowerItem.id,   x: 32, y: hasShawl ? 48 : 37, scale: itemScale, zIndex: 2,  group: 'lower' });
-    if (shoeItem)    entries.push({ id: shoeItem.id,    x: 32, y: hasShawl ? 73 : 68, scale: hasShawl ? 0.65 : 0.72, zIndex: 3, group: 'shoes' });
+    if (upperItem)   entries.push({ id: upperItem.id,   x: 32, y: hasShawl ? 32 : 17, scale: itemScale, zIndex: 1,  group: 'upper' });
+    if (lowerItem)   entries.push({ id: lowerItem.id,   x: 32, y: hasShawl ? 50 : 39, scale: itemScale, zIndex: 2,  group: 'lower' });
+    if (shoeItem)    entries.push({ id: shoeItem.id,    x: 32, y: hasShawl ? 63 : 58, scale: hasShawl ? 0.65 : 0.72, zIndex: 3, group: 'shoes' });
     if (shawlItem)   entries.push({ id: shawlItem.id,   x: 32, y: -5,                 scale: 0.55, zIndex: 10, group: 'acc' });
-    if (sideAccItem) entries.push({ id: sideAccItem.id, x: 63, y: hasShawl ? 20 : 5,  scale: 0.6,  zIndex: 4,  group: 'acc' });
+    if (sideAccItem) entries.push({ id: sideAccItem.id, x: 63, y: hasShawl ? 20 : 17, scale: 0.6,  zIndex: 4,  group: 'acc' });
 
     tryOnOverrideRef.current = { itemIds, layout: entries };
     setShowTryOnConfirm(true);
@@ -723,13 +843,23 @@ export default function ClosetPage() {
 
   function startTryOn() {
     tryOnCancelRef.current = false;
+
+    // Demo shortcut — show the pre-built result instantly, no API call needed
+    if (hasDemoItems) {
+      tryOnOverrideRef.current = null;
+      const DEMO_TRYON_URL = 'https://svaypimages2.blob.core.windows.net/product-images/try-on%2F07bbfdf7-504d-44f4-9880-6003831845cf%2F1e088b17-ed7d-4e79-8daf-6cae0a3f979b.png';
+      setTryOnState({ status: 'completed', resultUrl: DEMO_TRYON_URL });
+      saveTryOnResult(DEMO_TRYON_URL);
+      return;
+    }
+
     let itemIds: string[];
     let canvasId: string | undefined;
     if (tryOnOverrideRef.current) {
       itemIds = tryOnOverrideRef.current.itemIds;
       canvasId = undefined;
     } else {
-      const targetCanvas = canvases[tryOnCanvasIdxRef.current];
+      const targetCanvas = displayCanvases[tryOnCanvasIdxRef.current];
       itemIds = (targetCanvas?.layout ?? []).map((e) => e.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
       canvasId = targetCanvas?.id ?? undefined;
     }
@@ -792,7 +922,7 @@ export default function ClosetPage() {
       setShowPremiumGate('generation');
       return;
     }
-    const targetCanvas = canvases[canvasIdx];
+    const targetCanvas = displayCanvases[canvasIdx];
     const itemIds = (targetCanvas?.layout ?? []).map((e) => e.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
     if (itemIds.length === 0) return;
     tryOnCanvasIdxRef.current = canvasIdx;
@@ -888,24 +1018,26 @@ export default function ClosetPage() {
                 <span>{plan === 'free' ? 'Free' : plan === 'pro' ? 'Pro' : 'Premium'}</span>
               </button>
             )}
-            {/* Language: flag emoji */}
+            {/* My Looks button with label */}
             <button
               onClick={() => setShowMyLooks(true)}
-              className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
-              style={{ background: myLooksHistory.length > 0 ? 'rgba(243,112,167,0.12)' : 'rgba(0,0,0,0.05)' }}
+              className="flex flex-col items-center justify-center gap-0.5 px-2 h-9 rounded-full active:scale-[0.95] transition-transform"
+              style={{ background: myLooksHistory.length > 0 ? 'rgba(243,112,167,0.12)' : 'rgba(0,0,0,0.05)', minWidth: 38 }}
               aria-label="My Looks"
             >
-              <Images size={17} strokeWidth={1.8} style={{ color: myLooksHistory.length > 0 ? '#F370A7' : '#4b5563' }} />
+              <Images size={14} strokeWidth={1.8} style={{ color: myLooksHistory.length > 0 ? '#F370A7' : '#4b5563' }} />
+              <span className="text-[8px] font-medium leading-none whitespace-nowrap" style={{ color: myLooksHistory.length > 0 ? '#F370A7' : '#9ca3af' }}>{t.myLooks}</span>
             </button>
-            {/* Profile icon */}
+            {/* Profile icon with label */}
             {profileEnabled && (
               <button
                 onClick={() => setShowProfile(true)}
-                className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
-                style={{ background: 'rgba(0,0,0,0.05)' }}
+                className="flex flex-col items-center justify-center gap-0.5 px-2 h-9 rounded-full active:scale-[0.95] transition-transform"
+                style={{ background: 'rgba(0,0,0,0.05)', minWidth: 38 }}
                 aria-label="Profile"
               >
-                <User size={17} strokeWidth={1.8} className="text-gray-600" />
+                <User size={14} strokeWidth={1.8} className="text-gray-600" />
+                <span className="text-[8px] font-medium leading-none text-gray-400">{t.profile}</span>
               </button>
             )}
           </div>
@@ -958,13 +1090,25 @@ export default function ClosetPage() {
           0%   { background-position: -200% 0; }
           100% { background-position:  200% 0; }
         }
+        @keyframes hintSlideIn {
+          from { opacity: 0; transform: translate(-50%, 12px); }
+          to   { opacity: 1; transform: translate(-50%, 0); }
+        }
+        @keyframes tryOnPulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(243,112,167,0.55); }
+          50%       { box-shadow: 0 0 0 8px rgba(243,112,167,0); }
+        }
+        @keyframes tryOnShimmer {
+          0%   { background-position: -200% center; }
+          100% { background-position:  200% center; }
+        }
       `}</style>
 
       <main className="flex-1 overflow-y-auto pb-4" style={{ paddingTop: 0 }}>
         {/* ── My Outfits ────────────────────────────────────────── */}
         <OutfitSection
           allItems={items}
-          canvases={canvases}
+          canvases={displayCanvases}
           plan={plan}
           canGenerate={canGenerate}
           genCount={usage.regenerationsUsed}
@@ -972,7 +1116,7 @@ export default function ClosetPage() {
           tryOnCount={usage.tryItOnsUsed}
           aiSuggestingIdx={aiSuggestingIdx}
           onViewItems={(idx) => {
-            const layout = canvases[idx]?.layout ?? null;
+            const layout = displayCanvases[idx]?.layout ?? null;
             setEditingCanvasIdx(idx);
             setCanvasInitialLayout(layout);
             // Eagerly preload canvas images
@@ -992,7 +1136,7 @@ export default function ClosetPage() {
               acc: items.filter((i) => ACC_CATS.includes(i.category)),
             });
           }}
-          canAddCanvas={canAddCanvas}
+          canAddCanvas={hasDemoItems ? false : canAddCanvas}
           onAddCanvas={() => {
             // Create a new empty canvas at the end of the list
             const newIdx = canvases.length;
@@ -1006,6 +1150,7 @@ export default function ClosetPage() {
           onShowPlans={() => setShowPremiumGate('generation')}
           onTryItOn={(idx) => handleTryItOn(idx)}
           onDeleteCanvas={handleDeleteCanvas}
+          onAddItem={(cat) => openAdd(UPPER_CATS.includes(cat) ? 'upper' : LOWER_CATS.includes(cat) ? 'lower' : SHOES_CATS.includes(cat) ? 'shoes' : 'acc', cat)}
         />
 
         {/* ── Upper Body ────────────────────────────────────────── */}
@@ -1021,6 +1166,7 @@ export default function ClosetPage() {
           onTapItem={setEditItem}
           onViewAll={() => openViewAll(t.upperBody, UPPER_CATS)}
           onRemovePending={removePendingUpload}
+          onAddItem={() => openAdd('upper', 'tops')}
         />
 
         {/* ── Lower Body ────────────────────────────────────────── */}
@@ -1036,6 +1182,7 @@ export default function ClosetPage() {
           onTapItem={setEditItem}
           onViewAll={() => openViewAll(t.lowerBody, LOWER_CATS)}
           onRemovePending={removePendingUpload}
+          onAddItem={() => openAdd('lower', 'jeans')}
         />
 
         {/* ── Shoes ─────────────────────────────────────────────── */}
@@ -1051,6 +1198,7 @@ export default function ClosetPage() {
           onTapItem={setEditItem}
           onViewAll={() => openViewAll(t.shoes, SHOES_CATS)}
           onRemovePending={removePendingUpload}
+          onAddItem={() => openAdd('shoes', 'shoes')}
         />
 
         {/* ── Accessories ───────────────────────────────────────── */}
@@ -1066,6 +1214,7 @@ export default function ClosetPage() {
           onTapItem={setEditItem}
           onViewAll={() => openViewAll(t.accessories, ACC_CATS)}
           onRemovePending={removePendingUpload}
+          onAddItem={() => openAdd('acc', 'accessories')}
         />
 
         <div className="h-12" />
@@ -1109,13 +1258,15 @@ export default function ClosetPage() {
             if (editingCanvasIdx !== null) {
               setCanvases((prev) => {
                 const updated = [...prev];
-                updated[editingCanvasIdx] = { ...updated[editingCanvasIdx], layout };
+                const existing = updated[editingCanvasIdx] ?? { id: null, layout: [] };
+                updated[editingCanvasIdx] = { ...existing, layout };
                 return updated;
               });
               setCanvasInitialLayout(layout);
               setCanvasData(null);
-              // Save to backend
-              saveCanvasToBackend(layout, editingCanvasIdx);
+              if (!hasDemoItems) {
+                saveCanvasToBackend(layout, editingCanvasIdx);
+              }
             } else {
               setCanvasData(null);
             }
@@ -1202,7 +1353,7 @@ export default function ClosetPage() {
       {/* ── Try-On Confirm Sheet ── */}
       {showTryOnConfirm && (
         <TryOnConfirmModal
-          savedLayout={tryOnOverrideRef.current?.layout ?? canvases[tryOnCanvasIdxRef.current]?.layout ?? null}
+          savedLayout={tryOnOverrideRef.current?.layout ?? displayCanvases[tryOnCanvasIdxRef.current]?.layout ?? null}
           items={items}
           onConfirm={() => { setShowTryOnConfirm(false); startTryOn(); }}
           onCancel={() => setShowTryOnConfirm(false)}
@@ -1223,8 +1374,9 @@ export default function ClosetPage() {
 
       {/* ── Floating Add Button ── */}
       <div className="absolute right-6 z-50" style={{ bottom: '20px' }}>
-        <span className="absolute inset-0 rounded-full animate-ping" style={{ backgroundColor: '#F370A7', opacity: 0.35 }} />
+        {tourStep === 0 && <span className="absolute inset-0 rounded-full animate-ping" style={{ backgroundColor: '#F370A7', opacity: 0.35 }} />}
         <button
+          data-coach="fab"
           onClick={() => openAdd('', 'tops')}
           className="relative w-14 h-14 rounded-full flex items-center justify-center shadow-xl active:scale-[0.95] transition-transform"
           style={{ backgroundColor: '#F370A7' }}
@@ -1304,23 +1456,27 @@ export default function ClosetPage() {
             <div className="flex flex-col gap-3">
               {addGroup === '' ? (
                 <>
-                  <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">{t.category}</label>
-                  <div className="flex flex-col gap-2">
-                    {[
-                      { key: 'upper', label: t.upperBody },
-                      { key: 'lower', label: t.lowerBody },
-                      { key: 'shoes', label: t.shoes },
-                      { key: 'acc',   label: t.accessories },
-                    ].map((group) => (
+                  <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">{t.addCategory}</label>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {(
+                      [
+                        { key: 'upper', label: t.upperBody,   icon: <span className="text-[32px] leading-none">👗</span> },
+                        { key: 'lower', label: t.lowerBody, icon: <span className="text-[32px] leading-none">👖</span> },
+                        { key: 'shoes', label: t.shoes,       icon: <span className="text-[32px] leading-none">👟</span> },
+                        { key: 'acc',   label: t.accessories, icon: <span className="text-[32px] leading-none">👜</span> },
+                      ] as { key: string; label: string; icon: React.ReactNode }[]
+                    ).map((group) => (
                       <button
                         key={group.key}
                         onClick={() => {
                           setAddGroup(group.key);
                           setAddCategory(ADD_GROUPS[group.key][0]);
                         }}
-                        className="w-full h-12 rounded-2xl bg-gray-50 text-[14px] font-semibold text-gray-800 text-left px-4 active:scale-[0.98] transition-transform"
+                        className="flex flex-col items-center justify-center gap-1.5 rounded-2xl py-4 active:scale-[0.97] transition-transform"
+                        style={{ background: '#F9FAFB', border: '1.5px solid #F3F4F6' }}
                       >
-                        {group.label}
+                        <span className="leading-none flex items-center justify-center">{group.icon}</span>
+                        <span className="text-[12px] font-semibold text-gray-700">{group.label}</span>
                       </button>
                     ))}
                   </div>
@@ -1358,10 +1514,10 @@ export default function ClosetPage() {
             </div>
             <button
               onClick={handleAddSave}
-              disabled={addSaving}
+              disabled={addSaving || addGroup === ''}
               className="w-full py-3.5 rounded-full bg-black text-white text-[13px] font-semibold disabled:opacity-30 active:scale-[0.97] transition-transform"
             >
-              {addSaving ? t.uploading : t.saveToCloset}
+              {addSaving ? t.uploading : addGroup === '' ? t.addCategory : t.saveToCloset}
             </button>
           </div>
         </div>
@@ -1439,6 +1595,37 @@ export default function ClosetPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Replay tour */}
+              <button
+                onClick={() => {
+                  clearClosetTour();
+                  setTourStep(0);
+                  setShowProfile(false);
+                }}
+                className="mt-5 w-full h-11 rounded-2xl flex items-center justify-center gap-2 text-[13px] font-semibold active:scale-[0.97] transition-transform"
+                style={{ background: 'rgba(243,112,167,0.08)', color: '#F370A7' }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+                </svg>
+                {t.replayTour}
+              </button>
+
+              {/* Logout */}
+              <button
+                onClick={() => {
+                  clearTokens();
+                  router.replace('/');
+                }}
+                className="mt-2 w-full h-11 rounded-2xl flex items-center justify-center gap-2 text-[13px] font-semibold active:scale-[0.97] transition-transform"
+                style={{ background: 'rgba(239,68,68,0.07)', color: '#ef4444' }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                {t.logout}
+              </button>
             </div>
           </div>
         </div>
@@ -1480,12 +1667,21 @@ export default function ClosetPage() {
         </div>
       )}
 
+      {/* ── In-page coach marks ── */}
+      {tourStep !== null && (
+        <ClosetCoachMark
+          step={tourStep}
+          targetRect={tourTargetRect}
+          onDismiss={handleTourDismiss}
+        />
+      )}
+
     </div>
   );
 }
 
 // ─── My Outfits ─────────────────────────────────────────────────────────────────
-function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx }: {
+function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem }: {
   allItems: ClosetItem[];
   canvases: { id: string | null; layout: SavedCanvasLayout }[];
   plan: UserPlan;
@@ -1501,6 +1697,7 @@ function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits
   onTryItOn: (idx: number) => void;
   onDeleteCanvas: (idx: number) => void | Promise<void>;
   aiSuggestingIdx?: number | null;
+  onAddItem: (cat: ClosetCategory) => void;
 }) {
   const { t } = useI18n();
   const isEmpty = allItems.length === 0;
@@ -1528,6 +1725,7 @@ function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits
             tryOnCount={tryOnCount}
             tryOnLimit={limits.tryItOns}
             onDelete={idx > 0 ? () => onDeleteCanvas(idx) : undefined}
+            onAddItem={onAddItem}
           />
         )) : (
           <OutfitCard
@@ -1543,6 +1741,7 @@ function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits
             onTryItOn={() => onTryItOn(0)}
             tryOnCount={tryOnCount}
             tryOnLimit={limits.tryItOns}
+            onAddItem={onAddItem}
           />
         )}
 
@@ -1621,6 +1820,7 @@ function OutfitCard({
   tryOnCount,
   tryOnLimit,
   onDelete,
+  onAddItem,
 }: {
   allItems: ClosetItem[];
   isEmpty: boolean;
@@ -1635,10 +1835,11 @@ function OutfitCard({
   tryOnCount: number;
   tryOnLimit: number;
   onDelete?: () => void | Promise<void>;
+  onAddItem?: (cat: ClosetCategory) => void;
 }) {
   const { t } = useI18n();
 
-  // Valid outfit requires: dress/jumpsuit OR (top + bottom). Shoes alone or top+shoes is not enough.
+  // Valid outfit requires: dress/jumpsuit OR (top + (lower OR shoes))
   const FULL_BODY_CATS: ClosetCategory[] = ['dresses', 'jumpsuits'];
   const hasTop = allItems.some((i) => UPPER_CATS.includes(i.category));
   const hasLower = allItems.some((i) => LOWER_CATS.includes(i.category));
@@ -1659,7 +1860,6 @@ function OutfitCard({
       })
       .filter(Boolean) as { item: ClosetItem; x: number; y: number; scale: number; zIndex: number; group: string }[];
     // Validate layout forms a real outfit (same rule as canGenerateOutfit).
-    // Stale layouts with only accessories/shoes won't pass and show "tap ↻" instead.
     const hasDressInLayout = resolved.some((e) => FULL_BODY_CATS.includes(e.item.category as ClosetCategory));
     const hasUpperInLayout = resolved.some((e) => UPPER_CATS.includes(e.item.category as ClosetCategory));
     const hasLowerInLayout = resolved.some((e) => LOWER_CATS.includes(e.item.category as ClosetCategory));
@@ -1667,8 +1867,23 @@ function OutfitCard({
     return resolved;
   }, [savedLayout, allItems, canGenerateOutfit]);
 
+  // Auto-trigger regen whenever the wardrobe becomes ready and there's nothing to display yet
+  React.useEffect(() => {
+    const isDemo = allItems.length > 0 && allItems.every((i) => DEMO_ITEM_IDS.has(i.id));
+    if (
+      canGenerateOutfit &&
+      !isDemo &&
+      displayEntries.length === 0 &&
+      !isAiSuggesting &&
+      onRegenerate
+    ) {
+      onRegenerate();
+    }
+  }, [canGenerateOutfit, displayEntries.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div
+      data-coach="outfit-card"
       className="shrink-0 rounded-[28px] flex flex-col border border-gray-100 relative"
       style={{
         width: 'min(82vw, 340px)',
@@ -1695,11 +1910,12 @@ function OutfitCard({
           {onRegenerate && (
             <div className="flex flex-col items-center gap-0.5">
               <button
+                data-coach="regen"
                 onClick={isAiSuggesting ? undefined : onRegenerate}
                 disabled={isAiSuggesting}
                 className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform disabled:opacity-60"
                 style={{ background: isAiSuggesting ? 'rgba(99,102,241,0.12)' : 'rgba(0,0,0,0.06)' }}
-                title={isAiSuggesting ? 'AI is thinking…' : 'Regenerate with AI'}
+                title={isAiSuggesting ? t.aiThinking : t.regenerateWithAI}
               >
                 {isAiSuggesting ? (
                   <Loader2 size={14} strokeWidth={2.2} className="text-indigo-500 animate-spin" />
@@ -1747,58 +1963,89 @@ function OutfitCard({
               <span className="text-[13px] font-medium text-gray-400">{t.tapPlusToAddFirstPiece}</span>
             </p>
           </div>
-        ) : !canGenerateOutfit ? (
-          <div className="w-full h-full rounded-2xl flex flex-col items-center justify-center gap-3">
-            <div className="relative w-full flex-1 min-h-0 flex items-center justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/images/closet/outfitcard_empty_state.png"
-                alt="Empty outfit"
-                className="w-full h-full object-contain opacity-80"
-                onError={(e) => {
-                  const t = e.currentTarget;
-                  t.style.display = 'none';
-                  const fb = t.nextElementSibling as HTMLElement | null;
-                  if (fb) fb.style.display = 'flex';
-                }}
-              />
-              <div className="hidden w-full h-full flex-col items-center justify-center gap-2 opacity-30">
-                <svg width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
-                  <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.57a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.57a2 2 0 0 0-1.34-2.23z"/>
-                </svg>
+        ) : isAiSuggesting && displayEntries.length === 0 ? (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+            <Loader2 size={28} strokeWidth={1.8} className="text-indigo-400 animate-spin" />
+            <p className="text-[13px] font-medium text-gray-400">{t.tryOnGenerating}</p>
+          </div>
+        ) : !canGenerateOutfit || displayEntries.length === 0 ? (
+          // Progress state — 2 required steps: upper + lower body
+          (() => {
+            const hasUpper = hasTop || hasDress;
+            const hasBottom = hasDress || hasLower;
+            const steps = [
+              { label: t.upperBody, done: hasUpper, cat: 'tops' as ClosetCategory, emoji: '👕' },
+              { label: t.lowerBody, done: hasBottom, cat: 'jeans' as ClosetCategory, emoji: '👖' },
+            ];
+            const doneCount = steps.filter((s) => s.done).length;
+            const pct = Math.round((doneCount / 2) * 100);
+            const readyToGenerate = canGenerateOutfit;
+            const hintText = readyToGenerate
+              ? t.tapRegeneratePrompt
+              : !hasUpper
+                ? t.addUpperFirst
+                : t.addLowerOrShoes;
+
+            return (
+              <div className="w-full h-full flex flex-col items-center justify-center gap-4 px-6">
+                {/* Icon row */}
+                <div className="flex items-end justify-center gap-5">
+                  {steps.map((step) => (
+                    <div key={step.label} className="flex flex-col items-center gap-1.5">
+                      <div
+                        className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all"
+                        style={{
+                          background: step.done
+                            ? 'linear-gradient(135deg, rgba(243,112,167,0.15), rgba(243,112,167,0.06))'
+                            : '#F9FAFB',
+                          border: step.done ? '1.5px solid rgba(243,112,167,0.35)' : '1.5px dashed #E5E7EB',
+                        }}
+                      >
+                        {step.done ? (
+                          <span className="text-[24px] leading-none">{step.emoji}</span>
+                        ) : (
+                          <button
+                            onClick={() => onAddItem?.(step.cat)}
+                            className="w-full h-full flex items-center justify-center active:scale-[0.95] transition-transform"
+                          >
+                            <Plus size={18} strokeWidth={2} className="text-gray-300" />
+                          </button>
+                        )}
+                      </div>
+                      <span
+                        className="text-[10px] font-semibold text-center leading-tight"
+                        style={{ color: step.done ? '#F370A7' : '#D1D5DB', maxWidth: 64 }}
+                      >
+                        {step.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Progress bar */}
+                <div className="w-full">
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-[11px] font-semibold text-gray-400">{doneCount}/2</span>
+                    <span className="text-[11px] font-semibold" style={{ color: readyToGenerate ? '#F370A7' : '#9CA3AF' }}>
+                      {readyToGenerate ? t.readyLabel : t.moreNeeded.replace('{n}', String(2 - doneCount))}
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${pct}%`,
+                        background: 'linear-gradient(90deg, #F370A7, #e0409a)',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Hint */}
+                <p className="text-[12px] text-gray-400 text-center leading-snug -mt-1">{hintText}</p>
               </div>
-            </div>
-            <p className="text-[14px] font-medium text-gray-500 text-center leading-relaxed px-4 pb-1">
-              {t.addTopAndBottom}
-            </p>
-            <div className="flex gap-2 pb-2">
-              {(hasTop || hasDress) ? (
-                <span className="px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-[11px] font-semibold">✓ {t.upperBody}</span>
-              ) : (
-                <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 text-[11px] font-semibold">+ {t.upperBody}</span>
-              )}
-              {(hasDress || hasLower) ? (
-                <span className="px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-[11px] font-semibold">✓ {t.lowerBody}</span>
-              ) : (
-                <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 text-[11px] font-semibold">+ {t.lowerBody}</span>
-              )}
-              {hasShoes ? (
-                <span className="px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-[11px] font-semibold">✓ {t.shoes}</span>
-              ) : (
-                <span className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 text-[11px] font-semibold">+ {t.shoes}</span>
-              )}
-            </div>
-          </div>
-        ) : canGenerateOutfit && displayEntries.length === 0 ? (
-          // Wardrobe has enough clothes but no outfit has been generated yet — prompt user to tap ↻
-          <div className="w-full h-full rounded-2xl flex flex-col items-center justify-center gap-3 px-6">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.04)' }}>
-              <RefreshCw size={28} strokeWidth={1.5} className="text-gray-400" />
-            </div>
-            <p className="text-[13px] font-medium text-gray-400 text-center leading-relaxed">
-              {t.tapRegeneratePrompt}
-            </p>
-          </div>
+            );
+          })()
         ) : (
           <div className="w-full h-full flex items-center justify-center overflow-hidden isolate" style={{ containerType: 'size' }}>
             {/* Inner container matches InteractiveCanvas aspect ratio (3:4) so positions are identical */}
@@ -1830,6 +2077,7 @@ function OutfitCard({
       {canGenerateOutfit && (
       <div className="flex gap-2.5 px-5 pb-5">
         <button
+          data-coach="view-items"
           onClick={onViewItems}
           className="flex-1 h-[44px] rounded-full flex items-center justify-center text-[12px] font-semibold text-gray-700 tracking-wide"
           style={{ background: 'rgba(0,0,0,0.04)' }}
@@ -1838,13 +2086,19 @@ function OutfitCard({
         </button>
         {onTryItOn && (
         <button
+          data-coach="try-on"
           onClick={onTryItOn}
-          className="flex-1 h-[44px] rounded-full flex items-center justify-center gap-1.5 text-[12px] font-semibold text-white tracking-wide"
-          style={{ background: 'linear-gradient(135deg, #1a1a1a, #000)' }}
+          className="flex-1 h-[44px] rounded-full flex items-center justify-center gap-1.5 text-[12px] font-bold text-white tracking-wide active:scale-[0.97] transition-transform"
+          style={{
+            background: 'linear-gradient(135deg, #F370A7 0%, #e0409a 50%, #F370A7 100%)',
+            backgroundSize: '200% auto',
+            animation: 'tryOnShimmer 2.4s linear infinite, tryOnPulse 2s ease-in-out infinite',
+            boxShadow: '0 4px 18px rgba(243,112,167,0.5)',
+          }}
         >
-          <Sparkles size={12} />
+          <Sparkles size={13} />
           <span>{t.tryItOn}</span>
-          <span className="opacity-60 text-[10px]">{tryOnCount}/{tryOnLimit}</span>
+          <span className="opacity-70 text-[10px] font-medium">{tryOnCount}/{tryOnLimit}</span>
         </button>
         )}
       </div>
@@ -1936,6 +2190,20 @@ function InteractiveCanvas({
   // Pinch zoom state
   const pinchRef = useRef<{ initialDist: number; initialScale: number } | null>(null);
 
+  // ── Canvas interaction hint (one-time) ─────────────────────────────────────
+  const [showCanvasHint, setShowCanvasHint] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return !isCanvasHintSeen();
+  });
+  useEffect(() => {
+    if (!showCanvasHint) return;
+    const timer = setTimeout(() => {
+      setShowCanvasHint(false);
+      setCanvasHintSeen();
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [showCanvasHint]);
+
   function getGroupItems(group: 'upper' | 'lower' | 'shoes' | 'acc'): ClosetItem[] {
     switch (group) {
       case 'upper': return allItems.filter((i) => UPPER_CATS.includes(i.category));
@@ -1976,6 +2244,11 @@ function InteractiveCanvas({
     if (pinchRef.current) return;
     e.preventDefault();
     e.stopPropagation();
+    // Dismiss canvas hint on first interaction
+    if (showCanvasHint) {
+      setShowCanvasHint(false);
+      setCanvasHintSeen();
+    }
     handleSelect(idx);
     const ci = canvasItems[idx];
     setIsDragging(true);
@@ -2238,6 +2511,29 @@ function InteractiveCanvas({
             );
           })}
         </div>
+
+        {/* Canvas interaction hints — shown once on first open, auto-dismiss after 4 s */}
+        {showCanvasHint && (
+          <div
+            className="absolute bottom-6 left-0 right-0 flex justify-center gap-2 pointer-events-none z-[9998]"
+            style={{ animation: 'hintSlideIn 0.35s ease-out' }}
+          >
+            {([
+              { icon: '👆', label: t.canvasHintDrag },
+              { icon: '🤏', label: t.canvasHintPinch },
+              { icon: '🔄', label: t.canvasHintSwap },
+            ] as { icon: string; label: string }[]).map((hint) => (
+              <div
+                key={hint.label}
+                className="flex items-center gap-1 px-2.5 py-2 rounded-full text-[10px] font-semibold text-gray-700 whitespace-nowrap"
+                style={{ background: 'rgba(255,255,255,0.96)', boxShadow: '0 4px 14px rgba(0,0,0,0.14)', backdropFilter: 'blur(8px)' }}
+              >
+                <span>{hint.icon}</span>
+                <span>{hint.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Swap bottom sheet */}
@@ -2298,10 +2594,12 @@ interface ClothingSectionProps {
   onTapItem: (item: ClosetItem) => void;
   onViewAll: () => void;
   onRemovePending?: (id: string) => void;
+  onAddItem?: () => void;
 }
 
-function ClothingSection({ title, cats, filter, items, totalCount, maxCount, pendingItems = [], onFilterChange, onTapItem, onViewAll, onRemovePending }: ClothingSectionProps) {
+function ClothingSection({ title, cats, filter, items, totalCount, maxCount, pendingItems = [], onFilterChange, onTapItem, onViewAll, onRemovePending, onAddItem }: ClothingSectionProps) {
   const { t } = useI18n();
+  const isEmpty = items.length === 0 && pendingItems.length === 0;
   return (
     <div className="mt-9">
       {/* Section header */}
@@ -2332,23 +2630,38 @@ function ClothingSection({ title, cats, filter, items, totalCount, maxCount, pen
         </div>
       )}
 
-      {/* Horizontal scroll row */}
-      <div className="flex gap-2.5 overflow-x-auto hide-scrollbar px-4">
-        {pendingItems.map((p) => (
-          <ClothingItemCard
-            key={p.id}
-            item={{ id: p.id, category: p.category, imageData: p.imageData, createdAt: '' }}
-            onTap={() => {}}
-            isProcessing
-            processingStep={p.step}
-            processingProgress={p.progress}
-            onRemove={onRemovePending ? () => onRemovePending(p.id) : undefined}
-          />
-        ))}
-        {items.map((item) => (
-          <ClothingItemCard key={item.id} item={item} onTap={() => onTapItem(item)} />
-        ))}
-      </div>
+      {/* Horizontal scroll row — or empty state */}
+      {isEmpty ? (
+        <div className="mx-4 rounded-2xl border border-dashed border-gray-200 flex flex-col items-center justify-center gap-2 py-7 px-4">
+          <p className="text-[13px] font-medium text-gray-400">{t.noItemsInSection}</p>
+          {onAddItem && (
+            <button
+              onClick={onAddItem}
+              className="px-4 py-1.5 rounded-full text-[12px] font-semibold border active:scale-[0.97] transition-transform"
+              style={{ color: '#F370A7', borderColor: 'rgba(243,112,167,0.4)', background: 'rgba(243,112,167,0.06)' }}
+            >
+              {t.tapPlusToAdd}
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="flex gap-2.5 overflow-x-auto hide-scrollbar px-4">
+          {pendingItems.map((p) => (
+            <ClothingItemCard
+              key={p.id}
+              item={{ id: p.id, category: p.category, imageData: p.imageData, createdAt: '' }}
+              onTap={() => {}}
+              isProcessing
+              processingStep={p.step}
+              processingProgress={p.progress}
+              onRemove={onRemovePending ? () => onRemovePending(p.id) : undefined}
+            />
+          ))}
+          {items.map((item) => (
+            <ClothingItemCard key={item.id} item={item} onTap={() => onTapItem(item)} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -2629,8 +2942,8 @@ function OutfitDaysSheet({
                           const dayItems = [upper, lower, shoe, acc].filter(Boolean) as ClosetItem[];
                           onTryItOn(dayItems);
                         }}
-                        className="w-full h-8 rounded-full flex items-center justify-center gap-1 text-[10px] font-semibold text-white active:scale-[0.95] transition-transform"
-                        style={{ background: 'linear-gradient(135deg, #1a1a1a, #000)' }}
+                        className="w-full h-8 rounded-full flex items-center justify-center gap-1 text-[10px] font-bold text-white active:scale-[0.95] transition-transform"
+                        style={{ background: 'linear-gradient(135deg, #F370A7 0%, #e0409a 50%, #F370A7 100%)', backgroundSize: '200% auto', animation: 'tryOnShimmer 2.4s linear infinite', boxShadow: '0 3px 12px rgba(243,112,167,0.45)' }}
                       >
                         <Sparkles size={10} />
                         <span>{t.tryItOn}</span>
@@ -2699,8 +3012,8 @@ function OutfitDaysSheet({
                       const dayItems = [selUpper, selLower, selShoe, selAcc].filter(Boolean) as ClosetItem[];
                       onTryItOn(dayItems);
                     }}
-                    className="w-full h-11 rounded-full flex items-center justify-center gap-1.5 text-[13px] font-semibold text-white active:scale-[0.97] transition-transform"
-                    style={{ background: 'linear-gradient(135deg, #1a1a1a, #000)' }}
+                    className="w-full h-11 rounded-full flex items-center justify-center gap-1.5 text-[13px] font-bold text-white active:scale-[0.97] transition-transform"
+                    style={{ background: 'linear-gradient(135deg, #F370A7 0%, #e0409a 50%, #F370A7 100%)', backgroundSize: '200% auto', animation: 'tryOnShimmer 2.4s linear infinite, tryOnPulse 2s ease-in-out infinite', boxShadow: '0 4px 18px rgba(243,112,167,0.5)' }}
                   >
                     <Sparkles size={13} />
                     <span>{t.tryItOn}</span>
@@ -2897,7 +3210,11 @@ function TryOnConfirmModal({
           <button
             onClick={onConfirm}
             className="flex-1 h-12 rounded-full text-white text-[13px] font-semibold flex items-center justify-center gap-1.5"
-            style={{ background: 'linear-gradient(135deg, #1a1a1a, #000)' }}
+            style={{
+              background: 'linear-gradient(135deg, #F370A7 0%, #e0409a 50%, #F370A7 100%)',
+              backgroundSize: '200% auto',
+              boxShadow: '0 4px 18px rgba(243,112,167,0.45)',
+            }}
           >
             <Sparkles size={12} />
             {t.tryOnConfirm}

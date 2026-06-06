@@ -26,6 +26,7 @@ export interface Translations {
   takeANewPhoto: string;
   addToCloset: string;
   category: string;
+  addCategory: string;
   saveToCloset: string;
   uploading: string;
   delete: string;
@@ -102,6 +103,39 @@ export interface Translations {
   promoBannerTitle: string;
   promoBannerBody: string;
   promoBannerCta: string;
+  // ── Coach marks ────────────────────────────────────────────────
+  coachAddTitle: string;
+  coachAddBody: string;
+  coachGenerateTitle: string;
+  coachGenerateBody: string;
+  coachEditTitle: string;
+  coachEditBody: string;
+  coachTryOnTitle: string;
+  coachTryOnBody: string;
+  coachGotIt: string;
+  // ── Enhanced empty states ───────────────────────────────────────
+  emptyStep1: string;
+  emptyStep2: string;
+  emptyStep3: string;
+  emptyAddTap: string;
+  generateHint: string;
+  noItemsInSection: string;
+  tapPlusToAdd: string;
+  addUpperFirst: string;
+  addLowerOrShoes: string;
+  // ── Canvas hints ────────────────────────────────────────────────
+  canvasHintDrag: string;
+  canvasHintPinch: string;
+  canvasHintSwap: string;
+  profile: string;
+  replayTour: string;
+  logout: string;
+  demoAddTitle: string;
+  demoAddBody: string;
+  readyLabel: string;
+  moreNeeded: string;
+  regenerateWithAI: string;
+  aiThinking: string;
   cats: {
     tops: string;
     tshirts: string;
@@ -153,6 +187,7 @@ const en: Translations = {
   takeANewPhoto: 'Take a new photo',
   addToCloset: 'Add to Closet',
   category: 'Category',
+  addCategory: 'Add category',
   saveToCloset: 'Save to Closet',
   uploading: 'Uploading…',
   delete: 'Delete',
@@ -280,6 +315,40 @@ const en: Translations = {
   promoBannerTitle: 'Limited offer: 1+1 deal!',
   promoBannerBody: 'Buy 1 month of Libas AI Wardrobe subscription and get another month completely free. Limited offer!',
   promoBannerCta: 'Get offer',
+  // ── Coach marks ────────────────────────────────────────────────
+  coachAddTitle: 'Add your clothes',
+  coachAddBody: 'Tap + to upload a photo of any clothing item. AI removes the background automatically.',
+  coachGenerateTitle: 'Generate an outfit',
+  coachGenerateBody: 'Tap ↻ and AI will mix your clothes into a ready-to-wear outfit.',
+  coachEditTitle: 'Edit your outfit',
+  coachEditBody: 'Drag items to move, pinch to resize, tap an item then Swap to change it.',
+  coachTryOnTitle: 'See it on you',
+  coachTryOnBody: 'Virtually try on any outfit with AI — upload your photo and see the result instantly.',
+  coachGotIt: 'Got it →',
+  // ── Enhanced empty states ───────────────────────────────────────
+  emptyStep1: 'Add a top',
+  emptyStep2: 'Add a bottom',
+  emptyStep3: 'Generate outfit',
+  emptyAddTap: 'Tap to add',
+  generateHint: "We'll mix your items into a complete outfit",
+  noItemsInSection: 'No items yet',
+  tapPlusToAdd: 'Tap + to add your first piece',
+  addUpperFirst: 'Add a top to get started',
+  addLowerOrShoes: 'Now add lower body or shoes',
+  // ── Canvas hints ────────────────────────────────────────────────
+  canvasHintDrag: 'Drag to move',
+  canvasHintPinch: 'Pinch to resize',
+  canvasHintSwap: 'Tap item → Swap',
+  profile: 'Profile',
+  replayTour: 'Replay app tour',
+  logout: 'Log out',
+  demoAddTitle: 'Add your clothes',
+  demoAddBody: 'Upload a photo of your clothes to generate outfits and try them on!',
+  readyLabel: '✓ Ready!',
+  moreNeeded: '{n} more needed',
+  regenerateWithAI: 'Regenerate with AI',
+  aiThinking: 'AI is thinking…',
+
   cats: {
     tops: 'Tops',
     tshirts: 'T-Shirts',
@@ -331,6 +400,7 @@ const ru: Translations = {
   takeANewPhoto: 'Сделать фото',
   addToCloset: 'Добавить в гардероб',
   category: 'Категория',
+  addCategory: 'Выберите категорию',
   saveToCloset: 'Сохранить',
   uploading: 'Загрузка…',
   delete: 'Удалить',
@@ -458,6 +528,40 @@ const ru: Translations = {
   promoBannerTitle: 'Только сейчас: акция 1+1!',
   promoBannerBody: 'Оформите подписку Libas AI Гардероб на 1 месяц и получите ещё 1 месяц совершенно бесплатно. Предложение ограничено!',
   promoBannerCta: 'Получить',
+  // ── Coach marks ────────────────────────────────────────────────
+  coachAddTitle: 'Добавьте одежду',
+  coachAddBody: 'Нажмите + чтобы загрузить фото любой вещи. AI удалит фон автоматически.',
+  coachGenerateTitle: 'Создайте образ',
+  coachGenerateBody: 'Нажмите ↻ — AI смешает ваши вещи в готовый образ.',
+  coachEditTitle: 'Отредактируйте образ',
+  coachEditBody: 'Перетащите вещи для перемещения, сведите пальцы для изменения размера, нажмите на вещь → «Замена».',
+  coachTryOnTitle: 'Примерьте на себя',
+  coachTryOnBody: 'Виртуально примерьте любой образ с AI — загрузите фото и сразу увидите результат.',
+  coachGotIt: 'Понятно →',
+  // ── Enhanced empty states ───────────────────────────────────────
+  emptyStep1: 'Добавить верх',
+  emptyStep2: 'Добавить низ',
+  emptyStep3: 'Создать образ',
+  emptyAddTap: 'Нажмите, чтобы добавить',
+  generateHint: 'Мы смешаем ваши вещи в готовый образ',
+  noItemsInSection: 'Пока нет вещей',
+  tapPlusToAdd: 'Нажмите + чтобы добавить первую вещь',
+  addUpperFirst: 'Добавьте верхнюю часть гардероба',
+  addLowerOrShoes: 'Добавьте низ или обувь',
+  // ── Canvas hints ────────────────────────────────────────────────
+  canvasHintDrag: 'Перетащите',
+  canvasHintPinch: 'Сведите пальцы для масштаба',
+  canvasHintSwap: 'Нажмите → Замена',
+  profile: 'Профиль',
+  replayTour: 'Повторить обучение',
+  logout: 'Выйти',
+  demoAddTitle: 'Добавьте свою одежду',
+  demoAddBody: 'Загрузите фото своих вещей, чтобы создавать образы и примерять их!',
+  readyLabel: '✓ Готово!',
+  moreNeeded: 'ещё {n}',
+  regenerateWithAI: 'Обновить с AI',
+  aiThinking: 'AI думает…',
+
   cats: {
     tops: 'Топы',
     tshirts: 'Футболки',
@@ -495,9 +599,9 @@ const uz: Translations = {
   yourStyleStartsHere: 'Uslubingiz shu yerdan.',
   tapPlusToAddFirstPiece: "+  bosib birinchi narsani qo'shing.",
   tapRegeneratePrompt: 'Obrazingizni yaratish uchun ↻ bosing',
-  addTopAndBottom: "Outfit yaratish uchun kamida bitta yuqori va bitta quyi kiyim yoki oyoq kiyim qo'shing.",
+  addTopAndBottom: "Outfit yaratish uchun kamida bitta yuqori va bitta pastki kiyim yoki oyoq kiyim qo'shing.",
   upperBody: 'Yuqori kiyim',
-  lowerBody: 'Quyi kiyim',
+  lowerBody: 'Pastki kiyim',
   shoes: 'Oyoq kiyim',
   accessories: 'Aksessuarlar',
   viewAll: 'Barchasi',
@@ -509,6 +613,7 @@ const uz: Translations = {
   takeANewPhoto: 'Yangi rasm olish',
   addToCloset: "Garderobga qo'shish",
   category: 'Kategoriya',
+  addCategory: "Kategoriyani tanlang",
   saveToCloset: 'Saqlash',
   uploading: 'Yuklanmoqda…',
   delete: "O'chirish",
@@ -634,6 +739,40 @@ const uz: Translations = {
   promoBannerTitle: 'Faqat hozir: 1+1 aksiya!',
   promoBannerBody: 'Libas AI Garderob obunasini 1 oyga oling va yana 1 oy mutlaqo bepul foydalaning. Taklif cheklangan!',
   promoBannerCta: 'Taklifni olish',
+  // ── Coach marks ────────────────────────────────────────────────
+  coachAddTitle: "Kiyimlaringizni qo'shing",
+  coachAddBody: "Istalgan kiyim rasmini yuklash uchun + bosing. AI fonni avtomatik olib tashlaydi.",
+  coachGenerateTitle: 'Obraz yarating',
+  coachGenerateBody: "↻ bosing — AI kiyimlaringizni tayyor obrazga aralashtiradi.",
+  coachEditTitle: 'Obrazni tahrirlang',
+  coachEditBody: "Ko'chirish uchun torting, o'lchamni o'zgartirish uchun qistiring, kiyimni bosing → Almashtirish.",
+  coachTryOnTitle: "O'zingizda ko'ring",
+  coachTryOnBody: "AI yordamida istalgan obrazni virtual kiyib ko'ring — rasmingizni yuklang va natijani darhol ko'ring.",
+  coachGotIt: "Tushundim →",
+  // ── Enhanced empty states ───────────────────────────────────────
+  emptyStep1: "Yuqori kiyim qo'shing",
+  emptyStep2: "Pastki kiyim qo'shing",
+  emptyStep3: 'Obraz yarating',
+  emptyAddTap: "Qo'shish uchun bosing",
+  generateHint: "Kiyimlaringizni tayyor outfit yaratamiz",
+  noItemsInSection: "Hali narsalar yo'q",
+  tapPlusToAdd: "Birinchi kiyimni qo'shish uchun + bosing",
+  addUpperFirst: "Boshlash uchun yuqori kiyim qo'shing",
+  addLowerOrShoes: "Pastki kiyim yoki oyoq kiyim qo'shing",
+  // ── Canvas hints ────────────────────────────────────────────────
+  canvasHintDrag: "Ko'chirish uchun torting",
+  canvasHintPinch: "O'lcham uchun qistiring",
+  canvasHintSwap: "Bosing → Almashtirish",
+  profile: 'Profil',
+  replayTour: "Qo'llanmani qayta ko'rsatish",
+  logout: 'Chiqish',
+  demoAddTitle: "O'z kiyimlaringizni qo'shing",
+  demoAddBody: "Outfit yaratish va kiyib ko'rish uchun kiyimlaringiz rasmini yuklang!",
+  readyLabel: '✓ Tayyor!',
+  moreNeeded: 'yana {n} ta',
+  regenerateWithAI: 'AI bilan yangilash',
+  aiThinking: "AI o'ylayapti…",
+
   cats: {
     tops: 'Tepa kiyim',
     tshirts: 'Futbolkalar',

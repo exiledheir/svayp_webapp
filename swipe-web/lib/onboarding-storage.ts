@@ -56,3 +56,53 @@ export function clearOnboarding(): void {
     localStorage.removeItem(ONBOARDING_KEY);
   } catch { /* ignore */ }
 }
+
+// ─── Closet in-page tour ────────────────────────────────────────────────────────
+const CLOSET_TOUR_KEY = 'svayp_closet_tour_done';
+
+/** Returns true if the user has already dismissed the in-page coach-mark tour. */
+export function isClosetTourDone(): boolean {
+  if (typeof window === 'undefined') return true;
+  try {
+    return localStorage.getItem(CLOSET_TOUR_KEY) === 'true';
+  } catch {
+    return true;
+  }
+}
+
+/** Marks the entire in-page tour as completed so it never shows again. */
+export function setClosetTourDone(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(CLOSET_TOUR_KEY, 'true');
+  } catch { /* ignore */ }
+}
+
+/** Clears the tour-done flag so the tour will show again on next render. */
+export function clearClosetTour(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(CLOSET_TOUR_KEY);
+  } catch { /* ignore */ }
+}
+
+// ─── Canvas interaction hint ────────────────────────────────────────────────────
+const CANVAS_HINT_KEY = 'svayp_canvas_hint_seen';
+
+/** Returns true if the canvas drag/pinch/swap hint has already been shown. */
+export function isCanvasHintSeen(): boolean {
+  if (typeof window === 'undefined') return true;
+  try {
+    return localStorage.getItem(CANVAS_HINT_KEY) === 'true';
+  } catch {
+    return true;
+  }
+}
+
+/** Marks the canvas hint as seen so it never shows again. */
+export function setCanvasHintSeen(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(CANVAS_HINT_KEY, 'true');
+  } catch { /* ignore */ }
+}
