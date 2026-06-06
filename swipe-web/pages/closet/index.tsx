@@ -644,14 +644,12 @@ export default function ClosetPage() {
     const s = pick(shoesAll);
     const shawlItem = pick(shawlPool);
     const sideAccItem = pick(sidePool);
-    const hasShawl = shawlItem !== null;
-    const itemScale = hasShawl ? 0.88 : 1;
     const layout: SavedCanvasLayout = [];
-    if (u) layout.push({ id: u.id, x: 32, y: hasShawl ? 32 : 17, scale: itemScale, zIndex: 1, group: 'upper' });
-    if (l) layout.push({ id: l.id, x: 32, y: hasShawl ? 50 : 39, scale: itemScale, zIndex: 2, group: 'lower' });
-    if (s) layout.push({ id: s.id, x: 32, y: hasShawl ? 63 : 58, scale: hasShawl ? 0.65 : 0.72, zIndex: 3, group: 'shoes' });
-    if (shawlItem) layout.push({ id: shawlItem.id, x: 32, y: -5, scale: 0.55, zIndex: 10, group: 'acc' });
-    if (sideAccItem) layout.push({ id: sideAccItem.id, x: 63, y: hasShawl ? 20 : 17, scale: 0.6, zIndex: 4, group: 'acc' });
+    if (u) layout.push({ id: u.id, x: 32, y: 17, scale: 1, zIndex: 1, group: 'upper' });
+    if (l) layout.push({ id: l.id, x: 32, y: 39, scale: 1, zIndex: 2, group: 'lower' });
+    if (s) layout.push({ id: s.id, x: 32, y: 58, scale: 0.72, zIndex: 3, group: 'shoes' });
+    if (shawlItem) layout.push({ id: shawlItem.id, x: 30, y: 5, scale: 0.6, zIndex: 10, group: 'acc' });
+    if (sideAccItem) layout.push({ id: sideAccItem.id, x: 63, y: 17, scale: 0.6, zIndex: 4, group: 'acc' });
     return layout;
   }
 
@@ -663,22 +661,21 @@ export default function ClosetPage() {
     if (!matched.length) return generateRandomOutfit();
 
     const hasShawl = matched.some((i) => i.category === 'shawl');
-    const scale = hasShawl ? 0.88 : 1;
     const layout: SavedCanvasLayout = [];
-    let yOffset = hasShawl ? 0 : -15;
+    let yOffset = -15;
 
     for (const item of matched) {
       if (UPPER_CATS.includes(item.category)) {
-        layout.push({ id: item.id, x: 32, y: hasShawl ? 32 : 17, scale, zIndex: 1, group: 'upper' });
+        layout.push({ id: item.id, x: 32, y: 17, scale: 1, zIndex: 1, group: 'upper' });
       } else if (LOWER_CATS.includes(item.category)) {
-        layout.push({ id: item.id, x: 32, y: hasShawl ? 50 : 39, scale, zIndex: 2, group: 'lower' });
+        layout.push({ id: item.id, x: 32, y: 39, scale: 1, zIndex: 2, group: 'lower' });
       } else if (SHOES_CATS.includes(item.category)) {
-        layout.push({ id: item.id, x: 32, y: hasShawl ? 63 : 58, scale: hasShawl ? 0.65 : 0.72, zIndex: 3, group: 'shoes' });
+        layout.push({ id: item.id, x: 32, y: 58, scale: 0.72, zIndex: 3, group: 'shoes' });
       } else if (item.category === 'shawl') {
-        layout.push({ id: item.id, x: 32, y: -5, scale: 0.55, zIndex: 10, group: 'acc' });
+        layout.push({ id: item.id, x: 30, y: 5, scale: 0.6, zIndex: 10, group: 'acc' });
       } else {
         yOffset += 15;
-        layout.push({ id: item.id, x: 63, y: (hasShawl ? 20 : 17) + yOffset, scale: 0.6, zIndex: 4, group: 'acc' });
+        layout.push({ id: item.id, x: 63, y: 17 + yOffset, scale: 0.6, zIndex: 4, group: 'acc' });
       }
     }
     return layout.length ? layout : generateRandomOutfit();
@@ -828,14 +825,13 @@ export default function ClosetPage() {
     const shawlItem  = accAll.find((a) => a.category === 'shawl') ?? null;
     const sideAccItem = accAll.find((a) => a.category !== 'shawl') ?? null;
     const hasShawl = shawlItem !== null;
-    const itemScale = hasShawl ? 0.88 : 1;
 
     const entries: SavedCanvasLayout = [];
-    if (upperItem)   entries.push({ id: upperItem.id,   x: 32, y: hasShawl ? 32 : 17, scale: itemScale, zIndex: 1,  group: 'upper' });
-    if (lowerItem)   entries.push({ id: lowerItem.id,   x: 32, y: hasShawl ? 50 : 39, scale: itemScale, zIndex: 2,  group: 'lower' });
-    if (shoeItem)    entries.push({ id: shoeItem.id,    x: 32, y: hasShawl ? 63 : 58, scale: hasShawl ? 0.65 : 0.72, zIndex: 3, group: 'shoes' });
-    if (shawlItem)   entries.push({ id: shawlItem.id,   x: 32, y: -5,                 scale: 0.55, zIndex: 10, group: 'acc' });
-    if (sideAccItem) entries.push({ id: sideAccItem.id, x: 63, y: hasShawl ? 20 : 17, scale: 0.6,  zIndex: 4,  group: 'acc' });
+    if (upperItem)   entries.push({ id: upperItem.id,   x: 32, y: 17,  scale: 1,    zIndex: 1,  group: 'upper' });
+    if (lowerItem)   entries.push({ id: lowerItem.id,   x: 32, y: 39,  scale: 1,    zIndex: 2,  group: 'lower' });
+    if (shoeItem)    entries.push({ id: shoeItem.id,    x: 32, y: 58,  scale: 0.72, zIndex: 3,  group: 'shoes' });
+    if (shawlItem)   entries.push({ id: shawlItem.id,   x: 30, y: 5,   scale: 0.6,  zIndex: 10, group: 'acc' });
+    if (sideAccItem) entries.push({ id: sideAccItem.id, x: 63, y: 17,  scale: 0.6,  zIndex: 4,  group: 'acc' });
 
     tryOnOverrideRef.current = { itemIds, layout: entries };
     setShowTryOnConfirm(true);
