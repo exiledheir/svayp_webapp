@@ -2574,7 +2574,6 @@ function InteractiveCanvas({
               zIndex: ci.zIndex,
               userSelect: 'none',
               WebkitUserSelect: 'none',
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               WebkitTouchCallout: 'none' as any,
             }}
             onPointerDown={(e) => handlePointerDown(e, idx)}
