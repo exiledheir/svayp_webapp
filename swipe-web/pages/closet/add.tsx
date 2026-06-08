@@ -4,6 +4,8 @@ import { ArrowLeft, Camera, Image as ImageIcon } from 'lucide-react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import { addClosetItem, CLOSET_CATEGORIES } from '@/lib/closet-storage';
 import type { ClosetCategory } from '@/lib/closet-storage';
+import { logAnalyticsEvent } from '@/lib/analytics';
+import { Events, Params } from '@/lib/analytics-events';
 
 // Category groups — same as closet index
 const GROUPS: Record<string, ClosetCategory[]> = {
@@ -88,6 +90,7 @@ export default function ClosetAddPage() {
       // Pre-select full image so corner handles are visible immediately (crop is optional)
       setCrop({ unit: '%', x: 0, y: 0, width: 100, height: 100 });
       setCompletedCrop(undefined);
+      logAnalyticsEvent(Events.ADD_ITEM_PHOTO_SELECTED);
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -105,6 +108,10 @@ export default function ClosetAddPage() {
     }
 
     addClosetItem({ category, imageData: imageToSave });
+    logAnalyticsEvent(Events.ADD_ITEM_SAVED, {
+      [Params.CATEGORY]: category,
+      [Params.HAS_BG_REMOVED]: false,
+    });
     router.replace('/closet');
   }
 
@@ -169,7 +176,12 @@ export default function ClosetAddPage() {
                   return (
                     <button
                       key={cat}
-                      onClick={() => setCategory(cat)}
+                      onClick={() => {
+                        setCategory(cat);
+                        logAnalyticsEvent(Events.ADD_ITEM_CATEGORY_SELECTED, {
+                          [Params.CATEGORY]: cat,
+                        });
+                      }}
                       className={`px-3.5 py-[6px] rounded-full text-[12px] transition-colors
                         ${category === cat
                           ? 'bg-black text-white font-semibold'
@@ -226,7 +238,7 @@ export default function ClosetAddPage() {
               <div className="flex flex-col gap-2.5">
                 {/* Photo Library — primary action, opens native photo grid on mobile */}
                 <button
-                  onClick={() => { fileInputRef.current?.click(); setShowPicker(false); }}
+                  onClick={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'gallery' }); fileInputRef.current?.click(); setShowPicker(false); }}
                   className="w-full h-14 rounded-2xl bg-gray-50 flex items-center gap-3.5 px-4 active:scale-[0.98] transition-transform"
                 >
                   <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #F5576c 100%)' }}>
@@ -239,7 +251,7 @@ export default function ClosetAddPage() {
                 </button>
                 {/* Camera */}
                 <button
-                  onClick={() => { cameraInputRef.current?.click(); setShowPicker(false); }}
+                  onClick={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'camera' }); cameraInputRef.current?.click(); setShowPicker(false); }}
                   className="w-full h-14 rounded-2xl bg-gray-50 flex items-center gap-3.5 px-4 active:scale-[0.98] transition-transform"
                 >
                   <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: '#FF9800' }}>

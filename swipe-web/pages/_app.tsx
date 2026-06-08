@@ -2,10 +2,16 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import type { AppProps } from 'next/app';
 import { useRouter } from 'next/router';
-import { isAuthenticated, saveTokens, getRefreshFromCloud } from '@/lib/auth';
+import { isAuthenticated, saveTokens, getRefreshFromCloud, getUser } from '@/lib/auth';
 import { restoreOnboardingFromCloud } from '@/lib/onboarding-storage';
 import { I18nProvider } from '@/lib/i18n';
 import { FeatureFlagsProvider } from '@/lib/feature-flags-context';
+import {
+  initAnalytics,
+  logAnalyticsEvent,
+  setAnalyticsUser,
+  setAnalyticsUserProperties,
+} from '@/lib/analytics';
 import '@/styles/globals.css';
 import 'react-image-crop/dist/ReactCrop.css';
 
@@ -17,6 +23,41 @@ export default function App({ Component, pageProps }: AppProps) {
   // Block rendering until auth check (including CloudStorage restore) is done.
   // This prevents race-condition API calls before we know if the user is authed.
   const [ready, setReady] = useState(false);
+
+  // Initialise Firebase Analytics once on mount (client-only, SSR-safe)
+  // Set user identity in Analytics once the auth state is known
+  useEffect(() => {
+    if (!ready) return;
+    // After Firebase is initialized, set the user identity
+    initAnalytics().then(() => {
+      const user = getUser();
+      if (user) {
+        const userId = (user.id ?? user.userId ?? user.user_id) as string | undefined;
+        if (userId) setAnalyticsUser(String(userId));
+      }
+
+      // Detect which surface this session is running on
+      const context = (() => {
+        if (/flutter/i.test(navigator.userAgent)) return 'webview_flutter';
+        if (
+          typeof window !== 'undefined' &&
+          (window as unknown as { Telegram?: { WebApp?: { initData?: string } } })
+            .Telegram?.WebApp?.initData
+        ) return 'telegram_miniapp';
+        return 'browser';
+      })();
+      setAnalyticsUserProperties({ client_context: context });
+
+      // Track the initial page view (subsequent ones are handled by route events)
+      logAnalyticsEvent('page_view', { page_path: router.asPath });
+    });
+
+    const handleRouteChange = (url: string) => {
+      logAnalyticsEvent('page_view', { page_path: url });
+    };
+    router.events.on('routeChangeComplete', handleRouteChange);
+    return () => router.events.off('routeChangeComplete', handleRouteChange);
+  }, [ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     // Extract auth tokens injected by the Flutter WebView as query params and

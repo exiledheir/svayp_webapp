@@ -1,6 +1,18 @@
 import React from 'react';
 import { useI18n } from '@/lib/i18n';
 
+function BrandStarIcon({ size = 18, opacity = 1 }: { size?: number; opacity?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ opacity }} stroke="rgb(243, 112, 167)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
+      <path d="M20 3v4" />
+      <path d="M22 5h-4" />
+      <path d="M4 17v2" />
+      <path d="M5 18H3" />
+    </svg>
+  );
+}
+
 interface CoachMarkProps {
   /** 0-based step index: 0=add, 1=generate, 2=edit, 3=tryOn */
   step: number;
@@ -16,8 +28,9 @@ interface CoachMarkProps {
 }
 
 const CALLOUT_W = 260;
-const CALLOUT_H = 130;
+const CALLOUT_H = 240; // safe upper-bound for the tallest step
 const RING_PADDING = 12;
+const CALLOUT_GAP = 14;  // gap between ring edge and callout
 
 export default function ClosetCoachMark({ step, totalSteps = 4, targetRect, onDismiss }: CoachMarkProps) {
   const { t } = useI18n();
@@ -53,21 +66,31 @@ export default function ClosetCoachMark({ step, totalSteps = 4, targetRect, onDi
       pointerEvents: 'none',
     };
 
-    // Place callout below the ring if there's room, else above
+    // Place callout below the ring if there's room, else above; never overlap the ring
     const viewportH = typeof window !== 'undefined' ? window.innerHeight : 812;
     const viewportW = typeof window !== 'undefined' ? window.innerWidth : 390;
-    const spaceBelow = viewportH - (ry + rh);
-    const spaceAbove = ry;
+    const HEADER_MIN_Y = 100; // never render callout higher than this (header safe zone)
+    const spaceBelow = viewportH - (ry + rh) - CALLOUT_GAP;
+    const spaceAbove = ry - CALLOUT_GAP - HEADER_MIN_Y;
 
     let calloutTop: number;
-    if (spaceBelow >= CALLOUT_H + 16) {
-      calloutTop = ry + rh + 12;
-    } else if (spaceAbove >= CALLOUT_H + 16) {
-      calloutTop = ry - CALLOUT_H - 12;
+    if (spaceBelow >= CALLOUT_H) {
+      // Enough room below — place callout under the ring
+      calloutTop = ry + rh + CALLOUT_GAP;
+    } else if (spaceAbove >= CALLOUT_H) {
+      // Enough room above — place callout above the ring
+      calloutTop = ry - CALLOUT_H - CALLOUT_GAP;
     } else {
-      // fallback: vertically centred
-      calloutTop = (viewportH - CALLOUT_H) / 2;
+      // Neither side fits cleanly — pin to whichever side has more space,
+      // clamped so it stays fully on-screen and never overlaps the ring.
+      if (spaceAbove >= spaceBelow) {
+        calloutTop = Math.max(HEADER_MIN_Y, ry - CALLOUT_H - CALLOUT_GAP);
+      } else {
+        calloutTop = Math.min(viewportH - CALLOUT_H - 8, ry + rh + CALLOUT_GAP);
+      }
     }
+    // Always clamp within viewport bounds, respecting header safe zone
+    calloutTop = Math.max(HEADER_MIN_Y, Math.min(calloutTop, viewportH - CALLOUT_H - 8));
 
     const calloutLeft = Math.max(12, Math.min(rx + rw / 2 - CALLOUT_W / 2, viewportW - CALLOUT_W - 12));
 
@@ -143,9 +166,19 @@ export default function ClosetCoachMark({ step, totalSteps = 4, targetRect, onDi
           <p className="text-[14px] font-bold text-gray-900 leading-snug mb-1">
             {current.title}
           </p>
-          <p className="text-[12px] text-gray-500 leading-relaxed mb-3">
-            {current.body}
-          </p>
+          {step === 1 && (
+            <div className="flex items-center gap-2 mb-3 px-2 py-1.5 rounded-xl" style={{ background: 'rgba(243,112,167,0.08)' }}>
+              <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center flex-shrink-0" style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }}>
+                <BrandStarIcon size={18} />
+              </div>
+              <p className="text-[11px] text-gray-500 leading-snug">{current.body}</p>
+            </div>
+          )}
+          {step !== 1 && (
+            <p className="text-[12px] text-gray-500 leading-relaxed mb-3">
+              {current.body}
+            </p>
+          )}
 
           <button
             onClick={onDismiss}
