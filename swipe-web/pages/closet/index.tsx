@@ -15,6 +15,8 @@ import type { Locale } from '@/lib/translations';
 import { isOnboardingComplete, isClosetTourDone, setClosetTourDone, clearClosetTour, isCanvasHintSeen, setCanvasHintSeen } from '@/lib/onboarding-storage';
 import ClosetCoachMark from '@/components/ClosetCoachMark';
 import { saveTryOnResult, getTryOnHistory, getTryOnHistoryWithCloud, deleteTryOnRecord, saveActiveTryOnJob, getActiveTryOnJobWithCloud, clearActiveTryOnJob, type TryOnRecord } from '@/lib/tryon-history';
+import { logAnalyticsEvent } from '@/lib/analytics';
+import { Events, Params } from '@/lib/analytics-events';
 
 const ADD_GROUPS: Record<string, ClosetCategory[]> = {
   upper: ['tops', 'dresses', 'jackets', 'blouses', 'jumpsuits', 'tshirts'],
@@ -170,7 +172,22 @@ export default function ClosetPage() {
     const primary = document.querySelector(COACH_SELECTORS[tourStep]);
     const fallback = COACH_FALLBACKS[tourStep] ? document.querySelector(COACH_FALLBACKS[tourStep]) : null;
     const el = primary ?? fallback;
-    setTourTargetRect(el ? el.getBoundingClientRect() : null);
+    if (!el) { setTourTargetRect(null); return; }
+    // Scroll instantly so getBoundingClientRect is not called mid-animation
+    el.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'nearest' });
+    // After instant scroll, check if the element ended up behind the sticky header
+    // and nudge the scroll container down if needed.
+    const timer = setTimeout(() => {
+      const HEADER_SAFE_Y = 140; // header + promo banner height (conservative)
+      const scrollContainer = el.closest('main') as HTMLElement | null;
+      let rect = (el as HTMLElement).getBoundingClientRect();
+      if (scrollContainer && rect.top < HEADER_SAFE_Y) {
+        scrollContainer.scrollTop -= (HEADER_SAFE_Y - rect.top + 24);
+        rect = (el as HTMLElement).getBoundingClientRect();
+      }
+      setTourTargetRect(rect);
+    }, 80);
+    return () => clearTimeout(timer);
   }, [tourStep]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleTourDismiss() {
@@ -218,6 +235,18 @@ export default function ClosetPage() {
   const [canvasInitialLayout, setCanvasInitialLayout] = useState<SavedCanvasLayout | null>(null);
   const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | 'categoryFull' | null>(null);
   const { plan, limits, usage, fetchPlan, canGenerate, canTryOn, canAddToCategory, calendarDays } = usePlan();
+
+  // ── Analytics: upgrade modal shown ──────────────────────────────────────
+  const prevPremiumGate = useRef<string | null>(null);
+  useEffect(() => {
+    if (showPremiumGate && showPremiumGate !== prevPremiumGate.current) {
+      logAnalyticsEvent(Events.UPGRADE_MODAL_SHOWN, {
+        [Params.TRIGGER]: showPremiumGate,
+        [Params.CURRENT_PLAN]: plan,
+      });
+    }
+    prevPremiumGate.current = showPremiumGate;
+  }, [showPremiumGate, plan]);
 
   // Load all canvases from backend
   useEffect(() => {
@@ -340,6 +369,7 @@ export default function ClosetPage() {
       // Pre-select full image so corner handles are visible immediately (crop is optional)
       setAddCrop({ unit: '%', x: 0, y: 0, width: 100, height: 100 });
       setAddCompletedCrop(undefined);
+      logAnalyticsEvent(Events.ADD_ITEM_PHOTO_SELECTED);
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -387,19 +417,33 @@ export default function ClosetPage() {
           });
         });
         // Upload complete — remove pending, reload items
+        logAnalyticsEvent(Events.ADD_ITEM_SAVED, {
+          [Params.CATEGORY]: category,
+          [Params.HAS_BG_REMOVED]: true,
+        });
+        logAnalyticsEvent(Events.ADD_ITEM_BG_REMOVAL_COMPLETED);
         setPendingUploads((prev) => { const next = new Map(prev); next.delete(pendingId); return next; });
         await load();
         fetchPlan();
       } catch (err) {
         console.error('Failed to upload item:', err);
+        logAnalyticsEvent(Events.ADD_ITEM_BG_REMOVAL_FAILED);
         // Fallback: keep as local item
         addClosetItem({ category, imageData: previewImage });
+        logAnalyticsEvent(Events.ADD_ITEM_SAVED, {
+          [Params.CATEGORY]: category,
+          [Params.HAS_BG_REMOVED]: false,
+        });
         setPendingUploads((prev) => { const next = new Map(prev); next.delete(pendingId); return next; });
         await load();
       }
     } else {
       // No file — save locally
-      addClosetItem({ category, imageData: previewImage });
+      addClosetItem({ category: addCategory, imageData: previewImage });
+      logAnalyticsEvent(Events.ADD_ITEM_SAVED, {
+        [Params.CATEGORY]: addCategory,
+        [Params.HAS_BG_REMOVED]: false,
+      });
       setPendingUploads((prev) => { const next = new Map(prev); next.delete(pendingId); return next; });
       await load();
     }
@@ -453,6 +497,20 @@ export default function ClosetPage() {
     }
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  // ── Analytics: track screen viewed once after initial load completes ──────
+  const didTrackScreenView = useRef(false);
+  const tryOnStartTimeRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!isLoading && !didTrackScreenView.current) {
+      didTrackScreenView.current = true;
+      logAnalyticsEvent(Events.CLOSET_SCREEN_VIEWED, {
+        [Params.ITEM_COUNT]: items.length,
+        [Params.OUTFIT_COUNT]: canvases.length,
+        [Params.PLAN_TIER]: plan,
+      });
+    }
+  }, [isLoading, items.length, canvases.length, plan]);
 
   // Resume watching any uploads that were in progress when the page was closed
   useEffect(() => {
@@ -573,6 +631,10 @@ export default function ClosetPage() {
       setItems((prev) => prev.filter((i) => i.id !== id));
       return;
     }
+    const deletedItem = items.find((i) => i.id === id);
+    logAnalyticsEvent(Events.CLOSET_ITEM_DELETED, {
+      [Params.CATEGORY]: deletedItem?.category ?? 'unknown',
+    });
     try {
       if (!id.startsWith('local_')) {
         await removeClosetItem(id);
@@ -689,25 +751,30 @@ export default function ClosetPage() {
       if (plansEnabled) { setShowPremiumGate('generation'); return; }
     }
 
+    logAnalyticsEvent(Events.OUTFIT_GENERATE_TAPPED, {
+      [Params.ITEM_COUNT_IN_WARDROBE]: items.length,
+    });
+
     setAiSuggestingIdx(canvasIdx);
     let layout: SavedCanvasLayout | null = null;
     try {
       // Pass items from ALL canvases so backend skips outfits already shown on any canvas
       const allCanvasIds = [...new Set(canvases.flatMap((c) => (c.layout ?? []).map((e) => e.id)))];
+      logAnalyticsEvent(Events.OUTFIT_GENERATION_STARTED);
       const aiResult = await fetchAiCanvasSuggest(allCanvasIds);
+      logAnalyticsEvent(Events.OUTFIT_GENERATION_COMPLETED, {
+        [Params.OUTFIT_COUNT_RETURNED]: aiResult.itemIds.length,
+      });
       layout = _buildLayoutFromIds(aiResult.itemIds);
     } catch (err: unknown) {
       const errData = (err as { response?: { data?: { error?: { code?: string; message?: string }; code?: string } } })?.response?.data;
       const code = errData?.error?.code ?? errData?.code;
       if (code === 'NOT_ENOUGH_CLOTHES') {
-        const apiMsg = errData?.error?.message;
-        setOutfitBlockedModal({
-          title: 'Недостаточно одежды',
-          body: apiMsg ?? 'Добавьте больше вещей в гардероб, чтобы ИИ мог подобрать образ.',
-        });
-        return;
-      }
-      if (code === 'OUTFITS_EXHAUSTED') {
+        // API requires shoes but client only needs upper + lower — fall back to local random generation
+        logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: code });
+        layout = generateRandomOutfit();
+      } else if (code === 'OUTFITS_EXHAUSTED') {
+        logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: code });
         const apiMsg = errData?.error?.message;
         // If message mentions wardrobe variety → user has too few items for new combos
         const isTooFewItems = apiMsg && apiMsg.includes('мало одежды');
@@ -718,13 +785,15 @@ export default function ClosetPage() {
             : 'ИИ подбирает новые образы. Нажмите «Изменить» через 30–60 секунд.',
         });
         return;
-      }
-      if (code === 'QUOTA_EXCEEDED') {
+      } else if (code === 'QUOTA_EXCEEDED') {
+        logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: code });
         fetchPlan();
         if (plansEnabled) { setShowPremiumGate('generation'); return; }
         return;
+      } else {
+        logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: code ?? 'unknown' });
+        layout = generateRandomOutfit();
       }
-      layout = generateRandomOutfit();
     } finally {
       setAiSuggestingIdx(null);
     }
@@ -764,6 +833,9 @@ export default function ClosetPage() {
     const doCreate = async () => {
       const canvasName = `Outfit ${canvasIdx + 1}`;
       const canvas = await createOutfitCanvas({ name: canvasName, items: apiItems });
+      logAnalyticsEvent(Events.OUTFIT_BOARD_SAVED, {
+        [Params.ITEM_COUNT]: apiItems.length,
+      });
       setCanvases((prev) => {
         const updated = [...prev];
         if (updated[canvasIdx]) updated[canvasIdx] = { ...updated[canvasIdx], id: canvas.id };
@@ -810,6 +882,11 @@ export default function ClosetPage() {
     if (plansEnabled && !canTryOn) { setShowPremiumGate('generation'); return; }
     const itemIds = calItems.map((i) => i.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
     if (itemIds.length === 0) return;
+
+    logAnalyticsEvent(Events.TRYON_INITIATED, {
+      [Params.OUTFIT_ITEM_COUNT]: itemIds.length,
+      [Params.SOURCE]: 'calendar',
+    });
 
     const upperItem  = calItems.find((i) => UPPER_CATS.includes(i.category)) ?? null;
     const lowerItem  = calItems.find((i) => LOWER_CATS.includes(i.category)) ?? null;
@@ -861,6 +938,8 @@ export default function ClosetPage() {
       .then((job) => {
         if (tryOnCancelRef.current) return;
         saveActiveTryOnJob(job.id);
+        tryOnStartTimeRef.current = Date.now();
+        logAnalyticsEvent(Events.TRYON_PROCESSING_STARTED);
         setTryOnState({ status: 'processing' });
         fetchPlan();
         activeTryOnHandleRef.current = watchTryOnUntilDone(
@@ -875,9 +954,13 @@ export default function ClosetPage() {
             activeTryOnHandleRef.current = null;
             if (tryOnCancelRef.current) return;
             if (result.status === 'COMPLETED' && result.resultImageUrl) {
+              const durationMs = tryOnStartTimeRef.current ? Date.now() - tryOnStartTimeRef.current : 0;
+              logAnalyticsEvent(Events.TRYON_COMPLETED, { [Params.DURATION_MS]: durationMs });
+              tryOnStartTimeRef.current = null;
               setTryOnState({ status: 'completed', resultUrl: result.resultImageUrl });
               saveTryOnResult(result.resultImageUrl);
             } else {
+              logAnalyticsEvent(Events.TRYON_FAILED, { [Params.ERROR_CODE]: result.failureReason ?? 'unknown' });
               setTryOnState({ status: 'failed', failureReason: result.failureReason ?? 'Try-on failed. Please try again.' });
             }
           },
@@ -889,6 +972,7 @@ export default function ClosetPage() {
               setTryOnState(null);
               setShowPremiumGate('generation');
             } else {
+              logAnalyticsEvent(Events.TRYON_FAILED, { [Params.ERROR_CODE]: 'sse_error' });
               setTryOnState({ status: 'failed', failureReason: 'Something went wrong. Please try again.' });
             }
           },
@@ -914,6 +998,10 @@ export default function ClosetPage() {
     const targetCanvas = displayCanvases[canvasIdx];
     const itemIds = (targetCanvas?.layout ?? []).map((e) => e.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
     if (itemIds.length === 0) return;
+    logAnalyticsEvent(Events.TRYON_INITIATED, {
+      [Params.OUTFIT_ITEM_COUNT]: itemIds.length,
+      [Params.SOURCE]: 'outfit_board',
+    });
     tryOnCanvasIdxRef.current = canvasIdx;
     setShowTryOnConfirm(true);
   }
@@ -921,6 +1009,7 @@ export default function ClosetPage() {
   async function handleDeleteCanvas(canvasIdx: number) {
     const canvas = canvases[canvasIdx];
     if (!canvas) return;
+    logAnalyticsEvent(Events.OUTFIT_BOARD_DELETED);
     // Delete from backend if it has an id
     if (canvas.id) {
       try { await deleteOutfitCanvas(canvas.id); } catch { /* ignore */ }
@@ -1009,7 +1098,12 @@ export default function ClosetPage() {
             )}
             {/* My Looks button */}
             <button
-              onClick={() => setShowMyLooks(true)}
+              onClick={() => {
+                logAnalyticsEvent(Events.TRYON_HISTORY_VIEWED, {
+                  [Params.HISTORY_COUNT]: myLooksHistory.length,
+                });
+                setShowMyLooks(true);
+              }}
               className="flex items-center justify-center px-2 h-9 rounded-full active:scale-[0.95] transition-transform"
               style={{ background: myLooksHistory.length > 0 ? 'rgba(243,112,167,0.12)' : 'rgba(0,0,0,0.05)', minWidth: 38 }}
               aria-label="My Looks"
@@ -1298,7 +1392,13 @@ export default function ClosetPage() {
         <PremiumGateSheet
           reason={showPremiumGate}
           currentPlan={plan}
-          onClose={() => setShowPremiumGate(null)}
+          onClose={() => {
+            logAnalyticsEvent(Events.UPGRADE_MODAL_DISMISSED, {
+              [Params.TRIGGER]: showPremiumGate,
+              [Params.CURRENT_PLAN]: plan,
+            });
+            setShowPremiumGate(null);
+          }}
         />
       )}
 
@@ -1331,7 +1431,7 @@ export default function ClosetPage() {
               className="w-full py-3 rounded-2xl text-[15px] font-semibold text-gray-500 bg-gray-100"
               onClick={() => setOutfitBlockedModal(null)}
             >
-              Закрыть
+              {t.close}
             </button>
           </div>
         </div>
@@ -1391,7 +1491,7 @@ export default function ClosetPage() {
               <h3 className="text-[15px] font-bold text-gray-900 mb-4">{t.addPhoto}</h3>
               <div className="flex flex-col gap-2.5">
                 <button
-                  onClick={() => { fileInputRef.current?.click(); setShowAddPicker(false); }}
+                  onClick={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'gallery' }); fileInputRef.current?.click(); setShowAddPicker(false); }}
                   className="w-full h-14 rounded-2xl bg-gray-50 flex items-center gap-3.5 px-4 active:scale-[0.98] transition-transform"
                 >
                   <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #F5576c 100%)' }}>
@@ -1403,7 +1503,7 @@ export default function ClosetPage() {
                   </div>
                 </button>
                 <button
-                  onClick={() => { cameraInputRef.current?.click(); setShowAddPicker(false); }}
+                  onClick={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'camera' }); cameraInputRef.current?.click(); setShowAddPicker(false); }}
                   className="w-full h-14 rounded-2xl bg-gray-50 flex items-center gap-3.5 px-4 active:scale-[0.98] transition-transform"
                 >
                   <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: '#FF9800' }}>
@@ -1901,17 +2001,16 @@ function OutfitCard({
                 onClick={isAiSuggesting || isEmpty ? undefined : onRegenerate}
                 disabled={isAiSuggesting || isEmpty}
                 className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform disabled:opacity-40"
-                style={{ background: isAiSuggesting ? 'rgba(99,102,241,0.12)' : 'rgba(0,0,0,0.06)' }}
+                style={{
+                  background: isAiSuggesting ? 'rgba(99,102,241,0.08)' : '#ffffff',
+                  boxShadow: isAiSuggesting ? 'none' : '0 2px 8px rgba(0,0,0,0.14), 0 1px 3px rgba(0,0,0,0.08)',
+                }}
                 title={isAiSuggesting ? t.aiThinking : t.regenerateWithAI}
               >
                 {isAiSuggesting ? (
                   <Loader2 size={14} strokeWidth={2.2} className="text-indigo-500 animate-spin" />
                 ) : (
-                  <RefreshCw
-                    size={14}
-                    strokeWidth={2.2}
-                    className={canRegenerate ? 'text-gray-600' : 'text-gray-300'}
-                  />
+                  <Sparkles size={18} style={{ color: 'rgb(243, 112, 167)' }} />
                 )}
               </button>
               <span className="text-[9px] font-semibold leading-none" style={{ color: isAiSuggesting ? '#6366f1' : '#9ca3af' }}>
@@ -2068,7 +2167,6 @@ function OutfitCard({
             boxShadow: '0 4px 18px rgba(243,112,167,0.5)',
           }}
         >
-          <Sparkles size={13} />
           <span>{t.tryItOn}</span>
           <span className="opacity-70 text-[10px] font-medium">{tryOnCount}/{tryOnLimit}</span>
         </button>
@@ -2155,12 +2253,13 @@ function InteractiveCanvas({
   const [canvasItems, setCanvasItems] = useState<CanvasItem[]>(buildInitialItems);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState<{ x: number; y: number; itemX: number; itemY: number }>({ x: 0, y: 0, itemX: 0, itemY: 0 });
   const [swapTarget, setSwapTarget] = useState<number | null>(null);
   const [addPicker, setAddPicker] = useState(false);
   const [saveWarning, setSaveWarning] = useState(false);
-  // Pinch zoom state
-  const pinchRef = useRef<{ initialDist: number; initialScale: number } | null>(null);
+  // Pointer-based drag + pinch refs (replaces mixed Touch/Pointer approach)
+  const pointerCache = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const dragRef = useRef<{ pointerId: number; startX: number; startY: number; startItemX: number; startItemY: number; itemIdx: number } | null>(null);
+  const pinchRef = useRef<{ initialDist: number; initialScale: number; itemIdx: number } | null>(null);
 
   // ── Canvas interaction hint (one-time) ─────────────────────────────────────
   const [showCanvasHint, setShowCanvasHint] = useState<boolean>(() => {
@@ -2210,68 +2309,136 @@ function InteractiveCanvas({
     setSelectedIdx(idx);
   }
 
-  // Drag start — only for single-finger (non-pinch)
+  // ── Unified drag + pinch via Pointer Events only ─────────────────────────────
+  // Using a single pointerCache eliminates the race condition from the old
+  // mixed Touch/Pointer approach where the second finger's pointerdown reset the
+  // drag state before touchstart could switch to pinch mode.
+
   function handlePointerDown(e: React.PointerEvent, idx: number) {
-    // Skip if pinch is active
-    if (pinchRef.current) return;
     e.preventDefault();
     e.stopPropagation();
-    // Dismiss canvas hint on first interaction
-    if (showCanvasHint) {
-      setShowCanvasHint(false);
-      setCanvasHintSeen();
+    if (showCanvasHint) { setShowCanvasHint(false); setCanvasHintSeen(); }
+
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    pointerCache.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointerCache.current.size >= 2) {
+      // Second finger: switch to pinch on whichever item is being dragged / selected
+      const pinchItemIdx = dragRef.current?.itemIdx ?? selectedIdx ?? idx;
+      const ptrs = Array.from(pointerCache.current.values());
+      const dist = Math.hypot(ptrs[0].x - ptrs[1].x, ptrs[0].y - ptrs[1].y);
+      pinchRef.current = {
+        initialDist: dist,
+        initialScale: canvasItems[pinchItemIdx]?.scale ?? 1,
+        itemIdx: pinchItemIdx,
+      };
+      dragRef.current = null;
+      setIsDragging(false);
+      setSelectedIdx(pinchItemIdx);
+    } else {
+      // First finger: start drag
+      setSelectedIdx(idx);
+      const ci = canvasItems[idx];
+      dragRef.current = {
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        startItemX: ci.x,
+        startItemY: ci.y,
+        itemIdx: idx,
+      };
+      pinchRef.current = null;
+      setIsDragging(true);
     }
-    handleSelect(idx);
-    const ci = canvasItems[idx];
-    setIsDragging(true);
-    setDragStart({ x: e.clientX, y: e.clientY, itemX: ci.x, itemY: ci.y });
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+  }
+
+  // Second finger landing on the canvas background (not on any item) — start pinch
+  function handleCanvasPointerDown(e: React.PointerEvent) {
+    if (pointerCache.current.size >= 1 && dragRef.current !== null) {
+      e.preventDefault();
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      pointerCache.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointerCache.current.size >= 2) {
+        const pinchItemIdx = dragRef.current.itemIdx;
+        const ptrs = Array.from(pointerCache.current.values());
+        const dist = Math.hypot(ptrs[0].x - ptrs[1].x, ptrs[0].y - ptrs[1].y);
+        pinchRef.current = {
+          initialDist: dist,
+          initialScale: canvasItems[pinchItemIdx]?.scale ?? 1,
+          itemIdx: pinchItemIdx,
+        };
+        dragRef.current = null;
+        setIsDragging(false);
+      }
+    }
   }
 
   function handlePointerMove(e: React.PointerEvent) {
-    // Skip drag if pinch is active
-    if (!isDragging || pinchRef.current || selectedIdx === null || !containerRef.current) return;
+    if (!containerRef.current) return;
     e.preventDefault();
+
+    if (pointerCache.current.has(e.pointerId)) {
+      pointerCache.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+
+    if (pinchRef.current && pointerCache.current.size >= 2) {
+      // Pinch-to-scale: recalculate from current pointer positions
+      const ptrs = Array.from(pointerCache.current.values());
+      const dist = Math.hypot(ptrs[0].x - ptrs[1].x, ptrs[0].y - ptrs[1].y);
+      const ratio = dist / pinchRef.current.initialDist;
+      const { itemIdx, initialScale } = pinchRef.current;
+      const newScale = Math.max(0.3, Math.min(3, initialScale * ratio));
+      setCanvasItems((prev) =>
+        prev.map((ci, i) => (i === itemIdx ? { ...ci, scale: newScale } : ci))
+      );
+      return;
+    }
+
+    // Drag: only handle the pointer that started the drag
+    if (!dragRef.current || e.pointerId !== dragRef.current.pointerId) return;
+    const { startX, startY, startItemX, startItemY, itemIdx } = dragRef.current;
     const rect = containerRef.current.getBoundingClientRect();
-    const dx = ((e.clientX - dragStart.x) / rect.width) * 100;
-    const dy = ((e.clientY - dragStart.y) / rect.height) * 100;
+    const dx = ((e.clientX - startX) / rect.width) * 100;
+    const dy = ((e.clientY - startY) / rect.height) * 100;
     setCanvasItems((prev) =>
       prev.map((ci, i) =>
-        i === selectedIdx
-          ? { ...ci, x: Math.max(-20, Math.min(80, dragStart.itemX + dx)), y: Math.max(-10, Math.min(85, dragStart.itemY + dy)) }
+        i === itemIdx
+          ? { ...ci, x: Math.max(-20, Math.min(80, startItemX + dx)), y: Math.max(-10, Math.min(85, startItemY + dy)) }
           : ci
       )
     );
   }
 
-  function handlePointerUp() {
-    setIsDragging(false);
-  }
+  function handlePointerUp(e: React.PointerEvent) {
+    pointerCache.current.delete(e.pointerId);
+    const remaining = pointerCache.current.size;
 
-  // Pinch-to-zoom on touch
-  function handleTouchStart(e: React.TouchEvent, idx: number) {
-    if (e.touches.length === 2) {
-      // Disable drag when pinch starts
+    if (remaining === 0) {
+      dragRef.current = null;
+      pinchRef.current = null;
       setIsDragging(false);
-      handleSelect(idx);
-      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-      pinchRef.current = { initialDist: dist, initialScale: canvasItems[idx].scale };
+    } else if (remaining === 1 && pinchRef.current) {
+      // One finger lifted from a pinch: resume single-finger drag with remaining pointer.
+      // Pinch only changes scale, not x/y, so canvasItems positions are still current.
+      const [remainingId, remainingPos] = Array.from(pointerCache.current.entries())[0];
+      const itemIdx = pinchRef.current.itemIdx;
+      const ci = canvasItems[itemIdx];
+      pinchRef.current = null;
+      if (ci) {
+        dragRef.current = {
+          pointerId: remainingId,
+          startX: remainingPos.x,
+          startY: remainingPos.y,
+          startItemX: ci.x,
+          startItemY: ci.y,
+          itemIdx,
+        };
+        setIsDragging(true);
+      } else {
+        dragRef.current = null;
+        setIsDragging(false);
+      }
     }
-  }
-
-  function handleTouchMove(e: React.TouchEvent) {
-    if (e.touches.length === 2 && pinchRef.current && selectedIdx !== null) {
-      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-      const ratio = dist / pinchRef.current.initialDist;
-      const newScale = Math.max(0.3, Math.min(3, pinchRef.current.initialScale * ratio));
-      setCanvasItems((prev) =>
-        prev.map((ci, i) => (i === selectedIdx ? { ...ci, scale: newScale } : ci))
-      );
-    }
-  }
-
-  function handleTouchEnd() {
-    pinchRef.current = null;
   }
 
   // Wheel to zoom (desktop) — only scale, no position change
@@ -2385,11 +2552,11 @@ function InteractiveCanvas({
       <div
         className="flex-1 relative overflow-hidden bg-white touch-none flex items-center justify-center"
         style={{ containerType: 'size' }}
+        onPointerDown={handleCanvasPointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         onPointerLeave={handlePointerUp}
-        onTouchMove={(e) => handleTouchMove(e)}
-        onTouchEnd={handleTouchEnd}
         onClick={handleCanvasTap}
       >
         {/* Inner canvas with fixed aspect ratio — matches preview card. Uses container-query units so 3:4 is always maintained on all viewport sizes. */}
@@ -2405,16 +2572,19 @@ function InteractiveCanvas({
               aspectRatio: '1',
               transform: `scale(${ci.scale})`,
               zIndex: ci.zIndex,
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              WebkitTouchCallout: 'none' as any,
             }}
             onPointerDown={(e) => handlePointerDown(e, idx)}
-            onTouchStart={(e) => handleTouchStart(e, idx)}
             onWheel={(e) => handleWheel(e, idx)}
             onClick={(e) => { e.stopPropagation(); handleSelect(idx); }}
           >
             <div className="relative w-full h-full rounded-xl overflow-hidden cursor-grab active:cursor-grabbing">
               {/* Use plain img so images load eagerly with synchronous decoding — avoids the one-by-one stagger on mobile */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={ci.item.imageData} alt={ci.item.category} className="absolute inset-0 w-full h-full object-contain" decoding="sync" />
+              <img src={ci.item.imageData} alt={ci.item.category} className="absolute inset-0 w-full h-full object-contain" decoding="sync" draggable={false} />
             </div>
           </div>
         ))}
@@ -3364,13 +3534,19 @@ function TryOnModal({
           {status === 'completed' && (
             <>
               <button
-                onClick={onClose}
+                onClick={() => {
+                  logAnalyticsEvent(Events.TRYON_RESULT_DISMISSED);
+                  onClose();
+                }}
                 className="flex-1 h-12 rounded-full bg-gray-100 text-gray-700 text-[13px] font-semibold"
               >
                 {t.close}
               </button>
               <button
-                onClick={downloadWithLogo}
+                onClick={() => {
+                  logAnalyticsEvent(Events.TRYON_RESULT_SAVED);
+                  downloadWithLogo();
+                }}
                 disabled={isDownloading}
                 className="flex-1 h-12 rounded-full bg-black text-white text-[13px] font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
@@ -3466,6 +3642,11 @@ function PremiumGateSheet({
   ];
 
   function handleUpgrade(_planKey: UserPlan) {
+    logAnalyticsEvent(Events.UPGRADE_CTA_TAPPED, {
+      [Params.TRIGGER]: reason,
+      [Params.CURRENT_PLAN]: currentPlan,
+      [Params.DESTINATION]: 'telegram_web',
+    });
     window.open('https://t.me/libasai_admin', '_blank');
   }
 

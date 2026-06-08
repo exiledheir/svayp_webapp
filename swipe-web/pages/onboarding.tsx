@@ -4,6 +4,8 @@ import Image from 'next/image';
 import { Shirt } from 'lucide-react';
 import { isOnboardingComplete, setOnboardingComplete } from '@/lib/onboarding-storage';
 import { useI18n } from '@/lib/i18n';
+import { logAnalyticsEvent } from '@/lib/analytics';
+import { Events, Params } from '@/lib/analytics-events';
 
 const SLIDE_COUNT = 6;
 const SLIDE_WIDTH = `${100 / SLIDE_COUNT}%`;
@@ -286,6 +288,7 @@ export default function OnboardingPage() {
   const { t } = useI18n();
   const [current, setCurrent] = useState(0);
   const touchStartX = useRef<number | null>(null);
+  const didTrackStarted = useRef(false);
 
   // Returning user: skip onboarding entirely
   useEffect(() => {
@@ -297,15 +300,34 @@ export default function OnboardingPage() {
     if (isOnboardingComplete()) router.replace('/closet');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Track onboarding started and first slide viewed once
+  useEffect(() => {
+    if (!didTrackStarted.current) {
+      didTrackStarted.current = true;
+      logAnalyticsEvent(Events.ONBOARDING_STARTED);
+      logAnalyticsEvent(Events.ONBOARDING_SLIDE_VIEWED, { [Params.SLIDE_INDEX]: 0 });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Track each subsequent slide view
+  useEffect(() => {
+    if (!didTrackStarted.current) return; // wait until started is fired
+    if (current > 0) {
+      logAnalyticsEvent(Events.ONBOARDING_SLIDE_VIEWED, { [Params.SLIDE_INDEX]: current });
+    }
+  }, [current]);
+
   function advance() {
     if (current < SLIDE_COUNT - 1) setCurrent((c) => c + 1);
   }
 
   function skipToCta() {
+    logAnalyticsEvent(Events.ONBOARDING_SKIPPED, { [Params.AT_SLIDE_INDEX]: current });
     setCurrent(SLIDE_COUNT - 1);
   }
 
   function finish() {
+    logAnalyticsEvent(Events.ONBOARDING_COMPLETED);
     setOnboardingComplete();
     router.replace('/closet');
   }
