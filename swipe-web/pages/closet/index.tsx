@@ -2527,7 +2527,7 @@ function InteractiveCanvas({
       {/* Canvas area */}
       <div
         className="flex-1 relative overflow-hidden bg-white touch-none flex items-center justify-center"
-        style={{ containerType: 'size' }}
+        style={{ containerType: 'size', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' as any }}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
@@ -2552,6 +2552,8 @@ function InteractiveCanvas({
               userSelect: 'none',
               WebkitUserSelect: 'none',
               WebkitTouchCallout: 'none' as any,
+              WebkitUserDrag: 'none' as any,
+              touchAction: 'none',
             }}
             onPointerDown={(e) => handlePointerDown(e, idx)}
             onTouchStart={(e) => handleTouchStart(e, idx)}
@@ -2561,7 +2563,7 @@ function InteractiveCanvas({
             <div className="relative w-full h-full rounded-xl overflow-hidden cursor-grab active:cursor-grabbing">
               {/* Use plain img so images load eagerly with synchronous decoding — avoids the one-by-one stagger on mobile */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={ci.item.imageData} alt={ci.item.category} className="absolute inset-0 w-full h-full object-contain" decoding="sync" draggable={false} />
+              <img src={ci.item.imageData} alt={ci.item.category} className="absolute inset-0 w-full h-full object-contain" decoding="sync" draggable={false} style={{ pointerEvents: 'none', WebkitUserDrag: 'none' as any }} />
             </div>
           </div>
         ))}
