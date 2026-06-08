@@ -1948,8 +1948,8 @@ function OutfitCard({
 
   // Build display entries: only from saved layout (set after tapping Regenerate).
   // Canvas stays empty until the user explicitly requests an outfit.
+  // No restrictions on layout composition — users can save any combination they want.
   const displayEntries = React.useMemo(() => {
-    if (!canGenerateOutfit) return [];
     if (!savedLayout || savedLayout.length === 0) return [];
     const resolved = savedLayout
       .map((entry) => {
@@ -1958,13 +1958,8 @@ function OutfitCard({
         return { item, x: entry.x, y: entry.y, scale: entry.scale, zIndex: entry.zIndex, group: entry.group };
       })
       .filter(Boolean) as { item: ClosetItem; x: number; y: number; scale: number; zIndex: number; group: string }[];
-    // Validate layout forms a real outfit (same rule as canGenerateOutfit).
-    const hasDressInLayout = resolved.some((e) => FULL_BODY_CATS.includes(e.item.category as ClosetCategory));
-    const hasUpperInLayout = resolved.some((e) => UPPER_CATS.includes(e.item.category as ClosetCategory));
-    const hasLowerInLayout = resolved.some((e) => LOWER_CATS.includes(e.item.category as ClosetCategory));
-    if (!hasDressInLayout && !(hasUpperInLayout && hasLowerInLayout)) return [];
     return resolved;
-  }, [savedLayout, allItems, canGenerateOutfit]);
+  }, [savedLayout, allItems]);
 
   // Auto-trigger regen ONLY when canGenerateOutfit transitions false→true AFTER the
   // initial page load has settled (items + canvases both loaded). This prevents the
@@ -2059,7 +2054,7 @@ function OutfitCard({
             <Loader2 size={28} strokeWidth={1.8} className="text-indigo-400 animate-spin" />
             <p className="text-[13px] font-medium text-gray-400">{t.tryOnGenerating}</p>
           </div>
-        ) : !canGenerateOutfit || displayEntries.length === 0 ? (
+        ) : displayEntries.length === 0 ? (
           // Progress state — 2 required steps: upper + lower body
           (() => {
             const hasUpper = hasTop || hasDress;
@@ -2164,8 +2159,8 @@ function OutfitCard({
         )}
       </div>
 
-      {/* Bottom action bar — shown when outfit can be generated OR when closet is empty */}
-      {(canGenerateOutfit || isEmpty) && (
+      {/* Bottom action bar — shown when there's a saved layout, outfit can be generated, or closet is empty */}
+      {(displayEntries.length > 0 || canGenerateOutfit || isEmpty) && (
       <div className="flex gap-2.5 px-5 pb-5">
         <button
           data-coach="view-items"
@@ -2175,7 +2170,7 @@ function OutfitCard({
         >
           {t.viewItems}
         </button>
-        {onTryItOn && (canGenerateOutfit || isEmpty) && (
+        {onTryItOn && (displayEntries.length > 0 || canGenerateOutfit || isEmpty) && (
         <button
           data-coach="try-on"
           onClick={isEmpty ? undefined : onTryItOn}
@@ -2467,6 +2462,13 @@ function InteractiveCanvas({
   function handleSave() {
     if (canvasItems.length === 0) return;
 
+    // If no upper-body item is on canvas, show a toast and block save
+    if (!canvasItems.some((ci) => ci.group === 'upper')) {
+      setSaveWarning(true);
+      setTimeout(() => setSaveWarning(false), 3000);
+      return;
+    }
+
     const seen = new Set<string>();
     const deduped: SavedCanvasLayout = [];
     // Iterate in reverse so the last (top) occurrence wins
@@ -2490,7 +2492,7 @@ function InteractiveCanvas({
       {/* Save warning toast */}
       {saveWarning && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[999] px-4 py-2.5 rounded-full bg-amber-500 text-white text-[13px] font-semibold shadow-lg text-center max-w-[90vw]">
-          {t.addTopAndBottom}
+          {t.saveNeedsTopItem}
         </div>
       )}
       {/* Header */}
@@ -2515,7 +2517,7 @@ function InteractiveCanvas({
           )}
           <button
             onClick={handleSave}
-            disabled={!canvasItems.some((ci) => ci.group === 'upper') || !canvasItems.some((ci) => ci.group === 'lower' || ci.group === 'shoes')}
+            disabled={canvasItems.length === 0}
             className="px-4 py-2 rounded-full text-[13px] font-semibold text-white disabled:opacity-40 transition-opacity"
             style={{ backgroundColor: '#F370A7' }}
           >
@@ -2551,10 +2553,10 @@ function InteractiveCanvas({
               zIndex: ci.zIndex,
               userSelect: 'none',
               WebkitUserSelect: 'none',
-              WebkitTouchCallout: 'none' as any,
-              WebkitUserDrag: 'none' as any,
+              WebkitTouchCallout: 'none',
+              WebkitUserDrag: 'none',
               touchAction: 'none',
-            }}
+            } as any}
             onPointerDown={(e) => handlePointerDown(e, idx)}
             onTouchStart={(e) => handleTouchStart(e, idx)}
             onWheel={(e) => handleWheel(e, idx)}
@@ -2563,7 +2565,7 @@ function InteractiveCanvas({
             <div className="relative w-full h-full rounded-xl overflow-hidden cursor-grab active:cursor-grabbing">
               {/* Use plain img so images load eagerly with synchronous decoding — avoids the one-by-one stagger on mobile */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={ci.item.imageData} alt={ci.item.category} className="absolute inset-0 w-full h-full object-contain" decoding="sync" draggable={false} style={{ pointerEvents: 'none', WebkitUserDrag: 'none' as any }} />
+              <img src={ci.item.imageData} alt={ci.item.category} className="absolute inset-0 w-full h-full object-contain" decoding="sync" draggable={false} style={{ pointerEvents: 'none', WebkitUserDrag: 'none' } as any} />
             </div>
           </div>
         ))}
