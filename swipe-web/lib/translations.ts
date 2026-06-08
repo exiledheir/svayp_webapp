@@ -123,6 +123,7 @@ export interface Translations {
   tapPlusToAdd: string;
   addUpperFirst: string;
   addLowerOrShoes: string;
+  saveNeedsTopItem: string;
   // ── Canvas hints ────────────────────────────────────────────────
   canvasHintDrag: string;
   canvasHintPinch: string;
@@ -335,6 +336,7 @@ const en: Translations = {
   tapPlusToAdd: 'Tap + to add your first piece',
   addUpperFirst: 'Add a top to get started',
   addLowerOrShoes: 'Now add lower body or shoes',
+  saveNeedsTopItem: 'Please add at least one top item to save your outfit.',
   // ── Canvas hints ────────────────────────────────────────────────
   canvasHintDrag: 'Drag to move',
   canvasHintPinch: 'Pinch to resize',
@@ -548,6 +550,7 @@ const ru: Translations = {
   tapPlusToAdd: 'Нажмите + чтобы добавить первую вещь',
   addUpperFirst: 'Добавьте верхнюю часть гардероба',
   addLowerOrShoes: 'Добавьте низ или обувь',
+  saveNeedsTopItem: 'Пожалуйста, добавьте хотя бы один верх, чтобы сохранить образ.',
   // ── Canvas hints ────────────────────────────────────────────────
   canvasHintDrag: 'Перетащите',
   canvasHintPinch: 'Сведите пальцы для масштаба',
@@ -759,6 +762,7 @@ const uz: Translations = {
   tapPlusToAdd: "Birinchi kiyimni qo'shish uchun + bosing",
   addUpperFirst: "Boshlash uchun yuqori kiyim qo'shing",
   addLowerOrShoes: "Pastki kiyim yoki oyoq kiyim qo'shing",
+  saveNeedsTopItem: "Outfitni saqlash uchun kamida bitta yuqori kiyim qo'shing.",
   // ── Canvas hints ────────────────────────────────────────────────
   canvasHintDrag: "Ko'chirish uchun torting",
   canvasHintPinch: "O'lcham uchun qistiring",
