@@ -248,6 +248,10 @@ export default function ClosetPage() {
     prevPremiumGate.current = showPremiumGate;
   }, [showPremiumGate, plan]);
 
+  // canvasesLoaded: true once the canvas fetch has settled (success or failure).
+  // Used to prevent auto-generating an outfit on every page load/reload.
+  const [canvasesLoaded, setCanvasesLoaded] = useState(false);
+
   // Load all canvases from backend
   useEffect(() => {
     getOutfitCanvases({ page: 0, size: 20, sort: 'updatedAt,desc' })
@@ -277,12 +281,14 @@ export default function ClosetPage() {
             if (s) setCanvases([{ id: null, layout: JSON.parse(s) }]);
           } catch { /* ignore */ }
         }
+        setCanvasesLoaded(true);
       })
       .catch(() => {
         try {
           const s = localStorage.getItem('svayp_saved_layout');
           if (s) setCanvases([{ id: null, layout: JSON.parse(s) }]);
         } catch { /* ignore */ }
+        setCanvasesLoaded(true);
       });
   }, []);
 
@@ -1196,6 +1202,7 @@ export default function ClosetPage() {
           limits={limits}
           tryOnCount={usage.tryItOnsUsed}
           aiSuggestingIdx={aiSuggestingIdx}
+          allowAutoGenerate={!isLoading && canvasesLoaded}
           onViewItems={(idx) => {
             const layout = displayCanvases[idx]?.layout ?? null;
             setEditingCanvasIdx(idx);
@@ -1768,7 +1775,7 @@ export default function ClosetPage() {
 }
 
 // ─── My Outfits ─────────────────────────────────────────────────────────────────
-function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem }: {
+function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem, allowAutoGenerate }: {
   allItems: ClosetItem[];
   canvases: { id: string | null; layout: SavedCanvasLayout }[];
   plan: UserPlan;
@@ -1777,6 +1784,7 @@ function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits
   limits: PlanLimits;
   tryOnCount: number;
   canAddCanvas: boolean;
+  allowAutoGenerate: boolean;
   onViewItems: (idx: number) => void;
   onRegenerate: (idx: number) => void;
   onAddCanvas: () => void;
@@ -1813,6 +1821,7 @@ function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits
             tryOnLimit={limits.tryItOns}
             onDelete={idx > 0 ? () => onDeleteCanvas(idx) : undefined}
             onAddItem={onAddItem}
+            allowAutoGenerate={allowAutoGenerate}
           />
         )) : (
           <OutfitCard
@@ -1829,6 +1838,7 @@ function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits
             tryOnCount={tryOnCount}
             tryOnLimit={limits.tryItOns}
             onAddItem={onAddItem}
+            allowAutoGenerate={allowAutoGenerate}
           />
         )}
 
@@ -1908,6 +1918,7 @@ function OutfitCard({
   tryOnLimit,
   onDelete,
   onAddItem,
+  allowAutoGenerate,
 }: {
   allItems: ClosetItem[];
   isEmpty: boolean;
@@ -1923,6 +1934,7 @@ function OutfitCard({
   tryOnLimit: number;
   onDelete?: () => void | Promise<void>;
   onAddItem?: (cat: ClosetCategory) => void;
+  allowAutoGenerate: boolean;
 }) {
   const { t } = useI18n();
 
@@ -1954,11 +1966,20 @@ function OutfitCard({
     return resolved;
   }, [savedLayout, allItems, canGenerateOutfit]);
 
-  // Auto-trigger regen whenever the wardrobe becomes ready and there's nothing to display yet
+  // Auto-trigger regen ONLY when canGenerateOutfit transitions false→true AFTER the
+  // initial page load has settled (items + canvases both loaded). This prevents the
+  // AI API from being called on every reload, which would burn through the user's quota.
+  const prevCanGenerateOutfit = React.useRef(canGenerateOutfit);
   React.useEffect(() => {
+    const justBecameReady = !prevCanGenerateOutfit.current && canGenerateOutfit;
+    prevCanGenerateOutfit.current = canGenerateOutfit;
+
+    // Only fire when: wardrobe *just* became outfit-ready in this session (user added an item),
+    // the initial load has fully settled, and there's still nothing to display.
+    if (!justBecameReady) return;
+    if (!allowAutoGenerate) return;
     const isDemo = allItems.length > 0 && allItems.every((i) => DEMO_ITEM_IDS.has(i.id));
     if (
-      canGenerateOutfit &&
       !isDemo &&
       displayEntries.length === 0 &&
       !isAiSuggesting &&
@@ -1966,7 +1987,7 @@ function OutfitCard({
     ) {
       onRegenerate();
     }
-  }, [canGenerateOutfit, displayEntries.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [canGenerateOutfit, allowAutoGenerate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div
@@ -2253,12 +2274,11 @@ function InteractiveCanvas({
   const [canvasItems, setCanvasItems] = useState<CanvasItem[]>(buildInitialItems);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number; itemX: number; itemY: number }>({ x: 0, y: 0, itemX: 0, itemY: 0 });
   const [swapTarget, setSwapTarget] = useState<number | null>(null);
   const [addPicker, setAddPicker] = useState(false);
   const [saveWarning, setSaveWarning] = useState(false);
-  // Pointer-based drag + pinch refs (replaces mixed Touch/Pointer approach)
-  const pointerCache = useRef<Map<number, { x: number; y: number }>>(new Map());
-  const dragRef = useRef<{ pointerId: number; startX: number; startY: number; startItemX: number; startItemY: number; itemIdx: number } | null>(null);
+  // Pinch zoom state — stores the target item index so handleTouchMove doesn't rely on selectedIdx closure
   const pinchRef = useRef<{ initialDist: number; initialScale: number; itemIdx: number } | null>(null);
 
   // ── Canvas interaction hint (one-time) ─────────────────────────────────────
@@ -2309,136 +2329,92 @@ function InteractiveCanvas({
     setSelectedIdx(idx);
   }
 
-  // ── Unified drag + pinch via Pointer Events only ─────────────────────────────
-  // Using a single pointerCache eliminates the race condition from the old
-  // mixed Touch/Pointer approach where the second finger's pointerdown reset the
-  // drag state before touchstart could switch to pinch mode.
-
+  // Drag start — skip if a 2-finger pinch is already active
   function handlePointerDown(e: React.PointerEvent, idx: number) {
+    if (pinchRef.current) return;
     e.preventDefault();
     e.stopPropagation();
     if (showCanvasHint) { setShowCanvasHint(false); setCanvasHintSeen(); }
-
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    pointerCache.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-    if (pointerCache.current.size >= 2) {
-      // Second finger: switch to pinch on whichever item is being dragged / selected
-      const pinchItemIdx = dragRef.current?.itemIdx ?? selectedIdx ?? idx;
-      const ptrs = Array.from(pointerCache.current.values());
-      const dist = Math.hypot(ptrs[0].x - ptrs[1].x, ptrs[0].y - ptrs[1].y);
-      pinchRef.current = {
-        initialDist: dist,
-        initialScale: canvasItems[pinchItemIdx]?.scale ?? 1,
-        itemIdx: pinchItemIdx,
-      };
-      dragRef.current = null;
-      setIsDragging(false);
-      setSelectedIdx(pinchItemIdx);
-    } else {
-      // First finger: start drag
-      setSelectedIdx(idx);
-      const ci = canvasItems[idx];
-      dragRef.current = {
-        pointerId: e.pointerId,
-        startX: e.clientX,
-        startY: e.clientY,
-        startItemX: ci.x,
-        startItemY: ci.y,
-        itemIdx: idx,
-      };
-      pinchRef.current = null;
-      setIsDragging(true);
-    }
-  }
-
-  // Second finger landing on the canvas background (not on any item) — start pinch
-  function handleCanvasPointerDown(e: React.PointerEvent) {
-    if (pointerCache.current.size >= 1 && dragRef.current !== null) {
-      e.preventDefault();
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-      pointerCache.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pointerCache.current.size >= 2) {
-        const pinchItemIdx = dragRef.current.itemIdx;
-        const ptrs = Array.from(pointerCache.current.values());
-        const dist = Math.hypot(ptrs[0].x - ptrs[1].x, ptrs[0].y - ptrs[1].y);
-        pinchRef.current = {
-          initialDist: dist,
-          initialScale: canvasItems[pinchItemIdx]?.scale ?? 1,
-          itemIdx: pinchItemIdx,
-        };
-        dragRef.current = null;
-        setIsDragging(false);
-      }
-    }
+    handleSelect(idx);
+    const ci = canvasItems[idx];
+    setIsDragging(true);
+    setDragStart({ x: e.clientX, y: e.clientY, itemX: ci.x, itemY: ci.y });
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
   }
 
   function handlePointerMove(e: React.PointerEvent) {
-    if (!containerRef.current) return;
+    if (!isDragging || pinchRef.current || selectedIdx === null || !containerRef.current) return;
     e.preventDefault();
-
-    if (pointerCache.current.has(e.pointerId)) {
-      pointerCache.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    }
-
-    if (pinchRef.current && pointerCache.current.size >= 2) {
-      // Pinch-to-scale: recalculate from current pointer positions
-      const ptrs = Array.from(pointerCache.current.values());
-      const dist = Math.hypot(ptrs[0].x - ptrs[1].x, ptrs[0].y - ptrs[1].y);
-      const ratio = dist / pinchRef.current.initialDist;
-      const { itemIdx, initialScale } = pinchRef.current;
-      const newScale = Math.max(0.3, Math.min(3, initialScale * ratio));
-      setCanvasItems((prev) =>
-        prev.map((ci, i) => (i === itemIdx ? { ...ci, scale: newScale } : ci))
-      );
-      return;
-    }
-
-    // Drag: only handle the pointer that started the drag
-    if (!dragRef.current || e.pointerId !== dragRef.current.pointerId) return;
-    const { startX, startY, startItemX, startItemY, itemIdx } = dragRef.current;
     const rect = containerRef.current.getBoundingClientRect();
-    const dx = ((e.clientX - startX) / rect.width) * 100;
-    const dy = ((e.clientY - startY) / rect.height) * 100;
+    const dx = ((e.clientX - dragStart.x) / rect.width) * 100;
+    const dy = ((e.clientY - dragStart.y) / rect.height) * 100;
     setCanvasItems((prev) =>
       prev.map((ci, i) =>
-        i === itemIdx
-          ? { ...ci, x: Math.max(-20, Math.min(80, startItemX + dx)), y: Math.max(-10, Math.min(85, startItemY + dy)) }
+        i === selectedIdx
+          ? { ...ci, x: Math.max(-20, Math.min(80, dragStart.itemX + dx)), y: Math.max(-10, Math.min(85, dragStart.itemY + dy)) }
           : ci
       )
     );
   }
 
-  function handlePointerUp(e: React.PointerEvent) {
-    pointerCache.current.delete(e.pointerId);
-    const remaining = pointerCache.current.size;
+  function handlePointerUp() {
+    setIsDragging(false);
+  }
 
-    if (remaining === 0) {
-      dragRef.current = null;
-      pinchRef.current = null;
+  // Pinch-to-zoom via Touch Events.
+  // Uses pinchRef.itemIdx so handleTouchMove never relies on the selectedIdx closure.
+  function handleTouchStart(e: React.TouchEvent, idx: number) {
+    if (e.touches.length === 2) {
+      e.preventDefault();
       setIsDragging(false);
-    } else if (remaining === 1 && pinchRef.current) {
-      // One finger lifted from a pinch: resume single-finger drag with remaining pointer.
-      // Pinch only changes scale, not x/y, so canvasItems positions are still current.
-      const [remainingId, remainingPos] = Array.from(pointerCache.current.entries())[0];
-      const itemIdx = pinchRef.current.itemIdx;
-      const ci = canvasItems[itemIdx];
-      pinchRef.current = null;
+      // Always pinch whichever item was already selected; fall back to the touched item
+      const pinchItemIdx = selectedIdx ?? idx;
+      handleSelect(pinchItemIdx);
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY,
+      );
+      pinchRef.current = {
+        initialDist: dist,
+        initialScale: canvasItems[pinchItemIdx]?.scale ?? 1,
+        itemIdx: pinchItemIdx,
+      };
+    }
+  }
+
+  // Second finger landing on the canvas background (not on an item)
+  function handleContainerTouchStart(e: React.TouchEvent) {
+    if (e.touches.length === 2 && isDragging && selectedIdx !== null) {
+      e.preventDefault();
+      setIsDragging(false);
+      const ci = canvasItems[selectedIdx];
       if (ci) {
-        dragRef.current = {
-          pointerId: remainingId,
-          startX: remainingPos.x,
-          startY: remainingPos.y,
-          startItemX: ci.x,
-          startItemY: ci.y,
-          itemIdx,
-        };
-        setIsDragging(true);
-      } else {
-        dragRef.current = null;
-        setIsDragging(false);
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY,
+        );
+        pinchRef.current = { initialDist: dist, initialScale: ci.scale, itemIdx: selectedIdx };
       }
     }
+  }
+
+  function handleTouchMove(e: React.TouchEvent) {
+    if (e.touches.length === 2 && pinchRef.current) {
+      e.preventDefault();
+      const { initialDist, initialScale, itemIdx } = pinchRef.current;
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY,
+      );
+      const newScale = Math.max(0.3, Math.min(3, initialScale * (dist / initialDist)));
+      setCanvasItems((prev) =>
+        prev.map((ci, i) => (i === itemIdx ? { ...ci, scale: newScale } : ci))
+      );
+    }
+  }
+
+  function handleTouchEnd() {
+    pinchRef.current = null;
   }
 
   // Wheel to zoom (desktop) — only scale, no position change
@@ -2552,11 +2528,12 @@ function InteractiveCanvas({
       <div
         className="flex-1 relative overflow-hidden bg-white touch-none flex items-center justify-center"
         style={{ containerType: 'size' }}
-        onPointerDown={handleCanvasPointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
         onPointerLeave={handlePointerUp}
+        onTouchStart={handleContainerTouchStart}
+        onTouchMove={(e) => handleTouchMove(e)}
+        onTouchEnd={handleTouchEnd}
         onClick={handleCanvasTap}
       >
         {/* Inner canvas with fixed aspect ratio — matches preview card. Uses container-query units so 3:4 is always maintained on all viewport sizes. */}
@@ -2577,6 +2554,7 @@ function InteractiveCanvas({
               WebkitTouchCallout: 'none' as any,
             }}
             onPointerDown={(e) => handlePointerDown(e, idx)}
+            onTouchStart={(e) => handleTouchStart(e, idx)}
             onWheel={(e) => handleWheel(e, idx)}
             onClick={(e) => { e.stopPropagation(); handleSelect(idx); }}
           >
