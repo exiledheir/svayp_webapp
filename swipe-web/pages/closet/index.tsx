@@ -342,6 +342,42 @@ export default function ClosetPage() {
   const cropImgRef = useRef<HTMLImageElement>(null);
   const addFileRef = useRef<File | null>(null);
 
+  // ── Pull-to-refresh ─────────────────────────────────────────────────────────
+  const mainScrollRef = useRef<HTMLElement>(null);
+  const pullStartYRef = useRef<number | null>(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+  const PULL_THRESHOLD = 72;
+
+  function handlePullTouchStart(e: React.TouchEvent<HTMLElement>) {
+    if (mainScrollRef.current && mainScrollRef.current.scrollTop === 0) {
+      pullStartYRef.current = e.touches[0].clientY;
+    }
+  }
+
+  function handlePullTouchMove(e: React.TouchEvent<HTMLElement>) {
+    if (pullStartYRef.current === null || isPullRefreshing) return;
+    const dy = e.touches[0].clientY - pullStartYRef.current;
+    if (dy > 0 && mainScrollRef.current && mainScrollRef.current.scrollTop === 0) {
+      // Resist so it doesn't pull 1:1
+      setPullDistance(Math.min(dy * 0.45, PULL_THRESHOLD + 20));
+    } else {
+      setPullDistance(0);
+    }
+  }
+
+  async function handlePullTouchEnd() {
+    if (pullDistance >= PULL_THRESHOLD && !isPullRefreshing) {
+      setIsPullRefreshing(true);
+      setPullDistance(0);
+      await Promise.all([load(), fetchPlan()]);
+      setIsPullRefreshing(false);
+    } else {
+      setPullDistance(0);
+    }
+    pullStartYRef.current = null;
+  }
+
   function openAdd(group: string, category: ClosetCategory) {
     if (plansEnabled && !canAddToCategory(category)) {
       setShowPremiumGate('categoryFull');
@@ -788,7 +824,7 @@ export default function ClosetPage() {
           title: isTooFewItems ? 'Мало одежды для новых образов' : 'Генерируем образы',
           body: isTooFewItems
             ? (apiMsg ?? 'Добавьте больше одежды, чтобы ИИ создал разнообразные образы.')
-            : 'ИИ подбирает новые образы. Нажмите «Изменить» через 30–60 секунд.',
+            : 'ИИ подбирает новые образы. Нажмите ✦ через 30–60 секунд.',
         });
         return;
       } else if (code === 'QUOTA_EXCEEDED') {
@@ -1184,9 +1220,35 @@ export default function ClosetPage() {
           0%   { background-position: -200% center; }
           100% { background-position:  200% center; }
         }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
       `}</style>
 
-      <main className="flex-1 overflow-y-auto pb-4" style={{ paddingTop: 0 }}>
+      <main
+        ref={mainScrollRef}
+        className="flex-1 overflow-y-auto pb-4"
+        style={{ paddingTop: 0 }}
+        onTouchStart={handlePullTouchStart}
+        onTouchMove={handlePullTouchMove}
+        onTouchEnd={handlePullTouchEnd}
+      >
+        {/* ── Pull-to-refresh indicator ──────────────────────────── */}
+        <div
+          className="flex items-center justify-center overflow-hidden transition-all duration-200"
+          style={{ height: isPullRefreshing ? 44 : pullDistance > 0 ? Math.min(pullDistance, 44) : 0 }}
+        >
+          <div
+            className="w-7 h-7 rounded-full border-2 border-t-transparent"
+            style={{
+              borderColor: '#F370A7',
+              borderTopColor: 'transparent',
+              animation: isPullRefreshing ? 'spin 0.7s linear infinite' : 'none',
+              transform: isPullRefreshing ? undefined : `rotate(${Math.min((pullDistance / PULL_THRESHOLD) * 270, 270)}deg)`,
+              opacity: isPullRefreshing ? 1 : Math.min(pullDistance / PULL_THRESHOLD, 1),
+            }}
+          />
+        </div>
         {/* ── My Outfits ────────────────────────────────────────── */}
         <OutfitSection
           allItems={items}
@@ -2535,6 +2597,28 @@ function InteractiveCanvas({
       >
         {/* Inner canvas with fixed aspect ratio — matches preview card. Uses container-query units so 3:4 is always maintained on all viewport sizes. */}
         <div ref={containerRef} className="relative" style={{ aspectRatio: '3 / 4', width: 'min(75cqh, 100cqw)' }}>
+        {/* ── Empty-canvas tutorial hint ─────────────────────────── */}
+        {canvasItems.length === 0 && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 gap-3 px-8">
+            <div
+              className="w-16 h-16 rounded-full flex items-center justify-center"
+              style={{ background: 'rgba(243,112,167,0.12)', border: '2px dashed rgba(243,112,167,0.5)' }}
+            >
+              <Plus size={28} strokeWidth={2} color="#F370A7" />
+            </div>
+            <p className="text-[14px] font-semibold text-gray-500 text-center leading-snug">
+              {t.canvasEmptyHint}
+            </p>
+            {/* Arrow pointing right toward the Add button */}
+            <div className="flex items-center gap-1 mt-1">
+              <span className="text-[12px] text-gray-400 font-medium">{t.addToCloset}</span>
+              <svg width="20" height="12" viewBox="0 0 20 12" fill="none">
+                <path d="M1 6h16M13 1l5 5-5 5" stroke="#F370A7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+          </div>
+        )}
+
         {canvasItems.map((ci, idx) => (
           <div
             key={`${ci.group}-${idx}-${ci.item.id}`}
@@ -2615,15 +2699,19 @@ function InteractiveCanvas({
             },
           ].map((btn) => {
             const disabled = btn.needsSelection && selectedIdx === null;
+            const isAddBtn = btn.label === 'Add';
             return (
               <button
                 key={btn.label}
                 onClick={(e) => { e.stopPropagation(); if (!disabled) btn.action(); }}
-                className={`w-10 h-10 rounded-full bg-white shadow-md border border-gray-200 flex items-center justify-center transition-all active:scale-95 ${
+                className={`relative w-10 h-10 rounded-full bg-white shadow-md border border-gray-200 flex items-center justify-center transition-all active:scale-95 ${
                   disabled ? 'opacity-30 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'
                 }`}
                 title={btn.label}
               >
+                {isAddBtn && canvasItems.length === 0 && (
+                  <span className="absolute inset-0 rounded-full animate-ping" style={{ backgroundColor: '#F370A7', opacity: 0.35 }} />
+                )}
                 {btn.icon}
               </button>
             );

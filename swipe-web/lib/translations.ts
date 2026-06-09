@@ -125,6 +125,7 @@ export interface Translations {
   addLowerOrShoes: string;
   saveNeedsTopItem: string;
   // ── Canvas hints ────────────────────────────────────────────────
+  canvasEmptyHint: string;
   canvasHintDrag: string;
   canvasHintPinch: string;
   canvasHintSwap: string;
@@ -338,6 +339,7 @@ const en: Translations = {
   addLowerOrShoes: 'Now add lower body or shoes',
   saveNeedsTopItem: 'Please add at least one top item to save your outfit.',
   // ── Canvas hints ────────────────────────────────────────────────
+  canvasEmptyHint: 'Tap + to add your first item',
   canvasHintDrag: 'Drag to move',
   canvasHintPinch: 'Pinch to resize',
   canvasHintSwap: 'Tap item → Swap',
@@ -552,6 +554,7 @@ const ru: Translations = {
   addLowerOrShoes: 'Добавьте низ или обувь',
   saveNeedsTopItem: 'Пожалуйста, добавьте хотя бы один верх, чтобы сохранить образ.',
   // ── Canvas hints ────────────────────────────────────────────────
+  canvasEmptyHint: 'Нажмите + чтобы добавить первую вещь',
   canvasHintDrag: 'Перетащите',
   canvasHintPinch: 'Сведите пальцы для масштаба',
   canvasHintSwap: 'Нажмите → Замена',
@@ -764,6 +767,7 @@ const uz: Translations = {
   addLowerOrShoes: "Pastki kiyim yoki oyoq kiyim qo'shing",
   saveNeedsTopItem: "Outfitni saqlash uchun kamida bitta yuqori kiyim qo'shing.",
   // ── Canvas hints ────────────────────────────────────────────────
+  canvasEmptyHint: "Birinchi kiyimni qo'shish uchun + bosing",
   canvasHintDrag: "Ko'chirish uchun torting",
   canvasHintPinch: "O'lcham uchun qistiring",
   canvasHintSwap: "Bosing → Almashtirish",
