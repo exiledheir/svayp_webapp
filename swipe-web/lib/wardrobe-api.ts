@@ -29,10 +29,10 @@ function unwrapData<T>(res: { data: unknown }): T {
 // ── Plan ──────────────────────────────────────────────────────────────────────
 
 // Map the backend plan response (field names differ from frontend types).
-// Backend: { tier: "FREE"|"TRIAL"|"PREMIUM", limits: { wardrobeItems, canvases, tryOnPerMonth, regenPerMonth }, usage: { wardrobeItems, tryOnThisMonth, regenThisMonth } }
+// Backend: { tier: "FREE"|"TRIAL"|"PRO"|"PREMIUM", limits: { wardrobeItems, canvases, tryOnPerMonth, regenPerMonth }, usage: { wardrobeItems, tryOnThisMonth, regenThisMonth } }
 // Frontend: { plan: "free"|"pro"|"premium", limits: { itemsPerCategory, outfitCanvases, tryItOns, regenerations }, usage: { regenerationsUsed, tryItOnsUsed, itemCountByCategory } }
 function mapPlanResponse(raw: Record<string, unknown>): UserPlanResponse {
-  const tierMap: Record<string, PlanTier> = { FREE: 'free', TRIAL: 'pro', PREMIUM: 'premium' };
+  const tierMap: Record<string, PlanTier> = { FREE: 'free', TRIAL: 'pro', PRO: 'pro', PREMIUM: 'premium' };
   const tier = ((raw.tier ?? raw.plan ?? 'FREE') as string).toUpperCase();
   const limits = (raw.limits ?? {}) as Record<string, unknown>;
   const usage = (raw.usage ?? {}) as Record<string, unknown>;
