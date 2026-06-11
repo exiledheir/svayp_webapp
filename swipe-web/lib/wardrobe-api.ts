@@ -171,23 +171,35 @@ function getPollingInterval(status: string): number {
 export async function pollUploadUntilDone(
   jobId: string,
   onProgress?: (status: WardrobeUploadStatus) => void,
+  timeoutMs = POLL_TIMEOUT_MS,
 ): Promise<WardrobeUploadStatus> {
   const startTime = Date.now();
+  let consecutiveErrors = 0;
+  const MAX_CONSECUTIVE_ERRORS = 5;
 
   while (true) {
-    const status = await getUploadStatus(jobId);
-    onProgress?.(status);
+    try {
+      const status = await getUploadStatus(jobId);
+      consecutiveErrors = 0;
+      onProgress?.(status);
 
-    if (TERMINAL_STATUSES.has(status.status)) {
-      return status;
+      if (TERMINAL_STATUSES.has(status.status)) {
+        return status;
+      }
+
+      if (Date.now() - startTime > timeoutMs) {
+        throw new Error('Upload processing timed out');
+      }
+
+      const interval = getPollingInterval(status.status);
+      await new Promise((resolve) => setTimeout(resolve, interval));
+    } catch (err) {
+      if ((err as Error).message === 'Upload processing timed out') throw err;
+      consecutiveErrors++;
+      if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) throw err;
+      // Transient network error — wait and retry
+      await new Promise((resolve) => setTimeout(resolve, 5000));
     }
-
-    if (Date.now() - startTime > POLL_TIMEOUT_MS) {
-      throw new Error('Upload processing timed out after 3 minutes');
-    }
-
-    const interval = getPollingInterval(status.status);
-    await new Promise((resolve) => setTimeout(resolve, interval));
   }
 }
 
@@ -197,9 +209,12 @@ export function watchUploadUntilDone(
   onDone: (status: WardrobeUploadStatus) => void,
   onError: (err: Error) => void,
 ): SseHandle {
+  // Fallback polling gets a longer timeout than SSE — by the time SSE
+  // has timed out (3 min), the ML pipeline may still be running.
+  const FALLBACK_POLL_TIMEOUT = 15 * 60 * 1000;
   return watchWithSse<WardrobeUploadStatus, WardrobeUploadStatus>({
     sseUrl: `/wardrobe/uploads/${jobId}/stream`,
-    fallbackPoll: () => pollUploadUntilDone(jobId, onProgress),
+    fallbackPoll: () => pollUploadUntilDone(jobId, onProgress, FALLBACK_POLL_TIMEOUT),
     onProgress,
     onDone,
     onError,

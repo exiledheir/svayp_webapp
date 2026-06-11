@@ -45,6 +45,8 @@ function getCroppedImage(imageSrc: string, crop: PixelCrop, displayWidth: number
 
 // ─── Category groups ────────────────────────────────────────────────────────────
 const UPPER_CATS: ClosetCategory[] = ['tops', 'dresses', 'jackets', 'blouses', 'jumpsuits', 'tshirts'];
+// Full-body items are a complete outfit on their own — never paired with a bottom.
+const FULL_BODY_CATS: ClosetCategory[] = ['dresses', 'jumpsuits'];
 const LOWER_CATS: ClosetCategory[] = ['skirts', 'jeans', 'pants', 'shorts'];
 const SHOES_CATS: ClosetCategory[] = ['shoes', 'sneakers', 'heels', 'boots', 'sandals', 'flats'];
 const ACC_CATS: ClosetCategory[] = ['accessories', 'bags', 'shawl', 'jewelry', 'underwear'];
@@ -476,16 +478,27 @@ export default function ClosetPage() {
         fetchPlan();
       } catch (err) {
         console.error('Failed to upload item:', err);
-        if (activeJobId) clearUploadPreview(activeJobId);
         logAnalyticsEvent(Events.ADD_ITEM_BG_REMOVAL_FAILED);
-        // Fallback: keep as local item
-        addClosetItem({ category, imageData: previewImage });
-        logAnalyticsEvent(Events.ADD_ITEM_SAVED, {
-          [Params.CATEGORY]: category,
-          [Params.HAS_BG_REMOVED]: false,
-        });
-        setPendingUploads((prev) => { const next = new Map(prev); next.delete(pendingId); return next; });
-        await load();
+        if (activeJobId) {
+          // Job reached the backend — processing continues there even though our
+          // SSE/poll watcher timed out. Keep the card visible; auto-resume on next
+          // page load will pick it up from listUploads once processing finishes.
+          setPendingUploads((prev) => {
+            const next = new Map(prev);
+            const existing = next.get(pendingId);
+            if (existing) next.set(pendingId, { ...existing, step: 'Processing...' });
+            return next;
+          });
+        } else {
+          // Never reached backend — fall back to saving locally
+          addClosetItem({ category, imageData: previewImage });
+          logAnalyticsEvent(Events.ADD_ITEM_SAVED, {
+            [Params.CATEGORY]: category,
+            [Params.HAS_BG_REMOVED]: false,
+          });
+          setPendingUploads((prev) => { const next = new Map(prev); next.delete(pendingId); return next; });
+          await load();
+        }
       }
     } else {
       // No file — save locally
@@ -569,8 +582,11 @@ export default function ClosetPage() {
     (async () => {
       try {
         const page = await listUploads(0, 20);
+        const STALE_MS = 30 * 60 * 1000;
         const inProgress = page.content.filter(
-          (u) => u.status !== 'COMPLETED' && u.status !== 'FAILED' && !dismissedUploadJobsRef.current.has(u.uploadJobId)
+          (u) => u.status !== 'COMPLETED' && u.status !== 'FAILED'
+               && !dismissedUploadJobsRef.current.has(u.uploadJobId)
+               && (Date.now() - new Date(u.updatedAt).getTime()) < STALE_MS
         );
         if (unmounted || inProgress.length === 0) return;
         for (const job of inProgress) {
@@ -607,10 +623,16 @@ export default function ClosetPage() {
               fetchPlan();
             },
             () => {
-              clearUploadPreview(jobId);
+              // Watcher errored/timed out — backend may still be processing.
+              // Keep the card visible so the user isn't confused; it will
+              // resolve on the next page reload via auto-resume.
               if (unmounted || dismissedUploadJobsRef.current.has(jobId)) return;
-              setPendingUploads((prev) => { const next = new Map(prev); next.delete(pid); return next; });
-              load();
+              setPendingUploads((prev) => {
+                const next = new Map(prev);
+                const existing = next.get(pid);
+                if (existing) next.set(pid, { ...existing, step: 'Processing...' });
+                return next;
+              });
             },
           );
           handles.push(handle);
@@ -730,14 +752,12 @@ export default function ClosetPage() {
 
   function removePendingUpload(id: string) {
     setPendingUploads((prev) => { const next = new Map(prev); next.delete(id); return next; });
-    // For resumed jobs, persist the dismissal so they are skipped on reload
-    if (id.startsWith('resume_')) {
-      const jobId = id.slice('resume_'.length);
-      dismissedUploadJobsRef.current.add(jobId);
-      try {
-        localStorage.setItem('libas_dismissed_uploads', JSON.stringify([...dismissedUploadJobsRef.current]));
-      } catch {}
-    }
+    // Always persist dismissal regardless of id prefix so re-opening the app never brings it back
+    const jobId = id.startsWith('resume_') ? id.slice('resume_'.length) : id;
+    dismissedUploadJobsRef.current.add(jobId);
+    try {
+      localStorage.setItem('libas_dismissed_uploads', JSON.stringify([...dismissedUploadJobsRef.current]));
+    } catch {}
   }
 
   function openViewAll(title: string, cats: ClosetCategory[]) {
@@ -746,14 +766,20 @@ export default function ClosetPage() {
 
   function generateRandomOutfit(): SavedCanvasLayout {
     const pick = <T,>(arr: T[]): T | null => arr.length ? arr[Math.floor(Math.random() * arr.length)] : null;
-    const upperAll = items.filter((i) => UPPER_CATS.includes(i.category));
+    // A dress/jumpsuit is a complete outfit — pair it with shoes/accessories only, never a bottom.
+    // Otherwise build a top + bottom. Decide the structure first, then fill the slots.
+    const fullBodyAll = items.filter((i) => FULL_BODY_CATS.includes(i.category));
+    const topOnlyAll  = items.filter((i) => UPPER_CATS.includes(i.category) && !FULL_BODY_CATS.includes(i.category));
     const lowerAll = items.filter((i) => LOWER_CATS.includes(i.category));
     const shoesAll = items.filter((i) => SHOES_CATS.includes(i.category));
     const accAll   = items.filter((i) => ACC_CATS.includes(i.category));
     const shawlPool = accAll.filter((a) => a.category === 'shawl');
     const sidePool  = accAll.filter((a) => a.category !== 'shawl');
-    const u = pick(upperAll);
-    const l = pick(lowerAll);
+
+    // Prefer a full-body look when a dress/jumpsuit exists; fall back to top+bottom.
+    const useFullBody = fullBodyAll.length > 0 && (topOnlyAll.length === 0 || lowerAll.length === 0 || Math.random() < 0.5);
+    const u = useFullBody ? pick(fullBodyAll) : pick(topOnlyAll);
+    const l = useFullBody ? null : pick(lowerAll);
     const s = pick(shoesAll);
     const shawlItem = pick(shawlPool);
     const sideAccItem = pick(sidePool);
@@ -773,11 +799,16 @@ export default function ClosetPage() {
     const matched = aiItemIds.map((id) => byId.get(id)).filter(Boolean) as typeof items;
     if (!matched.length) return generateRandomOutfit();
 
-    const hasShawl = matched.some((i) => i.category === 'shawl');
+    // A dress/jumpsuit is a complete outfit — drop any bottom that slipped into the set.
+    const hasFullBody = matched.some((i) => FULL_BODY_CATS.includes(i.category));
+    const cleaned = hasFullBody
+      ? matched.filter((i) => !LOWER_CATS.includes(i.category))
+      : matched;
+
     const layout: SavedCanvasLayout = [];
     let yOffset = -15;
 
-    for (const item of matched) {
+    for (const item of cleaned) {
       if (UPPER_CATS.includes(item.category)) {
         layout.push({ id: item.id, x: 32, y: 17, scale: 1, zIndex: 1, group: 'upper' });
       } else if (LOWER_CATS.includes(item.category)) {
@@ -2011,8 +2042,7 @@ function OutfitCard({
 }) {
   const { t } = useI18n();
 
-  // Valid outfit requires: dress/jumpsuit OR (top + (lower OR shoes))
-  const FULL_BODY_CATS: ClosetCategory[] = ['dresses', 'jumpsuits'];
+  // Valid outfit requires: dress/jumpsuit OR (top + (lower OR shoes)). Uses module-level FULL_BODY_CATS.
   const hasTop = allItems.some((i) => UPPER_CATS.includes(i.category));
   const hasLower = allItems.some((i) => LOWER_CATS.includes(i.category));
   const hasDress = allItems.some((i) => FULL_BODY_CATS.includes(i.category));
@@ -2911,11 +2941,11 @@ function ClothingItemCard({ item, onTap, isProcessing, processingStep, processin
                  active:scale-[0.97] transition-transform`}
       onClick={isProcessing ? undefined : onTap}
     >
-      <div className="relative w-full h-full bg-gray-200">
+      <div className="relative w-full h-full">
         {item.imageData ? (
           <Image src={item.imageData} alt={item.category} fill className={`object-contain ${isProcessing ? 'opacity-50' : ''}`} unoptimized />
         ) : (
-          <div className="w-full h-full bg-gray-300 animate-pulse" />
+          <div className="w-full h-full bg-gray-200 animate-pulse" />
         )}
       </div>
       {/* Processing overlay */}
