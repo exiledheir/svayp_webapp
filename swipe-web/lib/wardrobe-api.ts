@@ -320,12 +320,16 @@ export async function uploadWardrobeItem(
   category?: WardrobeCategory,
   subcategory?: WardrobeSubcategory,
   onProgress?: (status: WardrobeUploadStatus) => void,
+  onJobId?: (jobId: string) => void,
 ): Promise<WardrobeUploadStatus> {
   const idempotencyKey = crypto.randomUUID();
   const contentType = file.type || 'image/jpeg';
 
   // 1. Initiate upload
   const { uploadJobId, putUrl } = await initiateUpload(contentType, idempotencyKey, category, subcategory, file.size);
+
+  // Fire early so the caller can persist a preview before the slow blob upload
+  onJobId?.(uploadJobId);
 
   // 2. Upload file to Azure blob
   await uploadFileToBlob(putUrl, file, contentType);

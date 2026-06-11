@@ -161,10 +161,11 @@ export async function addClosetItemFromFile(
   file: File,
   category: ClosetCategory,
   onProgress?: (status: WardrobeUploadStatus) => void,
+  onJobId?: (jobId: string) => void,
 ): Promise<WardrobeUploadStatus> {
   const apiCategory = toApiCategory(category);
   const apiSubcategory = toApiSubcategory(category);
-  return uploadWardrobeItem(file, apiCategory, apiSubcategory, onProgress);
+  return uploadWardrobeItem(file, apiCategory, apiSubcategory, onProgress, onJobId);
 }
 
 export async function removeClosetItem(id: string): Promise<void> {

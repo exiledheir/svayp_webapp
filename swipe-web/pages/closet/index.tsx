@@ -17,6 +17,7 @@ import ClosetCoachMark from '@/components/ClosetCoachMark';
 import { saveTryOnResult, getTryOnHistory, getTryOnHistoryWithCloud, deleteTryOnRecord, saveActiveTryOnJob, getActiveTryOnJobWithCloud, clearActiveTryOnJob, type TryOnRecord } from '@/lib/tryon-history';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
+import { saveUploadPreview, getUploadPreview, clearUploadPreview } from '@/lib/upload-previews';
 
 const ADD_GROUPS: Record<string, ClosetCategory[]> = {
   upper: ['tops', 'dresses', 'jackets', 'blouses', 'jumpsuits', 'tshirts'],
@@ -447,6 +448,7 @@ export default function ClosetPage() {
 
     // Run upload in background
     if (fileToUpload) {
+      let activeJobId: string | null = null;
       try {
         await addClosetItemFromFile(fileToUpload, category, (status) => {
           setPendingUploads((prev) => {
@@ -457,8 +459,13 @@ export default function ClosetPage() {
             }
             return next;
           });
+        }, (jobId) => {
+          activeJobId = jobId;
+          // Persist thumbnail + category so it survives page reload
+          saveUploadPreview(jobId, previewImage, category);
         });
         // Upload complete — remove pending, reload items
+        if (activeJobId) clearUploadPreview(activeJobId);
         logAnalyticsEvent(Events.ADD_ITEM_SAVED, {
           [Params.CATEGORY]: category,
           [Params.HAS_BG_REMOVED]: true,
@@ -469,6 +476,7 @@ export default function ClosetPage() {
         fetchPlan();
       } catch (err) {
         console.error('Failed to upload item:', err);
+        if (activeJobId) clearUploadPreview(activeJobId);
         logAnalyticsEvent(Events.ADD_ITEM_BG_REMOVAL_FAILED);
         // Fallback: keep as local item
         addClosetItem({ category, imageData: previewImage });
@@ -568,10 +576,16 @@ export default function ClosetPage() {
         for (const job of inProgress) {
           const pid = `resume_${job.uploadJobId}`;
           const jobId = job.uploadJobId;
+          const stored = getUploadPreview(jobId);
           setPendingUploads((prev) => {
             if (prev.has(pid)) return prev;
             const next = new Map(prev);
-            next.set(pid, { category: 'tops', imageData: '', step: formatStep(job.currentStep), progress: job.progressPercent });
+            next.set(pid, {
+              category: (stored?.category ?? 'tops') as ClosetCategory,
+              imageData: stored?.preview ?? '',
+              step: formatStep(job.currentStep),
+              progress: job.progressPercent,
+            });
             return next;
           });
           const handle = watchUploadUntilDone(
@@ -586,12 +600,14 @@ export default function ClosetPage() {
               });
             },
             () => {
+              clearUploadPreview(jobId);
               if (unmounted || dismissedUploadJobsRef.current.has(jobId)) return;
               setPendingUploads((prev) => { const next = new Map(prev); next.delete(pid); return next; });
               load();
               fetchPlan();
             },
             () => {
+              clearUploadPreview(jobId);
               if (unmounted || dismissedUploadJobsRef.current.has(jobId)) return;
               setPendingUploads((prev) => { const next = new Map(prev); next.delete(pid); return next; });
               load();
@@ -2895,8 +2911,12 @@ function ClothingItemCard({ item, onTap, isProcessing, processingStep, processin
                  active:scale-[0.97] transition-transform`}
       onClick={isProcessing ? undefined : onTap}
     >
-      <div className="relative w-full h-full">
-        <Image src={item.imageData} alt={item.category} fill className={`object-contain ${isProcessing ? 'opacity-50' : ''}`} unoptimized />
+      <div className="relative w-full h-full bg-gray-200">
+        {item.imageData ? (
+          <Image src={item.imageData} alt={item.category} fill className={`object-contain ${isProcessing ? 'opacity-50' : ''}`} unoptimized />
+        ) : (
+          <div className="w-full h-full bg-gray-300 animate-pulse" />
+        )}
       </div>
       {/* Processing overlay */}
       {isProcessing && (
