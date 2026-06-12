@@ -18,6 +18,7 @@ import { saveTryOnResult, getTryOnHistory, getTryOnHistoryWithCloud, deleteTryOn
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
 import { saveUploadPreview, getUploadPreview, clearUploadPreview } from '@/lib/upload-previews';
+import { compressImageForUpload } from '@/lib/image-utils';
 
 const ADD_GROUPS: Record<string, ClosetCategory[]> = {
   upper: ['tops', 'dresses', 'jackets', 'blouses', 'jumpsuits', 'tshirts'],
@@ -458,6 +459,12 @@ export default function ClosetPage() {
       }
     }
 
+    // Compress large gallery photos before upload to reduce blob transfer time
+    // and help the backend AI pipeline process smaller inputs faster.
+    if (fileToUpload) {
+      fileToUpload = await compressImageForUpload(fileToUpload);
+    }
+
     const pendingId = `pending_${Date.now()}`;
     const category = addCategory;
 
@@ -481,6 +488,14 @@ export default function ClosetPage() {
             }
             return next;
           });
+          // Item is ready in the wardrobe as soon as bg removal is done —
+          // show it immediately rather than waiting for EMBED/ANALYZE to finish.
+          if (
+            status.wardrobeItemId &&
+            (status.status === 'EMBED' || status.status === 'ANALYZE')
+          ) {
+            load();
+          }
         }, (jobId) => {
           activeJobId = jobId;
           // Persist thumbnail + category so it survives page reload
@@ -506,7 +521,7 @@ export default function ClosetPage() {
           setPendingUploads((prev) => {
             const next = new Map(prev);
             const existing = next.get(pendingId);
-            if (existing) next.set(pendingId, { ...existing, step: 'Processing...' });
+            if (existing) next.set(pendingId, { ...existing, step: t.stepProcessing });
             return next;
           });
         } else {
@@ -534,18 +549,18 @@ export default function ClosetPage() {
 
   function formatStep(step: string): string {
     const STEP_LABELS: Record<string, string> = {
-      UPLOADED: 'Processing...',
-      NSFW_SCAN: 'Checking image...',
-      nfsm_passed: 'Checking image...',
-      UPSCALE: 'Enhancing...',
-      BG_REMOVE: 'Removing background...',
-      bg_removed: 'Removing background...',
-      EMBED: 'Analyzing style...',
-      visual_embedded: 'Analyzing style...',
-      ANALYZE: 'Almost done...',
+      UPLOADED: t.stepProcessing,
+      NSFW_SCAN: t.stepChecking,
+      nfsm_passed: t.stepChecking,
+      UPSCALE: t.stepGenerating,
+      BG_REMOVE: t.stepRemovingBg,
+      bg_removed: t.stepRemovingBg,
+      EMBED: t.stepAnalyzing,
+      visual_embedded: t.stepAnalyzing,
+      ANALYZE: t.stepAlmostDone,
       COMPLETED: 'Done!',
     };
-    return STEP_LABELS[step] ?? 'Processing...';
+    return STEP_LABELS[step] ?? t.stepProcessing;
   }
 
   const load = useCallback(async () => {
@@ -634,6 +649,10 @@ export default function ClosetPage() {
                 if (existing) next.set(pid, { ...existing, step: formatStep(status.currentStep), progress: status.progressPercent });
                 return next;
               });
+              // Show the item as soon as bg removal is done — don't wait for EMBED/ANALYZE.
+              if (status.wardrobeItemId && (status.status === 'EMBED' || status.status === 'ANALYZE')) {
+                load();
+              }
             },
             () => {
               clearUploadPreview(jobId);
@@ -650,7 +669,7 @@ export default function ClosetPage() {
               setPendingUploads((prev) => {
                 const next = new Map(prev);
                 const existing = next.get(pid);
-                if (existing) next.set(pid, { ...existing, step: 'Processing...' });
+                if (existing) next.set(pid, { ...existing, step: t.stepProcessing });
                 return next;
               });
             },
@@ -2983,7 +3002,7 @@ function ClothingItemCard({ item, onTap, isProcessing, processingStep, processin
           <span className="text-[9px] font-medium text-white text-center px-2 leading-tight">{processingStep}</span>
           {(processingProgress ?? 0) > 0 && (
             <div className="w-[70%] h-1 mt-1.5 rounded-full bg-white/20 overflow-hidden">
-              <div className="h-full bg-white rounded-full transition-all duration-500" style={{ width: `${processingProgress}%` }} />
+              <div className="h-full bg-green-400 rounded-full transition-all duration-500" style={{ width: `${processingProgress}%` }} />
             </div>
           )}
         </div>

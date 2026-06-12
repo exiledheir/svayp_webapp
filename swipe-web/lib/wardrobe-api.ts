@@ -352,10 +352,12 @@ export async function uploadWardrobeItem(
   // 3. Confirm upload → start AI pipeline
   await confirmUpload(uploadJobId);
 
-  // 4. Watch until done (SSE with polling fallback)
-  return new Promise<WardrobeUploadStatus>((resolve, reject) => {
-    watchUploadUntilDone(uploadJobId, onProgress ?? (() => {}), resolve, reject);
-  });
+  // 4. Poll until done — polling fires onProgress on every interval so the UI
+  // sees intermediate steps (NSFW_SCAN → UPSCALE → BG_REMOVE → EMBED → ANALYZE).
+  // SSE-based watching is still used for the resume-on-page-load path, but
+  // for a fresh inline upload polling is simpler and more reliable: the backend
+  // SSE stream only sends the terminal event, so polling gives better feedback.
+  return pollUploadUntilDone(uploadJobId, onProgress);
 }
 
 // ── Outfit Canvases ───────────────────────────────────────────────────────────

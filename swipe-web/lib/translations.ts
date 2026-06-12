@@ -29,6 +29,12 @@ export interface Translations {
   addCategory: string;
   saveToCloset: string;
   uploading: string;
+  stepChecking: string;
+  stepGenerating: string;
+  stepRemovingBg: string;
+  stepAnalyzing: string;
+  stepAlmostDone: string;
+  stepProcessing: string;
   delete: string;
   save: string;
   noItemsYet: string;
@@ -196,6 +202,12 @@ const en: Translations = {
   addCategory: 'Add category',
   saveToCloset: 'Save to Closet',
   uploading: 'Uploading…',
+  stepChecking: 'Checking image…',
+  stepGenerating: 'Generating product image… (~1 min)',
+  stepRemovingBg: 'Removing background…',
+  stepAnalyzing: 'Analyzing style…',
+  stepAlmostDone: 'Almost done…',
+  stepProcessing: 'Processing…',
   delete: 'Delete',
   save: 'Save',
   noItemsYet: 'No items yet',
@@ -415,6 +427,12 @@ const ru: Translations = {
   addCategory: 'Выберите категорию',
   saveToCloset: 'Сохранить',
   uploading: 'Загрузка…',
+  stepChecking: 'Проверка изображения…',
+  stepGenerating: 'Генерация изображения… (~1 мин)',
+  stepRemovingBg: 'Удаление фона…',
+  stepAnalyzing: 'Анализ стиля…',
+  stepAlmostDone: 'Почти готово…',
+  stepProcessing: 'Обработка…',
   delete: 'Удалить',
   save: 'Сохранить',
   noItemsYet: 'Пока нет вещей',
@@ -634,6 +652,12 @@ const uz: Translations = {
   addCategory: "Kategoriyani tanlang",
   saveToCloset: 'Saqlash',
   uploading: 'Yuklanmoqda…',
+  stepChecking: 'Rasm tekshirilmoqda…',
+  stepGenerating: 'Mahsulot rasmi yaratilmoqda… (~1 daqiqa)',
+  stepRemovingBg: 'Fon o\'chirilmoqda…',
+  stepAnalyzing: 'Uslub tahlil qilinmoqda…',
+  stepAlmostDone: 'Deyarli tayyor…',
+  stepProcessing: 'Ishlov berilmoqda…',
   delete: "O'chirish",
   save: 'Saqlash',
   noItemsYet: "Hali narsalar yo'q",
