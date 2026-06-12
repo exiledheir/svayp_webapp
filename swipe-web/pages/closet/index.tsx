@@ -236,8 +236,20 @@ export default function ClosetPage() {
   const [canvases, setCanvases] = useState<{ id: string | null; layout: SavedCanvasLayout }[]>([]);
   const [editingCanvasIdx, setEditingCanvasIdx] = useState<number | null>(null);
   const [canvasInitialLayout, setCanvasInitialLayout] = useState<SavedCanvasLayout | null>(null);
-  const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | 'categoryFull' | null>(null);
-  const { plan, limits, usage, fetchPlan, canGenerate, canTryOn, canAddToCategory, calendarDays } = usePlan();
+  const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | 'categoryFull' | 'tryOn' | null>(null);
+  const { plan, limits, usage, fetchPlan, canGenerate, canTryOn, calendarDays } = usePlan();
+
+  // Count per group (upper/lower/shoes/acc) — the limit is per group, not per subcategory.
+  // Demo items don't count toward the limit.
+  function canAddToCategory(cat: string): boolean {
+    const groupCats = UPPER_CATS.includes(cat as ClosetCategory) ? UPPER_CATS
+      : LOWER_CATS.includes(cat as ClosetCategory) ? LOWER_CATS
+      : SHOES_CATS.includes(cat as ClosetCategory) ? SHOES_CATS
+      : ACC_CATS.includes(cat as ClosetCategory) ? ACC_CATS
+      : [cat as ClosetCategory];
+    const count = items.filter((i) => groupCats.includes(i.category) && !DEMO_ITEM_IDS.has(i.id)).length;
+    return count < limits.itemsPerCategory;
+  }
 
   // ── Analytics: upgrade modal shown ──────────────────────────────────────
   const prevPremiumGate = useRef<string | null>(null);
@@ -382,7 +394,9 @@ export default function ClosetPage() {
   }
 
   function openAdd(group: string, category: ClosetCategory) {
-    if (plansEnabled && !canAddToCategory(category)) {
+    // When group === '' (FAB flow) we don't know the target group yet — the user
+    // picks it inside the picker. Skip the gate here; handleAddSave re-checks.
+    if (group !== '' && plansEnabled && !canAddToCategory(category)) {
       setShowPremiumGate('categoryFull');
       return;
     }
@@ -422,6 +436,12 @@ export default function ClosetPage() {
 
   async function handleAddSave() {
     if (!addRawImage) return;
+    // Re-check the per-category limit here — the user may have changed the
+    // category inside the picker after the initial openAdd gate was passed.
+    if (plansEnabled && !canAddToCategory(addCategory)) {
+      setShowPremiumGate('categoryFull');
+      return;
+    }
     setAddSaving(true);
 
     // Prepare file + image before closing sheet
@@ -968,7 +988,7 @@ export default function ClosetPage() {
   const tryOnOverrideRef = useRef<{ itemIds: string[]; layout: SavedCanvasLayout } | null>(null);
 
   function handleTryItOnFromItems(calItems: ClosetItem[]) {
-    if (plansEnabled && !canTryOn) { setShowPremiumGate('generation'); return; }
+    if (plansEnabled && !canTryOn) { setShowPremiumGate('tryOn'); return; }
     const itemIds = calItems.map((i) => i.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
     if (itemIds.length === 0) return;
 
@@ -1081,7 +1101,7 @@ export default function ClosetPage() {
 
   function handleTryItOn(canvasIdx = 0) {
     if (plansEnabled && !canTryOn) {
-      setShowPremiumGate('generation');
+      setShowPremiumGate('tryOn');
       return;
     }
     const targetCanvas = displayCanvases[canvasIdx];
@@ -3054,8 +3074,6 @@ function ViewAllModal({
 }
 
 // ─── Outfit Days Sheet ──────────────────────────────────────────────────────────
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function pickItem(items: ClosetItem[], day: Date): ClosetItem | null {
   if (!items.length) return null;
@@ -3093,7 +3111,8 @@ function OutfitDaysSheet({
   const upperItems = allItems.filter((i) => UPPER_CATS.includes(i.category));
   const lowerItems = allItems.filter((i) => LOWER_CATS.includes(i.category));
   const shoeItems = allItems.filter((i) => SHOES_CATS.includes(i.category));
-  const accItems = allItems.filter((i) => ACC_CATS.includes(i.category));
+  const shawlItems = allItems.filter((i) => i.category === 'shawl');
+  const sideAccItems = allItems.filter((i) => ACC_CATS.includes(i.category) && i.category !== 'shawl');
   const hasItems = allItems.length > 0;
 
   return (
@@ -3129,10 +3148,11 @@ function OutfitDaysSheet({
                 const upper = pickItem(upperItems, day);
                 const lower = pickItem(lowerItems, day);
                 const shoe = pickItem(shoeItems, day);
-                const acc = pickItem(accItems, day);
+                const shawl = pickItem(shawlItems, day);
+                const sideAcc = pickItem(sideAccItems, day);
                 const dayLabel = isToday
                   ? t.today
-                  : `${DAY_NAMES[day.getDay()]}, ${day.getDate()} ${MONTH_NAMES[day.getMonth()]}`;
+                  : `${t.dayNames[day.getDay()]}, ${day.getDate()} ${t.monthNames[day.getMonth()]}`;
 
                 return (
                   <div
@@ -3163,11 +3183,12 @@ function OutfitDaysSheet({
                       className="relative rounded-2xl overflow-hidden border border-gray-100 bg-white flex flex-col"
                       style={{ height: 220, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}
                     >
-                      {/* Outfit items stacked */}
+                      {/* Scarf at top, then upper, lower, shoes, accessory */}
+                      <MiniOutfitSlot item={shawl} flex />
                       <MiniOutfitSlot item={upper} flex />
                       <MiniOutfitSlot item={lower} flex />
                       <MiniOutfitSlot item={shoe} flex />
-                      {acc && <MiniOutfitSlot item={acc} flex />}
+                      <MiniOutfitSlot item={sideAcc} flex />
 
                       {/* Blur overlay for locked days — only when plans feature is enabled */}
                       {!isUnlocked && plansEnabled && (
@@ -3195,7 +3216,7 @@ function OutfitDaysSheet({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          const dayItems = [upper, lower, shoe, acc].filter(Boolean) as ClosetItem[];
+                          const dayItems = [shawl, upper, lower, shoe, sideAcc].filter(Boolean) as ClosetItem[];
                           onTryItOn(dayItems);
                         }}
                         className="w-full h-8 rounded-full flex items-center justify-center gap-1 text-[10px] font-bold text-white active:scale-[0.95] transition-transform"
@@ -3218,11 +3239,12 @@ function OutfitDaysSheet({
           const selUpper = pickItem(upperItems, selDay);
           const selLower = pickItem(lowerItems, selDay);
           const selShoe = pickItem(shoeItems, selDay);
-          const selAcc = pickItem(accItems, selDay);
+          const selShawl = pickItem(shawlItems, selDay);
+          const selSideAcc = pickItem(sideAccItems, selDay);
           const selIsToday = selectedDayIdx === 0 && new Date().toDateString() === selDay.toDateString();
           const selLabel = selIsToday
             ? t.today
-            : `${DAY_NAMES[selDay.getDay()]}, ${selDay.getDate()} ${MONTH_NAMES[selDay.getMonth()]}`;
+            : `${t.dayNames[selDay.getDay()]}, ${selDay.getDate()} ${t.monthNames[selDay.getMonth()]}`;
           return (
             <div
               className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center"
@@ -3255,17 +3277,19 @@ function OutfitDaysSheet({
                   className="relative w-full flex flex-col"
                   style={{ height: 'min(60vh, 400px)' }}
                 >
+                  {/* Scarf at top, then upper, lower, shoes, accessory */}
+                  <MiniOutfitSlot item={selShawl} flex />
                   <MiniOutfitSlot item={selUpper} flex />
                   <MiniOutfitSlot item={selLower} flex />
                   <MiniOutfitSlot item={selShoe} flex />
-                  {selAcc && <MiniOutfitSlot item={selAcc} flex />}
+                  <MiniOutfitSlot item={selSideAcc} flex />
                 </div>
                 {/* Try it on button */}
                 <div className="w-full px-5 py-3">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      const dayItems = [selUpper, selLower, selShoe, selAcc].filter(Boolean) as ClosetItem[];
+                      const dayItems = [selShawl, selUpper, selLower, selShoe, selSideAcc].filter(Boolean) as ClosetItem[];
                       onTryItOn(dayItems);
                     }}
                     className="w-full h-11 rounded-full flex items-center justify-center gap-1.5 text-[13px] font-bold text-white active:scale-[0.97] transition-transform"
@@ -3710,7 +3734,7 @@ function PremiumGateSheet({
   currentPlan,
   onClose,
 }: {
-  reason: 'generation' | 'items' | 'categoryFull';
+  reason: 'generation' | 'items' | 'categoryFull' | 'tryOn';
   currentPlan: UserPlan;
   onClose: () => void;
 }) {
@@ -3779,35 +3803,37 @@ function PremiumGateSheet({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Drag handle */}
-        <div className="flex justify-center pt-3 pb-2">
+        <div className="flex justify-center pt-3 pb-1">
           <div className="w-9 h-1 rounded-full bg-gray-200" />
         </div>
 
-        <div className="px-4 pb-8">
+        <div className="px-5 pb-8">
           {/* Header */}
-          <div className="flex justify-center mb-3 mt-1">
+          <div className="flex justify-center mb-3 mt-3">
             <div
               className="w-14 h-14 rounded-full flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, #B8860B 0%, #8B6914 100%)', boxShadow: '0 4px 16px rgba(184,134,11,0.3)' }}
+              style={{ background: 'linear-gradient(135deg, #F370A7 0%, #e0559a 100%)', boxShadow: '0 4px 20px rgba(243,112,167,0.35)' }}
             >
-              <Crown size={26} color="#FFD700" strokeWidth={1.5} />
+              <Crown size={26} color="#fff" strokeWidth={1.8} />
             </div>
           </div>
 
-          <h2 className="text-[18px] font-bold text-gray-900 text-center mb-1">{t.choosePlan}</h2>
-          <p className="text-[11px] text-gray-500 text-center mb-4 leading-relaxed">
+          <h2 className="text-[20px] font-extrabold text-gray-900 text-center mb-2">{t.choosePlan}</h2>
+          <p className="text-[13px] text-gray-500 text-center mb-5 leading-snug px-2">
             {reason === 'generation'
               ? t.reachedRegenLimit.replace('{n}', String(PLAN_LIMITS_FALLBACK[currentPlan].regenerations))
+              : reason === 'tryOn'
+              ? t.reachedTryOnLimit.replace('{n}', String(PLAN_LIMITS_FALLBACK[currentPlan].tryItOns))
               : reason === 'categoryFull'
               ? t.categoryFullError.replace(/\{n\}/g, String(PLAN_LIMITS_FALLBACK[currentPlan].itemsPerCategory))
               : t.reachedItemLimit.replace('{n}', String(PLAN_LIMITS_FALLBACK[currentPlan].itemsPerCategory))}
           </p>
 
           {/* Monthly / Yearly toggle */}
-          <div className="flex items-center justify-center gap-2 mb-4">
+          <div className="flex items-center justify-center gap-2 mb-5">
             <button
               onClick={() => setYearly(false)}
-              className={`px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
+              className={`px-4 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
                 !yearly ? 'bg-black text-white' : 'bg-gray-100 text-gray-500'
               }`}
             >
@@ -3815,7 +3841,7 @@ function PremiumGateSheet({
             </button>
             <button
               onClick={() => setYearly(true)}
-              className={`px-3.5 py-1.5 rounded-full text-[11px] font-semibold transition-colors relative ${
+              className={`px-4 py-1.5 rounded-full text-[12px] font-semibold transition-colors relative ${
                 yearly ? 'bg-black text-white' : 'bg-gray-100 text-gray-500'
               }`}
             >
@@ -3829,10 +3855,11 @@ function PremiumGateSheet({
             </button>
           </div>
 
-          {/* Plan cards in a ROW */}
-          <div className="grid grid-cols-3 gap-2 mb-4">
+          {/* Plan cards */}
+          <div className="grid grid-cols-3 gap-2 mb-5">
             {plans.map((p) => {
               const isCurrent = currentPlan === p.key;
+              const isPro = p.key === 'pro';
               const price = yearly ? p.yearlyPrice : p.monthlyPrice;
               const originalYearly = p.yearlyOriginal;
               const isFree = p.key === 'free';
@@ -3840,21 +3867,30 @@ function PremiumGateSheet({
               return (
                 <div
                   key={p.key}
-                  className="rounded-2xl border-2 p-3 flex flex-col relative"
-                  style={{ borderColor: isCurrent ? p.color : '#e5e7eb' }}
+                  className="rounded-2xl flex flex-col relative overflow-visible"
+                  style={{
+                    border: isPro ? '2.5px solid #F370A7' : '1.5px solid #e5e7eb',
+                    paddingTop: isPro ? '20px' : '12px',
+                    paddingBottom: '12px',
+                    paddingLeft: '10px',
+                    paddingRight: '10px',
+                    background: isPro ? 'linear-gradient(160deg, #fff5f9 0%, #fff 100%)' : '#fff',
+                    boxShadow: isPro ? '0 4px 20px rgba(243,112,167,0.18)' : 'none',
+                  }}
                 >
-                  {isCurrent && (
+                  {/* Most popular badge — Pro only */}
+                  {isPro && (
                     <span
-                      className="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[8px] font-bold text-white whitespace-nowrap"
-                      style={{ background: p.color }}
+                      className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full text-[9px] font-bold text-white whitespace-nowrap"
+                      style={{ background: 'linear-gradient(135deg, #F370A7 0%, #e0559a 100%)', boxShadow: '0 2px 8px rgba(243,112,167,0.4)' }}
                     >
-                      {t.currentPlan}
+                      ⭐ {t.mostPopular}
                     </span>
                   )}
 
                   {/* Plan icon + name */}
-                  <div className="flex flex-col items-center gap-1 mb-2 mt-1">
-                    <Crown size={16} strokeWidth={2} color={p.color} />
+                  <div className="flex flex-col items-center gap-1 mb-2">
+                    <Crown size={isPro ? 18 : 15} strokeWidth={2} color={p.color} />
                     <span className="text-[13px] font-bold" style={{ color: p.color }}>{p.label}</span>
                   </div>
 
@@ -3863,43 +3899,43 @@ function PremiumGateSheet({
                     {isFree ? (
                       <div className="flex flex-col items-center">
                         <span className="text-[16px] font-bold text-gray-900">0</span>
-                        <span className="text-[9px] text-gray-500">{t.sumPerMo}</span>
+                        <span className="text-[9px] text-gray-400">{t.sumPerMo}</span>
                       </div>
                     ) : yearly ? (
                       <div className="flex flex-col items-center">
                         <span className="text-[10px] text-gray-400 line-through">{formatPrice(originalYearly)}</span>
                         <span className="text-[15px] font-bold text-gray-900">{formatPrice(price)}</span>
-                        <span className="text-[9px] text-gray-500">{t.sumPerYear}</span>
+                        <span className="text-[9px] text-gray-400">{t.sumPerYear}</span>
                       </div>
                     ) : (
                       <div className="flex flex-col items-center">
                         <span className="text-[15px] font-bold text-gray-900">{formatPrice(price)}</span>
-                        <span className="text-[9px] text-gray-500">{t.sumPerMo}</span>
+                        <span className="text-[9px] text-gray-400">{t.sumPerMo}</span>
                       </div>
                     )}
                   </div>
 
                   {/* Features */}
                   <div className="flex flex-col gap-1 mb-3 flex-1">
-                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS_FALLBACK[p.key].itemsPerCategory} {t.itemsPerCat}</span>
-                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS_FALLBACK[p.key].outfitCanvases} {t.outfitCanvases}</span>
-                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS_FALLBACK[p.key].regenerations} {t.regens}</span>
-                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS_FALLBACK[p.key].tryItOns} {t.tryOns}</span>
-                    <span className="text-[9px] text-gray-600">{PLAN_LIMITS_FALLBACK[p.key].calendarDays} {t.calDays}</span>
+                    <span className="text-[9px] text-gray-500">{PLAN_LIMITS_FALLBACK[p.key].itemsPerCategory} {t.itemsPerCat}</span>
+                    <span className="text-[9px] text-gray-500">{PLAN_LIMITS_FALLBACK[p.key].outfitCanvases} {t.outfitCanvases}</span>
+                    <span className="text-[9px] text-gray-500">{PLAN_LIMITS_FALLBACK[p.key].regenerations} {t.regens}</span>
+                    <span className="text-[9px] text-gray-500">{PLAN_LIMITS_FALLBACK[p.key].tryItOns} {t.tryOns}</span>
+                    <span className="text-[9px] text-gray-500">{PLAN_LIMITS_FALLBACK[p.key].calendarDays} {t.calDays}</span>
                   </div>
 
                   {/* CTA */}
                   {!isCurrent && !isFree && (
                     <button
                       onClick={() => handleUpgrade(p.key)}
-                      className="w-full py-2 rounded-lg text-white font-bold text-[10px] active:scale-[0.97] transition-transform"
-                      style={{ background: p.gradient }}
+                      className="w-full py-2 rounded-xl text-white font-bold text-[10px] active:scale-[0.97] transition-transform"
+                      style={{ background: p.gradient, boxShadow: isPro ? '0 2px 10px rgba(243,112,167,0.35)' : 'none' }}
                     >
                       {t.upgrade}
                     </button>
                   )}
                   {isFree && !isCurrent && (
-                    <div className="w-full py-2 rounded-lg text-center text-gray-400 font-medium text-[10px] bg-gray-50">
+                    <div className="w-full py-2 rounded-xl text-center text-gray-400 font-medium text-[10px] bg-gray-50">
                       {t.currentPlan}
                     </div>
                   )}
@@ -3907,7 +3943,6 @@ function PremiumGateSheet({
               );
             })}
           </div>
-
 
         </div>
       </div>

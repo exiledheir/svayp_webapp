@@ -41,6 +41,7 @@ export interface Translations {
   calendar: string;
   choosePlan: string;
   currentPlan: string;
+  mostPopular: string;
   upgrade: string;
   monthly: string;
   yearly: string;
@@ -52,6 +53,7 @@ export interface Translations {
   tryOns: string;
   calDays: string;
   reachedRegenLimit: string;
+  reachedTryOnLimit: string;
   reachedItemLimit: string;
   categoryFullError: string;
   discoverFashion: string;
@@ -132,6 +134,8 @@ export interface Translations {
   profile: string;
   replayTour: string;
   logout: string;
+  dayNames: [string, string, string, string, string, string, string];
+  monthNames: [string, string, string, string, string, string, string, string, string, string, string, string];
   demoAddTitle: string;
   demoAddBody: string;
   readyLabel: string;
@@ -204,6 +208,7 @@ const en: Translations = {
   calendar: 'Calendar',
   choosePlan: 'Choose Your Plan',
   currentPlan: 'Current',
+  mostPopular: 'Most popular',
   upgrade: 'Upgrade',
   monthly: 'Monthly',
   yearly: 'Yearly',
@@ -215,6 +220,7 @@ const en: Translations = {
   tryOns: 'virtual try-ons',
   calDays: 'days in calendar',
   reachedRegenLimit: "You've used your {n} regenerations. Upgrade for more.",
+  reachedTryOnLimit: "You've used all {n} try-ons. Upgrade to try on more outfits.",
   reachedItemLimit: 'You\'ve reached the {n} items/category limit.',
   categoryFullError: 'This category is full ({n}/{n}). Try another category or upgrade for more slots.',
 
@@ -346,6 +352,8 @@ const en: Translations = {
   profile: 'Profile',
   replayTour: 'Replay app tour',
   logout: 'Log out',
+  dayNames: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+  monthNames: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
   demoAddTitle: 'Add your clothes',
   demoAddBody: 'Upload a photo of your clothes to generate outfits and try them on!',
   readyLabel: '✓ Ready!',
@@ -419,6 +427,7 @@ const ru: Translations = {
   calendar: 'Календарь',
   choosePlan: 'Выберите тариф',
   currentPlan: 'Текущий',
+  mostPopular: 'Популярный',
   upgrade: 'Улучшить',
   monthly: 'Ежемесячно',
   yearly: 'Ежегодно',
@@ -430,6 +439,7 @@ const ru: Translations = {
   tryOns: 'примерок',
   calDays: 'дней в календаре',
   reachedRegenLimit: 'Вы использовали {n} генераций. Улучшите план для большего.',
+  reachedTryOnLimit: 'Вы использовали все {n} примерок. Улучшите план, чтобы примерять больше образов.',
   reachedItemLimit: 'Достигнут лимит {n} вещей на категорию.',
   categoryFullError: 'Эта категория заполнена ({n}/{n}). Добавьте в другую или улучшите план.',
 
@@ -561,6 +571,8 @@ const ru: Translations = {
   profile: 'Профиль',
   replayTour: 'Повторить обучение',
   logout: 'Выйти',
+  dayNames: ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
+  monthNames: ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'],
   demoAddTitle: 'Добавьте свою одежду',
   demoAddBody: 'Загрузите фото своих вещей, чтобы создавать образы и примерять их!',
   readyLabel: '✓ Готово!',
@@ -634,17 +646,19 @@ const uz: Translations = {
   calendar: 'Kalendar',
   choosePlan: 'Rejani tanlang',
   currentPlan: 'Joriy',
+  mostPopular: "Ko'pchilik tanlovi",
   upgrade: 'Faollashtirish',
   monthly: 'Oylik',
   yearly: 'Yillik',
   sumPerMo: "so'm/oy",
   sumPerYear: "so'm/yil",
   itemsPerCat: 'ta kiyim/kategoriya',
-  outfitCanvases: 'ta obraz taxtasi',
+  outfitCanvases: 'ta Obrazlar doskasi',
   regens: 'ta re-generatsiya',
   tryOns: "ta kiyib ko'rish",
   calDays: 'kun kalendarda',
   reachedRegenLimit: "{n} ta re-generatsiyadan foydalandingiz. Ko'proq uchun yangilang.",
+  reachedTryOnLimit: "{n} ta kiyib ko'rishdan foydalandingiz. Ko'proq uchun rejani yangilang.",
   reachedItemLimit: 'Kategoriyada {n} ta kiyim chegarasiga yetdingiz.',
   categoryFullError: "Bu kategoriya to'lgan ({n}/{n}). Boshqasiga qo'shing yoki rejani yangilang.",
 
@@ -774,6 +788,8 @@ const uz: Translations = {
   profile: 'Profil',
   replayTour: "Qo'llanmani qayta ko'rsatish",
   logout: 'Chiqish',
+  dayNames: ['Yak', 'Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh'],
+  monthNames: ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyun', 'Iyul', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'],
   demoAddTitle: "O'z kiyimlaringizni qo'shing",
   demoAddBody: "Outfit yaratish va kiyib ko'rish uchun kiyimlaringiz rasmini yuklang!",
   readyLabel: '✓ Tayyor!',
