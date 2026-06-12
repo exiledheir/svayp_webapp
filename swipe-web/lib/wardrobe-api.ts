@@ -352,12 +352,18 @@ export async function uploadWardrobeItem(
   // 3. Confirm upload → start AI pipeline
   await confirmUpload(uploadJobId);
 
-  // 4. Poll until done — polling fires onProgress on every interval so the UI
-  // sees intermediate steps (NSFW_SCAN → UPSCALE → BG_REMOVE → EMBED → ANALYZE).
-  // SSE-based watching is still used for the resume-on-page-load path, but
-  // for a fresh inline upload polling is simpler and more reliable: the backend
-  // SSE stream only sends the terminal event, so polling gives better feedback.
-  return pollUploadUntilDone(uploadJobId, onProgress);
+  // 4. Watch via SSE — backend pushes every ML callback (NSFW_SCAN → UPSCALE →
+  // BG_REMOVE → EMBED → ANALYZE → COMPLETED) so we get the same intermediate
+  // steps as polling but with a single persistent connection instead of repeated
+  // GET requests. Falls back to polling automatically if SSE fails.
+  return new Promise<WardrobeUploadStatus>((resolve, reject) => {
+    watchUploadUntilDone(
+      uploadJobId,
+      (s) => onProgress?.(s),
+      (s) => resolve(s),
+      (err) => reject(err),
+    );
+  });
 }
 
 // ── Outfit Canvases ───────────────────────────────────────────────────────────
@@ -466,12 +472,29 @@ export async function dismissOutfitSuggestion(id: string): Promise<void> {
 
 // ── Virtual Try-On ────────────────────────────────────────────────────────────
 
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buf = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+}
+
 export async function createTryOnJob(data: {
   canvasId?: string;
   wardrobeItemIds: string[];
   modelImageUrl?: string;
+  snapshotBlob?: Blob;
 }): Promise<TryOnJobResponse> {
-  const res = await api.post('/outfits/try-on', data);
+  const snapshotBase64 = data.snapshotBlob ? await blobToBase64(data.snapshotBlob) : undefined;
+  const res = await api.post('/outfits/try-on', {
+    canvasId: data.canvasId,
+    wardrobeItemIds: data.wardrobeItemIds,
+    modelImageUrl: data.modelImageUrl,
+    snapshotBase64,
+  });
   return unwrapData<TryOnJobResponse>(res);
 }
 
