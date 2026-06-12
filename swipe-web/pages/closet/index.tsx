@@ -562,14 +562,19 @@ export default function ClosetPage() {
   function formatStep(step: string): string {
     const STEP_LABELS: Record<string, string> = {
       UPLOADED: t.stepProcessing,
+      downloaded: t.stepProcessing,
       NSFW_SCAN: t.stepChecking,
-      nfsm_passed: t.stepChecking,
+      nsfw_passed: t.stepChecking,
       UPSCALE: t.stepGenerating,
+      enhancing: t.stepGenerating,
+      product_shot_ready: t.stepGenerating,
       BG_REMOVE: t.stepRemovingBg,
       bg_removed: t.stepRemovingBg,
+      thumbnail_built: t.stepRemovingBg,
       EMBED: t.stepAnalyzing,
       visual_embedded: t.stepAnalyzing,
       ANALYZE: t.stepAlmostDone,
+      ready: t.stepAlmostDone,
       COMPLETED: 'Done!',
     };
     return STEP_LABELS[step] ?? t.stepProcessing;
@@ -1059,15 +1064,19 @@ export default function ClosetPage() {
       return;
     }
 
+    const override = tryOnOverrideRef.current;
     let itemIds: string[];
     let canvasId: string | undefined;
-    if (tryOnOverrideRef.current) {
-      itemIds = tryOnOverrideRef.current.itemIds;
+    let snapshotLayout: SavedCanvasLayout | null;
+    if (override) {
+      itemIds = override.itemIds;
+      snapshotLayout = override.layout;
       canvasId = undefined;
     } else {
       const targetCanvas = displayCanvases[tryOnCanvasIdxRef.current];
       itemIds = (targetCanvas?.layout ?? []).map((e) => e.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
       canvasId = targetCanvas?.id ?? undefined;
+      snapshotLayout = targetCanvas?.layout ?? null;
     }
     tryOnOverrideRef.current = null;
     if (itemIds.length === 0) return;
@@ -1078,7 +1087,19 @@ export default function ClosetPage() {
 
     setTryOnState({ status: 'loading', previewImages });
 
-    createTryOnJob({ wardrobeItemIds: itemIds, canvasId })
+    const buildJob = async () => {
+      let snapshotBlob: Blob | undefined;
+      if (snapshotLayout && snapshotLayout.length > 0) {
+        try {
+          snapshotBlob = await captureCanvasSnapshot(snapshotLayout, items);
+        } catch {
+          // snapshot capture failed — fall back to classic mode
+        }
+      }
+      return createTryOnJob({ wardrobeItemIds: itemIds, canvasId, snapshotBlob });
+    };
+
+    buildJob()
       .then((job) => {
         if (tryOnCancelRef.current) return;
         saveActiveTryOnJob(job.id);
@@ -1528,6 +1549,7 @@ export default function ClosetPage() {
               setCanvasData(null);
             }
             setEditingCanvasIdx(null);
+            setTryOnState(null);
           }}
           onRegenerate={handleNewOutfit}
           onShowPlans={() => setShowPremiumGate('generation')}
@@ -3629,6 +3651,44 @@ function TryOnConfirmModal({
 }
 
 // ─── Shared download helper ───────────────────────────────────────────────────────────
+async function captureCanvasSnapshot(layout: SavedCanvasLayout, allItems: ClosetItem[]): Promise<Blob> {
+  const W = 400, H = 533;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+
+  const sorted = [...layout].sort((a, b) => a.zIndex - b.zIndex);
+  for (const entry of sorted) {
+    const closetItem = allItems.find((i) => i.id === entry.id);
+    if (!closetItem?.imageData) continue;
+    const img = new window.Image();
+    img.crossOrigin = 'anonymous';
+    const src =
+      closetItem.imageData.startsWith('blob:') || closetItem.imageData.startsWith('data:')
+        ? closetItem.imageData
+        : `/api/proxy-image?url=${encodeURIComponent(closetItem.imageData)}`;
+    await new Promise<void>((res, rej) => {
+      img.onload = () => res();
+      img.onerror = () => rej(new Error(`Failed to load image for item ${entry.id}`));
+      img.src = src;
+    });
+    const itemW = W * 0.35;
+    const itemH = itemW;
+    const drawW = itemW * entry.scale;
+    const drawH = itemH * entry.scale;
+    const cx = W * (entry.x / 100) + itemW / 2;
+    const cy = H * (entry.y / 100) + itemH / 2;
+    ctx.drawImage(img, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
+  }
+
+  return new Promise<Blob>((res, rej) =>
+    canvas.toBlob((b) => (b ? res(b) : rej(new Error('toBlob failed'))), 'image/png'),
+  );
+}
+
 async function downloadWithWatermark(resultUrl: string): Promise<void> {
   const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(resultUrl)}`;
   const img = new window.Image();
