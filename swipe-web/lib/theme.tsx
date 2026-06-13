@@ -41,9 +41,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const saved = localStorage.getItem('svayp_theme');
     if (saved === 'dark' || saved === 'light') return saved;
 
-    // No URL param and no saved preference — use the device system setting.
-    // This matches the Flutter app's default behavior of following the OS theme.
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    // No URL param and no saved preference — default to 'light'
+    return 'light';
   });
 
   // Apply / remove the `dark` class on <html> whenever theme changes.
