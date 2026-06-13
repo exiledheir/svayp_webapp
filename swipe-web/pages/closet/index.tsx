@@ -3790,7 +3790,7 @@ function TryOnModal({
                 <div className="flex gap-1.5 mb-1.5">
                   {[0, 1, 2, 3].map((seg) => {
                     const fill = segmentFill(seg);
-                    const isActive = seg === currentPhase && status !== 'completed';
+                    const isActive = seg === currentPhase && isProcessing;
                     return (
                       <div
                         key={seg}
