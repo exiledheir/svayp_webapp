@@ -47,8 +47,8 @@ function mapPlanResponse(raw: Record<string, unknown>): UserPlanResponse {
       calendarDays:     (limits.calendarDays ?? 2) as number,
     },
     usage: {
-      regenerationsUsed:    (usage.regenThisMonth ?? usage.regenerationsUsed ?? 0) as number,
-      tryItOnsUsed:         (usage.tryOnThisMonth ?? usage.tryItOnsUsed ?? 0) as number,
+      regenerationsUsed:    (usage.regenThisMonth ?? usage.regenerationsUsed ?? usage.regenUsed ?? 0) as number,
+      tryItOnsUsed:         (usage.tryOnThisMonth ?? usage.tryOnsThisMonth ?? usage.tryItOnsThisMonth ?? usage.tryItOnsUsed ?? usage.tryOnsUsed ?? 0) as number,
       itemCountByCategory:  (usage.itemCountByCategory ?? {}) as Record<string, number>,
     },
     billingPeriodStart: (raw.billingPeriodStart ?? '') as string,
@@ -57,7 +57,7 @@ function mapPlanResponse(raw: Record<string, unknown>): UserPlanResponse {
 }
 
 export async function getUserPlan(): Promise<UserPlanResponse> {
-  const res = await api.get('/me/plan');
+  const res = await api.get('/me/plan', { headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' } });
   const raw = unwrapData<Record<string, unknown>>(res);
   return mapPlanResponse(raw);
 }

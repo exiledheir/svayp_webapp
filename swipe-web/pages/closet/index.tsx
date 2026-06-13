@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { Plus, X, Sparkles, Sun, CalendarDays, TreePine, Camera, Image as ImageIcon, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2 } from 'lucide-react';
+import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Image as ImageIcon, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2 } from 'lucide-react';
 import { getUser, clearTokens } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags-context';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
@@ -17,6 +17,7 @@ import ClosetCoachMark from '@/components/ClosetCoachMark';
 import { saveTryOnResult, getTryOnHistory, getTryOnHistoryWithCloud, deleteTryOnRecord, saveActiveTryOnJob, getActiveTryOnJobWithCloud, clearActiveTryOnJob, type TryOnRecord } from '@/lib/tryon-history';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
+import { useTheme } from '@/lib/theme';
 import { saveUploadPreview, getUploadPreview, clearUploadPreview } from '@/lib/upload-previews';
 import { compressImageForUpload } from '@/lib/image-utils';
 
@@ -123,6 +124,16 @@ function usePlan() {
 
   useEffect(() => { fetchPlan(); }, [fetchPlan]);
 
+  // Re-fetch plan whenever the user returns to this tab so that backend-side
+  // resets (e.g. subscription or usage reset by admin) are reflected immediately.
+  useEffect(() => {
+    function handleVisibility() {
+      if (!document.hidden) fetchPlan();
+    }
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [fetchPlan]);
+
   const totalItems = Object.values(usage.itemCountByCategory ?? {}).reduce((s, n) => s + n, 0);
 
   function canAddToCategory(cat: string): boolean {
@@ -146,6 +157,7 @@ function usePlan() {
 export default function ClosetPage() {
   const router = useRouter();
   const { t, locale, setLocale } = useI18n();
+  const { theme, setTheme } = useTheme();
   const { plansEnabled, profileEnabled } = useFeatureFlags();
   const [showLangPicker, setShowLangPicker] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -907,10 +919,10 @@ export default function ClosetPage() {
         // If message mentions wardrobe variety → user has too few items for new combos
         const isTooFewItems = apiMsg && apiMsg.includes('мало одежды');
         setOutfitBlockedModal({
-          title: isTooFewItems ? 'Мало одежды для новых образов' : 'Генерируем образы',
+          title: isTooFewItems ? t.tooFewItemsTitle : t.outfitsExhaustedTitle,
           body: isTooFewItems
-            ? (apiMsg ?? 'Добавьте больше одежды, чтобы ИИ создал разнообразные образы.')
-            : 'ИИ подбирает новые образы. Нажмите ✦ через 30–60 секунд.',
+            ? t.tooFewItemsBody
+            : t.outfitsExhaustedBody,
         });
         return;
       } else if (code === 'QUOTA_EXCEEDED') {
@@ -1167,7 +1179,7 @@ export default function ClosetPage() {
   }
 
   return (
-    <div className="phone-container flex flex-col bg-white" style={{ height: '100dvh' }}>
+    <div className="phone-container flex flex-col bg-white dark:bg-[#111111]" style={{ height: '100dvh' }}>
       {/* Save-failed toast */}
       {saveFailed && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[999] px-4 py-2.5 rounded-full bg-red-500 text-white text-[13px] font-semibold shadow-lg">
@@ -1181,21 +1193,21 @@ export default function ClosetPage() {
         </div>
       )}
       {/* Header — mobile glass-morphism style */}
-      <header className="shrink-0 bg-white px-4 pt-3 pb-2">
+      <header className="shrink-0 px-4 pt-3 pb-2 bg-white dark:bg-[#1a1a1a]">
         <div
           className="flex items-center justify-between px-3"
           style={{
-            background: 'rgba(255, 255, 255, 0.85)',
+            background: theme === 'dark' ? 'rgba(32, 32, 32, 0.85)' : 'rgba(255, 255, 255, 0.85)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
             borderRadius: 22,
-            border: '0.5px solid rgba(0, 0, 0, 0.10)',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+            border: theme === 'dark' ? '0.5px solid rgba(255, 255, 255, 0.10)' : '0.5px solid rgba(0, 0, 0, 0.10)',
+            boxShadow: theme === 'dark' ? '0 4px 16px rgba(0,0,0,0.3)' : '0 4px 16px rgba(0,0,0,0.06)',
             minHeight: 52,
           }}
         >
           {/* Left: LIBΛS logo */}
-          <h1 className="text-[20px] font-bold tracking-[0.12em]">LIB<span style={{ color: '#F370A7' }}>Λ</span>S</h1>
+          <h1 className="text-[20px] font-bold tracking-[0.12em] text-black dark:text-white">LIB<span style={{ color: '#F370A7' }}>Λ</span>S</h1>
 
           {/* Right: action buttons + profile */}
           <div className="flex items-center gap-1.5">
@@ -1205,7 +1217,10 @@ export default function ClosetPage() {
                 key={occ.key}
                 onClick={() => showOutfitsForPeriod(occ.key)}
                 className="flex items-center gap-1 px-2.5 h-8 rounded-full text-[11px] font-semibold active:scale-[0.95] transition-transform"
-                style={{ background: 'rgba(0,0,0,0.05)', color: '#555' }}
+                style={{
+                  background: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                  color: theme === 'dark' ? '#aaa' : '#555',
+                }}
                 aria-label="Calendar"
               >
                 <occ.Icon size={12} strokeWidth={1.8} color={occ.iconColor} />
@@ -1218,9 +1233,8 @@ export default function ClosetPage() {
                 onClick={() => setShowPremiumGate('generation')}
                 className="flex items-center gap-1 px-2.5 h-8 rounded-full text-[11px] font-bold active:scale-[0.95] transition-all"
                 style={{
-
-                  background: plan === 'free' ? 'rgba(0,0,0,0.05)' : PLAN_COLORS[plan].bg,
-                  color: plan === 'free' ? '#888' : PLAN_COLORS[plan].text,
+                  background: plan === 'free' ? (theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)') : PLAN_COLORS[plan].bg,
+                  color: plan === 'free' ? (theme === 'dark' ? '#aaa' : '#888') : PLAN_COLORS[plan].text,
                 }}
                 aria-label="Plan"
               >
@@ -1237,20 +1251,26 @@ export default function ClosetPage() {
                 setShowMyLooks(true);
               }}
               className="flex items-center justify-center px-2 h-9 rounded-full active:scale-[0.95] transition-transform"
-              style={{ background: myLooksHistory.length > 0 ? 'rgba(243,112,167,0.12)' : 'rgba(0,0,0,0.05)', minWidth: 38 }}
+              style={{
+                background: myLooksHistory.length > 0 ? 'rgba(243,112,167,0.12)' : (theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'),
+                minWidth: 38,
+              }}
               aria-label="My Looks"
             >
-              <Images size={14} strokeWidth={1.8} style={{ color: myLooksHistory.length > 0 ? '#F370A7' : '#4b5563' }} />
+              <Images size={14} strokeWidth={1.8} style={{ color: myLooksHistory.length > 0 ? '#F370A7' : (theme === 'dark' ? '#888' : '#4b5563') }} />
             </button>
             {/* Profile icon */}
             {profileEnabled && (
               <button
                 onClick={() => setShowProfile(true)}
                 className="flex items-center justify-center px-2 h-9 rounded-full active:scale-[0.95] transition-transform"
-                style={{ background: 'rgba(0,0,0,0.05)', minWidth: 38 }}
+                style={{
+                  background: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                  minWidth: 38,
+                }}
                 aria-label="Profile"
               >
-                <User size={14} strokeWidth={1.8} className="text-gray-600" />
+                <User size={14} strokeWidth={1.8} style={{ color: theme === 'dark' ? '#888' : '#666' }} />
               </button>
             )}
           </div>
@@ -1574,13 +1594,13 @@ export default function ClosetPage() {
               <p className="text-[17px] font-bold text-gray-900 mb-1">{outfitBlockedModal.title}</p>
               <p className="text-[14px] text-gray-500 leading-snug">{outfitBlockedModal.body}</p>
             </div>
-            {outfitBlockedModal.title === 'Недостаточно одежды' && (
+            {outfitBlockedModal.title === t.tooFewItemsTitle && (
               <button
                 className="w-full py-3.5 rounded-2xl text-[15px] font-semibold text-white"
                 style={{ background: 'linear-gradient(135deg, #F370A7 0%, #d946a8 100%)' }}
                 onClick={() => { setOutfitBlockedModal(null); openAdd('', 'tops'); }}
               >
-                Добавить одежду
+                {t.addClothingBtn}
               </button>
             )}
             <button
@@ -1691,7 +1711,7 @@ export default function ClosetPage() {
           </header>
           <div className="flex-1 overflow-y-auto px-4 pb-8 flex flex-col gap-5 pt-2">
             {/* Crop area — crop is optional, handles shown as hint */}
-            <div className="rounded-2xl bg-gray-100 flex justify-center" style={{ padding: '14px 14px 10px' }}>
+            <div className="rounded-2xl flex justify-center" style={{ padding: '14px 14px 10px', backgroundColor: theme === 'dark' ? '#1a1a1a' : '#f3f4f6' }}>
               <ReactCrop crop={addCrop} onChange={(c) => setAddCrop(c)} onComplete={(c) => setAddCompletedCrop(c)}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img ref={cropImgRef} src={addRawImage} alt="Crop" style={{ maxHeight: '55vh', maxWidth: '100%', display: 'block', margin: '0 auto', borderRadius: 12 }} />
@@ -1700,7 +1720,7 @@ export default function ClosetPage() {
             <div className="flex flex-col gap-3">
               {addGroup === '' ? (
                 <>
-                  <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">{t.addCategory}</label>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider block" style={{ color: theme === 'dark' ? '#666666' : '#9ca3af' }}>{t.addCategory}</label>
                   <div className="grid grid-cols-2 gap-2.5">
                     {(
                       [
@@ -1716,11 +1736,14 @@ export default function ClosetPage() {
                           setAddGroup(group.key);
                           setAddCategory(ADD_GROUPS[group.key][0]);
                         }}
-                        className="flex flex-col items-center justify-center gap-1.5 rounded-2xl py-4 active:scale-[0.97] transition-transform"
-                        style={{ background: '#F9FAFB', border: '1.5px solid #F3F4F6' }}
+                        className="flex flex-col items-center justify-center gap-1.5 rounded-2xl py-4 active:scale-[0.97] transition-colors"
+                        style={{
+                          backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f9fafb',
+                          border: theme === 'dark' ? '1.5px solid #3a3a3a' : '1.5px solid #f3f4f6',
+                        }}
                       >
                         <span className="leading-none flex items-center justify-center">{group.icon}</span>
-                        <span className="text-[12px] font-semibold text-gray-700">{group.label}</span>
+                        <span className="text-[12px] font-semibold" style={{ color: theme === 'dark' ? '#cccccc' : '#374151' }}>{group.label}</span>
                       </button>
                     ))}
                   </div>
@@ -1730,13 +1753,14 @@ export default function ClosetPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setAddGroup('')}
-                      className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center shrink-0"
+                      className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f3f4f6' }}
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: theme === 'dark' ? '#999999' : '#000000' }}>
                         <path d="M15 18l-6-6 6-6"/>
                       </svg>
                     </button>
-                    <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                    <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: theme === 'dark' ? '#666666' : '#9ca3af' }}>
                       {addGroup === 'upper' ? t.upperBody : addGroup === 'lower' ? t.lowerBody : addGroup === 'shoes' ? t.shoes : t.accessories}
                     </label>
                   </div>
@@ -1745,9 +1769,16 @@ export default function ClosetPage() {
                       <button
                         key={cat}
                         onClick={() => setAddCategory(cat)}
-                        className={`px-3.5 py-[6px] rounded-full text-[12px] transition-colors ${
-                          addCategory === cat ? 'bg-black text-white font-semibold' : 'bg-gray-100 text-gray-500 font-medium'
-                        }`}
+                        className="px-3.5 py-[6px] rounded-full text-[12px] transition-colors font-medium"
+                        style={{
+                          backgroundColor: addCategory === cat
+                            ? (theme === 'dark' ? '#ffffff' : '#000000')
+                            : (theme === 'dark' ? '#2a2a2a' : '#f3f4f6'),
+                          color: addCategory === cat
+                            ? (theme === 'dark' ? '#000000' : '#ffffff')
+                            : (theme === 'dark' ? '#999999' : '#6b7280'),
+                          fontWeight: addCategory === cat ? '600' : '500',
+                        }}
                       >
                         {catLabel(cat, t.cats)}
                       </button>
@@ -1759,7 +1790,11 @@ export default function ClosetPage() {
             <button
               onClick={handleAddSave}
               disabled={addSaving || addGroup === ''}
-              className="w-full py-3.5 rounded-full bg-black text-white text-[13px] font-semibold disabled:opacity-30 active:scale-[0.97] transition-transform"
+              className="w-full py-3.5 rounded-full text-[13px] font-semibold disabled:opacity-30 active:scale-[0.97] transition-transform"
+              style={{
+                backgroundColor: theme === 'dark' ? '#000000' : '#000000',
+                color: theme === 'dark' ? '#ffffff' : '#ffffff',
+              }}
             >
               {addSaving ? t.uploading : addGroup === '' ? t.addCategory : t.saveToCloset}
             </button>
@@ -1785,9 +1820,9 @@ export default function ClosetPage() {
           className="fixed inset-0 z-[70] flex items-end justify-center bg-black/30 backdrop-blur-sm"
           onClick={() => setShowProfile(false)}
         >
-          <div className="w-full max-w-[430px] rounded-t-3xl bg-white" onClick={(e) => e.stopPropagation()}>
+          <div className={`w-full max-w-[430px] rounded-t-3xl bg-white dark:bg-[#1a1a1a]`} onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-center pt-3 pb-2">
-              <div className="w-9 h-1 rounded-full bg-gray-200" />
+              <div className="w-9 h-1 rounded-full bg-gray-200 dark:bg-gray-700" />
             </div>
             <div className="px-5 pb-10">
               {/* Avatar + name + phone */}
@@ -1799,29 +1834,28 @@ export default function ClosetPage() {
                   {userInfo?.name ? userInfo.name.trim()[0].toUpperCase() : <User size={24} strokeWidth={2} color="white" />}
                 </div>
                 <div>
-                  <div className="text-[17px] font-bold text-gray-900">{userInfo?.name || '—'}</div>
-                  <div className="text-[13px] text-gray-400 mt-0.5">{userInfo?.phoneNumber || t.phoneNumber}</div>
+                  <div className="text-[17px] font-bold text-gray-900 dark:text-white">{userInfo?.name || '—'}</div>
+                  <div className="text-[13px] mt-0.5 text-gray-400 dark:text-gray-400">{userInfo?.phoneNumber || t.phoneNumber}</div>
                 </div>
               </div>
               {/* Plan badge */}
               <div
                 className="flex items-center gap-2.5 px-4 h-13 rounded-2xl"
                 style={{
-
-                  background: plan === 'free' ? '#F5F5F5' : PLAN_COLORS[plan].bg,
+                  background: plan === 'free' ? (theme === 'dark' ? '#2a2a2a' : '#F5F5F5') : PLAN_COLORS[plan].bg,
                   height: 52,
                 }}
               >
-                <Crown size={17} strokeWidth={2} color={plan === 'free' ? '#aaa' : PLAN_COLORS[plan].crownColor} />
+                <Crown size={17} strokeWidth={2} color={plan === 'free' ? (theme === 'dark' ? '#666' : '#aaa') : PLAN_COLORS[plan].crownColor} />
                 <span
                   className="text-[14px] font-semibold"
-                  style={{ color: plan === 'free' ? '#888' : PLAN_COLORS[plan].text }}
+                  style={{ color: plan === 'free' ? (theme === 'dark' ? '#aaa' : '#888') : PLAN_COLORS[plan].text }}
                 >
                   {plan === 'free' ? 'Free plan' : plan === 'pro' ? 'Pro' : 'Premium'}
                 </span>
               </div>
 
-              {/* Language selector */}
+              {/* Language & Theme selector */}
               <div className="mt-4">
                 <p className="text-[12px] font-semibold text-gray-400 uppercase tracking-wider mb-2">{t.language}</p>
                 <div className="flex gap-2">
@@ -1830,11 +1864,34 @@ export default function ClosetPage() {
                       key={l}
                       onClick={() => setLocale(l)}
                       className={`flex-1 h-11 rounded-2xl flex items-center justify-center gap-1.5 transition-colors ${
-                        locale === l ? 'bg-black text-white' : 'bg-gray-50 text-gray-700'
+                        locale === l
+                          ? 'bg-black text-white dark:bg-white dark:text-black'
+                          : 'bg-gray-50 text-gray-700 dark:bg-gray-700 dark:text-gray-200'
                       }`}
                     >
                       <span className="text-[18px] leading-none">{l === 'uz' ? '🇺🇿' : l === 'ru' ? '🇷🇺' : '🇬🇧'}</span>
                       <span className="text-[12px] font-semibold">{l === 'en' ? 'EN' : l === 'ru' ? 'RU' : 'UZ'}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Theme toggle */}
+              <div className="mt-4">
+                <p className="text-[12px] font-semibold text-gray-400 uppercase tracking-wider mb-2">{t.theme}</p>
+                <div className="flex gap-2">
+                  {(['light', 'dark'] as const).map((themeMode) => (
+                    <button
+                      key={themeMode}
+                      onClick={() => setTheme(themeMode)}
+                      className={`flex-1 h-11 rounded-2xl flex items-center justify-center gap-1.5 transition-colors ${
+                        theme === themeMode
+                          ? 'bg-black text-white dark:bg-white dark:text-black'
+                          : 'bg-gray-50 text-gray-700 dark:bg-gray-700 dark:text-gray-200'
+                      }`}
+                    >
+                      {themeMode === 'light' ? <Sun size={16} strokeWidth={2} /> : <Moon size={16} strokeWidth={2} />}
+                      <span className="text-[12px] font-semibold">{themeMode === 'light' ? t.themeLight : t.themeDark}</span>
                     </button>
                   ))}
                 </div>
@@ -1847,8 +1904,11 @@ export default function ClosetPage() {
                   setTourStep(0);
                   setShowProfile(false);
                 }}
-                className="mt-5 w-full h-11 rounded-2xl flex items-center justify-center gap-2 text-[13px] font-semibold active:scale-[0.97] transition-transform"
-                style={{ background: 'rgba(243,112,167,0.08)', color: '#F370A7' }}
+                className="mt-5 w-full h-11 rounded-2xl flex items-center justify-center gap-2 text-[13px] font-semibold active:scale-[0.97] transition-colors"
+                style={{
+                  background: theme === 'dark' ? 'rgba(243,112,167,0.2)' : 'rgba(243,112,167,0.08)',
+                  color: theme === 'dark' ? '#ff9bc5' : '#F370A7',
+                }}
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
@@ -1862,8 +1922,11 @@ export default function ClosetPage() {
                   clearTokens();
                   router.replace('/');
                 }}
-                className="mt-2 w-full h-11 rounded-2xl flex items-center justify-center gap-2 text-[13px] font-semibold active:scale-[0.97] transition-transform"
-                style={{ background: 'rgba(239,68,68,0.07)', color: '#ef4444' }}
+                className="mt-2 w-full h-11 rounded-2xl flex items-center justify-center gap-2 text-[13px] font-semibold active:scale-[0.97] transition-colors"
+                style={{
+                  background: theme === 'dark' ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.07)',
+                  color: theme === 'dark' ? '#ff7a7a' : '#ef4444',
+                }}
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
@@ -1947,6 +2010,7 @@ function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits
   onAddItem: (cat: ClosetCategory) => void;
 }) {
   const { t } = useI18n();
+  const { theme } = useTheme();
   const isEmpty = allItems.length === 0;
 
   return (
@@ -2005,22 +2069,22 @@ function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits
               style={{
                 width: 'min(82vw, 340px)',
                 height: 440,
-                borderColor: '#D1D5DB',
-                background: 'rgba(249,250,251,0.8)',
+                borderColor: theme === 'dark' ? '#4a4a4a' : '#D1D5DB',
+                background: theme === 'dark' ? 'rgba(42,42,42,0.6)' : 'rgba(249,250,251,0.8)',
               }}
             >
               <div
                 className="w-16 h-16 rounded-full flex items-center justify-center"
                 style={{
-                  background: '#F3F4F6',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                  background: theme === 'dark' ? '#2a2a2a' : '#F3F4F6',
+                  boxShadow: theme === 'dark' ? '0 2px 8px rgba(0,0,0,0.4)' : '0 2px 8px rgba(0,0,0,0.08)',
                 }}
               >
-                <Plus size={26} strokeWidth={2} className="text-gray-500" />
+                <Plus size={26} strokeWidth={2} style={{ color: theme === 'dark' ? '#888' : '#9ca3af' }} />
               </div>
               <div className="text-center px-6">
-                <p className="text-[14px] font-bold text-gray-700">{t.newOutfit}</p>
-                <p className="text-[12px] text-gray-400 mt-0.5">{limits.outfitCanvases - canvases.length} {t.moreAvailable}</p>
+                <p className="text-[14px] font-bold" style={{ color: theme === 'dark' ? '#f0f0f0' : '#1f2937' }}>{t.newOutfit}</p>
+                <p className="text-[12px] mt-0.5" style={{ color: theme === 'dark' ? '#888' : '#9ca3af' }}>{limits.outfitCanvases - canvases.length} {t.moreAvailable}</p>
               </div>
             </button>
           ) : (
@@ -2095,6 +2159,7 @@ function OutfitCard({
   onShowPlans?: () => void;
 }) {
   const { t } = useI18n();
+  const { theme } = useTheme();
 
   // Valid outfit requires: dress/jumpsuit OR (top + (lower OR shoes)). Uses module-level FULL_BODY_CATS.
   const hasTop = allItems.some((i) => UPPER_CATS.includes(i.category));
@@ -2144,12 +2209,12 @@ function OutfitCard({
   return (
     <div
       data-coach="outfit-card"
-      className="shrink-0 rounded-[28px] flex flex-col border border-gray-100 relative overflow-hidden"
+      className="shrink-0 rounded-[28px] flex flex-col border border-gray-100 dark:border-gray-700 relative overflow-hidden"
       style={{
         width: 'min(82vw, 340px)',
         height: 440,
-        background: '#FFFFFF',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        background: theme === 'dark' ? '#1a1a1a' : '#FFFFFF',
+        boxShadow: theme === 'dark' ? '0 2px 12px rgba(0,0,0,0.3)' : '0 2px 12px rgba(0,0,0,0.06)',
       }}
     >
       {/* Top-left delete button */}
@@ -2157,7 +2222,7 @@ function OutfitCard({
         <button
           onClick={onDelete}
           className="absolute top-3.5 left-3.5 z-10 w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
-          style={{ background: 'rgba(239,68,68,0.08)' }}
+          style={{ background: theme === 'dark' ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.08)' }}
           title="Delete"
         >
           <Trash2 size={14} strokeWidth={2.2} className="text-red-400" />
@@ -2175,8 +2240,8 @@ function OutfitCard({
                 disabled={isAiSuggesting || isEmpty}
                 className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform disabled:opacity-40"
                 style={{
-                  background: isAiSuggesting ? 'rgba(99,102,241,0.08)' : '#ffffff',
-                  boxShadow: isAiSuggesting ? 'none' : '0 2px 8px rgba(0,0,0,0.14), 0 1px 3px rgba(0,0,0,0.08)',
+                  background: isAiSuggesting ? 'rgba(99,102,241,0.08)' : (theme === 'dark' ? '#2a2a2a' : '#ffffff'),
+                  boxShadow: isAiSuggesting ? 'none' : (theme === 'dark' ? '0 2px 8px rgba(0,0,0,0.4)' : '0 2px 8px rgba(0,0,0,0.14), 0 1px 3px rgba(0,0,0,0.08)'),
                 }}
                 title={isAiSuggesting ? t.aiThinking : t.regenerateWithAI}
               >
@@ -2240,8 +2305,8 @@ function OutfitCard({
                         style={{
                           background: step.done
                             ? 'linear-gradient(135deg, rgba(243,112,167,0.15), rgba(243,112,167,0.06))'
-                            : '#F9FAFB',
-                          border: step.done ? '1.5px solid rgba(243,112,167,0.35)' : '1.5px dashed #E5E7EB',
+                            : theme === 'dark' ? '#2a2a2a' : '#F9FAFB',
+                          border: step.done ? '1.5px solid rgba(243,112,167,0.35)' : (theme === 'dark' ? '1.5px dashed #4a4a4a' : '1.5px dashed #E5E7EB'),
                         }}
                       >
                         {step.done ? (
@@ -2251,13 +2316,13 @@ function OutfitCard({
                             onClick={() => onAddItem?.(step.cat)}
                             className="w-full h-full flex items-center justify-center active:scale-[0.95] transition-transform"
                           >
-                            <Plus size={18} strokeWidth={2} className="text-gray-300" />
+                            <Plus size={18} strokeWidth={2} style={{ color: theme === 'dark' ? '#666' : '#d1d5db' }} />
                           </button>
                         )}
                       </div>
                       <span
                         className="text-[10px] font-semibold text-center leading-tight"
-                        style={{ color: step.done ? '#F370A7' : '#D1D5DB', maxWidth: 64 }}
+                        style={{ color: step.done ? '#F370A7' : (theme === 'dark' ? '#666' : '#D1D5DB'), maxWidth: 64 }}
                       >
                         {step.label}
                       </span>
@@ -2268,12 +2333,12 @@ function OutfitCard({
                 {/* Progress bar */}
                 <div className="w-full">
                   <div className="flex justify-between items-center mb-1.5">
-                    <span className="text-[11px] font-semibold text-gray-400">{doneCount}/2</span>
-                    <span className="text-[11px] font-semibold" style={{ color: readyToGenerate ? '#F370A7' : '#9CA3AF' }}>
+                    <span className="text-[11px] font-semibold" style={{ color: theme === 'dark' ? '#888' : '#9ca3af' }}>{doneCount}/2</span>
+                    <span className="text-[11px] font-semibold" style={{ color: readyToGenerate ? '#F370A7' : (theme === 'dark' ? '#666' : '#9CA3AF') }}>
                       {readyToGenerate ? t.readyLabel : t.moreNeeded.replace('{n}', String(2 - doneCount))}
                     </span>
                   </div>
-                  <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <div className={`w-full h-2 rounded-full ${theme === 'dark' ? 'dark:bg-gray-700' : 'bg-gray-100'} overflow-hidden`}>
                     <div
                       className="h-full rounded-full transition-all duration-500"
                       style={{
@@ -2285,7 +2350,7 @@ function OutfitCard({
                 </div>
 
                 {/* Hint */}
-                <p className="text-[12px] text-gray-400 text-center leading-snug -mt-1">{hintText}</p>
+                <p className="text-[12px] text-center leading-snug -mt-1" style={{ color: theme === 'dark' ? '#888' : '#9ca3af' }}>{hintText}</p>
               </div>
             );
           })()
@@ -2322,8 +2387,11 @@ function OutfitCard({
         <button
           data-coach="view-items"
           onClick={onViewItems}
-          className="flex-1 h-[44px] rounded-full flex items-center justify-center text-[12px] font-semibold text-gray-700 tracking-wide"
-          style={{ background: 'rgba(0,0,0,0.04)' }}
+          className="flex-1 h-[44px] rounded-full flex items-center justify-center text-[12px] font-semibold tracking-wide"
+          style={{
+            background: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+            color: theme === 'dark' ? '#aaa' : '#666'
+          }}
         >
           {t.viewItems}
         </button>
@@ -2354,7 +2422,7 @@ function OutfitCard({
           style={{
             backdropFilter: 'blur(10px)',
             WebkitBackdropFilter: 'blur(10px)',
-            background: 'rgba(255,255,255,0.30)',
+            background: theme === 'dark' ? 'rgba(0,0,0,0.40)' : 'rgba(255,255,255,0.30)',
           }}
           onClick={onShowPlans}
         >

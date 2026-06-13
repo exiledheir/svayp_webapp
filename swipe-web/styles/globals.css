@@ -17,6 +17,41 @@ body {
   scrollbar-width: none;
 }
 
+/* ── Dark theme base ──────────────────────────────────────────────────────── */
+html.dark,
+html.dark body {
+  background: #111111;
+  color: #f0f0f0;
+}
+
+/* Override the most common Tailwind color utilities used in the app.
+   Higher specificity (html.dark prefix) beats plain utility classes without
+   needing !important on every rule. */
+
+/* Backgrounds */
+html.dark .bg-white       { background-color: #111111; }
+html.dark .bg-gray-50     { background-color: #1a1a1a; }
+html.dark .bg-gray-100    { background-color: #222222; }
+html.dark .bg-gray-200    { background-color: #2c2c2c; }
+
+/* Text */
+html.dark .text-black     { color: #f0f0f0; }
+html.dark .text-gray-900  { color: #f0f0f0; }
+html.dark .text-gray-800  { color: #e4e4e4; }
+html.dark .text-gray-700  { color: #cccccc; }
+html.dark .text-gray-600  { color: #aaaaaa; }
+html.dark .text-gray-500  { color: #888888; }
+html.dark .text-gray-400  { color: #6a6a6a; }
+
+/* Borders */
+html.dark .border-gray-100  { border-color: #2a2a2a; }
+html.dark .border-gray-200  { border-color: #333333; }
+html.dark .border-gray-300  { border-color: #404040; }
+
+/* Dividers */
+html.dark .divide-gray-100 > * + * { border-color: #2a2a2a; }
+html.dark .divide-gray-200 > * + * { border-color: #333333; }
+
 html::-webkit-scrollbar,
 body::-webkit-scrollbar,
 *::-webkit-scrollbar {
