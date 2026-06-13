@@ -62,6 +62,17 @@ body::-webkit-scrollbar,
   animation: vs-pulse 2s ease-in-out infinite;
 }
 
+/* ── Try-On loading animations ────────────────────────────────────── */
+@keyframes tryOnScanBeam {
+  0%   { transform: translateX(-110%); }
+  60%  { transform: translateX(110%); }
+  100% { transform: translateX(110%); }
+}
+@keyframes tryOnItemShimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
 /* ── Custom crop handles (corner brackets like mobile visual search) ── */
 .ReactCrop__crop-selection {
   border: 2px solid rgba(255,255,255,0.9) !important;
