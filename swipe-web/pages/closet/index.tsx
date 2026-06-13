@@ -3936,7 +3936,7 @@ function PremiumGateSheet({
   currentPlan,
   onClose,
 }: {
-  reason: 'generation' | 'items' | 'categoryFull' | 'tryOn';
+  reason: 'generation' | 'items' | 'categoryFull' | 'tryOn' | 'canvas';
   currentPlan: UserPlan;
   onClose: () => void;
 }) {
