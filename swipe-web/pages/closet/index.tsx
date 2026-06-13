@@ -1790,7 +1790,7 @@ export default function ClosetPage() {
                     {ADD_GROUPS[addGroup]?.map((cat) => (
                       <button
                         key={cat}
-                        onClick={() => setAddCategory(cat)}
+                        onClick={() => { setAddCategory(cat); logAnalyticsEvent(Events.ADD_ITEM_CATEGORY_SELECTED, { [Params.CATEGORY]: cat }); }}
                         className="px-3.5 py-[6px] rounded-full text-[12px] transition-colors font-medium"
                         style={{
                           backgroundColor: addCategory === cat
