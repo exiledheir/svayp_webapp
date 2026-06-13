@@ -6,6 +6,7 @@ import { addClosetItem, CLOSET_CATEGORIES } from '@/lib/closet-storage';
 import type { ClosetCategory } from '@/lib/closet-storage';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
+import { useTheme } from '@/lib/theme';
 
 // Category groups — same as closet index
 const GROUPS: Record<string, ClosetCategory[]> = {
@@ -50,6 +51,7 @@ function getCroppedImage(
 
 export default function ClosetAddPage() {
   const router = useRouter();
+  const { theme } = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -116,17 +118,20 @@ export default function ClosetAddPage() {
   }
 
   return (
-    <div className="phone-container flex flex-col bg-white" style={{ height: '100dvh' }}>
+    <div className="phone-container flex flex-col bg-white dark:bg-[#111111]" style={{ height: '100dvh' }}>
       {/* Header */}
       <header className="shrink-0 flex items-center gap-3 px-4 h-14">
         <button
           onClick={() => router.back()}
-          className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center"
+          className="w-8 h-8 rounded-full flex items-center justify-center"
+          style={{
+            backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f3f4f6',
+          }}
           aria-label="Back"
         >
-          <ArrowLeft size={17} strokeWidth={2} className="text-gray-700" />
+          <ArrowLeft size={17} strokeWidth={2} style={{ color: theme === 'dark' ? '#999999' : '#374151' }} />
         </button>
-        <h1 className="text-[15px] font-semibold text-gray-900">Add to Closet</h1>
+        <h1 className="text-[15px] font-semibold" style={{ color: theme === 'dark' ? '#ffffff' : '#111111' }}>Add to Closet</h1>
       </header>
 
       <main className="flex-1 overflow-y-auto px-4 pb-8">
@@ -149,7 +154,7 @@ export default function ClosetAddPage() {
         {rawImage ? (
           <div className="flex flex-col gap-5 pt-2">
             {/* Crop area + category on same screen */}
-            <div className="rounded-2xl bg-gray-100 flex justify-center" style={{ padding: '14px 14px 10px' }}>
+            <div className="rounded-2xl flex justify-center" style={{ padding: '14px 14px 10px', backgroundColor: theme === 'dark' ? '#1a1a1a' : '#f3f4f6' }}>
               <ReactCrop
                 crop={crop}
                 onChange={(c) => setCrop(c)}
@@ -167,12 +172,13 @@ export default function ClosetAddPage() {
 
             {/* Category */}
             <div>
-              <label className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2.5 block">
+              <label className="text-[11px] font-semibold uppercase tracking-wider mb-2.5 block" style={{ color: theme === 'dark' ? '#666666' : '#9ca3af' }}>
                 Category
               </label>
               <div className="flex flex-wrap gap-2">
                 {allowedCats.map((cat) => {
                   const label = CLOSET_CATEGORIES.find((c) => c.value === cat)?.label ?? cat;
+                  const isSelected = category === cat;
                   return (
                     <button
                       key={cat}
@@ -182,11 +188,16 @@ export default function ClosetAddPage() {
                           [Params.CATEGORY]: cat,
                         });
                       }}
-                      className={`px-3.5 py-[6px] rounded-full text-[12px] transition-colors
-                        ${category === cat
-                          ? 'bg-black text-white font-semibold'
-                          : 'bg-gray-100 text-gray-500 font-medium'
-                        }`}
+                      className="px-3.5 py-[6px] rounded-full text-[12px] transition-colors font-medium"
+                      style={{
+                        backgroundColor: isSelected 
+                          ? (theme === 'dark' ? '#ffffff' : '#000000')
+                          : (theme === 'dark' ? '#2a2a2a' : '#f3f4f6'),
+                        color: isSelected
+                          ? (theme === 'dark' ? '#000000' : '#ffffff')
+                          : (theme === 'dark' ? '#999999' : '#888888'),
+                        fontWeight: isSelected ? '600' : '500',
+                      }}
                     >
                       {label}
                     </button>
@@ -199,8 +210,11 @@ export default function ClosetAddPage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full py-3.5 rounded-full bg-black text-white text-[13px] font-semibold
-                         disabled:opacity-30 active:scale-[0.97] transition-transform"
+              className="w-full py-3.5 rounded-full text-[13px] font-semibold active:scale-[0.97] transition-transform disabled:opacity-30"
+              style={{
+                backgroundColor: theme === 'dark' ? '#000000' : '#000000',
+                color: theme === 'dark' ? '#ffffff' : '#ffffff',
+              }}
             >
               {saving ? 'Saving…' : 'Save to Closet'}
             </button>
@@ -208,10 +222,14 @@ export default function ClosetAddPage() {
         ) : (
           /* Empty state - prompt to pick */
           <div className="flex flex-col items-center justify-center h-64 gap-4">
-            <p className="text-[13px] font-medium text-gray-400">Choose a photo to add</p>
+            <p className="text-[13px] font-medium" style={{ color: theme === 'dark' ? '#888888' : '#999999' }}>Choose a photo to add</p>
             <button
               onClick={() => setShowPicker(true)}
-              className="px-6 py-2.5 rounded-full bg-black text-white text-[12px] font-semibold"
+              className="px-6 py-2.5 rounded-full text-[12px] font-semibold"
+              style={{
+                backgroundColor: theme === 'dark' ? '#000000' : '#000000',
+                color: theme === 'dark' ? '#ffffff' : '#ffffff',
+              }}
             >
               Select Photo
             </button>
@@ -226,39 +244,45 @@ export default function ClosetAddPage() {
           onClick={() => { setShowPicker(false); if (!rawImage) router.back(); }}
         >
           <div
-            className="w-full max-w-[430px] rounded-t-3xl bg-white"
+            className="w-full max-w-[430px] rounded-t-3xl bg-white dark:bg-[#1a1a1a]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Drag handle */}
             <div className="flex justify-center pt-3 pb-2">
-              <div className="w-9 h-1 rounded-full bg-gray-200" />
+              <div className="w-9 h-1 rounded-full bg-gray-200 dark:bg-gray-700" />
             </div>
             <div className="px-5 pb-8">
-              <h3 className="text-[15px] font-bold text-gray-900 mb-4">Add Photo</h3>
+              <h3 className="text-[15px] font-bold mb-4" style={{ color: theme === 'dark' ? '#ffffff' : '#111111' }}>Add Photo</h3>
               <div className="flex flex-col gap-2.5">
                 {/* Photo Library — primary action, opens native photo grid on mobile */}
                 <button
                   onClick={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'gallery' }); fileInputRef.current?.click(); setShowPicker(false); }}
-                  className="w-full h-14 rounded-2xl bg-gray-50 flex items-center gap-3.5 px-4 active:scale-[0.98] transition-transform"
+                  className="w-full h-14 rounded-2xl flex items-center gap-3.5 px-4 active:scale-[0.98] transition-transform"
+                  style={{
+                    backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f3f4f6',
+                  }}
                 >
                   <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #F5576c 100%)' }}>
                     <ImageIcon size={19} strokeWidth={1.8} color="#fff" />
                   </div>
                   <div className="text-left">
-                    <span className="text-[14px] font-semibold text-gray-900 block">Photo Library</span>
+                    <span className="text-[14px] font-semibold block" style={{ color: theme === 'dark' ? '#ffffff' : '#1f2937' }}>Photo Library</span>
                     <span className="text-[11px] text-gray-400">Choose from your photos</span>
                   </div>
                 </button>
                 {/* Camera */}
                 <button
                   onClick={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'camera' }); cameraInputRef.current?.click(); setShowPicker(false); }}
-                  className="w-full h-14 rounded-2xl bg-gray-50 flex items-center gap-3.5 px-4 active:scale-[0.98] transition-transform"
+                  className="w-full h-14 rounded-2xl flex items-center gap-3.5 px-4 active:scale-[0.98] transition-transform"
+                  style={{
+                    backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f3f4f6',
+                  }}
                 >
                   <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: '#FF9800' }}>
                     <Camera size={19} strokeWidth={1.8} color="#fff" />
                   </div>
                   <div className="text-left">
-                    <span className="text-[14px] font-semibold text-gray-900 block">Camera</span>
+                    <span className="text-[14px] font-semibold block" style={{ color: theme === 'dark' ? '#ffffff' : '#1f2937' }}>Camera</span>
                     <span className="text-[11px] text-gray-400">Take a new photo</span>
                   </div>
                 </button>

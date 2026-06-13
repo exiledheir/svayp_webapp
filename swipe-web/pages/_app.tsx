@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { isAuthenticated, saveTokens, getRefreshFromCloud, getUser } from '@/lib/auth';
 import { restoreOnboardingFromCloud } from '@/lib/onboarding-storage';
 import { I18nProvider } from '@/lib/i18n';
+import { ThemeProvider } from '@/lib/theme';
 import { FeatureFlagsProvider } from '@/lib/feature-flags-context';
 import {
   initAnalytics,
@@ -111,9 +112,11 @@ export default function App({ Component, pageProps }: AppProps) {
 
   return (
     <FeatureFlagsProvider>
-      <I18nProvider>
-        <Component {...pageProps} />
-      </I18nProvider>
+      <ThemeProvider>
+        <I18nProvider>
+          <Component {...pageProps} />
+        </I18nProvider>
+      </ThemeProvider>
     </FeatureFlagsProvider>
   );
 }

@@ -147,10 +147,18 @@ export interface Translations {
   profile: string;
   replayTour: string;
   logout: string;
+  theme: string;
+  themeLight: string;
+  themeDark: string;
   dayNames: [string, string, string, string, string, string, string];
   monthNames: [string, string, string, string, string, string, string, string, string, string, string, string];
   demoAddTitle: string;
   demoAddBody: string;
+  tooFewItemsTitle: string;
+  tooFewItemsBody: string;
+  outfitsExhaustedTitle: string;
+  outfitsExhaustedBody: string;
+  addClothingBtn: string;
   readyLabel: string;
   moreNeeded: string;
   regenerateWithAI: string;
@@ -378,10 +386,18 @@ const en: Translations = {
   profile: 'Profile',
   replayTour: 'Replay app tour',
   logout: 'Log out',
+  theme: 'Theme',
+  themeLight: 'light',
+  themeDark: 'dark',
   dayNames: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
   monthNames: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
   demoAddTitle: 'Add your clothes',
   demoAddBody: 'Upload a photo of your clothes to generate outfits and try them on!',
+  tooFewItemsTitle: 'Not enough variety',
+  tooFewItemsBody: 'Add more clothing items so AI can create diverse outfits for you!',
+  outfitsExhaustedTitle: 'Generating outfits',
+  outfitsExhaustedBody: 'AI is finding new combinations. Tap ✦ again in 30–60 seconds.',
+  addClothingBtn: 'Add clothing',
   readyLabel: '✓ Ready!',
   moreNeeded: '{n} more needed',
   regenerateWithAI: 'Regenerate with AI',
@@ -610,10 +626,18 @@ const ru: Translations = {
   profile: 'Профиль',
   replayTour: 'Повторить обучение',
   logout: 'Выйти',
+  theme: 'Тема',
+  themeLight: 'светлая',
+  themeDark: 'тёмная',
   dayNames: ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
   monthNames: ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'],
   demoAddTitle: 'Добавьте свою одежду',
   demoAddBody: 'Загрузите фото своих вещей, чтобы создавать образы и примерять их!',
+  tooFewItemsTitle: 'Мало одежды для новых образов',
+  tooFewItemsBody: 'Добавьте больше вещей, чтобы ИИ создал разнообразные образы!',
+  outfitsExhaustedTitle: 'Генерируем образы',
+  outfitsExhaustedBody: 'ИИ подбирает новые образы. Нажмите ✦ через 30–60 секунд.',
+  addClothingBtn: 'Добавить одежду',
   readyLabel: '✓ Готово!',
   moreNeeded: 'ещё {n}',
   regenerateWithAI: 'Обновить с AI',
@@ -840,10 +864,18 @@ const uz: Translations = {
   profile: 'Profil',
   replayTour: "Qo'llanmani qayta ko'rsatish",
   logout: 'Chiqish',
+  theme: 'Mavzu',
+  themeLight: 'oq',
+  themeDark: 'qora',
   dayNames: ['Yak', 'Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh'],
   monthNames: ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyun', 'Iyul', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'],
   demoAddTitle: "O'z kiyimlaringizni qo'shing",
   demoAddBody: "Outfit yaratish va kiyib ko'rish uchun kiyimlaringiz rasmini yuklang!",
+  tooFewItemsTitle: "Yangi obrazlar uchun kiyim yetarli emas",
+  tooFewItemsBody: "Xilma-xil obrazlar uchun AI ko'proq kiyim kerak. Yangi kiyimlar qo'shing!",
+  outfitsExhaustedTitle: "Obrazlar yaratilmoqda",
+  outfitsExhaustedBody: "AI yangi kombinatsiyalarni qidirmoqda. 30–60 soniyadan so'ng ✦ tugmasini bosing.",
+  addClothingBtn: "Kiyim qo'shish",
   readyLabel: '✓ Tayyor!',
   moreNeeded: 'yana {n} ta',
   regenerateWithAI: 'AI bilan yangilash',
