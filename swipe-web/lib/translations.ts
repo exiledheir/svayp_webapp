@@ -59,6 +59,7 @@ export interface Translations {
   tryOns: string;
   calDays: string;
   reachedRegenLimit: string;
+  reachedCanvasLimit: string;
   reachedTryOnLimit: string;
   reachedItemLimit: string;
   categoryFullError: string;
@@ -95,7 +96,13 @@ export interface Translations {
   tryOnConfirm: string;
   tryOnStarting: string;
   tryOnGenerating: string;
+  tryOnPhase2: string;
+  tryOnPhase3: string;
+  tryOnPhase4: string;
+  tryOnTimeEstimate: string;
   tryOnStyleTip: string;
+  tryOnProTip: string;
+  tryOnDidYouKnow: string;
   tryOnTips: string[];
   tryOnFailedTitle: string;
   close: string;
@@ -232,6 +239,7 @@ const en: Translations = {
   tryOns: 'virtual try-ons',
   calDays: 'days in calendar',
   reachedRegenLimit: "You've used your {n} regenerations. Upgrade for more.",
+  reachedCanvasLimit: 'This outfit board is locked. Your current plan includes {n} board(s). Upgrade to unlock all your boards.',
   reachedTryOnLimit: "You've used all {n} try-ons. Upgrade to try on more outfits.",
   reachedItemLimit: 'You\'ve reached the {n} items/category limit.',
   categoryFullError: 'This category is full ({n}/{n}). Try another category or upgrade for more slots.',
@@ -269,7 +277,13 @@ const en: Translations = {
   tryOnConfirm: 'Try It On',
   tryOnStarting: 'Starting try-on...',
   tryOnGenerating: 'Generating your look...',
+  tryOnPhase2: 'Analyzing your outfit...',
+  tryOnPhase3: 'Rendering your look...',
+  tryOnPhase4: 'Adding finishing touches...',
+  tryOnTimeEstimate: 'Usually takes 30–60 seconds',
   tryOnStyleTip: 'Style Tip',
+  tryOnProTip: 'Pro Tip',
+  tryOnDidYouKnow: 'Did you know?',
   tryOnTips: [
     'Your wardrobe may be hiding dozens of outfits you have never tried.',
     'You do not always need to buy something new to look new.',
@@ -457,6 +471,7 @@ const ru: Translations = {
   tryOns: 'примерок',
   calDays: 'дней в календаре',
   reachedRegenLimit: 'Вы использовали {n} генераций. Улучшите план для большего.',
+  reachedCanvasLimit: 'Эта доска нарядов заблокирована. Ваш текущий план включает {n} досок(у). Обновите план, чтобы разблокировать все.',
   reachedTryOnLimit: 'Вы использовали все {n} примерок. Улучшите план, чтобы примерять больше образов.',
   reachedItemLimit: 'Достигнут лимит {n} вещей на категорию.',
   categoryFullError: 'Эта категория заполнена ({n}/{n}). Добавьте в другую или улучшите план.',
@@ -494,7 +509,13 @@ const ru: Translations = {
   tryOnConfirm: 'Примерить',
   tryOnStarting: 'Запуск примерки...',
   tryOnGenerating: 'Создаём ваш образ...',
+  tryOnPhase2: 'Анализируем ваш наряд...',
+  tryOnPhase3: 'Рендерим ваш образ...',
+  tryOnPhase4: 'Добавляем финальные штрихи...',
+  tryOnTimeEstimate: 'Обычно занимает 30–60 секунд',
   tryOnStyleTip: 'Совет по стилю',
+  tryOnProTip: 'Профи-совет',
+  tryOnDidYouKnow: 'Знали ли вы?',
   tryOnTips: [
     'В вашем гардеробе могут скрываться десятки образов, которые вы ещё не пробовали.',
     'Необязательно покупать новое, чтобы выглядеть по-новому.',
@@ -662,7 +683,7 @@ const uz: Translations = {
   save: 'Saqlash',
   noItemsYet: "Hali narsalar yo'q",
   language: 'Til',
-  upgradeToGetMore: "Qo'shish uchun yangilang",
+  upgradeToGetMore: "Ko'rish uchun yangilang",
   moreAvailable: 'ta joy mavjud',
   saveFailed: "Obrazni saqlashda xatolik. Qaytadan urinib ko'ring.",
   addItemsFirst: "Avval garderobingizga kiyim qo'shing",
@@ -681,7 +702,8 @@ const uz: Translations = {
   regens: 'ta re-generatsiya',
   tryOns: "ta kiyib ko'rish",
   calDays: 'kun kalendarda',
-  reachedRegenLimit: "{n} ta re-generatsiyadan foydalandingiz. Ko'proq uchun yangilang.",
+  reachedRegenLimit: "Siz {n} ta outfit generatsiyasidan foydalandingiz. Ko'proq uchun obunangizni yangilang.",
+  reachedCanvasLimit: "Bu obrazlar doskasi qulflangan. Joriy rejangizda {n} ta doska mavjud. Barchasini ochish uchun obunangizni yangilang.",
   reachedTryOnLimit: "{n} ta kiyib ko'rishdan foydalandingiz. Ko'proq uchun rejani yangilang.",
   reachedItemLimit: 'Kategoriyada {n} ta kiyim chegarasiga yetdingiz.',
   categoryFullError: "Bu kategoriya to'lgan ({n}/{n}). Boshqasiga qo'shing yoki rejani yangilang.",
@@ -717,7 +739,13 @@ const uz: Translations = {
   tryOnConfirm: "Kiyib ko'rish",
   tryOnStarting: "Kiyib ko'rish boshlanyapti...",
   tryOnGenerating: "Ko'rinishingiz yaratilyapti...",
+  tryOnPhase2: "Outfitingiz tahlil qilinyapti...",
+  tryOnPhase3: "Ko'rinishingiz renderlanmoqda...",
+  tryOnPhase4: "Yakuniy bezaklar qo'shilmoqda...",
+  tryOnTimeEstimate: 'Odatda 30–60 soniya davom etadi',
   tryOnStyleTip: 'Stil maslahati',
+  tryOnProTip: 'Pro maslahat',
+  tryOnDidYouKnow: 'Bilasizmi?',
   tryOnTips: [
     "Garderobingizda hali foydalanilmagan o'nlab obrazlar yashiringan bo'lishi mumkin.",
     "Yangicha ko'rinish uchun har doim yangi kiyim sotib olish shart emas.",

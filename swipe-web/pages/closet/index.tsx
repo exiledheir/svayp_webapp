@@ -237,7 +237,7 @@ export default function ClosetPage() {
   const [canvases, setCanvases] = useState<{ id: string | null; layout: SavedCanvasLayout }[]>([]);
   const [editingCanvasIdx, setEditingCanvasIdx] = useState<number | null>(null);
   const [canvasInitialLayout, setCanvasInitialLayout] = useState<SavedCanvasLayout | null>(null);
-  const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | 'categoryFull' | 'tryOn' | null>(null);
+  const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | 'categoryFull' | 'tryOn' | 'canvas' | null>(null);
   const { plan, limits, usage, fetchPlan, canGenerate, canTryOn, calendarDays } = usePlan();
 
   // Count per group (upper/lower/shoes/acc) — the limit is per group, not per subcategory.
@@ -319,7 +319,7 @@ export default function ClosetPage() {
 
   const [outfitSheet, setOutfitSheet] = useState<{ title: string; days: Date[] } | null>(null);
   const [editItem, setEditItem] = useState<ClosetItem | null>(null);
-  const [tryOnState, setTryOnState] = useState<{ status: 'loading' | 'processing' | 'completed' | 'failed'; resultUrl?: string; failureReason?: string } | null>(null);
+  const [tryOnState, setTryOnState] = useState<{ status: 'loading' | 'processing' | 'completed' | 'failed'; resultUrl?: string; failureReason?: string; previewImages?: string[] } | null>(null);
   const [showTryOnConfirm, setShowTryOnConfirm] = useState(false);
   const [showMyLooks, setShowMyLooks] = useState(false);
   const [myLooksHistory, setMyLooksHistory] = useState<TryOnRecord[]>([]);
@@ -1060,7 +1060,11 @@ export default function ClosetPage() {
     tryOnOverrideRef.current = null;
     if (itemIds.length === 0) return;
 
-    setTryOnState({ status: 'loading' });
+    const previewImages = itemIds.slice(0, 4)
+      .map((id) => items.find((i) => i.id === id)?.imageData)
+      .filter(Boolean) as string[];
+
+    setTryOnState({ status: 'loading', previewImages });
 
     createTryOnJob({ wardrobeItemIds: itemIds, canvasId })
       .then((job) => {
@@ -1068,13 +1072,13 @@ export default function ClosetPage() {
         saveActiveTryOnJob(job.id);
         tryOnStartTimeRef.current = Date.now();
         logAnalyticsEvent(Events.TRYON_PROCESSING_STARTED);
-        setTryOnState({ status: 'processing' });
+        setTryOnState((prev) => ({ status: 'processing', previewImages: prev?.previewImages }));
         fetchPlan();
         activeTryOnHandleRef.current = watchTryOnUntilDone(
           job.id,
           (progress) => {
             if (!tryOnCancelRef.current && progress.status === 'PROCESSING') {
-              setTryOnState({ status: 'processing' });
+              setTryOnState((prev) => ({ status: 'processing', previewImages: prev?.previewImages }));
             }
           },
           (result) => {
@@ -1367,6 +1371,7 @@ export default function ClosetPage() {
               acc: items.filter((i) => ACC_CATS.includes(i.category)),
             });
           }}
+          plansEnabled={plansEnabled}
           canAddCanvas={hasDemoItems ? false : canAddCanvas}
           onAddCanvas={() => {
             // Create a new empty canvas at the end of the list
@@ -1379,6 +1384,7 @@ export default function ClosetPage() {
           }}
           onRegenerate={(idx) => handleNewOutfit(idx)}
           onShowPlans={() => setShowPremiumGate('generation')}
+          onShowCanvasPlans={() => setShowPremiumGate('canvas')}
           onTryItOn={(idx) => handleTryItOn(idx)}
           onDeleteCanvas={handleDeleteCanvas}
           onAddItem={(cat) => openAdd(UPPER_CATS.includes(cat) ? 'upper' : LOWER_CATS.includes(cat) ? 'lower' : SHOES_CATS.includes(cat) ? 'shoes' : 'acc', cat)}
@@ -1603,6 +1609,7 @@ export default function ClosetPage() {
           status={tryOnState.status}
           resultUrl={tryOnState.resultUrl}
           failureReason={tryOnState.failureReason}
+          previewImages={tryOnState.previewImages}
           onClose={() => setTryOnState(null)}
           onRetry={startTryOn}
           onCancel={handleCancelTryOn}
@@ -1918,7 +1925,7 @@ export default function ClosetPage() {
 }
 
 // ─── My Outfits ─────────────────────────────────────────────────────────────────
-function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem, allowAutoGenerate }: {
+function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onShowCanvasPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem, allowAutoGenerate, plansEnabled }: {
   allItems: ClosetItem[];
   canvases: { id: string | null; layout: SavedCanvasLayout }[];
   plan: UserPlan;
@@ -1928,6 +1935,8 @@ function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits
   tryOnCount: number;
   canAddCanvas: boolean;
   allowAutoGenerate: boolean;
+  plansEnabled: boolean;
+  onShowCanvasPlans: () => void;
   onViewItems: (idx: number) => void;
   onRegenerate: (idx: number) => void;
   onAddCanvas: () => void;
@@ -1965,6 +1974,8 @@ function OutfitSection({ allItems, canvases, plan, canGenerate, genCount, limits
             onDelete={idx > 0 ? () => onDeleteCanvas(idx) : undefined}
             onAddItem={onAddItem}
             allowAutoGenerate={allowAutoGenerate}
+            isLocked={plansEnabled && idx >= limits.outfitCanvases}
+            onShowPlans={plansEnabled && idx >= limits.outfitCanvases ? onShowCanvasPlans : onShowPlans}
           />
         )) : (
           <OutfitCard
@@ -2062,6 +2073,8 @@ function OutfitCard({
   onDelete,
   onAddItem,
   allowAutoGenerate,
+  isLocked,
+  onShowPlans,
 }: {
   allItems: ClosetItem[];
   isEmpty: boolean;
@@ -2078,6 +2091,8 @@ function OutfitCard({
   onDelete?: () => void | Promise<void>;
   onAddItem?: (cat: ClosetCategory) => void;
   allowAutoGenerate: boolean;
+  isLocked?: boolean;
+  onShowPlans?: () => void;
 }) {
   const { t } = useI18n();
 
@@ -2129,7 +2144,7 @@ function OutfitCard({
   return (
     <div
       data-coach="outfit-card"
-      className="shrink-0 rounded-[28px] flex flex-col border border-gray-100 relative"
+      className="shrink-0 rounded-[28px] flex flex-col border border-gray-100 relative overflow-hidden"
       style={{
         width: 'min(82vw, 340px)',
         height: 440,
@@ -2330,6 +2345,27 @@ function OutfitCard({
         </button>
         )}
       </div>
+      )}
+
+      {/* Locked overlay — shown when plan no longer covers this canvas slot */}
+      {isLocked && (
+        <div
+          className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 cursor-pointer active:scale-[0.98] transition-transform"
+          style={{
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            background: 'rgba(255,255,255,0.30)',
+          }}
+          onClick={onShowPlans}
+        >
+          <div
+            className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg"
+            style={{ background: 'linear-gradient(135deg, #B8860B 0%, #8B6914 100%)' }}
+          >
+            <Crown size={22} strokeWidth={1.5} color="#FFD700" />
+          </div>
+          <p className="text-[13px] font-semibold text-gray-700">{t.upgradeToGetMore}</p>
+        </div>
       )}
     </div>
   );
@@ -3587,6 +3623,7 @@ function TryOnModal({
   status,
   resultUrl,
   failureReason,
+  previewImages,
   onClose,
   onRetry,
   onCancel,
@@ -3594,6 +3631,7 @@ function TryOnModal({
   status: 'loading' | 'processing' | 'completed' | 'failed';
   resultUrl?: string;
   failureReason?: string;
+  previewImages?: string[];
   onClose: () => void;
   onRetry: () => void;
   onCancel: () => void;
@@ -3602,9 +3640,22 @@ function TryOnModal({
   const [isDownloading, setIsDownloading] = useState(false);
   const [tipIndex, setTipIndex] = useState(() => Math.floor(Math.random() * 49));
   const [tipFading, setTipFading] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [activeItemIdx, setActiveItemIdx] = useState(0);
+  const [phaseFading, setPhaseFading] = useState(false);
 
+  const isProcessing = status === 'loading' || status === 'processing';
+
+  // Elapsed timer (drives progress bar + phase labels)
   useEffect(() => {
-    if (status !== 'loading' && status !== 'processing') return;
+    if (!isProcessing) { setElapsed(0); return; }
+    const id = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [isProcessing]);
+
+  // Tip rotation
+  useEffect(() => {
+    if (!isProcessing) return;
     const interval = setInterval(() => {
       setTipFading(true);
       setTimeout(() => {
@@ -3613,7 +3664,44 @@ function TryOnModal({
       }, 350);
     }, 6000);
     return () => clearInterval(interval);
-  }, [status]);
+  }, [isProcessing, t.tryOnTips.length]);
+
+  // Active item cycling (for scanning animation)
+  useEffect(() => {
+    if (!isProcessing || !previewImages?.length) return;
+    const id = setInterval(() => {
+      setActiveItemIdx((i) => (i + 1) % (previewImages?.length ?? 1));
+    }, 1500);
+    return () => clearInterval(id);
+  }, [isProcessing, previewImages?.length]);
+
+  // Phase label + fade
+  const prevPhaseRef = React.useRef(0);
+  const currentPhase = elapsed < 10 ? 0 : elapsed < 25 ? 1 : elapsed < 45 ? 2 : 3;
+  useEffect(() => {
+    if (currentPhase !== prevPhaseRef.current) {
+      prevPhaseRef.current = currentPhase;
+      setPhaseFading(true);
+      setTimeout(() => setPhaseFading(false), 350);
+    }
+  }, [currentPhase]);
+
+  const phaseLabels = [t.tryOnStarting, t.tryOnPhase2, t.tryOnPhase3, t.tryOnPhase4];
+  const tipHeaders = ['✦ ' + t.tryOnStyleTip, '✦ ' + t.tryOnProTip, '✦ ' + t.tryOnDidYouKnow];
+
+  // 4 segments with durations: 10s, 15s, 20s, 15s = 60s total
+  // Each segment fills fully when its phase is passed, partially when current
+  const PHASE_ENDS = [10, 25, 45, 60];
+  function segmentFill(segIdx: number): number {
+    if (status === 'completed') return 100;
+    const segStart = segIdx === 0 ? 0 : PHASE_ENDS[segIdx - 1];
+    const segEnd = PHASE_ENDS[segIdx];
+    if (elapsed >= segEnd) return 100;
+    if (elapsed <= segStart) return 0;
+    return Math.round(((elapsed - segStart) / (segEnd - segStart)) * 100);
+  }
+  const secondsLeft = Math.max(0, 60 - elapsed);
+  const timeLabel = status === 'completed' ? null : elapsed < 5 ? t.tryOnTimeEstimate : `~${secondsLeft}s`;
 
   async function downloadWithLogo() {
     if (!resultUrl || isDownloading) return;
@@ -3638,21 +3726,116 @@ function TryOnModal({
       >
         {/* Result area */}
         <div className="relative w-full" style={{ minHeight: status === 'completed' ? 420 : 300 }}>
-          {(status === 'loading' || status === 'processing') && (
+          {isProcessing && (
             <div className="w-full flex flex-col items-center justify-center gap-4 px-5 pt-8 pb-6">
+
+              {/* ── AI Scanning item strip ── */}
+              {previewImages && previewImages.length > 0 && (
+                <div className="relative w-full flex justify-center">
+                  <div
+                    className="relative flex gap-2.5 items-center justify-center px-3 py-3 rounded-2xl overflow-hidden"
+                    style={{ background: 'rgba(243,112,167,0.06)' }}
+                  >
+                    {/* Scan beam sweeps across the entire row */}
+                    <div
+                      className="pointer-events-none absolute inset-0 rounded-2xl"
+                      style={{
+                        background: 'linear-gradient(90deg, transparent 0%, rgba(243,112,167,0.22) 50%, transparent 100%)',
+                        animation: 'tryOnScanBeam 2.4s ease-in-out infinite',
+                      }}
+                    />
+                    {previewImages.map((src, i) => {
+                      const isActive = i === activeItemIdx;
+                      return (
+                        <div
+                          key={i}
+                          className="relative shrink-0 overflow-hidden rounded-xl transition-all duration-500"
+                          style={{
+                            width: 60,
+                            height: 60,
+                            transform: isActive ? 'scale(1.10)' : 'scale(1)',
+                            boxShadow: isActive
+                              ? '0 0 0 2.5px #F370A7, 0 4px 16px rgba(243,112,167,0.45)'
+                              : '0 1px 4px rgba(0,0,0,0.10)',
+                            filter: isActive ? 'grayscale(0%)' : 'grayscale(20%)',
+                            background: '#f9fafb',
+                          }}
+                        >
+                          <Image src={src} alt="outfit item" fill className="object-contain" unoptimized />
+                          {/* Shimmer overlay on active item */}
+                          {isActive && (
+                            <div
+                              className="absolute inset-0 rounded-xl pointer-events-none"
+                              style={{
+                                background: 'linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.55) 50%, transparent 70%)',
+                                animation: 'tryOnItemShimmer 1.2s ease-in-out infinite',
+                              }}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Spinner ── */}
               <div className="relative">
-                <div className="w-16 h-16 rounded-full border-[3px] border-gray-200 border-t-[#F370A7] animate-spin" />
-                <Sparkles size={20} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[#F370A7]" />
+                <div className="w-14 h-14 rounded-full border-[3px] border-gray-200 border-t-[#F370A7] animate-spin" />
+                <Sparkles size={18} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[#F370A7]" />
               </div>
-              <div className="text-center">
-                <p className="text-[15px] font-semibold text-gray-900">
-                  {status === 'loading' ? t.tryOnStarting : t.tryOnGenerating}
+
+              {/* ── Segmented progress bar + time estimate ── */}
+              <div className="w-full">
+                <div className="flex gap-1.5 mb-1.5">
+                  {[0, 1, 2, 3].map((seg) => {
+                    const fill = segmentFill(seg);
+                    const isActive = seg === currentPhase && status !== 'completed';
+                    return (
+                      <div
+                        key={seg}
+                        className="flex-1 h-1.5 rounded-full overflow-hidden"
+                        style={{ background: '#f0f0f0' }}
+                      >
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${fill}%`,
+                            background: isActive
+                              ? 'linear-gradient(90deg, #F370A7, #e0409a)'
+                              : fill === 100
+                              ? '#F370A7'
+                              : 'transparent',
+                            transition: isActive ? 'width 1s ease-out' : 'none',
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                {timeLabel && (
+                  <p className="text-center text-[11px] text-gray-400 font-medium">
+                    {timeLabel}
+                  </p>
+                )}
+              </div>
+
+              {/* ── Phase label ── */}
+              <div className="text-center" style={{ minHeight: '1.4em' }}>
+                <p
+                  className="text-[14px] font-semibold text-gray-900"
+                  style={{ opacity: phaseFading ? 0 : 1, transition: 'opacity 0.35s ease' }}
+                >
+                  {phaseLabels[currentPhase]}
                 </p>
               </div>
-              {/* Rotating style tip */}
+
+              {/* ── Style tip card ── */}
               <div className="w-full">
                 <div className="bg-gray-50 rounded-2xl px-4 py-3">
-                  <p className="text-[10px] font-semibold text-[#F370A7] uppercase tracking-wider mb-1.5">✦ {t.tryOnStyleTip}</p>
+                  <p className="text-[10px] font-semibold text-[#F370A7] uppercase tracking-wider mb-1.5">
+                    {tipHeaders[tipIndex % 3]}
+                  </p>
                   <div style={{ opacity: tipFading ? 0 : 1, transition: 'opacity 0.35s ease', minHeight: '3.5em' }}>
                     <p className="text-[12px] text-gray-600 leading-relaxed">{t.tryOnTips[tipIndex]}</p>
                   </div>
@@ -3841,6 +4024,8 @@ function PremiumGateSheet({
           <p className="text-[13px] text-gray-500 text-center mb-5 leading-snug px-2">
             {reason === 'generation'
               ? t.reachedRegenLimit.replace('{n}', String(PLAN_LIMITS_FALLBACK[currentPlan].regenerations))
+              : reason === 'canvas'
+              ? t.reachedCanvasLimit.replace('{n}', String(PLAN_LIMITS_FALLBACK[currentPlan].outfitCanvases))
               : reason === 'tryOn'
               ? t.reachedTryOnLimit.replace('{n}', String(PLAN_LIMITS_FALLBACK[currentPlan].tryItOns))
               : reason === 'categoryFull'
