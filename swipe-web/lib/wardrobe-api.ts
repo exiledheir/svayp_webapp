@@ -212,14 +212,19 @@ export function watchUploadUntilDone(
   // Fallback polling gets a longer timeout than SSE — by the time SSE
   // has timed out (3 min), the ML pipeline may still be running.
   const FALLBACK_POLL_TIMEOUT = 15 * 60 * 1000;
+  // SSE events arrive as raw JSON and are NOT passed through mapUploadStatus
+  // by watchWithSse. The backend may send snake_case keys (current_step,
+  // progress_percent) so we must normalise every SSE event before forwarding.
+  const mapRaw = (raw: WardrobeUploadStatus) =>
+    mapUploadStatus(raw as unknown as Record<string, unknown>);
   return watchWithSse<WardrobeUploadStatus, WardrobeUploadStatus>({
     sseUrl: `/wardrobe/uploads/${jobId}/stream`,
     fallbackPoll: () => pollUploadUntilDone(jobId, onProgress, FALLBACK_POLL_TIMEOUT),
-    onProgress,
-    onDone,
+    onProgress: (raw) => onProgress(mapRaw(raw)),
+    onDone: (raw) => onDone(mapRaw(raw)),
     onError,
-    isTerminal: (s) => TERMINAL_STATUSES.has(s.status),
-    toFinal: (s) => s,
+    isTerminal: (raw) => TERMINAL_STATUSES.has((raw as unknown as Record<string, unknown>).status as string ?? raw.status),
+    toFinal: (raw) => mapRaw(raw),
     timeoutMs: POLL_TIMEOUT_MS,
   });
 }
@@ -350,7 +355,12 @@ export async function uploadWardrobeItem(
   await uploadFileToBlob(putUrl, file, contentType);
 
   // 3. Confirm upload → start AI pipeline
-  await confirmUpload(uploadJobId);
+  const confirmStatus = await confirmUpload(uploadJobId);
+
+  // Fire an immediate progress update with the post-confirmation status so the
+  // UI card transitions away from "Uploading…" right away, without waiting for
+  // the first SSE event (which may arrive with a delay).
+  onProgress?.(confirmStatus);
 
   // 4. Watch via SSE — backend pushes every ML callback (NSFW_SCAN → UPSCALE →
   // BG_REMOVE → EMBED → ANALYZE → COMPLETED) so we get the same intermediate
