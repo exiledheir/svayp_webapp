@@ -254,14 +254,17 @@ export default function ClosetPage() {
 
   // Count per group (upper/lower/shoes/acc) — the limit is per group, not per subcategory.
   // Demo items don't count toward the limit.
+  // Pending (in-flight) uploads are included so rapid back-to-back submissions
+  // can't bypass the cap before any upload completes.
   function canAddToCategory(cat: string): boolean {
     const groupCats = UPPER_CATS.includes(cat as ClosetCategory) ? UPPER_CATS
       : LOWER_CATS.includes(cat as ClosetCategory) ? LOWER_CATS
       : SHOES_CATS.includes(cat as ClosetCategory) ? SHOES_CATS
       : ACC_CATS.includes(cat as ClosetCategory) ? ACC_CATS
       : [cat as ClosetCategory];
-    const count = items.filter((i) => groupCats.includes(i.category) && !DEMO_ITEM_IDS.has(i.id)).length;
-    return count < limits.itemsPerCategory;
+    const completedCount = items.filter((i) => groupCats.includes(i.category) && !DEMO_ITEM_IDS.has(i.id)).length;
+    const pendingCount = Array.from(pendingUploads.values()).filter((p) => groupCats.includes(p.category)).length;
+    return completedCount + pendingCount < limits.itemsPerCategory;
   }
 
   // ── Analytics: upgrade modal shown ──────────────────────────────────────
@@ -1284,7 +1287,7 @@ export default function ClosetPage() {
             {profileEnabled && (
               <button
                 onClick={() => setShowProfile(true)}
-                className="flex items-center justify-center px-2 h-9 rounded-full active:scale-[0.95] transition-transform"
+                className="relative flex items-center justify-center px-2 h-9 rounded-full active:scale-[0.95] transition-transform"
                 style={{
                   background: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
                   minWidth: 38,
@@ -1292,6 +1295,12 @@ export default function ClosetPage() {
                 aria-label="Profile"
               >
                 <User size={14} strokeWidth={1.8} style={{ color: theme === 'dark' ? '#888' : '#666' }} />
+                <span
+                  className="absolute top-0.5 right-1 text-[9px] leading-none select-none"
+                  aria-hidden="true"
+                >
+                  {locale === 'uz' ? '🇺🇿' : locale === 'ru' ? '🇷🇺' : '🇬🇧'}
+                </span>
               </button>
             )}
           </div>
