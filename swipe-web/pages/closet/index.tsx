@@ -3019,7 +3019,7 @@ interface ClothingSectionProps {
   items: ClosetItem[];
   totalCount: number;
   maxCount: number;
-  pendingItems?: { id: string; category: ClosetCategory; imageData: string; step: string; progress: number }[];
+  pendingItems?: { id: string; category: ClosetCategory; imageData: string; step: string; progress: number; startedAt: number }[];
   onFilterChange: (cat: ClosetCategory | null) => void;
   onTapItem: (item: ClosetItem) => void;
   onViewAll: () => void;
