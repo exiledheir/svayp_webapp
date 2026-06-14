@@ -252,6 +252,34 @@ export default function ClosetPage() {
   const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | 'categoryFull' | 'tryOn' | 'canvas' | null>(null);
   const { plan, limits, usage, fetchPlan, canGenerate, canTryOn, calendarDays } = usePlan();
 
+  // ── 24h promo countdown timer ─────────────────────────────────────────────────
+  const PROMO_DURATION_MS = 24 * 60 * 60 * 1000;
+  const [promoSecondsLeft, setPromoSecondsLeft] = useState<number>(PROMO_DURATION_MS / 1000);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const userKey = userInfo?.phoneNumber ?? 'guest';
+    const PROMO_TIMER_KEY = `promoTimerStart_${userKey}`;
+    let stored = localStorage.getItem(PROMO_TIMER_KEY);
+    if (!stored) {
+      stored = String(Date.now());
+      localStorage.setItem(PROMO_TIMER_KEY, stored);
+    }
+    const startMs = parseInt(stored, 10);
+    const calc = () => {
+      const remaining = Math.max(0, PROMO_DURATION_MS - (Date.now() - startMs));
+      setPromoSecondsLeft(Math.floor(remaining / 1000));
+    };
+    calc();
+    const interval = setInterval(calc, 1000);
+    return () => clearInterval(interval);
+  }, [userInfo?.phoneNumber]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const promoHH = String(Math.floor(promoSecondsLeft / 3600)).padStart(2, '0');
+  const promoMM = String(Math.floor((promoSecondsLeft % 3600) / 60)).padStart(2, '0');
+  const promoSS = String(promoSecondsLeft % 60).padStart(2, '0');
+  const promoTimeStr = `${promoHH}:${promoMM}:${promoSS}`;
+
   // Count per group (upper/lower/shoes/acc) — the limit is per group, not per subcategory.
   // Demo items don't count toward the limit.
   // Pending (in-flight) uploads are included so rapid back-to-back submissions
@@ -1311,20 +1339,17 @@ export default function ClosetPage() {
         </div>
       </header>
 
-      {/* ── Promo Banner: 1+1 Aksiya ─────────────────────────────── */}
-      {/* DISABLED: 1+1 deal banner temporarily commented out
+      {/* ── Promo Banner: 20% sale ────────────────────────────────── */}
+      {plan === 'free' && promoSecondsLeft > 0 && (
       <div
         onClick={() => setShowPremiumGate('generation')}
         className="shrink-0 mx-3 mb-2 rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform select-none"
         style={{
-          background: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 50%, #f7971e 100%)',
-          boxShadow: '0 4px 18px rgba(255,75,43,0.4)',
+          background: 'linear-gradient(135deg, #7b2ff7 0%, #f107a3 100%)',
+          boxShadow: '0 4px 18px rgba(123,47,247,0.4)',
         }}
       >
         <div className="relative px-4 py-3 flex items-center gap-3">
-          <div className="shrink-0 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-[22px] leading-none">
-            🔥
-          </div>
           <div className="flex-1 min-w-0">
             <p className="text-white font-extrabold text-[13px] leading-snug">
               {t.promoBannerTitle}
@@ -1332,21 +1357,27 @@ export default function ClosetPage() {
             <p className="text-white/90 text-[10.5px] font-medium leading-snug mt-0.5 line-clamp-2">
               {t.promoBannerBody}
             </p>
+            <p className="text-white/70 text-[9.5px] font-medium leading-snug mt-1">
+              {t.promoBannerNote}
+            </p>
           </div>
-          <button
-            onClick={(e) => { e.stopPropagation(); setShowPremiumGate('generation'); }}
-            className="shrink-0 px-3 py-1.5 rounded-full bg-white text-[11px] font-bold active:scale-[0.95] transition-transform whitespace-nowrap"
-            style={{ color: '#ff4b2b' }}
-          >
-            {t.promoBannerCta}
-          </button>
+          <div className="shrink-0 flex flex-col items-center gap-1.5">
+            <span className="text-white font-black text-[13px] tabular-nums leading-none tracking-tight">{promoTimeStr}</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowPremiumGate('generation'); }}
+              className="px-3 py-1.5 rounded-full bg-white text-[11px] font-bold active:scale-[0.95] transition-transform whitespace-nowrap"
+              style={{ color: '#7b2ff7' }}
+            >
+              {t.promoBannerCta}
+            </button>
+          </div>
         </div>
         <div
           className="h-[3px] w-full"
           style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%)', backgroundSize: '200% 100%', animation: 'shimmer 2s infinite linear' }}
         />
       </div>
-      */}
+      )}
       <style jsx>{`
         @keyframes shimmer {
           0%   { background-position: -200% 0; }

@@ -118,6 +118,8 @@ export interface Translations {
   promoBannerTitle: string;
   promoBannerBody: string;
   promoBannerCta: string;
+  promoBannerTimerLabel: string;
+  promoBannerNote: string;
   // ── Coach marks ────────────────────────────────────────────────
   coachAddTitle: string;
   coachAddBody: string;
@@ -354,9 +356,11 @@ const en: Translations = {
   justNow: 'Just now',
   minutesAgo: '{n}m ago',
   yesterday: 'Yesterday',
-  promoBannerTitle: 'Limited offer: 1+1 deal!',
-  promoBannerBody: 'Buy 1 month of Libas AI Wardrobe subscription and get another month completely free. Limited offer!',
-  promoBannerCta: 'Get offer',
+  promoBannerTitle: '20% off Pro & Premium 🔥',
+  promoBannerBody: 'Subscribe today and unlock all AI stylist features.',
+  promoBannerCta: 'Subscribe',
+  promoBannerTimerLabel: 'Offer expires in',
+  promoBannerNote: 'Offer valid for a limited time only.',
   // ── Coach marks ────────────────────────────────────────────────
   coachAddTitle: 'Add your clothes',
   coachAddBody: 'Tap + to upload a photo of any clothing item. AI removes the background automatically.',
@@ -594,9 +598,11 @@ const ru: Translations = {
   justNow: 'Только что',
   minutesAgo: '{n} мин назад',
   yesterday: 'Вчера',
-  promoBannerTitle: 'Только сейчас: акция 1+1!',
-  promoBannerBody: 'Оформите подписку Libas AI Гардероб на 1 месяц и получите ещё 1 месяц совершенно бесплатно. Предложение ограничено!',
-  promoBannerCta: 'Получить',
+  promoBannerTitle: 'Скидка 20% на Pro и Premium 🔥',
+  promoBannerBody: 'Подпишитесь сегодня и откройте все возможности AI-стилиста.',
+  promoBannerCta: 'Подписаться',
+  promoBannerTimerLabel: 'Предложение истекает через',
+  promoBannerNote: 'Акция действует ограниченное время.',
   // ── Coach marks ────────────────────────────────────────────────
   coachAddTitle: 'Добавьте одежду',
   coachAddBody: 'Нажмите + чтобы загрузить фото любой вещи. AI удалит фон автоматически.',
@@ -832,9 +838,11 @@ const uz: Translations = {
   justNow: 'Hozirgina',
   minutesAgo: '{n} daqiqa oldin',
   yesterday: 'Kecha',
-  promoBannerTitle: 'Faqat hozir: 1+1 aksiya!',
-  promoBannerBody: 'Libas AI Garderob obunasini 1 oyga oling va yana 1 oy mutlaqo bepul foydalaning. Taklif cheklangan!',
-  promoBannerCta: 'Taklifni olish',
+  promoBannerTitle: 'Premium va Pro obunalariga 20% chegirma 🔥',
+  promoBannerBody: 'Bugunoq obuna bo\'ling va AI stilistning barcha imkoniyatlarini oching.',
+  promoBannerCta: 'Obuna bo\'lish',
+  promoBannerTimerLabel: 'Taklif tugashiga',
+  promoBannerNote: 'Taklif cheklangan vaqt davomida amal qiladi.',
   // ── Coach marks ────────────────────────────────────────────────
   coachAddTitle: "Kiyimlaringizni qo'shing",
   coachAddBody: "Istalgan kiyim rasmini yuklash uchun + bosing. AI fonni avtomatik olib tashlaydi.",
