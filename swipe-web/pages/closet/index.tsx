@@ -367,7 +367,7 @@ export default function ClosetPage() {
   const [addCompletedCrop, setAddCompletedCrop] = useState<PixelCrop>();
   const [addSaving, setAddSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [pendingUploads, setPendingUploads] = useState<Map<string, { category: ClosetCategory; imageData: string; step: string; progress: number }>>(new Map());
+  const [pendingUploads, setPendingUploads] = useState<Map<string, { category: ClosetCategory; imageData: string; step: string; progress: number; startedAt: number }>>(new Map());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const cropImgRef = useRef<HTMLImageElement>(null);
@@ -482,9 +482,10 @@ export default function ClosetPage() {
 
     const pendingId = `pending_${Date.now()}`;
     const category = addCategory;
+    const uploadStartedAt = Date.now();
 
     // Immediately close the add sheet and show placeholder in grid
-    setPendingUploads((prev) => new Map(prev).set(pendingId, { category, imageData: previewImage, step: t.uploading, progress: 0 }));
+    setPendingUploads((prev) => new Map(prev).set(pendingId, { category, imageData: previewImage, step: t.uploading, progress: 0, startedAt: uploadStartedAt }));
     setAddRawImage('');
     setShowAddPicker(false);
     addFileRef.current = null;
@@ -513,8 +514,8 @@ export default function ClosetPage() {
           }
         }, (jobId) => {
           activeJobId = jobId;
-          // Persist thumbnail + category so it survives page reload
-          saveUploadPreview(jobId, previewImage, category);
+          // Persist thumbnail + category + start time so it survives page reload
+          saveUploadPreview(jobId, previewImage, category, uploadStartedAt);
         });
         // Upload complete — remove pending, reload items
         if (activeJobId) clearUploadPreview(activeJobId);
@@ -648,6 +649,8 @@ export default function ClosetPage() {
           const pid = `resume_${job.uploadJobId}`;
           const jobId = job.uploadJobId;
           const stored = getUploadPreview(jobId);
+          // Use persisted startedAt if available; otherwise estimate from updatedAt
+          const resumedStartedAt = stored?.startedAt ?? (Date.now() - (Date.now() - new Date(job.updatedAt).getTime()));
           setPendingUploads((prev) => {
             if (prev.has(pid)) return prev;
             const next = new Map(prev);
@@ -656,6 +659,7 @@ export default function ClosetPage() {
               imageData: stored?.preview ?? '',
               step: formatStep(job.currentStep),
               progress: job.progressPercent,
+              startedAt: resumedStartedAt,
             });
             return next;
           });
@@ -3080,6 +3084,7 @@ function ClothingSection({ title, cats, filter, items, totalCount, maxCount, pen
               isProcessing
               processingStep={p.step}
               processingProgress={p.progress}
+              startedAt={p.startedAt}
               onRemove={onRemovePending ? () => onRemovePending(p.id) : undefined}
             />
           ))}
@@ -3107,8 +3112,32 @@ function FilterChip({ label, selected, onClick }: { label: string; selected: boo
   );
 }
 
-function ClothingItemCard({ item, onTap, isProcessing, processingStep, processingProgress, onRemove }: { item: ClosetItem; onTap: () => void; isProcessing?: boolean; processingStep?: string; processingProgress?: number; onRemove?: () => void }) {
+function ClothingItemCard({ item, onTap, isProcessing, startedAt, onRemove }: { item: ClosetItem; onTap: () => void; isProcessing?: boolean; processingStep?: string; processingProgress?: number; startedAt?: number; onRemove?: () => void }) {
   const { t } = useI18n();
+
+  // Simulated progress — runs a local timer so the card always animates
+  // smoothly regardless of whether SSE/polling events arrive.
+  // Phases: 0–8s Uploading | 8–20s Checking | 20–40s Generating | 40–55s Removing bg | 55–60s Almost done
+  // Progress is capped at 95% until the entry is removed (item done).
+  // initialElapsed is computed from startedAt so reloads resume mid-animation.
+  const PHASES: { until: number; label: () => string }[] = [
+    { until: 8,  label: () => t.uploading },
+    { until: 20, label: () => t.stepChecking },
+    { until: 40, label: () => t.stepGenerating },
+    { until: 55, label: () => t.stepRemovingBg },
+    { until: 60, label: () => t.stepAlmostDone },
+  ];
+  const initialElapsed = startedAt ? Math.min(Math.floor((Date.now() - startedAt) / 1000), 60) : 0;
+  const [elapsed, setElapsed] = useState(initialElapsed);
+  useEffect(() => {
+    if (!isProcessing) return;
+    const id = setInterval(() => setElapsed((s) => Math.min(s + 1, 60)), 1000);
+    return () => clearInterval(id);
+  }, [isProcessing]);
+
+  const currentPhase = PHASES.find((p) => elapsed < p.until) ?? PHASES[PHASES.length - 1];
+  const simProgress = Math.min(Math.round((elapsed / 60) * 95), 95);
+
   return (
     <div
       className={`shrink-0 w-[120px] h-[168px] rounded-2xl overflow-hidden relative cursor-pointer
@@ -3134,12 +3163,10 @@ function ClothingItemCard({ item, onTap, isProcessing, processingStep, processin
             </button>
           )}
           <div className="w-8 h-8 mb-1.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-          <span className="text-[9px] font-medium text-white text-center px-2 leading-tight">{processingStep}</span>
-          {(processingProgress ?? 0) > 0 && (
-            <div className="w-[70%] h-1 mt-1.5 rounded-full bg-white/20 overflow-hidden">
-              <div className="h-full bg-green-400 rounded-full transition-all duration-500" style={{ width: `${processingProgress}%` }} />
-            </div>
-          )}
+          <span className="text-[9px] font-medium text-white text-center px-2 leading-tight">{currentPhase.label()}</span>
+          <div className="w-[70%] h-1 mt-1.5 rounded-full bg-white/20 overflow-hidden">
+            <div className="h-full bg-green-400 rounded-full transition-all duration-1000" style={{ width: `${simProgress}%` }} />
+          </div>
         </div>
       )}
       {/* Category label */}

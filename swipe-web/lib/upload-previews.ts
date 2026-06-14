@@ -19,19 +19,19 @@ async function compressThumbnail(dataUrl: string): Promise<string> {
   });
 }
 
-export async function saveUploadPreview(jobId: string, imageDataUrl: string, category: string): Promise<void> {
+export async function saveUploadPreview(jobId: string, imageDataUrl: string, category: string, startedAt?: number): Promise<void> {
   try {
     const thumbnail = await compressThumbnail(imageDataUrl);
-    localStorage.setItem(`${PREFIX}${jobId}`, JSON.stringify({ preview: thumbnail, category }));
+    localStorage.setItem(`${PREFIX}${jobId}`, JSON.stringify({ preview: thumbnail, category, startedAt: startedAt ?? Date.now() }));
   } catch {
     // storage full or canvas unavailable — silent fail
   }
 }
 
-export function getUploadPreview(jobId: string): { preview: string; category: string } | null {
+export function getUploadPreview(jobId: string): { preview: string; category: string; startedAt?: number } | null {
   try {
     const raw = localStorage.getItem(`${PREFIX}${jobId}`);
-    return raw ? (JSON.parse(raw) as { preview: string; category: string }) : null;
+    return raw ? (JSON.parse(raw) as { preview: string; category: string; startedAt?: number }) : null;
   } catch {
     return null;
   }
