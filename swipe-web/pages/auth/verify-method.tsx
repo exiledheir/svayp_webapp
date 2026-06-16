@@ -29,18 +29,24 @@ export default function VerifyMethodPage() {
     try {
       const { url, session } = await buildTelegramAuthUrl();
 
-      // If running inside Flutter WebView: send PKCE session to Flutter
-      // so it can store it and use it when intercepting the deep-link callback.
+      // Inside Flutter WebView: hand the auth URL + PKCE session to Flutter so it
+      // opens the URL in an EXTERNAL browser (which launches the native Telegram
+      // app) and intercepts the com.svaypai.app:// deep-link callback itself.
+      // We must NOT navigate the WebView here — that would just load the consent
+      // page inside the WebView and never open the Telegram app.
       if (isInFlutterWebView()) {
         sendToFlutter({
           type: 'telegram_auth_start',
+          url,
           codeVerifier: session.codeVerifier,
           state: session.state,
           nonce: session.nonce,
           redirectUri: session.redirectUri,
         });
+        return; // keep button in loading state; Flutter drives the rest
       }
 
+      // Regular browser: navigate to the Telegram consent page as before.
       window.location.href = url;
     } catch {
       setError(t.telegramAuthError);
