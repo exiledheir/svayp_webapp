@@ -76,7 +76,10 @@ function getChannel(): FlutterBridgeChannel | null {
 
 /** Returns true when running inside the Flutter WebView. */
 export function isInFlutterWebView(): boolean {
-  return getChannel() !== null;
+  if (getChannel() !== null) return true;
+  // Fallback: Flutter embeds "flutter" in the User-Agent
+  if (typeof navigator !== 'undefined' && /flutter/i.test(navigator.userAgent)) return true;
+  return false;
 }
 
 /** Send a typed message to the Flutter host. Safe to call in any environment. */
