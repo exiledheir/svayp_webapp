@@ -1,84 +1,195 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { sendOtp } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
+import type { Locale } from '@/lib/translations';
+import { sendToFlutter } from '@/lib/flutter-bridge';
 
 const UZ_PREFIX = '+998';
 
+const LOCALES: { code: Locale; flag: string; label: string }[] = [
+  { code: 'uz', flag: '🇺🇿', label: "O'zbek" },
+  { code: 'ru', flag: '🇷🇺', label: 'Русский' },
+  { code: 'en', flag: '🇬🇧', label: 'English' },
+];
+
 export default function PhonePage() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, locale, setLocale } = useI18n();
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [langOpen, setLangOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setLangOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // 5-tap logo easter egg → partner login
+  const tapCount = useRef(0);
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleLogoTap = useCallback(() => {
+    tapCount.current++;
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+    if (tapCount.current >= 5) {
+      tapCount.current = 0;
+      router.push('/auth/partner');
+    } else {
+      tapTimer.current = setTimeout(() => { tapCount.current = 0; }, 2000);
+    }
+  }, [router]);
+
+  const currentLocale = LOCALES.find((l) => l.code === locale) ?? LOCALES[0];
+  const digits = phone.replace(/\D/g, '');
+
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-    const digits = phone.replace(/\D/g, '');
     if (digits.length < 9) {
       setError(t.enterAtLeast9);
       return;
     }
     const fullPhone = `${UZ_PREFIX}${digits}`;
-    setLoading(true);
-    try {
-      await sendOtp(fullPhone);
-      router.push(`/auth/otp?phone=${encodeURIComponent(fullPhone)}`);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to send OTP';
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
+    router.push(`/auth/verify-method?phone=${encodeURIComponent(fullPhone)}`);
   }
 
   return (
-    <div className="phone-container flex flex-col items-center justify-center min-h-screen px-6 bg-white">
-      <div className="w-full max-w-sm">
-        {/* Logo / Brand */}
-        <h1 className="text-4xl font-bold tracking-[0.12em] text-center mb-2">LIB<span style={{ color: '#F370A7' }}>Λ</span>S</h1>
-        <p className="text-sm text-gray-500 text-center mb-10">{t.discoverFashion}</p>
+    <div className="flex flex-col min-h-screen bg-white">
+      {/* ── Scrollable content ── */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-10">
+        <div className="w-full max-w-sm flex flex-col gap-6">
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">
-              {t.phoneNumber}
+          {/* Logo */}
+          <button
+            type="button"
+            onClick={handleLogoTap}
+            className="self-center bg-transparent border-none outline-none cursor-default select-none"
+            tabIndex={-1}
+          >
+            <span className="text-5xl font-bold tracking-[2px] leading-none">
+              LIB<span style={{ color: '#F370A7' }}>Λ</span>S
             </span>
-            <div className="flex items-center border border-gray-300 rounded-xl overflow-hidden focus-within:border-black transition-colors">
-              <span className="px-4 py-3.5 text-sm font-medium text-gray-700 bg-gray-50 border-r border-gray-300 select-none">
-                {UZ_PREFIX}
+          </button>
+
+          {/* Title */}
+          <div className="flex flex-col gap-2">
+            <h1 className="text-2xl font-bold text-gray-900 leading-snug">
+              {t.enterPhoneNumber}
+            </h1>
+            <p className="text-sm text-gray-500 leading-relaxed">
+              {t.phoneVerificationSubtitle}
+            </p>
+          </div>
+
+          {/* Language dropdown */}
+          <div ref={dropdownRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setLangOpen((v) => !v)}
+              className="flex items-center gap-2 px-4 py-3 w-full border border-gray-200 rounded-xl
+                         bg-white text-sm font-medium text-gray-800 hover:border-gray-400
+                         transition-colors focus:outline-none focus:border-black"
+            >
+              <span className="text-lg leading-none">{currentLocale.flag}</span>
+              <span className="flex-1 text-left">{currentLocale.label}</span>
+              <svg
+                width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                className={`text-gray-400 transition-transform duration-150 ${langOpen ? 'rotate-180' : ''}`}
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+
+            {langOpen && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200
+                              rounded-xl shadow-lg overflow-hidden z-50">
+                {LOCALES.map(({ code, flag, label }) => (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => { setLocale(code); setLangOpen(false); }}
+                    className={`flex items-center gap-3 w-full px-4 py-3 text-sm text-left
+                                transition-colors hover:bg-gray-50
+                                ${locale === code ? 'font-semibold text-black bg-gray-50' : 'text-gray-700'}`}
+                  >
+                    <span className="text-lg leading-none">{flag}</span>
+                    <span>{label}</span>
+                    {locale === code && (
+                      <svg className="ml-auto" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 6L9 17l-5-5" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Phone input */}
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3" id="phone-form">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm font-semibold text-gray-700">
+                {t.phoneNumber}
               </span>
-              <input
-                type="tel"
-                inputMode="numeric"
-                placeholder="90 123 45 67"
-                value={phone}
-                onChange={(e) => {
-                  setPhone(e.target.value.replace(/[^\d\s]/g, ''));
-                  setError('');
-                }}
-                className="flex-1 px-4 py-3.5 text-sm outline-none bg-white"
-                autoComplete="tel"
-                maxLength={12}
-                disabled={loading}
-              />
-            </div>
-          </label>
+              <div className="flex items-center border border-gray-200 rounded-xl overflow-hidden
+                              focus-within:border-black transition-colors bg-white">
+                <span className="px-4 py-3.5 text-sm font-semibold text-gray-700 bg-gray-50
+                                 border-r border-gray-200 select-none whitespace-nowrap">
+                  {UZ_PREFIX}
+                </span>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  placeholder="90 123 45 67"
+                  value={phone}
+                  onChange={(e) => { setPhone(e.target.value.replace(/[^\d\s]/g, '')); setError(''); }}
+                  className="flex-1 px-4 py-3.5 text-sm outline-none bg-white min-w-0"
+                  autoComplete="tel"
+                  maxLength={12}
+                  disabled={loading}
+                />
+              </div>
+            </label>
 
-          {error && (
-            <p className="text-xs text-red-500 mt-1">{error}</p>
-          )}
+            {error && (
+              <p className="text-xs text-red-500">{error}</p>
+            )}
+          </form>
+        </div>
+      </div>
 
+      {/* ── Sticky bottom buttons ── */}
+      <div className="sticky bottom-0 bg-white border-t border-gray-100 px-6 pt-4 pb-8
+                      sm:relative sm:border-t-0 sm:pt-0 sm:pb-10">
+        <div className="w-full max-w-sm mx-auto flex flex-col gap-3">
           <button
             type="submit"
-            disabled={loading || phone.replace(/\D/g, '').length < 9}
-            className="w-full py-3.5 rounded-xl bg-black text-white text-sm font-semibold
+            form="phone-form"
+            disabled={loading || digits.length < 9}
+            className="w-full py-4 rounded-2xl bg-black text-white text-sm font-semibold
                        disabled:opacity-40 active:scale-[0.98] transition-transform"
           >
             {loading ? t.sending : t.continueBtn}
           </button>
-        </form>
+
+          <button
+            type="button"
+            onClick={() => sendToFlutter({ type: 'guest_mode' })}
+            className="w-full py-3 rounded-2xl text-sm font-medium text-gray-500
+                       hover:text-gray-800 hover:bg-gray-50 transition-colors"
+          >
+            {t.browseAsGuest}
+          </button>
+        </div>
       </div>
     </div>
   );
