@@ -100,6 +100,7 @@ export interface Translations {
   verifyMethodTitle: string;
   verifyMethodSubtitle: string;
   verifyWithSms: string;
+  back: string;
   partnerPortal: string;
   partnerWelcomeBack: string;
   partnerSignInSubtitle: string;
@@ -328,6 +329,7 @@ const en: Translations = {
   verifyMethodTitle: 'Verify your identity',
   verifyMethodSubtitle: 'Choose how to verify your number',
   verifyWithSms: 'Use SMS instead',
+  back: 'Back',
   partnerPortal: 'Partner Portal',
   partnerWelcomeBack: 'Welcome back',
   partnerSignInSubtitle: 'Sign in to your partner account',
@@ -607,6 +609,7 @@ const ru: Translations = {
   verifyMethodTitle: 'Подтвердите личность',
   verifyMethodSubtitle: 'Выберите способ подтверждения',
   verifyWithSms: 'Подтвердить через SMS',
+  back: 'Назад',
   partnerPortal: 'Партнёрский портал',
   partnerWelcomeBack: 'С возвращением',
   partnerSignInSubtitle: 'Войдите в свой партнёрский аккаунт',
@@ -886,6 +889,7 @@ const uz: Translations = {
   verifyMethodTitle: 'Shaxsingizni tasdiqlang',
   verifyMethodSubtitle: 'Tasdiqlash usulini tanlang',
   verifyWithSms: 'SMS orqali tasdiqlash',
+  back: 'Orqaga',
   partnerPortal: 'Hamkor portali',
   partnerWelcomeBack: 'Xush kelibsiz',
   partnerSignInSubtitle: 'Hamkor hisobingizga kiring',
