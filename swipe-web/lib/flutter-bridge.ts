@@ -41,9 +41,15 @@ export interface GuestModePayload {
   type: 'guest_mode';
 }
 
-/** Sent before navigating to Telegram OIDC so Flutter can store PKCE params. */
+/**
+ * Sent before navigating to Telegram OIDC so Flutter can store PKCE params AND
+ * open the auth URL in an EXTERNAL browser (so the native Telegram app opens
+ * instead of loading oauth.telegram.org inside the WebView). Flutter then
+ * intercepts the com.svaypai.app:// deep-link callback and exchanges the code.
+ */
 export interface TelegramAuthStartPayload {
   type: 'telegram_auth_start';
+  url: string;
   codeVerifier: string;
   state: string;
   nonce: string;
