@@ -73,6 +73,43 @@ export interface Translations {
   changeNumber: string;
   verifying: string;
   enterFull6Digit: string;
+  resendCode: string;
+  resendCodeIn: string;
+  enterPhoneNumber: string;
+  browseAsGuest: string;
+  phoneVerificationSubtitle: string;
+  verifyPhoneNumber: string;
+  tellUsAboutYourself: string;
+  personalizeExperience: string;
+  fullName: string;
+  enterYourName: string;
+  dateOfBirth: string;
+  day: string;
+  month: string;
+  year: string;
+  invalidDateError: string;
+  gender: string;
+  genderFemale: string;
+  genderMale: string;
+  signInTitle: string;
+  signInSubtitle: string;
+  continueWithTelegram: string;
+  orSeparator: string;
+  telegramVerifying: string;
+  telegramAuthError: string;
+  verifyMethodTitle: string;
+  verifyMethodSubtitle: string;
+  verifyWithSms: string;
+  partnerPortal: string;
+  partnerWelcomeBack: string;
+  partnerSignInSubtitle: string;
+  partnerUsernameLabel: string;
+  partnerUsernameHint: string;
+  partnerPasswordLabel: string;
+  partnerPasswordHint: string;
+  partnerSignIn: string;
+  partnerNeedAccess: string;
+  partnerLoginFailed: string;
   onboarding_slide1_title: string;
   onboarding_slide1_body: string;
   onboarding_slide2_title: string;
@@ -264,6 +301,43 @@ const en: Translations = {
   changeNumber: 'Change number',
   verifying: 'Verifying…',
   enterFull6Digit: 'Enter the full 6-digit code',
+  resendCode: 'Resend code',
+  resendCodeIn: 'Resend in {n}s',
+  enterPhoneNumber: 'Enter your phone number',
+  browseAsGuest: 'Browse as guest',
+  phoneVerificationSubtitle: 'We will send you a verification code to confirm your number',
+  verifyPhoneNumber: 'Verify your number',
+  tellUsAboutYourself: 'Tell us about yourself',
+  personalizeExperience: 'Help us personalise your experience',
+  fullName: 'Full name',
+  enterYourName: 'Enter your name',
+  dateOfBirth: 'Date of birth',
+  day: 'DD',
+  month: 'MM',
+  year: 'YYYY',
+  invalidDateError: 'Please enter a valid date',
+  gender: 'Gender',
+  genderFemale: 'Female',
+  genderMale: 'Male',
+  signInTitle: 'Sign in to LIBΛS',
+  signInSubtitle: 'Sign in or create your account',
+  continueWithTelegram: 'Continue with Telegram',
+  orSeparator: 'or',
+  telegramVerifying: 'Signing in with Telegram…',
+  telegramAuthError: 'Telegram sign-in failed. Please try again.',
+  verifyMethodTitle: 'Verify your identity',
+  verifyMethodSubtitle: 'Choose how to verify your number',
+  verifyWithSms: 'Use SMS instead',
+  partnerPortal: 'Partner Portal',
+  partnerWelcomeBack: 'Welcome back',
+  partnerSignInSubtitle: 'Sign in to your partner account',
+  partnerUsernameLabel: 'Username or email',
+  partnerUsernameHint: 'Enter your username',
+  partnerPasswordLabel: 'Password',
+  partnerPasswordHint: 'Enter your password',
+  partnerSignIn: 'Sign in',
+  partnerNeedAccess: 'Need access? Contact your manager.',
+  partnerLoginFailed: 'Login failed. Check your credentials.',
   onboarding_slide1_title: 'Welcome to Your Closet',
   onboarding_slide1_body: 'Your personal AI-powered wardrobe. Style smarter, dress better.',
   onboarding_slide2_title: 'Build Your Wardrobe',
@@ -506,6 +580,43 @@ const ru: Translations = {
   changeNumber: 'Изменить номер',
   verifying: 'Проверка…',
   enterFull6Digit: 'Введите полный 6-значный код',
+  resendCode: 'Отправить снова',
+  resendCodeIn: 'Повторная отправка через {n}с',
+  enterPhoneNumber: 'Введите номер телефона',
+  browseAsGuest: 'Войти как гость',
+  phoneVerificationSubtitle: 'Мы отправим вам код подтверждения для подтверждения номера',
+  verifyPhoneNumber: 'Подтвердите номер',
+  tellUsAboutYourself: 'Расскажите о себе',
+  personalizeExperience: 'Помогите нам персонализировать ваш опыт',
+  fullName: 'Полное имя',
+  enterYourName: 'Введите ваше имя',
+  dateOfBirth: 'Дата рождения',
+  day: 'ДД',
+  month: 'ММ',
+  year: 'ГГГГ',
+  invalidDateError: 'Введите корректную дату',
+  gender: 'Пол',
+  genderFemale: 'Женский',
+  genderMale: 'Мужской',
+  signInTitle: 'Вход в LIBLΛS',
+  signInSubtitle: 'Войдите или создайте аккаунт',
+  continueWithTelegram: 'Продолжить через Telegram',
+  orSeparator: 'или',
+  telegramVerifying: 'Вход через Telegram…',
+  telegramAuthError: 'Ошибка входа через Telegram. Попробуйте ещё раз.',
+  verifyMethodTitle: 'Подтвердите личность',
+  verifyMethodSubtitle: 'Выберите способ подтверждения',
+  verifyWithSms: 'Подтвердить через SMS',
+  partnerPortal: 'Партнёрский портал',
+  partnerWelcomeBack: 'С возвращением',
+  partnerSignInSubtitle: 'Войдите в свой партнёрский аккаунт',
+  partnerUsernameLabel: 'Имя пользователя или email',
+  partnerUsernameHint: 'Введите имя пользователя',
+  partnerPasswordLabel: 'Пароль',
+  partnerPasswordHint: 'Введите пароль',
+  partnerSignIn: 'Войти',
+  partnerNeedAccess: 'Нужен доступ? Обратитесь к менеджеру.',
+  partnerLoginFailed: 'Ошибка входа. Проверьте данные.',
   onboarding_slide1_title: 'Добро пожаловать в ваш гардероб',
   onboarding_slide1_body: 'Ваш личный гардероб с искусственным интеллектом. Одевайтесь умнее и стильнее.',
   onboarding_slide2_title: 'Создайте свой гардероб',
@@ -748,6 +859,43 @@ const uz: Translations = {
   changeNumber: "Raqamni o'zgartirish",
   verifying: 'Tekshirilmoqda…',
   enterFull6Digit: "6 xonali kodni to'liq kiriting",
+  resendCode: 'Kodni qayta yuborish',
+  resendCodeIn: '{n}s ichida qayta yuborish',
+  enterPhoneNumber: 'Telefon raqamingizni kiriting',
+  browseAsGuest: 'Mehmon sifatida kirish',
+  phoneVerificationSubtitle: 'Raqamingizni tasdiqlash uchun sizga tasdiqlash kodini yuboramiz',
+  verifyPhoneNumber: 'Raqamingizni tasdiqlang',
+  tellUsAboutYourself: "O'zingiz haqingizda ayting",
+  personalizeExperience: "Tajribangizni shaxsiylashtirish uchun yordam bering",
+  fullName: 'To\'liq ism',
+  enterYourName: 'Ismingizni kiriting',
+  dateOfBirth: "Tug'ilgan sana",
+  day: 'KK',
+  month: 'OO',
+  year: 'YYYY',
+  invalidDateError: "To'g'ri sanani kiriting",
+  gender: 'Jins',
+  genderFemale: 'Ayol',
+  genderMale: 'Erkak',
+  signInTitle: 'LIBLΛS ga kirish',
+  signInSubtitle: 'Hisobingizga kiring yoki roʻxatdan oʻing',
+  continueWithTelegram: 'Telegram orqali davom etish',
+  orSeparator: 'yoki',
+  telegramVerifying: 'Telegram orqali kirilmoqda…',
+  telegramAuthError: 'Telegram orqali kirish muvaffaqiyatsiz. Qayta urinib koʻing.',
+  verifyMethodTitle: 'Shaxsingizni tasdiqlang',
+  verifyMethodSubtitle: 'Tasdiqlash usulini tanlang',
+  verifyWithSms: 'SMS orqali tasdiqlash',
+  partnerPortal: 'Hamkor portali',
+  partnerWelcomeBack: 'Xush kelibsiz',
+  partnerSignInSubtitle: 'Hamkor hisobingizga kiring',
+  partnerUsernameLabel: 'Foydalanuvchi nomi yoki email',
+  partnerUsernameHint: 'Foydalanuvchi nomini kiriting',
+  partnerPasswordLabel: 'Parol',
+  partnerPasswordHint: 'Parolni kiriting',
+  partnerSignIn: 'Kirish',
+  partnerNeedAccess: 'Kirish kerakmi? Menejgeringizga murojaat qiling.',
+  partnerLoginFailed: 'Kirish muvaffaqiyatsiz. Ma\'lumotlarni tekshiring.',
   onboarding_slide1_title: "Garderobingizga xush kelibsiz",
   onboarding_slide1_body: "Sun'iy intellekt yordamida shaxsiy garderobingiz. Aqlliroq va chiroyliroq kiyining.",
   onboarding_slide2_title: "Garderobingizni yarating",

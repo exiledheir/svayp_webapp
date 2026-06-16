@@ -140,6 +140,57 @@ export async function verifyOtp(phoneNumber: string, otpCode: string) {
   };
 }
 
+export async function adminLogin(username: string, password: string) {
+  const res = await api.post('/auth/admin/login', { username, password });
+  const payload = unwrapSingle(res.data) as Record<string, unknown>;
+  return {
+    accessToken: payload.access_token as string,
+    refreshToken: payload.refresh_token as string,
+  };
+}
+
+export interface CreateProfileRequest {
+  fullName?: string;
+  gender: string;
+  dateOfBirth: string; // YYYY-MM-DD
+}
+
+export async function createProfile(data: CreateProfileRequest) {
+  const res = await api.post('/users/profile', data);
+  return unwrapSingle(res.data) as Record<string, unknown>;
+}
+
+// v2 — simplified profile creation (name + dob + gender only, no measurements)
+export interface CreateProfileV2Request {
+  fullName: string;
+  dateOfBirth: string; // YYYY-MM-DD
+  gender?: string;     // defaults to FEMALE on backend
+}
+
+export async function createProfileV2(data: CreateProfileV2Request) {
+  const res = await api.post('/users/profile', data, {
+    baseURL: '/proxy-v2',
+  });
+  return unwrapSingle(res.data) as Record<string, unknown>;
+}
+
+export interface TelegramOidcRequest {
+  code: string;
+  codeVerifier: string;
+  redirectUri: string;
+  nonce?: string;
+}
+
+export async function telegramOidcLogin(req: TelegramOidcRequest) {
+  const res = await api.post('/auth/telegram/oidc', req);
+  const payload = unwrapSingle(res.data) as Record<string, unknown>;
+  return {
+    accessToken: payload.access_token as string,
+    refreshToken: payload.refresh_token as string,
+    user: payload.user as Record<string, unknown>,
+  };
+}
+
 // ── Products ──────────────────────────────────────────────────────────────────
 
 function mapProduct(raw: unknown): Product {
