@@ -20,19 +20,30 @@ export const TELEGRAM_CLIENT_ID = '8713945846';
  * When running in a regular browser we use NEXT_PUBLIC_TELEGRAM_REDIRECT_URI
  * (or fall back to the current origin).
  */
+const FLUTTER_REDIRECT_URI = 'com.svaypai.app://auth/telegram/callback';
+
+function isFlutterWebView(): boolean {
+  if (typeof window === 'undefined') return false;
+  // Detect by JS bridge (injected before page loads by addJavaScriptChannel)
+  if ((window as unknown as { FlutterBridge?: unknown }).FlutterBridge) return true;
+  // Fallback: Flutter embeds "flutter" in the User-Agent (wkwebview / webview_flutter)
+  if (/flutter/i.test(navigator.userAgent)) return true;
+  return false;
+}
+
 function getRedirectUri(): string {
-  // Inside Flutter WebView — use the native scheme
-  if (typeof window !== 'undefined' &&
-    (window as unknown as { FlutterBridge?: unknown }).FlutterBridge) {
-    return 'com.svaypai.app://auth/telegram/callback';
+  // Inside Flutter WebView — must use the native deep-link scheme so the
+  // NavigationDelegate can intercept the callback instead of the browser.
+  if (isFlutterWebView()) {
+    return FLUTTER_REDIRECT_URI;
   }
-  // Browser — use env var or current origin
+  // Browser — use env var (baked at build time) or current origin
   const envUri = process.env.NEXT_PUBLIC_TELEGRAM_REDIRECT_URI;
   if (envUri) return envUri;
   if (typeof window !== 'undefined') {
     return `${window.location.origin}/auth/telegram/callback`;
   }
-  return '';
+  return FLUTTER_REDIRECT_URI; // safe fallback — never empty
 }
 
 const STORAGE_KEY = 'svayp_tg_pkce';
