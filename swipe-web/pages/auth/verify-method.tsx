@@ -42,6 +42,7 @@ export default function VerifyMethodPage() {
           state: session.state,
           nonce: session.nonce,
           redirectUri: session.redirectUri,
+          phone, // fallback for the backend if Telegram omits the number
         });
         return; // keep button in loading state; Flutter drives the rest
       }
