@@ -54,6 +54,8 @@ export interface TelegramAuthStartPayload {
   state: string;
   nonce: string;
   redirectUri: string;
+  /** Phone the user typed — fallback for the backend if Telegram omits it. */
+  phone?: string;
 }
 
 export type BridgePayload =
