@@ -108,6 +108,49 @@ body::-webkit-scrollbar,
   100% { transform: translateX(100%); }
 }
 
+/* ── Shared closet/onboarding animations (used by extracted InteractiveCanvas
+      and TryOn components, and the onboarding wizard) ────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+@keyframes hintSlideIn {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes tryOnPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(243,112,167,0.55); }
+  50%       { box-shadow: 0 0 0 8px rgba(243,112,167,0); }
+}
+@keyframes tryOnShimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes itemNudge {
+  0%   { transform: translate(0,    0   ); }
+  20%  { transform: translate(18px, 12px); }
+  40%  { transform: translate(18px, 12px); }
+  60%  { transform: translate(0,    0   ); }
+  75%  { transform: translate(-10px, 8px); }
+  90%  { transform: translate(-10px, 8px); }
+  100% { transform: translate(0,    0   ); }
+}
+@keyframes demoTextPop {
+  0%   { transform: translateY(8px) scale(0.96); opacity: 0; }
+  100% { transform: translateY(0)   scale(1);    opacity: 1; }
+}
+@keyframes dragHint {
+  0%   { transform: translate(0, 0);    opacity: 0; }
+  12%  { opacity: 1; }
+  45%  { transform: translate(38px, 28px); opacity: 1; }
+  55%  { transform: translate(38px, 28px); opacity: 0.85; }
+  88%  { transform: translate(0, 0);    opacity: 0.7; }
+  100% { opacity: 0; }
+}
+
 /* ── Custom crop handles (corner brackets like mobile visual search) ── */
 .ReactCrop__crop-selection {
   border: 2px solid rgba(255,255,255,0.9) !important;

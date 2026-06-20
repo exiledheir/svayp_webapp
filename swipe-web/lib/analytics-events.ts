@@ -43,6 +43,8 @@ export const Events = {
   ONBOARDING_SLIDE_VIEWED: 'onboarding_slide_viewed',
   ONBOARDING_COMPLETED: 'onboarding_completed',
   ONBOARDING_SKIPPED: 'onboarding_skipped',
+  ONBOARDING_STEP_VIEWED: 'onboarding_step_viewed',
+  ONBOARDING_STEP_COMPLETED: 'onboarding_step_completed',
 } as const;
 
 export const Params = {
@@ -64,4 +66,5 @@ export const Params = {
   BOARD_COUNT: 'board_count',
   ITEM_COUNT_IN_WARDROBE: 'item_count_in_wardrobe',
   AT_SLIDE_INDEX: 'at_slide_index',
+  OB_STEP: 'ob_step',
 } as const;
