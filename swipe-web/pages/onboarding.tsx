@@ -1,433 +1,312 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import Image from 'next/image';
-import { Shirt } from 'lucide-react';
-import { isOnboardingComplete, setOnboardingComplete } from '@/lib/onboarding-storage';
+import { Sparkles, Check } from 'lucide-react';
+import {
+  isOnboardingComplete, setOnboardingComplete, clearOnboarding,
+  setOnboardingStep, getOnboardingStep, clearOnboardingStep,
+  setClosetTourDone,
+} from '@/lib/onboarding-storage';
+import { fetchClosetItems, type ClosetItem, type ClosetCategory } from '@/lib/closet-storage';
+import {
+  UPPER_CATS, LOWER_CATS, SHOES_CATS, ACC_CATS, FULL_BODY_CATS,
+  type SavedCanvasLayout,
+} from '@/lib/closet-types';
+import { createOutfitCanvas } from '@/lib/wardrobe-api';
+import InteractiveCanvas from '@/components/closet/InteractiveCanvas';
+import AddItemStep from '@/components/onboarding/AddItemStep';
+import GenerateStep from '@/components/onboarding/GenerateStep';
+import TryOnStep from '@/components/onboarding/TryOnStep';
 import { useI18n } from '@/lib/i18n';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
 
-const SLIDE_COUNT = 6;
-const SLIDE_WIDTH = `${100 / SLIDE_COUNT}%`;
-
-// ─── Shared primitives ──────────────────────────────────────────────────────────
-
-function SlideWrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="h-full flex flex-col" style={{ width: SLIDE_WIDTH, flexShrink: 0 }}>
-      {children}
-    </div>
-  );
-}
-
-function SlideText({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="px-6 pb-4">
-      <h2 className="text-2xl font-bold tracking-tight text-gray-900 mb-2">{title}</h2>
-      <p className="text-sm text-gray-500 leading-relaxed">{body}</p>
-    </div>
-  );
-}
-
-// ─── Slides ─────────────────────────────────────────────────────────────────────
-
-function SlideWelcome() {
-  const { t } = useI18n();
-  return (
-    <SlideWrapper>
-      <div className="flex-1 flex items-center justify-center">
-        <div
-          className="flex flex-col items-center justify-center gap-6 rounded-3xl px-14 py-16"
-          style={{
-            background: 'rgba(243,112,167,0.08)',
-            boxShadow: '0 0 100px 30px rgba(243,112,167,0.12)',
-          }}
-        >
-          <p className="text-[52px] font-black tracking-[3px] leading-none select-none">
-            <span className="text-black">LIB</span>
-            <span style={{ color: '#F370A7' }}>Λ</span>
-            <span className="text-black">S</span>
-          </p>
-        </div>
-      </div>
-      <SlideText title={t.onboarding_slide1_title} body={t.onboarding_slide1_body} />
-    </SlideWrapper>
-  );
-}
-
-function SlideBuildWardrobe() {
-  const { t } = useI18n();
-  const [err1, setErr1] = useState(false);
-  const [err2, setErr2] = useState(false);
-  return (
-    <SlideWrapper>
-      <div className="flex-1 flex items-center px-5 gap-3">
-        {/* Original photo */}
-        <div className="flex flex-col items-center gap-2 flex-1 min-w-0">
-          <div
-            className="relative w-full rounded-2xl overflow-hidden bg-gray-100"
-            style={{ aspectRatio: '3/4', maxHeight: '46vh' }}
-          >
-            {!err1 ? (
-              <Image
-                src="/images/closet/user_new_item.png"
-                alt="Original photo"
-                fill
-                className="object-cover"
-                onError={() => setErr1(true)}
-              />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Shirt size={36} color="#ccc" />
-              </div>
-            )}
-          </div>
-          <span className="text-xs text-gray-400 shrink-0">{t.onboarding_slide2_original}</span>
-        </div>
-
-        {/* Arrow */}
-        <span className="flex-none text-black font-bold text-2xl shrink-0">→</span>
-
-        {/* Generated flat-style */}
-        <div className="flex flex-col items-center gap-2 flex-1 min-w-0">
-          <div
-            className="relative w-full rounded-2xl overflow-hidden"
-            style={{
-              aspectRatio: '3/4',
-              maxHeight: '46vh',
-              background: 'linear-gradient(135deg, #FEF3F8 0%, #FDE8F3 100%)',
-            }}
-          >
-            {!err2 ? (
-              <Image
-                src="/images/closet/user_new_item_regenerated.png"
-                alt="AI flat style"
-                fill
-                className="object-contain p-3"
-                onError={() => setErr2(true)}
-              />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Shirt size={36} color="#F370A7" />
-              </div>
-            )}
-          </div>
-          <span className="text-xs font-medium shrink-0" style={{ color: '#F370A7' }}>
-            {t.onboarding_slide2_aiflat}
-          </span>
-        </div>
-      </div>
-      <SlideText title={t.onboarding_slide2_title} body={t.onboarding_slide2_body} />
-    </SlideWrapper>
-  );
-}
-
-function SlideAIOutfits() {
-  const { t } = useI18n();
-  const [err1, setErr1] = useState(false);
-  const [err2, setErr2] = useState(false);
-  const [err3, setErr3] = useState(false);
-  const imgs = [
-    { src: '/images/closet/outfit_grouped.png', err: err1, setErr: setErr1 },
-    { src: '/images/closet/outfit_grouped2.png', err: err2, setErr: setErr2 },
-    { src: '/images/closet/outfit_grouped3.png', err: err3, setErr: setErr3 },
-  ];
-  return (
-    <SlideWrapper>
-      <div className="flex-1 flex items-center justify-center px-4 gap-2">
-        {imgs.map(({ src, err, setErr }, i) => (
-          <div
-            key={i}
-            className="flex-1 relative rounded-2xl overflow-hidden"
-            style={{ aspectRatio: '3/4', maxHeight: '52vh' }}
-          >
-            {!err ? (
-              <Image
-                src={src}
-                alt="AI outfit"
-                fill
-                className="object-contain"
-                onError={() => setErr(true)}
-              />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Shirt size={32} color="#ccc" />
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-      <SlideText title={t.onboarding_slide3_title} body={t.onboarding_slide3_body} />
-    </SlideWrapper>
-  );
-}
-
-function SlideEditOutfit() {
-  const { t } = useI18n();
-  return (
-    <SlideWrapper>
-      <div className="flex-1 flex items-end justify-center px-6 pb-4">
-        <div
-          className="relative w-full rounded-2xl overflow-hidden bg-gray-100"
-          style={{ aspectRatio: '9/16', maxHeight: '52vh' }}
-        >
-          <video
-            src="/video/closet/outfit_edit.mp4"
-            autoPlay
-            muted
-            loop
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-        </div>
-      </div>
-      <SlideText title={t.onboarding_slide4_title} body={t.onboarding_slide4_body} />
-    </SlideWrapper>
-  );
-}
-
-function SlideTryItOn() {
-  const { t } = useI18n();
-  const [err1, setErr1] = useState(false);
-  const [err2, setErr2] = useState(false);
-  return (
-    <SlideWrapper>
-      <div className="flex-1 flex items-center px-5 gap-3">
-        {/* Original */}
-        <div className="flex flex-col items-center gap-2 flex-1 min-w-0">
-          <div
-            className="relative w-full rounded-2xl overflow-hidden bg-gray-100"
-            style={{ aspectRatio: '3/4', maxHeight: '46vh' }}
-          >
-            {!err1 ? (
-              <Image
-                src="/images/closet/outfit_example.png"
-                alt="Original"
-                fill
-                className="object-cover"
-                onError={() => setErr1(true)}
-              />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Shirt size={36} color="#ccc" />
-              </div>
-            )}
-          </div>
-          <span className="text-xs text-gray-400 shrink-0">{t.onboarding_slide2_original}</span>
-        </div>
-
-        {/* Arrow */}
-        <span className="flex-none text-black font-bold text-2xl shrink-0">→</span>
-
-        {/* Try-on result */}
-        <div className="flex flex-col items-center gap-2 flex-1 min-w-0">
-          <div
-            className="relative w-full rounded-2xl overflow-hidden bg-gray-100"
-            style={{ aspectRatio: '3/4', maxHeight: '46vh' }}
-          >
-            {!err2 ? (
-              <Image
-                src="/images/closet/outfit_tryit_on.jpg"
-                alt="Try-on result"
-                fill
-                className="object-cover"
-                onError={() => setErr2(true)}
-              />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Shirt size={36} color="#F370A7" />
-              </div>
-            )}
-          </div>
-          <span className="text-xs font-medium shrink-0" style={{ color: '#F370A7' }}>{t.onboarding_slide5_title}</span>
-        </div>
-      </div>
-      <SlideText title={t.onboarding_slide5_title} body={t.onboarding_slide5_body} />
-    </SlideWrapper>
-  );
-}
-
-function SlideCTA() {
-  const { t } = useI18n();
-  const [err, setErr] = useState(false);
-  return (
-    <SlideWrapper>
-      <div className="flex-1 flex items-center justify-center px-8">
-        <div
-          className="relative w-full rounded-3xl overflow-hidden"
-          style={{
-            aspectRatio: '3/4',
-            maxHeight: '55vh',
-            background: 'rgba(243,112,167,0.08)',
-          }}
-        >
-          {!err ? (
-            <Image
-              src="/images/closet/outfitcard_empty_state.png"
-              alt="Get started"
-              fill
-              className="object-contain p-4"
-              onError={() => setErr(true)}
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Shirt size={80} color="#F370A7" strokeWidth={1.25} />
-            </div>
-          )}
-        </div>
-      </div>
-      <SlideText title={t.onboarding_cta_title} body={t.onboarding_cta_body} />
-    </SlideWrapper>
-  );
-}
-
-// ─── Page ────────────────────────────────────────────────────────────────────────
+// ─── Step machine ───────────────────────────────────────────────────────────────
+const WELCOME = 0, ADD_UPPER = 1, ADD_LOWER = 2, GENERATE = 3, EDIT = 4, TRY_ON = 5, DONE = 6;
+// ADD_SHOES is an alternative second-item step shown after a dress/jumpsuit
+// (full-body) is added instead of ADD_LOWER. Numbered above DONE so existing
+// step ordering is untouched; treated as part of the "add" phase for progress.
+const ADD_SHOES = 7;
+// Action steps shown in the progress indicator (add → generate → edit → try-on)
+const PROGRESS_STEPS = [ADD_UPPER, GENERATE, EDIT, TRY_ON];
+// Second-item steps that belong to the same "add" phase as ADD_UPPER.
+const ADD_SECOND_STEPS = [ADD_LOWER, ADD_SHOES];
+const STEP_NAMES: Record<number, string> = {
+  [WELCOME]: 'welcome', [ADD_UPPER]: 'add_upper', [ADD_LOWER]: 'add_lower', [ADD_SHOES]: 'add_shoes',
+  [GENERATE]: 'generate', [EDIT]: 'edit', [TRY_ON]: 'try_on', [DONE]: 'done',
+};
 
 export default function OnboardingPage() {
   const router = useRouter();
   const { t } = useI18n();
-  const [current, setCurrent] = useState(0);
-  const touchStartX = useRef<number | null>(null);
-  const didTrackStarted = useRef(false);
+  const [step, setStep] = useState<number>(WELCOME);
+  const [ready, setReady] = useState(false);
+  const [addedItems, setAddedItems] = useState<ClosetItem[]>([]);
+  const [layout, setLayout] = useState<SavedCanvasLayout | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const didStart = useRef(false);
+  // Holds promises for background uploads started in AddItemStep.
+  const pendingUploadsRef = useRef<Promise<unknown>[]>([]);
 
-  // Returning user: skip onboarding entirely
+  // ── Mount: handle reset / returning user / resume ──────────────────────────
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('reset') === 'true') {
-      localStorage.removeItem('svayp_onboarding_complete');
+      clearOnboarding();
+      clearOnboardingStep();
+    } else if (isOnboardingComplete()) {
+      router.replace('/closet');
       return;
     }
-    if (isOnboardingComplete()) router.replace('/closet');
+    (async () => {
+      const saved = getOnboardingStep();
+      if (saved > WELCOME) {
+        try {
+          const its = await fetchClosetItems();
+          setAddedItems(its);
+        } catch { /* ignore */ }
+      }
+      // Resume rules:
+      // - ADD_LOWER / ADD_SHOES: restart from ADD_UPPER so the user always adds
+      //   both items fresh rather than landing mid-add-phase and being confused.
+      // - Beyond GENERATE: resume at GENERATE (in-memory layout is lost on reload).
+      const resume = ADD_SECOND_STEPS.includes(saved) ? ADD_UPPER
+        : saved > GENERATE && saved <= DONE ? GENERATE
+        : saved;
+      setStep(resume);
+      setReady(true);
+    })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Track onboarding started and first slide viewed once
+  // ── Analytics: started once, step-viewed on each change ────────────────────
   useEffect(() => {
-    if (!didTrackStarted.current) {
-      didTrackStarted.current = true;
+    if (!ready) return;
+    if (!didStart.current) {
+      didStart.current = true;
       logAnalyticsEvent(Events.ONBOARDING_STARTED);
-      logAnalyticsEvent(Events.ONBOARDING_SLIDE_VIEWED, { [Params.SLIDE_INDEX]: 0 });
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    setOnboardingStep(step);
+    logAnalyticsEvent(Events.ONBOARDING_STEP_VIEWED, { [Params.OB_STEP]: STEP_NAMES[step] });
+  }, [step, ready]);
 
-  // Track each subsequent slide view
-  useEffect(() => {
-    if (!didTrackStarted.current) return; // wait until started is fired
-    if (current > 0) {
-      logAnalyticsEvent(Events.ONBOARDING_SLIDE_VIEWED, { [Params.SLIDE_INDEX]: current });
-    }
-  }, [current]);
-
-  function advance() {
-    if (current < SLIDE_COUNT - 1) setCurrent((c) => c + 1);
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2800);
   }
 
-  function skipToCta() {
-    logAnalyticsEvent(Events.ONBOARDING_SKIPPED, { [Params.AT_SLIDE_INDEX]: current });
-    setCurrent(SLIDE_COUNT - 1);
+  function completeStep(name: string) {
+    logAnalyticsEvent(Events.ONBOARDING_STEP_COMPLETED, { [Params.OB_STEP]: name });
+  }
+
+  /** Awaits all background uploads then fetches the fresh item list. */
+  async function awaitUploadsAndFetch(): Promise<ClosetItem[]> {
+    await Promise.allSettled(pendingUploadsRef.current);
+    try {
+      const its = await fetchClosetItems();
+      setAddedItems(its);
+      return its;
+    } catch {
+      return addedItems;
+    }
   }
 
   function finish() {
     logAnalyticsEvent(Events.ONBOARDING_COMPLETED);
     setOnboardingComplete();
+    clearOnboardingStep();
+    // Interactive onboarding already taught the core actions — suppress the
+    // closet's passive coach-mark tour (still replayable from the profile).
+    setClosetTourDone();
     router.replace('/closet');
   }
 
-  function handleTouchStart(e: React.TouchEvent) {
-    touchStartX.current = e.touches[0].clientX;
+  function skip() {
+    logAnalyticsEvent(Events.ONBOARDING_SKIPPED, { [Params.OB_STEP]: STEP_NAMES[step] });
+    setOnboardingComplete();
+    clearOnboardingStep();
+    setClosetTourDone();
+    router.replace('/closet');
   }
 
-  function handleTouchEnd(e: React.TouchEvent) {
-    if (touchStartX.current === null) return;
-    const dx = e.changedTouches[0].clientX - touchStartX.current;
-    touchStartX.current = null;
-    if (dx < -50) advance();
-    else if (dx > 50 && current > 0) setCurrent((c) => c - 1);
+  // ── Step transitions ───────────────────────────────────────────────────────
+  function handleUpperAdded(category: ClosetCategory, uploadP: Promise<unknown>) {
+    completeStep('add_upper');
+    pendingUploadsRef.current.push(uploadP);
+    if (FULL_BODY_CATS.includes(category)) {
+      // A dress/jumpsuit is a complete top+bottom — pair it with shoes instead
+      // of a bottom, then generate a top (dress) + shoes outfit.
+      showToast(t.ob_dress_skip_toast);
+      setStep(ADD_SHOES);
+    } else {
+      setStep(ADD_LOWER);
+    }
   }
 
-  const isCta = current === SLIDE_COUNT - 1;
+  function handleLowerAdded(_cat: ClosetCategory, uploadP: Promise<unknown>) {
+    completeStep('add_lower');
+    pendingUploadsRef.current.push(uploadP);
+    setStep(GENERATE);
+  }
+
+  function handleShoesAdded(_cat: ClosetCategory, uploadP: Promise<unknown>) {
+    completeStep('add_shoes');
+    pendingUploadsRef.current.push(uploadP);
+    setStep(GENERATE);
+  }
+
+  async function persistCanvas(l: SavedCanvasLayout) {
+    const apiItems = l
+      .filter((e) => !e.id.startsWith('local_') && !e.id.startsWith('pending_'))
+      .map((e) => ({ wardrobeItemId: e.id, x: e.x, y: e.y, scale: e.scale, zIndex: e.zIndex, itemGroup: e.group }));
+    if (apiItems.length === 0) return;
+    try { await createOutfitCanvas({ items: apiItems }); } catch { /* non-blocking */ }
+  }
+
+  if (!ready) {
+    return <div className="phone-container bg-white dark:bg-[#111111]" style={{ height: '100dvh' }} />;
+  }
+
+  // EDIT step renders the full-screen canvas editor directly (it owns its own chrome).
+  if (step === EDIT) {
+    return (
+      <>
+        <InteractiveCanvas
+          upper={addedItems.filter((i) => UPPER_CATS.includes(i.category))}
+          lower={addedItems.filter((i) => LOWER_CATS.includes(i.category))}
+          shoes={addedItems.filter((i) => SHOES_CATS.includes(i.category))}
+          acc={addedItems.filter((i) => ACC_CATS.includes(i.category))}
+          initialLayout={layout}
+          allItems={addedItems}
+          onClose={() => { setStep(TRY_ON); }}
+          onSave={(l) => { completeStep('edit'); setLayout(l); persistCanvas(l); setStep(TRY_ON); }}
+          onRegenerate={() => { }}
+          onShowPlans={() => { }}
+          canRegenerate={false}
+          plansEnabled={false}
+          alwaysShowHint={true}
+        />
+      </>
+    );
+  }
 
   return (
-    <div
-      className="phone-container flex flex-col bg-white overflow-hidden"
-      style={{ height: '100dvh' }}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-    >
-      {/* Slides carousel */}
-      <div className="flex-1 overflow-hidden">
-        <div
-          className="flex h-full"
-          style={{
-            width: `${SLIDE_COUNT * 100}%`,
-            transform: `translateX(-${(current * 100) / SLIDE_COUNT}%)`,
-            transition: 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-          }}
-        >
-          <SlideWelcome />
-          <SlideBuildWardrobe />
-          <SlideAIOutfits />
-          <SlideEditOutfit />
-          <SlideTryItOn />
-          <SlideCTA />
+    <div className="phone-container flex flex-col bg-white dark:bg-[#111111] overflow-hidden" style={{ height: '100dvh' }}>
+      {/* Toast */}
+      {toast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[999] px-4 py-2.5 rounded-full bg-gray-900 text-white text-[13px] font-semibold shadow-lg text-center max-w-[90vw]">
+          {toast}
         </div>
+      )}
+
+      {/* Top bar: progress + skip */}
+      <div className="relative z-10 flex-none flex items-center justify-between px-5 pt-4 pb-1" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 1rem))' }}>
+        <div className="flex gap-1.5">
+          {PROGRESS_STEPS.map((s) => {
+            // Second-item steps (ADD_LOWER / ADD_SHOES) share the ADD_UPPER dot.
+            const progressStep = ADD_SECOND_STEPS.includes(step) ? ADD_UPPER : step;
+            const reached = progressStep >= s;
+            const isCurrent = progressStep === s;
+            return (
+              <div
+                key={s}
+                className="rounded-full transition-all duration-300"
+                style={{ width: isCurrent ? 20 : 8, height: 8, background: reached ? '#F370A7' : '#E5E7EB' }}
+              />
+            );
+          })}
+        </div>
+        {step !== WELCOME && step !== DONE && (
+          <button onClick={skip} className="text-[13px] font-medium text-gray-400 active:opacity-60">
+            {t.ob_skip}
+          </button>
+        )}
       </div>
 
-      {/* Bottom controls */}
-      <div
-        className="flex-none px-6 pt-4"
-        style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom, 2rem))' }}
-      >
-        {/* Progress dots */}
-        <div className="flex justify-center gap-2 mb-6">
-          {Array.from({ length: SLIDE_COUNT }).map((_, i) => (
+      {/* Step body */}
+      {step === WELCOME && (
+        <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex items-center justify-center">
+            <div
+              className="flex flex-col items-center justify-center gap-6 rounded-3xl px-14 py-16"
+              style={{ background: 'rgba(243,112,167,0.08)', boxShadow: '0 0 100px 30px rgba(243,112,167,0.12)' }}
+            >
+              <p className="text-[52px] font-black tracking-[3px] leading-none select-none">
+                <span className="text-black dark:text-white">LIB</span>
+                <span style={{ color: '#F370A7' }}>Λ</span>
+                <span className="text-black dark:text-white">S</span>
+              </p>
+            </div>
+          </div>
+          <div className="px-6 pb-4">
+            <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-2">{t.ob_welcome_title}</h2>
+            <p className="text-sm text-gray-500 leading-relaxed">{t.ob_welcome_body}</p>
+          </div>
+          <div className="flex-none px-6 pb-2" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}>
             <button
-              key={i}
-              aria-label={`Go to slide ${i + 1}`}
-              onClick={() => setCurrent(i)}
-              className="rounded-full transition-all duration-300"
-              style={{
-                width: i === current ? 20 : 8,
-                height: 8,
-                background: i === current ? '#F370A7' : '#E5E7EB',
-              }}
-            />
-          ))}
+              onClick={() => setStep(ADD_UPPER)}
+              className="w-full py-4 rounded-2xl text-white font-semibold text-base active:opacity-80 flex items-center justify-center gap-2"
+              style={{ background: '#F370A7' }}
+            >
+              <Sparkles size={18} />
+              {t.ob_welcome_cta}
+            </button>
+          </div>
         </div>
+      )}
 
-        {isCta ? (
-          <div className="flex flex-col gap-3">
+      {step === ADD_UPPER && (
+        <AddItemStep key="add-upper" group="upper" title={t.ob_add_upper_title} body={t.ob_add_upper_body} onItemAdded={handleUpperAdded} />
+      )}
+
+      {step === ADD_LOWER && (
+        <AddItemStep key="add-lower" group="lower" title={t.ob_add_lower_title} body={t.ob_add_lower_body} onItemAdded={handleLowerAdded} />
+      )}
+
+      {step === ADD_SHOES && (
+        <AddItemStep key="add-shoes" group="shoes" title={t.ob_add_shoes_title} body={t.ob_add_shoes_body} onItemAdded={handleShoesAdded} />
+      )}
+
+      {step === GENERATE && (
+        <GenerateStep
+          awaitAndFetch={awaitUploadsAndFetch}
+          title={t.ob_generate_title}
+          body={t.ob_generate_body}
+          onGenerated={(l, its) => { completeStep('generate'); setLayout(l); setAddedItems(its); }}
+          onContinue={() => setStep(EDIT)}
+        />
+      )}
+
+      {step === TRY_ON && (
+        <TryOnStep
+          items={addedItems}
+          layout={layout}
+          title={t.ob_tryon_title}
+          body={t.ob_tryon_body}
+          onFinished={() => { completeStep('try_on'); finish(); }}
+        />
+      )}
+
+      {step === DONE && (
+        <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col items-center justify-center gap-6 px-8">
+            <div className="w-24 h-24 rounded-full flex items-center justify-center" style={{ background: 'rgba(243,112,167,0.12)' }}>
+              <Check size={48} color="#F370A7" strokeWidth={2.5} />
+            </div>
+            <div className="text-center">
+              <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-2">{t.ob_done_title}</h2>
+              <p className="text-sm text-gray-500 leading-relaxed">{t.ob_done_body}</p>
+            </div>
+          </div>
+          <div className="flex-none px-6 pb-2" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}>
             <button
-              onClick={() => finish()}
+              onClick={finish}
               className="w-full py-4 rounded-2xl text-white font-semibold text-base active:opacity-80"
               style={{ background: '#F370A7' }}
             >
-              {t.onboarding_btn_add_item}
-            </button>
-            <button
-              onClick={() => finish()}
-              className="w-full py-2 text-gray-400 text-sm active:opacity-60"
-            >
-              {t.onboarding_btn_skip}
+              {t.ob_done_cta}
             </button>
           </div>
-        ) : (
-          <div className="flex justify-between items-center">
-            <button
-              onClick={skipToCta}
-              className="text-gray-400 text-sm py-2 active:opacity-60"
-            >
-              {t.onboarding_btn_skip}
-            </button>
-            <button
-              onClick={advance}
-              className="py-3 px-8 rounded-full text-white font-semibold text-sm active:opacity-80"
-              style={{ background: '#111' }}
-            >
-              {t.onboarding_btn_next} →
-            </button>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

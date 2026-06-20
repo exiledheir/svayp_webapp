@@ -57,6 +57,36 @@ export function clearOnboarding(): void {
   } catch { /* ignore */ }
 }
 
+// ─── Interactive onboarding step (resume mid-flow) ──────────────────────────────
+const ONBOARDING_STEP_KEY = 'svayp_onboarding_step';
+
+/** Persist the current interactive-onboarding step so a reload resumes where the user left off. */
+export function setOnboardingStep(step: number): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(ONBOARDING_STEP_KEY, String(step));
+  } catch { /* ignore */ }
+}
+
+/** Returns the saved interactive-onboarding step, or 0 if none/unparseable. */
+export function getOnboardingStep(): number {
+  if (typeof window === 'undefined') return 0;
+  try {
+    const v = parseInt(localStorage.getItem(ONBOARDING_STEP_KEY) ?? '', 10);
+    return Number.isFinite(v) && v >= 0 ? v : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Clears the saved step (called when onboarding completes or is skipped). */
+export function clearOnboardingStep(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(ONBOARDING_STEP_KEY);
+  } catch { /* ignore */ }
+}
+
 // ─── Closet in-page tour ────────────────────────────────────────────────────────
 const CLOSET_TOUR_KEY = 'svayp_closet_tour_done';
 

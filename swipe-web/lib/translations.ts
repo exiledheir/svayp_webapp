@@ -128,6 +128,42 @@ export interface Translations {
   onboarding_btn_next: string;
   onboarding_btn_skip: string;
   onboarding_btn_add_item: string;
+  // ── Interactive onboarding wizard ──
+  ob_skip: string;
+  ob_welcome_title: string;
+  ob_welcome_body: string;
+  ob_welcome_cta: string;
+  ob_add_upper_title: string;
+  ob_add_upper_body: string;
+  ob_add_lower_title: string;
+  ob_add_lower_body: string;
+  ob_add_shoes_title: string;
+  ob_add_shoes_body: string;
+  ob_add_pick_photo: string;
+  ob_add_take_photo: string;
+  ob_add_choose_category: string;
+  ob_add_save: string;
+  ob_add_change_photo: string;
+  ob_add_processing: string;
+  ob_dress_skip_toast: string;
+  ob_generate_title: string;
+  ob_generate_body: string;
+  ob_generate_cta: string;
+  ob_generating: string;
+  ob_generate_again: string;
+  ob_generate_continue: string;
+  ob_edit_title: string;
+  ob_edit_body: string;
+  ob_edit_cta: string;
+  ob_edit_open: string;
+  ob_tryon_title: string;
+  ob_tryon_body: string;
+  ob_tryon_cta: string;
+  ob_tryon_quota_note: string;
+  ob_tryon_continue: string;
+  ob_done_title: string;
+  ob_done_body: string;
+  ob_done_cta: string;
   tryOnConfirmTitle: string;
   tryOnConfirmBody: string;
   tryOnCancel: string;
@@ -184,6 +220,10 @@ export interface Translations {
   canvasHintDrag: string;
   canvasHintPinch: string;
   canvasHintSwap: string;
+  // ── Canvas move demo (onboarding) ───────────────────────────────
+  canvasDemoIntro: string;
+  canvasDemoSwap: string;
+  canvasDemoDone: string;
   profile: string;
   replayTour: string;
   logout: string;
@@ -226,6 +266,7 @@ export interface Translations {
     jewelry: string;
     underwear: string;
   };
+  categoryLabels: Record<string, string>;
 }
 
 const en: Translations = {
@@ -357,6 +398,42 @@ const en: Translations = {
   onboarding_btn_next: 'Next',
   onboarding_btn_skip: 'Skip',
   onboarding_btn_add_item: 'Add Item',
+  // ── Interactive onboarding wizard ──
+  ob_skip: 'Skip tour',
+  ob_welcome_title: 'Welcome to LIBΛS',
+  ob_welcome_body: "Let's build your first outfit together — it takes about a minute.",
+  ob_welcome_cta: "Let's start",
+  ob_add_upper_title: 'Your closet starts here',
+  ob_add_upper_body: 'Take a photo or upload a top, jacket, or dress. Our AI strips the background in seconds.',
+  ob_add_lower_title: 'Complete the look',
+  ob_add_lower_body: 'Add jeans, a skirt, or pants — your first AI outfit is almost ready.',
+  ob_add_shoes_title: 'Add some shoes',
+  ob_add_shoes_body: 'Add sneakers, heels, or boots to finish your look — your first AI outfit is almost ready.',
+  ob_add_pick_photo: 'Choose from gallery',
+  ob_add_take_photo: 'Take a photo',
+  ob_add_choose_category: 'Choose a category',
+  ob_add_save: 'Add to closet',
+  ob_add_change_photo: 'Change photo',
+  ob_add_processing: 'Processing your item…',
+  ob_dress_skip_toast: 'A dress is a full look — now add some shoes!',
+  ob_generate_title: 'Generate an outfit',
+  ob_generate_body: 'Let AI put your items together into a styled look. Tap Generate to see the magic.',
+  ob_generate_cta: 'Generate with AI',
+  ob_generating: 'Styling your look…',
+  ob_generate_again: 'Try another',
+  ob_generate_continue: 'Looks great →',
+  ob_edit_title: 'Make it yours',
+  ob_edit_body: 'Drag, resize and swap items on the canvas until you love it. Tap Save when done.',
+  ob_edit_cta: 'Looks good →',
+  ob_edit_open: 'Open editor',
+  ob_tryon_title: 'Try it on',
+  ob_tryon_body: 'See the outfit on you with a virtual try-on. It takes about a minute.',
+  ob_tryon_cta: 'Try it on',
+  ob_tryon_quota_note: 'You can run a virtual try-on anytime from your closet.',
+  ob_tryon_continue: 'Finish →',
+  ob_done_title: "You're all set! ✨",
+  ob_done_body: 'Your closet is ready. Add more items, generate outfits and try them on anytime.',
+  ob_done_cta: 'Go to my closet',
   tryOnConfirmTitle: 'Try It On?',
   tryOnConfirmBody: 'See how this outfit looks on you',
   tryOnCancel: 'Cancel',
@@ -432,7 +509,7 @@ const en: Translations = {
   justNow: 'Just now',
   minutesAgo: '{n}m ago',
   yesterday: 'Yesterday',
-  promoBannerTitle: '20% off Pro & Premium 🔥',
+  promoBannerTitle: '20% off Plus & Premium 🔥',
   promoBannerBody: 'Subscribe today and unlock all AI stylist features.',
   promoBannerCta: 'Subscribe',
   promoBannerTimerLabel: 'Offer expires in',
@@ -463,6 +540,9 @@ const en: Translations = {
   canvasHintDrag: 'Drag to move',
   canvasHintPinch: 'Pinch to resize',
   canvasHintSwap: 'Tap item → Swap',
+  canvasDemoIntro: 'You can move any item',
+  canvasDemoSwap: 'Just drag to rearrange ✨',
+  canvasDemoDone: 'Now try it yourself!',
   profile: 'Profile',
   replayTour: 'Replay app tour',
   logout: 'Log out',
@@ -484,6 +564,29 @@ const en: Translations = {
   aiThinking: 'AI is thinking…',
 
   cats: {
+    tops: 'Tops',
+    tshirts: 'T-Shirts',
+    blouses: 'Blouses',
+    dresses: 'Dresses',
+    jumpsuits: 'Jumpsuits',
+    jackets: 'Jackets',
+    skirts: 'Skirts',
+    jeans: 'Jeans',
+    pants: 'Pants',
+    shorts: 'Shorts',
+    shoes: 'Shoes',
+    sneakers: 'Sneakers',
+    heels: 'Heels',
+    boots: 'Boots',
+    sandals: 'Sandals',
+    flats: 'Flats',
+    bags: 'Bags',
+    accessories: 'Accessories',
+    shawl: 'Shawl',
+    jewelry: 'Jewelry',
+    underwear: 'Underwear',
+  },
+  categoryLabels: {
     tops: 'Tops',
     tshirts: 'T-Shirts',
     blouses: 'Blouses',
@@ -637,6 +740,42 @@ const ru: Translations = {
   onboarding_btn_next: 'Далее',
   onboarding_btn_skip: 'Пропустить',
   onboarding_btn_add_item: 'Добавить вещь',
+  // ── Interactive onboarding wizard ──
+  ob_skip: 'Пропустить',
+  ob_welcome_title: 'Добро пожаловать в LIBΛS',
+  ob_welcome_body: 'Давайте вместе соберём ваш первый образ — это займёт около минуты.',
+  ob_welcome_cta: 'Начать',
+  ob_add_upper_title: 'Начните свой гардероб',
+  ob_add_upper_body: 'Сфотографируйте или загрузите топ, жакет или платье. ИИ мгновенно уберёт фон.',
+  ob_add_lower_title: 'Завершите образ',
+  ob_add_lower_body: 'Добавьте джинсы, юбку или брюки — и ваш первый образ будет готов.',
+  ob_add_shoes_title: 'Добавьте обувь',
+  ob_add_shoes_body: 'Добавьте кроссовки, каблуки или ботинки — и ваш первый образ почти готов.',
+  ob_add_pick_photo: 'Выбрать из галереи',
+  ob_add_take_photo: 'Сделать фото',
+  ob_add_choose_category: 'Выберите категорию',
+  ob_add_save: 'Добавить в гардероб',
+  ob_add_change_photo: 'Изменить фото',
+  ob_add_processing: 'Обрабатываем вещь…',
+  ob_dress_skip_toast: 'Платье — это готовый образ. Теперь добавьте обувь!',
+  ob_generate_title: 'Создайте образ',
+  ob_generate_body: 'ИИ соберёт ваши вещи в стильный образ. Нажмите «Создать», чтобы увидеть результат.',
+  ob_generate_cta: 'Создать с ИИ',
+  ob_generating: 'Подбираем образ…',
+  ob_generate_again: 'Ещё вариант',
+  ob_generate_continue: 'Отлично →',
+  ob_edit_title: 'Настройте под себя',
+  ob_edit_body: 'Перемещайте, меняйте размер и заменяйте вещи на холсте. Нажмите «Сохранить», когда готово.',
+  ob_edit_cta: 'Готово →',
+  ob_edit_open: 'Открыть редактор',
+  ob_tryon_title: 'Примерьте',
+  ob_tryon_body: 'Посмотрите образ на себе с виртуальной примеркой. Это займёт около минуты.',
+  ob_tryon_cta: 'Примерить',
+  ob_tryon_quota_note: 'Виртуальную примерку можно запустить в любой момент из гардероба.',
+  ob_tryon_continue: 'Завершить →',
+  ob_done_title: 'Всё готово! ✨',
+  ob_done_body: 'Ваш гардероб готов. Добавляйте вещи, создавайте образы и примеряйте их в любое время.',
+  ob_done_cta: 'В мой гардероб',
   tryOnConfirmTitle: 'Примерить?',
   tryOnConfirmBody: 'Посмотрите, как наряд смотрится на вас',
   tryOnCancel: 'Отмена',
@@ -712,7 +851,7 @@ const ru: Translations = {
   justNow: 'Только что',
   minutesAgo: '{n} мин назад',
   yesterday: 'Вчера',
-  promoBannerTitle: 'Скидка 20% на Pro и Premium 🔥',
+  promoBannerTitle: 'Скидка 20% на Plus и Premium 🔥',
   promoBannerBody: 'Подпишитесь сегодня и откройте все возможности AI-стилиста.',
   promoBannerCta: 'Подписаться',
   promoBannerTimerLabel: 'Предложение истекает через',
@@ -743,6 +882,9 @@ const ru: Translations = {
   canvasHintDrag: 'Перетащите',
   canvasHintPinch: 'Сведите пальцы для масштаба',
   canvasHintSwap: 'Нажмите → Замена',
+  canvasDemoIntro: 'Любую вещь можно перемещать',
+  canvasDemoSwap: 'Просто перетащите ✨',
+  canvasDemoDone: 'Теперь попробуйте сами!',
   profile: 'Профиль',
   replayTour: 'Повторить обучение',
   logout: 'Выйти',
@@ -786,6 +928,29 @@ const ru: Translations = {
     jewelry: 'Украшения',
     underwear: 'Нижнее бельё',
   },
+  categoryLabels: {
+    tops: 'Топы',
+    tshirts: 'Футболки',
+    blouses: 'Блузки',
+    dresses: 'Платья',
+    jumpsuits: 'Комбинезоны',
+    jackets: 'Жакеты',
+    skirts: 'Юбки',
+    jeans: 'Джинсы',
+    pants: 'Брюки',
+    shorts: 'Шорты',
+    shoes: 'Обувь',
+    sneakers: 'Кроссовки',
+    heels: 'Каблуки',
+    boots: 'Ботинки',
+    sandals: 'Сандалии',
+    flats: 'Балетки',
+    bags: 'Сумки',
+    accessories: 'Аксессуары',
+    shawl: 'Шаль',
+    jewelry: 'Украшения',
+    underwear: 'Нижнее бельё',
+  },
 };
 
 const uz: Translations = {
@@ -800,8 +965,8 @@ const uz: Translations = {
   yourStyleStartsHere: 'Uslubingiz shu yerdan.',
   tapPlusToAddFirstPiece: "+  bosib birinchi narsani qo'shing.",
   tapRegeneratePrompt: 'Obrazingizni yaratish uchun ↻ bosing',
-  addTopAndBottom: "Outfit yaratish uchun kamida bitta yuqori va bitta pastki kiyim yoki oyoq kiyim qo'shing.",
-  upperBody: 'Yuqori kiyim',
+  addTopAndBottom: "Obraz yaratish uchun kamida bitta ustki va bitta pastki kiyim yoki ko'ylak qo'shing.",
+  upperBody: 'Ustki kiyim',
   lowerBody: 'Pastki kiyim',
   shoes: 'Oyoq kiyim',
   accessories: 'Aksessuarlar',
@@ -846,7 +1011,7 @@ const uz: Translations = {
   regens: 'ta re-generatsiya',
   tryOns: "ta kiyib ko'rish",
   calDays: 'kun kalendarda',
-  reachedRegenLimit: "Siz {n} ta outfit generatsiyasidan foydalandingiz. Ko'proq uchun obunangizni yangilang.",
+  reachedRegenLimit: "Siz {n} ta obraz yaratish imkoniyatidan foydalandingiz. Ko'proq uchun obunangizni yangilang.",
   reachedCanvasLimit: "Bu obrazlar doskasi qulflangan. Joriy rejangizda {n} ta doska mavjud. Barchasini ochish uchun obunangizni yangilang.",
   reachedTryOnLimit: "{n} ta kiyib ko'rishdan foydalandingiz. Ko'proq uchun rejani yangilang.",
   reachedItemLimit: 'Kategoriyada {n} ta kiyim chegarasiga yetdingiz.',
@@ -905,23 +1070,59 @@ const uz: Translations = {
   onboarding_slide2_title: "Garderobingizni yarating",
   onboarding_slide2_body: "Istalgan rasmni yuklang. AI fonni olib tashlaydi va kiyimni tekis uslubda qayta yaratadi \u2014 aralashtirib moslashtirish uchun tayyor.",  onboarding_slide2_original: 'Original',
   onboarding_slide2_aiflat: 'AI tekis uslub',  onboarding_slide3_title: "AI yordamida obrazlar",
-  onboarding_slide3_body: "Sun'iy intellekt garderobingizdan bir zumda outfit kombinatsiyalari yaratadi.",
+  onboarding_slide3_body: "Sun'iy intellekt garderobingizdan bir zumda obraz kombinatsiyalarini yaratadi.",
   onboarding_slide4_title: "Obrazingizni sozlang",
-  onboarding_slide4_body: "Istalgan kiyimni almashtiring, qo'shing yoki olib tashlang \u2014 mukammal outfit yarating.",
+  onboarding_slide4_body: "Istalgan kiyimni almashtiring, qo'shing yoki olib tashlang \u2014 mukammal obraz yarating.",
   onboarding_slide5_title: "Virtual kiyib ko'rish",
-  onboarding_slide5_body: "Uydan chiqmasdan outfit qanday ko'rinishini ko'ring. Rasmingizni yuklang va bir zumda kiyib ko'ring.",
+  onboarding_slide5_body: "Uydan chiqmasdan obraz qanday ko'rinishini ko'ring. Rasmingizni yuklang va bir zumda kiyib ko'ring.",
   onboarding_cta_title: "Birinchi kiyimingizni qo'shing",
   onboarding_cta_body: "Bitta kiyimdan boshlang. Qolganini biz qilamiz.",
   onboarding_btn_next: "Keyingi",
   onboarding_btn_skip: "O'tkazib yuborish",
   onboarding_btn_add_item: "Kiyim qo'shish",
+  // ── Interactive onboarding wizard ──
+  ob_skip: "O'tkazib yuborish",
+  ob_welcome_title: 'LIBΛS ga xush kelibsiz',
+  ob_welcome_body: "Keling, birinchi obrazingizni birga yaratamiz — bu bor-yo'g'i bir daqiqa vaqt oladi.",
+  ob_welcome_cta: 'Boshlash',
+  ob_add_upper_title: "Garderobingiz shu yerdan boshlanadi",
+  ob_add_upper_body: "Futbolka, kurtka yoki ko'ylak rasmini oling yoki yuklang. AI fonni bir zumda olib tashlaydi.",
+  ob_add_lower_title: "Ko'rinishni yakunlang",
+  ob_add_lower_body: "Jinsi, yubka yoki shim qo'shing — birinchi AI obrazingiz deyarli tayyor.",
+  ob_add_shoes_title: "Oyoq kiyim qo'shing",
+  ob_add_shoes_body: "Krossovka, poshnali tufli yoki etik qo'shib obrazni yakunlang — birinchi AI obrazingiz deyarli tayyor.",
+  ob_add_pick_photo: 'Galereyadan tanlash',
+  ob_add_take_photo: 'Rasmga olish',
+  ob_add_choose_category: 'Kategoriyani tanlang',
+  ob_add_save: "Garderobga qo'shish",
+  ob_add_change_photo: "Rasmni o'zgartirish",
+  ob_add_processing: 'Kiyim qayta ishlanmoqda…',
+  ob_dress_skip_toast: "Ko'ylak — bu tayyor ko'rinish. Endi oyoq kiyim qo'shing!",
+  ob_generate_title: "Obraz yarating",
+  ob_generate_body: "AI kiyimlaringizni uyg'un obrazga jamlaydi. Natijani ko'rish uchun «Yaratish»ni bosing.",
+  ob_generate_cta: 'AI bilan yaratish',
+  ob_generating: 'Obraz tayyorlanmoqda…',
+  ob_generate_again: 'Boshqasini sinab ko\'rish',
+  ob_generate_continue: 'Ajoyib →',
+  ob_edit_title: "O'zingizga moslang",
+  ob_edit_body: "Kiyimlarni suring, o'lchamini o'zgartiring va almashtiring. Tugagach «Saqlash»ni bosing.",
+  ob_edit_cta: 'Tayyor →',
+  ob_edit_open: 'Tahrirlovchini ochish',
+  ob_tryon_title: "Kiyib ko'ring",
+  ob_tryon_body: "Virtual kiyib ko'rish orqali obrazni o'zingizda ko'ring. Bu bir daqiqa vaqt oladi.",
+  ob_tryon_cta: "Kiyib ko'rish",
+  ob_tryon_quota_note: "Virtual kiyib ko'rishni istalgan vaqtda garderobdan ishga tushirishingiz mumkin.",
+  ob_tryon_continue: 'Yakunlash →',
+  ob_done_title: 'Hammasi tayyor! ✨',
+  ob_done_body: "Garderobingiz tayyor. Istalgan vaqtda kiyim qo'shing, obrazlar yarating va ularni kiyib ko'ring.",
+  ob_done_cta: 'Garderobimga o\'tish',
   tryOnConfirmTitle: "Kiyib ko'rish?",
-  tryOnConfirmBody: "Bu outfit sizga qanday ko'rinishini ko'ring",
+  tryOnConfirmBody: "Bu obraz sizga qanday yarashishini ko'ring",
   tryOnCancel: 'Bekor',
   tryOnConfirm: "Kiyib ko'rish",
-  tryOnStarting: "Kiyib ko'rish boshlanyapti...",
-  tryOnGenerating: "Ko'rinishingiz yaratilyapti...",
-  tryOnPhase2: "Outfitingiz tahlil qilinyapti...",
+  tryOnStarting: "Kiyib ko'rish boshlanmoqda...",
+  tryOnGenerating: "Ko'rinishingiz yaratilmoqda...",
+  tryOnPhase2: "Obrazingiz tahlil qilinmoqda...",
   tryOnPhase3: "Ko'rinishingiz renderlanmoqda...",
   tryOnPhase4: "Yakuniy bezaklar qo'shilmoqda...",
   tryOnTimeEstimate: 'Odatda 30–60 soniya davom etadi',
@@ -952,15 +1153,15 @@ const uz: Translations = {
     "Ko'p qatlamlilik kamroq kiyimdan ko'proq obraz yaratishning eng oson usuli.",
     "Yuz yonidagi kiyim rangi sizning ko'rinishingizga ta'sir qiladi.",
     "Sifat miqdordan doimo muhimroq.",
-    "Yenglarni shimab qo'yish har qanday outfitni bir zumda erkin ko'rsatadi.",
-    "Yaxshi daqlangan ko'ylak hatto eng oddiy obrazni ham ko'taradi.",
+    "Yenglarni shimarib qo'yish har qanday obrazni bir zumda erkin ko'rsatadi.",
+    "Yaxshi dazmollangan ko'ylak hatto eng oddiy obrazni ham ko'taradi.",
     "To'q ranglar ingichkalatadi, och ranglar hajm qo'shadi.",
     "Oyoq kiyim butun obrazning ohangini belgilaydi.",
     "Ko'ylagingizni ichkariga suqib qo'yish bo'sh obrazga tuzilma beradi.",
-    "Naqsh aralashtiruv ishlaydi: biri yirik, ikkinchisi kichik bo'lsa.",
+    "Naqshlarni aralashtirish ishlaydi: biri yirik, ikkinchisi kichik bo'lsa.",
     "Oq krossovkalar deyarli hamma narsa bilan mos keladi.",
     "Kamar har qanday obrazning siluetini o'zgartirishi mumkin.",
-    "Qattiq sumkalar resmiyroq, yumshoq sumkalar kundalikroq ko'rinadi.",
+    "Qattiq sumkalar rasmiyroq, yumshoq sumkalar kundalikroq ko'rinadi.",
     "Vertikal chiziqlar tanani vizual ravishda cho'zadi.",
     "Sumkani tuflisi bilan moslashtirish — klassika va nafosatdir.",
     "Sovuq tonlar sovuq rang turiga, issiq tonlar issiq rang turiga to'g'ri keladi.",
@@ -990,7 +1191,7 @@ const uz: Translations = {
   justNow: 'Hozirgina',
   minutesAgo: '{n} daqiqa oldin',
   yesterday: 'Kecha',
-  promoBannerTitle: 'Premium va Pro obunalariga 20% chegirma 🔥',
+  promoBannerTitle: 'Premium va Plus obunalariga 20% chegirma 🔥',
   promoBannerBody: 'Bugunoq obuna bo\'ling va AI stilistning barcha imkoniyatlarini oching.',
   promoBannerCta: 'Obuna bo\'lish',
   promoBannerTimerLabel: 'Taklif tugashiga',
@@ -1006,21 +1207,24 @@ const uz: Translations = {
   coachTryOnBody: "AI yordamida istalgan obrazni virtual kiyib ko'ring — rasmingizni yuklang va natijani darhol ko'ring.",
   coachGotIt: "Tushundim →",
   // ── Enhanced empty states ───────────────────────────────────────
-  emptyStep1: "Yuqori kiyim qo'shing",
+  emptyStep1: "Ustki kiyim qo'shing",
   emptyStep2: "Pastki kiyim qo'shing",
   emptyStep3: 'Obraz yarating',
   emptyAddTap: "Qo'shish uchun bosing",
-  generateHint: "Kiyimlaringizni tayyor outfit yaratamiz",
+  generateHint: "Kiyimlaringizdan tayyor obraz yaratamiz",
   noItemsInSection: "Hali narsalar yo'q",
   tapPlusToAdd: "Birinchi kiyimni qo'shish uchun + bosing",
-  addUpperFirst: "Boshlash uchun yuqori kiyim qo'shing",
+  addUpperFirst: "Boshlash uchun ustki kiyim qo'shing",
   addLowerOrShoes: "Pastki kiyim yoki oyoq kiyim qo'shing",
-  saveNeedsTopItem: "Outfitni saqlash uchun kamida bitta yuqori kiyim qo'shing.",
+  saveNeedsTopItem: "Obrazni saqlash uchun kamida bitta ustki kiyim qo'shing.",
   // ── Canvas hints ────────────────────────────────────────────────
   canvasEmptyHint: "Birinchi kiyimni qo'shish uchun + bosing",
   canvasHintDrag: "Ko'chirish uchun torting",
   canvasHintPinch: "O'lcham uchun qistiring",
   canvasHintSwap: "Bosing → Almashtirish",
+  canvasDemoIntro: "Istalgan kiyimni ko'chirishingiz mumkin",
+  canvasDemoSwap: "Shunchaki torting ✨",
+  canvasDemoDone: "Endi o'zingiz sinab ko'ring!",
   profile: 'Profil',
   replayTour: "Qo'llanmani qayta ko'rsatish",
   logout: 'Chiqish',
@@ -1030,9 +1234,9 @@ const uz: Translations = {
   dayNames: ['Yak', 'Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh'],
   monthNames: ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyun', 'Iyul', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek'],
   demoAddTitle: "O'z kiyimlaringizni qo'shing",
-  demoAddBody: "Outfit yaratish va kiyib ko'rish uchun kiyimlaringiz rasmini yuklang!",
+  demoAddBody: "Obraz yaratish va kiyib ko'rish uchun kiyimlaringiz rasmini yuklang!",
   tooFewItemsTitle: "Yangi obrazlar uchun kiyim yetarli emas",
-  tooFewItemsBody: "Xilma-xil obrazlar uchun AI ko'proq kiyim kerak. Yangi kiyimlar qo'shing!",
+  tooFewItemsBody: "Xilma-xil obrazlar uchun AI'ga ko'proq kiyim kerak. Yangi kiyimlar qo'shing!",
   outfitsExhaustedTitle: "Obrazlar yaratilmoqda",
   outfitsExhaustedBody: "AI yangi kombinatsiyalarni qidirmoqda. 30–60 soniyadan so'ng ✦ tugmasini bosing.",
   addClothingBtn: "Kiyim qo'shish",
@@ -1042,26 +1246,49 @@ const uz: Translations = {
   aiThinking: "AI o'ylayapti…",
 
   cats: {
-    tops: 'Tepa kiyim',
+    tops: 'Toplar',
     tshirts: 'Futbolkalar',
-    blouses: "Ko'ylaklar",
-    dresses: 'Liboslar',
+    blouses: 'Bluzkalar',
+    dresses: "Ko'ylaklar",
     jumpsuits: 'Kombinezonlar',
     jackets: 'Kurtkalar',
     skirts: 'Yubkalar',
-    jeans: 'Jinsi',
+    jeans: 'Jinsilar',
     pants: 'Shimlar',
-    shorts: 'Shortilar',
+    shorts: 'Shortlar',
     shoes: 'Oyoq kiyim',
     sneakers: 'Krossovkalar',
     heels: 'Poshnali tufli',
     boots: 'Etiklar',
     sandals: 'Sandallar',
-    flats: 'Balet tufli',
+    flats: 'Baletkalar',
     bags: 'Sumkalar',
     accessories: 'Aksessuarlar',
     shawl: "Ro'mol",
-    jewelry: 'Zargarlik',
+    jewelry: 'Taqinchoqlar',
+    underwear: 'Ichki kiyim',
+  },
+  categoryLabels: {
+    tops: 'Toplar',
+    tshirts: 'Futbolkalar',
+    blouses: 'Bluzkalar',
+    dresses: "Ko'ylaklar",
+    jumpsuits: 'Kombinezonlar',
+    jackets: 'Kurtkalar',
+    skirts: 'Yubkalar',
+    jeans: 'Jinsilar',
+    pants: 'Shimlar',
+    shorts: 'Shortlar',
+    shoes: 'Oyoq kiyim',
+    sneakers: 'Krossovkalar',
+    heels: 'Poshnali tufli',
+    boots: 'Etiklar',
+    sandals: 'Sandallar',
+    flats: 'Baletkalar',
+    bags: 'Sumkalar',
+    accessories: 'Aksessuarlar',
+    shawl: "Ro'mol",
+    jewelry: 'Taqinchoqlar',
     underwear: 'Ichki kiyim',
   },
 };
