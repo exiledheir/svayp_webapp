@@ -14,8 +14,7 @@ import { getUserPlan, generateOutfitSuggestions, fetchAiCanvasSuggest, createTry
 import type { SseHandle } from '@/types';
 import { useI18n } from '@/lib/i18n';
 import type { Locale } from '@/lib/translations';
-import { isOnboardingComplete, isClosetTourDone, setClosetTourDone, clearClosetTour, isCanvasHintSeen, setCanvasHintSeen } from '@/lib/onboarding-storage';
-import ClosetCoachMark from '@/components/ClosetCoachMark';
+import { isOnboardingComplete, isCanvasHintSeen, setCanvasHintSeen } from '@/lib/onboarding-storage';
 import { saveTryOnResult, getTryOnHistory, getTryOnHistoryWithCloud, deleteTryOnRecord, saveActiveTryOnJob, getActiveTryOnJobWithCloud, clearActiveTryOnJob, type TryOnRecord } from '@/lib/tryon-history';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
@@ -177,52 +176,6 @@ export default function ClosetPage() {
       router.replace('/onboarding');
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── In-page coach marks tour ──────────────────────────────────────────────────
-  const COACH_SELECTORS = ['[data-coach="fab"]', '[data-coach="regen"]', '[data-coach="view-items"]', '[data-coach="try-on"]'];
-  // Fallback selectors used when the primary target isn't in the DOM yet (e.g. no items added)
-  const COACH_FALLBACKS = ['[data-coach="fab"]', '[data-coach="outfit-card"]', '[data-coach="outfit-card"]', '[data-coach="outfit-card"]'];
-  const [tourStep, setTourStep] = useState<number | null>(null);
-  const [tourTargetRect, setTourTargetRect] = useState<DOMRect | null>(null);
-
-  useEffect(() => {
-    if (!isClosetTourDone()) {
-      setTourStep(0);
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (tourStep === null) return;
-    const primary = document.querySelector(COACH_SELECTORS[tourStep]);
-    const fallback = COACH_FALLBACKS[tourStep] ? document.querySelector(COACH_FALLBACKS[tourStep]) : null;
-    const el = primary ?? fallback;
-    if (!el) { setTourTargetRect(null); return; }
-    // Scroll instantly so getBoundingClientRect is not called mid-animation
-    el.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'nearest' });
-    // After instant scroll, check if the element ended up behind the sticky header
-    // and nudge the scroll container down if needed.
-    const timer = setTimeout(() => {
-      const HEADER_SAFE_Y = 140; // header + promo banner height (conservative)
-      const scrollContainer = el.closest('main') as HTMLElement | null;
-      let rect = (el as HTMLElement).getBoundingClientRect();
-      if (scrollContainer && rect.top < HEADER_SAFE_Y) {
-        scrollContainer.scrollTop -= (HEADER_SAFE_Y - rect.top + 24);
-        rect = (el as HTMLElement).getBoundingClientRect();
-      }
-      setTourTargetRect(rect);
-    }, 80);
-    return () => clearTimeout(timer);
-  }, [tourStep]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function handleTourDismiss() {
-    const nextStep = (tourStep ?? 0) + 1;
-    if (nextStep >= COACH_SELECTORS.length) {
-      setTourStep(null);
-      setClosetTourDone();
-    } else {
-      setTourStep(nextStep);
-    }
-  }
 
   useEffect(() => {
     // Immediately show whatever is in localStorage (prevents flicker)
@@ -1640,9 +1593,7 @@ export default function ClosetPage() {
 
       {/* ── Floating Add Button ── */}
       <div className="absolute right-6 z-50" style={{ bottom: '20px' }}>
-        {tourStep === 0 && <span className="absolute inset-0 rounded-full animate-ping" style={{ backgroundColor: '#F370A7', opacity: 0.35 }} />}
         <button
-          data-coach="fab"
           onClick={() => openAdd('TOPS')}
           className="relative w-14 h-14 rounded-full flex items-center justify-center shadow-xl active:scale-[0.95] transition-transform"
           style={{ backgroundColor: '#F370A7' }}
@@ -1839,25 +1790,6 @@ export default function ClosetPage() {
                 </div>
               </div>
 
-              {/* Replay tour */}
-              <button
-                onClick={() => {
-                  clearClosetTour();
-                  setTourStep(0);
-                  setShowProfile(false);
-                }}
-                className="mt-5 w-full h-11 rounded-2xl flex items-center justify-center gap-2 text-[13px] font-semibold active:scale-[0.97] transition-colors"
-                style={{
-                  background: theme === 'dark' ? 'rgba(243,112,167,0.2)' : 'rgba(243,112,167,0.08)',
-                  color: theme === 'dark' ? '#ff9bc5' : '#F370A7',
-                }}
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
-                </svg>
-                {t.replayTour}
-              </button>
-
               {/* Logout */}
               <button
                 onClick={() => {
@@ -1914,15 +1846,6 @@ export default function ClosetPage() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* ── In-page coach marks ── */}
-      {tourStep !== null && (
-        <ClosetCoachMark
-          step={tourStep}
-          targetRect={tourTargetRect}
-          onDismiss={handleTourDismiss}
-        />
       )}
 
     </div>
@@ -2150,7 +2073,6 @@ function OutfitCard({
 
   return (
     <div
-      data-coach="outfit-card"
       className="shrink-0 rounded-[28px] flex flex-col border border-gray-100 dark:border-gray-700 relative overflow-hidden"
       style={{
         width: 'min(82vw, 340px)',
@@ -2177,7 +2099,6 @@ function OutfitCard({
           {onRegenerate && (
             <div className="flex flex-col items-center gap-0.5">
               <button
-                data-coach="regen"
                 onClick={isAiSuggesting || isEmpty ? undefined : onRegenerate}
                 disabled={isAiSuggesting || isEmpty}
                 className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform disabled:opacity-40"
@@ -2327,7 +2248,6 @@ function OutfitCard({
       {(displayEntries.length > 0 || canGenerateOutfit || isEmpty) && (
       <div className="flex gap-2.5 px-5 pb-5">
         <button
-          data-coach="view-items"
           onClick={onViewItems}
           className="flex-1 h-[44px] rounded-full flex items-center justify-center text-[12px] font-semibold tracking-wide"
           style={{
@@ -2339,7 +2259,6 @@ function OutfitCard({
         </button>
         {onTryItOn && (displayEntries.length > 0 || canGenerateOutfit || isEmpty) && (
         <button
-          data-coach="try-on"
           onClick={isEmpty ? undefined : onTryItOn}
           disabled={isEmpty}
           className="flex-1 h-[44px] rounded-full flex items-center justify-center gap-1.5 text-[12px] font-bold text-white tracking-wide active:scale-[0.97] transition-transform"
