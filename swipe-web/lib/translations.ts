@@ -8,6 +8,13 @@ export interface Translations {
   marketComingSoonTitle: string;
   marketComingSoonText: string;
   myOutfits: string;
+  tabBoards: string;
+  tabOutfits: string;
+  tabDressMe: string;
+  tabCalendar: string;
+  noTryOnsYet: string;
+  noTryOnsHint: string;
+  dressMeNeedsItems: string;
   newOutfit: string;
   addPiecesToBuildIt: string;
   viewItems: string;
@@ -194,6 +201,7 @@ export interface Translations {
   tryOnFailedTitle: string;
   close: string;
   retry: string;
+  loadMore: string;
   myLooks: string;
   myLooksSaved: string;
   myLooksEmpty: string;
@@ -289,6 +297,13 @@ const en: Translations = {
   marketComingSoonTitle: 'Coming soon',
   marketComingSoonText: 'Soon, the place where you can sell your things',
   myOutfits: 'My Outfits',
+  tabBoards: 'Boards',
+  tabOutfits: 'Outfits',
+  tabDressMe: 'Dress Me',
+  tabCalendar: 'Calendar',
+  noTryOnsYet: 'No try-ons yet',
+  noTryOnsHint: 'Your virtual try-on results will appear here.',
+  dressMeNeedsItems: 'Add tops, bottoms and footwear to mix and match looks.',
   newOutfit: 'New Outfit',
   addPiecesToBuildIt: 'Add pieces to build it',
   viewItems: 'Edit',
@@ -525,6 +540,7 @@ const en: Translations = {
   tryOnFailedTitle: 'Try-on failed',
   close: 'Close',
   retry: 'Retry',
+  loadMore: 'Load more',
   myLooks: 'My Looks',
   myLooksSaved: 'saved',
   myLooksEmpty: 'No saved looks yet',
@@ -642,6 +658,13 @@ const ru: Translations = {
   marketComingSoonTitle: 'Скоро',
   marketComingSoonText: 'Скоро здесь вы сможете продавать свои вещи',
   myOutfits: 'Мои образы',
+  tabBoards: 'Доски',
+  tabOutfits: 'Образы',
+  tabDressMe: 'Примерочная',
+  tabCalendar: 'Календарь',
+  noTryOnsYet: 'Примерок пока нет',
+  noTryOnsHint: 'Здесь появятся результаты виртуальной примерки.',
+  dressMeNeedsItems: 'Добавьте верх, низ и обувь, чтобы собирать образы.',
   newOutfit: 'Новый образ',
   addPiecesToBuildIt: 'Добавьте вещи для образа',
   viewItems: 'Изменить',
@@ -878,6 +901,7 @@ const ru: Translations = {
   tryOnFailedTitle: 'Примерка не удалась',
   close: 'Закрыть',
   retry: 'Повторить',
+  loadMore: 'Показать ещё',
   myLooks: 'Мои образы',
   myLooksSaved: 'сохранено',
   myLooksEmpty: 'Нет сохранённых образов',
@@ -995,6 +1019,13 @@ const uz: Translations = {
   marketComingSoonTitle: 'Tez orada',
   marketComingSoonText: "Tez orada, bu yerda siz o'z buyumlaringizni sotishingiz mumkin",
   myOutfits: 'Obrazlarim',
+  tabBoards: 'Doskalar',
+  tabOutfits: 'Obrazlar',
+  tabDressMe: 'Kiyintirish',
+  tabCalendar: 'Kalendar',
+  noTryOnsYet: "Hali primerka yo'q",
+  noTryOnsHint: 'Virtual primerka natijalari shu yerda paydo boʻladi.',
+  dressMeNeedsItems: 'Obraz yigʻish uchun yuqori, pastki va poyabzal qoʻshing.',
   newOutfit: 'Yangi obraz',
   addPiecesToBuildIt: "Qismlar qo'shib yarating",
   viewItems: "O'zgartirish",
@@ -1229,6 +1260,7 @@ const uz: Translations = {
   tryOnFailedTitle: "Kiyib ko'rish amalga oshmadi",
   close: 'Yopish',
   retry: 'Qayta urinish',
+  loadMore: 'Yana koʻrsatish',
   myLooks: "Mening obrazlarim",
   myLooksSaved: 'saqlangan',
   myLooksEmpty: "Hali saqlangan ko'rinish yo'q",

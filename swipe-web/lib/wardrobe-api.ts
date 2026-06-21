@@ -16,6 +16,7 @@ import type {
   OutfitCanvasItemRequest,
   OutfitSuggestionResponse,
   TryOnJobResponse,
+  TryOnStatus,
   CalendarResponse,
   SseHandle,
 } from '@/types';
@@ -534,6 +535,23 @@ export async function createTryOnJob(data: {
 export async function getTryOnJob(id: string): Promise<TryOnJobResponse> {
   const res = await api.get(`/outfits/try-on/${id}`);
   return unwrapData<TryOnJobResponse>(res);
+}
+
+/**
+ * Try-on history for the current user (newest first), paginated.
+ * Pass status (e.g. 'COMPLETED') to only get finished jobs that have a resultImageUrl.
+ */
+export async function getTryOnJobHistory(
+  params: { page?: number; size?: number; status?: TryOnStatus } = {},
+): Promise<PageResponse<TryOnJobResponse>> {
+  const res = await api.get('/outfits/try-on', {
+    params: {
+      page: params.page ?? 0,
+      size: params.size ?? 20,
+      ...(params.status ? { status: params.status } : {}),
+    },
+  });
+  return unwrapData<PageResponse<TryOnJobResponse>>(res);
 }
 
 export async function pollTryOnUntilDone(
