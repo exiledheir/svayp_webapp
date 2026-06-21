@@ -74,17 +74,49 @@ export interface ChatMessage {
 
 // ── Wardrobe ──────────────────────────────────────────────────────────────────
 
+// New section-level taxonomy (migration V96). The legacy values below remain
+// valid (accepted by the backend) so older items keep working unchanged.
+export type WardrobeSection =
+  | 'TOPS' | 'BOTTOMS' | 'DRESSES_SETS' | 'OUTERWEAR' | 'FOOTWEAR' | 'ACCESSORIES';
+
 export type WardrobeCategory =
+  // new sections
+  | 'BOTTOMS' | 'DRESSES_SETS' | 'OUTERWEAR' | 'FOOTWEAR' | 'OTHER'
+  // legacy
   | 'TOPS' | 'TSHIRTS' | 'BLOUSES' | 'DRESSES' | 'JUMPSUITS' | 'JACKETS'
   | 'SKIRTS' | 'JEANS' | 'PANTS' | 'SHORTS'
   | 'SHOES' | 'SNEAKERS' | 'HEELS' | 'BOOTS' | 'SANDALS' | 'FLATS'
   | 'BAGS' | 'ACCESSORIES' | 'SHAWL' | 'JEWELRY' | 'UNDERWEAR';
 
 export type WardrobeSubcategory =
+  // new "type of item" values
+  | 'TSHIRTS_TOPS' | 'SHIRTS_BLOUSES' | 'SWEATERS_KNITS'
+  | 'TROUSERS_JEANS' | 'LEGGINGS_TRIKO'
+  | 'SETS'
+  | 'JACKET' | 'COAT' | 'PUFFER' | 'TRENCH'
+  | 'ANKLE_BOOTS' | 'HIGH_BOOTS' | 'PUMPS'
+  | 'HEADSCARF_HIJAB' | 'SCARF' | 'GLASSES' | 'HEADWEAR' | 'BELT'
+  // legacy / shared
   | 'TOPS' | 'TSHIRTS' | 'BLOUSES' | 'DRESSES' | 'JUMPSUITS' | 'JACKETS'
   | 'SKIRTS' | 'JEANS' | 'PANTS' | 'SHORTS'
   | 'SHOES' | 'SNEAKERS' | 'HEELS' | 'BOOTS' | 'SANDALS' | 'FLATS'
   | 'BAGS' | 'ACCESSORIES' | 'SHAWL' | 'JEWELRY' | 'UNDERWEAR';
+
+// Subcategory of a garment (only where applicable — e.g. shirts, knits, sets, jewelry).
+export type WardrobeItemType =
+  | 'T_SHIRT' | 'TANK_TOP' | 'TOP' | 'LONGSLEEVE' | 'POLO'
+  | 'SHIRT' | 'BLOUSE' | 'TUNIC'
+  | 'SWEATER' | 'HOODIE' | 'CARDIGAN' | 'TURTLENECK' | 'VEST'
+  | 'DUO' | 'TRIO' | 'SUIT' | 'JUMPSUIT'
+  | 'EARRINGS' | 'BRACELET' | 'CHAIN' | 'RING' | 'WATCH';
+
+// Length / cut.
+export type WardrobeLength =
+  | 'MINI' | 'MIDI' | 'MAXI' | 'KNEE_LENGTH' | 'ABOVE_KNEE' | 'ANKLE'
+  | 'FLOOR_LENGTH' | 'BERMUDA' | 'STRAIGHT' | 'FLARED' | 'SKINNY' | 'TEA_LENGTH';
+
+// Fit type.
+export type WardrobeFitType = 'REGULAR' | 'LOOSE' | 'SLIM';
 
 export type UploadJobStatus =
   | 'UPLOADED' | 'NSFW_SCAN' | 'UPSCALE' | 'BG_REMOVE'
@@ -112,7 +144,10 @@ export interface WardrobeItemResponse {
   id: string;
   category: WardrobeCategory;
   subcategory: WardrobeSubcategory;
-  layer: 'BASE' | 'MID' | 'OUTER' | null;
+  itemType: WardrobeItemType | null;
+  length: WardrobeLength | null;
+  fitType: WardrobeFitType | null;
+  layer: 'BASE' | 'MID' | 'OUTER' | 'BOTTOM' | null;
   status: string;
   imageUrl: string;
   thumbnailUrl: string;

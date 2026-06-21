@@ -5,9 +5,11 @@ import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Image as 
 import { getUser, clearTokens } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags-context';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
-import { fetchClosetItems, addClosetItemFromFile, removeClosetItem, updateClosetItemApi, getClosetItems, addClosetItem, deleteClosetItem, updateClosetItem, CLOSET_CATEGORIES } from '@/lib/closet-storage';
+import { fetchClosetItems, addClosetItemFromFile, removeClosetItem, updateClosetItemApi, getClosetItems, addClosetItem, deleteClosetItem, updateClosetItem } from '@/lib/closet-storage';
 import type { ClosetItem, ClosetCategory } from '@/lib/closet-storage';
-import type { WardrobeUploadStatus, PlanTier, PlanLimits, PlanUsage, TryOnJobResponse } from '@/types';
+import type { WardrobeUploadStatus, PlanTier, PlanLimits, PlanUsage, TryOnJobResponse, WardrobeSection, WardrobeSubcategory } from '@/types';
+import ItemOptionsPicker, { defaultSelectionForSection, isSelectionComplete, type ItemOptionsSelection } from '@/components/closet/ItemOptionsPicker';
+import { subcategoryToLocal, sectionForSubcategory, subcategoriesForSection, SECTION_ORDER, localToSubcategory, taxLabel } from '@/lib/wardrobe-taxonomy';
 import { getUserPlan, generateOutfitSuggestions, fetchAiCanvasSuggest, createTryOnJob, watchTryOnUntilDone, getOutfitCalendar, createOutfitCanvas, updateOutfitCanvas, deleteOutfitCanvas, getOutfitCanvases, getOutfitCanvas, listUploads, watchUploadUntilDone, getTryOnJob, getUserProfile } from '@/lib/wardrobe-api';
 import type { SseHandle } from '@/types';
 import { useI18n } from '@/lib/i18n';
@@ -29,12 +31,27 @@ import { captureCanvasSnapshot, downloadWithWatermark } from '@/lib/canvas-snaps
 import InteractiveCanvas from '@/components/closet/InteractiveCanvas';
 import { TryOnConfirmModal, TryOnModal } from '@/components/closet/TryOnFlow';
 
-const ADD_GROUPS: Record<string, ClosetCategory[]> = {
-  upper: ['tops', 'dresses', 'jackets', 'blouses', 'jumpsuits', 'tshirts'],
-  lower: ['skirts', 'jeans', 'pants', 'shorts'],
-  shoes: ['shoes', 'sneakers', 'heels', 'boots', 'sandals', 'flats'],
-  acc: ['accessories', 'bags', 'shawl', 'jewelry', 'underwear'],
-};
+// The precise taxonomy subcategory of an item — its stored subcategory when set
+// (new items), otherwise derived from the legacy local category.
+function effectiveSubcategory(item: ClosetItem): WardrobeSubcategory {
+  return item.subcategory ?? localToSubcategory(item.category);
+}
+
+// Which of the six closet sections an item belongs to.
+function itemSection(item: ClosetItem): WardrobeSection {
+  return sectionForSubcategory(effectiveSubcategory(item)) ?? localCatToSection(item.category);
+}
+
+// Map a legacy local category to the new section so the add picker can land on
+// the right section when opened from a section's "+" button.
+function localCatToSection(cat: ClosetCategory): WardrobeSection {
+  if (cat === 'dresses' || cat === 'jumpsuits') return 'DRESSES_SETS';
+  if (cat === 'jackets') return 'OUTERWEAR';
+  if (UPPER_CATS.includes(cat)) return 'TOPS';
+  if (LOWER_CATS.includes(cat)) return 'BOTTOMS';
+  if (SHOES_CATS.includes(cat)) return 'FOOTWEAR';
+  return 'ACCESSORIES';
+}
 
 function getCroppedImage(imageSrc: string, crop: PixelCrop, displayWidth: number, displayHeight: number): Promise<string> {
   return new Promise((resolve) => {
@@ -76,9 +93,6 @@ const DEMO_CANVAS_LAYOUT: SavedCanvasLayout = [
   { id: 'fb18130c-1192-4d32-aa84-0d5a837a3bcd', x: 63, y: 17, scale: 0.6,  zIndex: 4, group: 'acc'   },
 ];
 
-function catLabel(cat: ClosetCategory, cats?: Record<string, string>): string {
-  return cats?.[cat] ?? CLOSET_CATEGORIES.find((c) => c.value === cat)?.label ?? cat;
-}
 
 const OCCASION_CONFIG = [
   { key: 'weekend' as const, Icon: CalendarDays, iconColor: '#388E3C' },
@@ -232,9 +246,8 @@ export default function ClosetPage() {
       .catch(() => { /* silently ignore — we already have the localStorage fallback */ });
   }, []);
   const [items, setItems] = useState<ClosetItem[]>([]);
-  const [upperFilter, setUpperFilter] = useState<ClosetCategory | null>(null);
-  const [lowerFilter, setLowerFilter] = useState<ClosetCategory | null>(null);
-  const [accFilter, setAccFilter] = useState<ClosetCategory | null>(null);
+  // Selected "Type" chip per section (null = All).
+  const [sectionFilter, setSectionFilter] = useState<Partial<Record<WardrobeSection, WardrobeSubcategory | null>>>({});
   const [viewAll, setViewAll] = useState<{ title: string; items: ClosetItem[] } | null>(null);
   const [canvasData, setCanvasData] = useState<{ upper: ClosetItem[]; lower: ClosetItem[]; shoes: ClosetItem[]; acc: ClosetItem[] } | null>(null);
   // Multi-canvas state: each board has a backend id + layout
@@ -374,8 +387,8 @@ export default function ClosetPage() {
   }
 
   // ── Inline add flow ──────────────────────────────────────────────────────────
-  const [addGroup, setAddGroup] = useState<string>('upper');
-  const [addCategory, setAddCategory] = useState<ClosetCategory>('tops');
+  // The richer taxonomy selection (section → type → optional itemType/length/fit).
+  const [addSelection, setAddSelection] = useState<ItemOptionsSelection>(() => defaultSelectionForSection('TOPS'));
   const [showAddPicker, setShowAddPicker] = useState(false);
   const [addRawImage, setAddRawImage] = useState('');
   const [addCrop, setAddCrop] = useState<Crop>();
@@ -424,15 +437,12 @@ export default function ClosetPage() {
     pullStartYRef.current = null;
   }
 
-  function openAdd(group: string, category: ClosetCategory) {
-    // When group === '' (FAB flow) we don't know the target group yet — the user
-    // picks it inside the picker. Skip the gate here; handleAddSave re-checks.
-    if (group !== '' && plansEnabled && !canAddItem()) {
+  function openAdd(section: WardrobeSection = 'TOPS') {
+    if (plansEnabled && !canAddItem()) {
       setShowPremiumGate('items');
       return;
     }
-    setAddGroup(group);
-    setAddCategory(category);
+    setAddSelection(defaultSelectionForSection(section));
     setAddRawImage('');
     setAddCrop(undefined);
     setAddCompletedCrop(undefined);
@@ -496,7 +506,17 @@ export default function ClosetPage() {
     }
 
     const pendingId = `pending_${Date.now()}`;
-    const category = addCategory;
+    const selection = addSelection;
+    if (!selection.subcategory) { setAddSaving(false); return; }
+    // Local category drives layout/grouping; the precise taxonomy goes to the API.
+    const category = subcategoryToLocal(selection.subcategory);
+    const extras = {
+      section: selection.section,
+      subcategory: selection.subcategory,
+      itemType: selection.itemType,
+      length: selection.length,
+      fitType: selection.fitType,
+    };
     const uploadStartedAt = Date.now();
 
     // Immediately close the add sheet and show placeholder in grid
@@ -510,7 +530,7 @@ export default function ClosetPage() {
     if (fileToUpload) {
       let activeJobId: string | null = null;
       try {
-        await addClosetItemFromFile(fileToUpload, category, (status) => {
+        await addClosetItemFromFile(fileToUpload, category, extras, (status) => {
           setPendingUploads((prev) => {
             const next = new Map(prev);
             const existing = next.get(pendingId);
@@ -568,9 +588,9 @@ export default function ClosetPage() {
       }
     } else {
       // No file — save locally
-      addClosetItem({ category: addCategory, imageData: previewImage });
+      addClosetItem({ category, imageData: previewImage });
       logAnalyticsEvent(Events.ADD_ITEM_SAVED, {
-        [Params.CATEGORY]: addCategory,
+        [Params.CATEGORY]: category,
         [Params.HAS_BG_REMOVED]: false,
       });
       setPendingUploads((prev) => { const next = new Map(prev); next.delete(pendingId); return next; });
@@ -818,13 +838,42 @@ export default function ClosetPage() {
     load();
   }
 
-  function itemsFor(cats: ClosetCategory[], filter: ClosetCategory | null) {
-    return items.filter((i) => cats.includes(i.category) && (filter === null || i.category === filter));
+  function handleUpdateItem(id: string, sel: ItemOptionsSelection) {
+    if (DEMO_ITEM_IDS.has(id)) return;
+    const subcategory = sel.subcategory;
+    if (!subcategory) return;
+    const localCat = subcategoryToLocal(subcategory);
+    // Optimistically reflect the new taxonomy in the grid right away.
+    setItems((prev) => prev.map((i) => i.id === id
+      ? { ...i, category: localCat, subcategory, itemType: sel.itemType, length: sel.length, fitType: sel.fitType }
+      : i));
+    if (id.startsWith('local_')) {
+      updateClosetItem(id, { category: localCat });
+    } else {
+      updateClosetItemApi(id, {
+        section: sel.section,
+        subcategory,
+        itemType: sel.itemType,
+        length: sel.length,
+        fitType: sel.fitType,
+      }).catch(() => {
+        updateClosetItem(id, { category: localCat });
+      });
+    }
   }
 
-  function pendingFor(cats: ClosetCategory[]) {
+  // Items in a section, optionally narrowed to a single "Type" chip.
+  function itemsForSection(section: WardrobeSection, filter: WardrobeSubcategory | null) {
+    return items.filter((i) => itemSection(i) === section && (filter === null || effectiveSubcategory(i) === filter));
+  }
+
+  function countForSection(section: WardrobeSection) {
+    return items.filter((i) => itemSection(i) === section).length;
+  }
+
+  function pendingForSection(section: WardrobeSection) {
     return Array.from(pendingUploads.entries())
-      .filter(([, p]) => cats.includes(p.category))
+      .filter(([, p]) => localCatToSection(p.category) === section)
       .map(([id, p]) => ({ id, ...p }));
   }
 
@@ -838,8 +887,8 @@ export default function ClosetPage() {
     } catch {}
   }
 
-  function openViewAll(title: string, cats: ClosetCategory[]) {
-    setViewAll({ title, items: items.filter((i) => cats.includes(i.category)) });
+  function openViewAllSection(section: WardrobeSection) {
+    setViewAll({ title: taxLabel(section, locale), items: items.filter((i) => itemSection(i) === section) });
   }
 
   const [aiSuggestingIdx, setAiSuggestingIdx] = useState<number | null>(null);
@@ -852,7 +901,7 @@ export default function ClosetPage() {
     const hasUpper = items.some((i) => UPPER_CATS.includes(i.category));
     const hasLower = items.some((i) => LOWER_CATS.includes(i.category));
     if (!hasUpper || !hasLower) {
-      openAdd('', 'tops');
+      openAdd('TOPS');
       return;
     }
     if (!canGenerate) {
@@ -1400,68 +1449,29 @@ export default function ClosetPage() {
           onShowCanvasPlans={() => setShowPremiumGate('canvas')}
           onTryItOn={(idx) => handleTryItOn(idx)}
           onDeleteCanvas={handleDeleteCanvas}
-          onAddItem={(cat) => openAdd(UPPER_CATS.includes(cat) ? 'upper' : LOWER_CATS.includes(cat) ? 'lower' : SHOES_CATS.includes(cat) ? 'shoes' : 'acc', cat)}
+          onAddItem={(cat) => openAdd(localCatToSection(cat))}
         />
 
-        {/* ── Upper Body ────────────────────────────────────────── */}
-        <ClothingSection
-          title={t.upperBody}
-          cats={UPPER_CATS}
-          filter={upperFilter}
-          items={itemsFor(UPPER_CATS, upperFilter)}
-          totalCount={items.filter((i) => UPPER_CATS.includes(i.category)).length}
-          pendingItems={pendingFor(UPPER_CATS)}
-          onFilterChange={setUpperFilter}
-          onTapItem={setEditItem}
-          onViewAll={() => openViewAll(t.upperBody, UPPER_CATS)}
-          onRemovePending={removePendingUpload}
-          onAddItem={() => openAdd('upper', 'tops')}
-        />
-
-        {/* ── Lower Body ────────────────────────────────────────── */}
-        <ClothingSection
-          title={t.lowerBody}
-          cats={LOWER_CATS}
-          filter={lowerFilter}
-          items={itemsFor(LOWER_CATS, lowerFilter)}
-          totalCount={items.filter((i) => LOWER_CATS.includes(i.category)).length}
-          pendingItems={pendingFor(LOWER_CATS)}
-          onFilterChange={setLowerFilter}
-          onTapItem={setEditItem}
-          onViewAll={() => openViewAll(t.lowerBody, LOWER_CATS)}
-          onRemovePending={removePendingUpload}
-          onAddItem={() => openAdd('lower', 'jeans')}
-        />
-
-        {/* ── Shoes ─────────────────────────────────────────────── */}
-        <ClothingSection
-          title={t.shoes}
-          cats={SHOES_CATS}
-          filter={null}
-          items={itemsFor(SHOES_CATS, null)}
-          totalCount={items.filter((i) => SHOES_CATS.includes(i.category)).length}
-          pendingItems={pendingFor(SHOES_CATS)}
-          onFilterChange={() => {}}
-          onTapItem={setEditItem}
-          onViewAll={() => openViewAll(t.shoes, SHOES_CATS)}
-          onRemovePending={removePendingUpload}
-          onAddItem={() => openAdd('shoes', 'shoes')}
-        />
-
-        {/* ── Accessories ───────────────────────────────────────── */}
-        <ClothingSection
-          title={t.accessories}
-          cats={ACC_CATS}
-          filter={accFilter}
-          items={itemsFor(ACC_CATS, accFilter)}
-          totalCount={items.filter((i) => ACC_CATS.includes(i.category)).length}
-          pendingItems={pendingFor(ACC_CATS)}
-          onFilterChange={setAccFilter}
-          onTapItem={setEditItem}
-          onViewAll={() => openViewAll(t.accessories, ACC_CATS)}
-          onRemovePending={removePendingUpload}
-          onAddItem={() => openAdd('acc', 'accessories')}
-        />
+        {/* ── Sections (new taxonomy: Tops · Bottoms · Dresses & Sets · Outerwear · Footwear · Accessories) ── */}
+        {SECTION_ORDER.map((section) => {
+          const filter = sectionFilter[section] ?? null;
+          return (
+            <ClothingSection
+              key={section}
+              title={taxLabel(section, locale)}
+              cats={subcategoriesForSection(section)}
+              filter={filter}
+              items={itemsForSection(section, filter)}
+              totalCount={countForSection(section)}
+              pendingItems={pendingForSection(section)}
+              onFilterChange={(c) => setSectionFilter((prev) => ({ ...prev, [section]: c }))}
+              onTapItem={setEditItem}
+              onViewAll={() => openViewAllSection(section)}
+              onRemovePending={removePendingUpload}
+              onAddItem={() => openAdd(section)}
+            />
+          );
+        })}
 
         <div className="h-12" />
       </main>
@@ -1549,7 +1559,7 @@ export default function ClosetPage() {
           item={editItem}
           onClose={() => setEditItem(null)}
           onDelete={(id) => { handleDelete(id); setEditItem(null); }}
-          onSave={(id, cat) => { handleUpdateCategory(id, cat); setEditItem(null); }}
+          onSave={(id, sel) => { handleUpdateItem(id, sel); setEditItem(null); }}
         />
       )}
 
@@ -1588,7 +1598,7 @@ export default function ClosetPage() {
               <button
                 className="w-full py-3.5 rounded-2xl text-[15px] font-semibold text-white"
                 style={{ background: 'linear-gradient(135deg, #F370A7 0%, #d946a8 100%)' }}
-                onClick={() => { setOutfitBlockedModal(null); openAdd('', 'tops'); }}
+                onClick={() => { setOutfitBlockedModal(null); openAdd('TOPS'); }}
               >
                 {t.addClothingBtn}
               </button>
@@ -1631,7 +1641,7 @@ export default function ClosetPage() {
         {tourStep === 0 && <span className="absolute inset-0 rounded-full animate-ping" style={{ backgroundColor: '#F370A7', opacity: 0.35 }} />}
         <button
           data-coach="fab"
-          onClick={() => openAdd('', 'tops')}
+          onClick={() => openAdd('TOPS')}
           className="relative w-14 h-14 rounded-full flex items-center justify-center shadow-xl active:scale-[0.95] transition-transform"
           style={{ backgroundColor: '#F370A7' }}
           aria-label="Add item"
@@ -1707,86 +1717,26 @@ export default function ClosetPage() {
                 <img ref={cropImgRef} src={addRawImage} alt="Crop" style={{ maxHeight: '55vh', maxWidth: '100%', display: 'block', margin: '0 auto', borderRadius: 12 }} />
               </ReactCrop>
             </div>
-            <div className="flex flex-col gap-3">
-              {addGroup === '' ? (
-                <>
-                  <label className="text-[11px] font-semibold uppercase tracking-wider block" style={{ color: theme === 'dark' ? '#666666' : '#9ca3af' }}>{t.addCategory}</label>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    {(
-                      [
-                        { key: 'upper', label: t.upperBody,   icon: <span className="text-[32px] leading-none">👗</span> },
-                        { key: 'lower', label: t.lowerBody, icon: <span className="text-[32px] leading-none">👖</span> },
-                        { key: 'shoes', label: t.shoes,       icon: <span className="text-[32px] leading-none">👟</span> },
-                        { key: 'acc',   label: t.accessories, icon: <span className="text-[32px] leading-none">👜</span> },
-                      ] as { key: string; label: string; icon: React.ReactNode }[]
-                    ).map((group) => (
-                      <button
-                        key={group.key}
-                        onClick={() => {
-                          setAddGroup(group.key);
-                          setAddCategory(ADD_GROUPS[group.key][0]);
-                        }}
-                        className="flex flex-col items-center justify-center gap-1.5 rounded-2xl py-4 active:scale-[0.97] transition-colors"
-                        style={{
-                          backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f9fafb',
-                          border: theme === 'dark' ? '1.5px solid #3a3a3a' : '1.5px solid #f3f4f6',
-                        }}
-                      >
-                        <span className="leading-none flex items-center justify-center">{group.icon}</span>
-                        <span className="text-[12px] font-semibold" style={{ color: theme === 'dark' ? '#cccccc' : '#374151' }}>{group.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setAddGroup('')}
-                      className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f3f4f6' }}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: theme === 'dark' ? '#999999' : '#000000' }}>
-                        <path d="M15 18l-6-6 6-6"/>
-                      </svg>
-                    </button>
-                    <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: theme === 'dark' ? '#666666' : '#9ca3af' }}>
-                      {addGroup === 'upper' ? t.upperBody : addGroup === 'lower' ? t.lowerBody : addGroup === 'shoes' ? t.shoes : t.accessories}
-                    </label>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {ADD_GROUPS[addGroup]?.map((cat) => (
-                      <button
-                        key={cat}
-                        onClick={() => { setAddCategory(cat); logAnalyticsEvent(Events.ADD_ITEM_CATEGORY_SELECTED, { [Params.CATEGORY]: cat }); }}
-                        className="px-3.5 py-[6px] rounded-full text-[12px] transition-colors font-medium"
-                        style={{
-                          backgroundColor: addCategory === cat
-                            ? (theme === 'dark' ? '#ffffff' : '#000000')
-                            : (theme === 'dark' ? '#2a2a2a' : '#f3f4f6'),
-                          color: addCategory === cat
-                            ? (theme === 'dark' ? '#000000' : '#ffffff')
-                            : (theme === 'dark' ? '#999999' : '#6b7280'),
-                          fontWeight: addCategory === cat ? '600' : '500',
-                        }}
-                      >
-                        {catLabel(cat, t.cats)}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+            <ItemOptionsPicker
+              value={addSelection}
+              onChange={(next) => {
+                if (next.subcategory && next.subcategory !== addSelection.subcategory) {
+                  logAnalyticsEvent(Events.ADD_ITEM_CATEGORY_SELECTED, { [Params.CATEGORY]: subcategoryToLocal(next.subcategory) });
+                }
+                setAddSelection(next);
+              }}
+              dark={theme === 'dark'}
+            />
             <button
               onClick={handleAddSave}
-              disabled={addSaving || addGroup === ''}
+              disabled={addSaving || !isSelectionComplete(addSelection)}
               className="w-full py-3.5 rounded-full text-[13px] font-semibold disabled:opacity-30 active:scale-[0.97] transition-transform"
               style={{
                 backgroundColor: theme === 'dark' ? '#000000' : '#000000',
                 color: theme === 'dark' ? '#ffffff' : '#ffffff',
               }}
             >
-              {addSaving ? t.uploading : addGroup === '' ? t.addCategory : t.saveToCloset}
+              {addSaving ? t.uploading : t.saveToCloset}
             </button>
           </div>
         </div>
@@ -2441,12 +2391,12 @@ function FlatLayPlaceholder({ label }: { label: string }) {
 // ─── Clothing Section ───────────────────────────────────────────────────────────
 interface ClothingSectionProps {
   title: string;
-  cats: ClosetCategory[];
-  filter: ClosetCategory | null;
+  cats: WardrobeSubcategory[];
+  filter: WardrobeSubcategory | null;
   items: ClosetItem[];
   totalCount: number;
   pendingItems?: { id: string; category: ClosetCategory; imageData: string; step: string; progress: number; startedAt: number }[];
-  onFilterChange: (cat: ClosetCategory | null) => void;
+  onFilterChange: (cat: WardrobeSubcategory | null) => void;
   onTapItem: (item: ClosetItem) => void;
   onViewAll: () => void;
   onRemovePending?: (id: string) => void;
@@ -2454,7 +2404,7 @@ interface ClothingSectionProps {
 }
 
 function ClothingSection({ title, cats, filter, items, totalCount, pendingItems = [], onFilterChange, onTapItem, onViewAll, onRemovePending, onAddItem }: ClothingSectionProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const isEmpty = items.length === 0 && pendingItems.length === 0;
   return (
     <div className="mt-9">
@@ -2478,7 +2428,7 @@ function ClothingSection({ title, cats, filter, items, totalCount, pendingItems 
           {cats.map((cat) => (
             <FilterChip
               key={cat}
-              label={catLabel(cat, t.cats)}
+              label={taxLabel(cat, locale)}
               selected={filter === cat}
               onClick={() => onFilterChange(cat)}
             />
@@ -2539,7 +2489,7 @@ function FilterChip({ label, selected, onClick }: { label: string; selected: boo
 }
 
 function ClothingItemCard({ item, onTap, isProcessing, startedAt, onRemove }: { item: ClosetItem; onTap: () => void; isProcessing?: boolean; processingStep?: string; processingProgress?: number; startedAt?: number; onRemove?: () => void }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
 
   // Simulated progress — runs a local timer so the card always animates
   // smoothly regardless of whether SSE/polling events arrive.
@@ -2600,7 +2550,7 @@ function ClothingItemCard({ item, onTap, isProcessing, startedAt, onRemove }: { 
         <div className="absolute bottom-0 left-0 right-0 px-2.5 py-2"
              style={{ background: 'linear-gradient(transparent, rgba(0,0,0,0.4))' }}>
           <span className="text-[10px] font-medium text-white/90 uppercase tracking-wide">
-            {catLabel(item.category, t.cats)}
+            {taxLabel(effectiveSubcategory(item), locale)}
           </span>
         </div>
       )}
@@ -2622,7 +2572,7 @@ function ViewAllModal({
   showDelete?: boolean;
   onDelete: (id: string) => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   return (
     <div
       className="fixed inset-0 z-[60] flex items-end justify-center bg-black/30 backdrop-blur-sm"
@@ -2667,7 +2617,7 @@ function ViewAllModal({
                   <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5"
                        style={{ background: 'linear-gradient(transparent, rgba(0,0,0,0.35))' }}>
                     <span className="text-[9px] font-medium text-white/90 uppercase tracking-wide">
-                      {catLabel(item.category, t.cats)}
+                      {taxLabel(effectiveSubcategory(item), locale)}
                     </span>
                   </div>
                 </div>
@@ -2926,6 +2876,21 @@ function MiniOutfitSlot({ item, flex }: { item: ClosetItem | null; flex?: boolea
 }
 
 // ─── Item Edit Sheet ────────────────────────────────────────────────────────────
+function selectionFromItem(item: ClosetItem): ItemOptionsSelection {
+  if (item.subcategory) {
+    const section = sectionForSubcategory(item.subcategory) ?? localCatToSection(item.category);
+    return {
+      section,
+      subcategory: item.subcategory,
+      itemType: item.itemType ?? null,
+      length: item.length ?? null,
+      fitType: item.fitType ?? null,
+    };
+  }
+  // Legacy item without a stored subcategory — land on the matching section.
+  return defaultSelectionForSection(localCatToSection(item.category));
+}
+
 function ItemEditSheet({
   item,
   onClose,
@@ -2935,19 +2900,12 @@ function ItemEditSheet({
   item: ClosetItem;
   onClose: () => void;
   onDelete: (id: string) => void;
-  onSave: (id: string, category: ClosetCategory) => void;
+  onSave: (id: string, selection: ItemOptionsSelection) => void;
 }) {
-  const [selectedCat, setSelectedCat] = useState<ClosetCategory>(item.category);
-  const { t } = useI18n();
-
-  // Determine which group this item belongs to
-  const groupCats = UPPER_CATS.includes(item.category)
-    ? UPPER_CATS
-    : LOWER_CATS.includes(item.category)
-    ? LOWER_CATS
-    : SHOES_CATS.includes(item.category)
-    ? SHOES_CATS
-    : ACC_CATS;
+  const [selection, setSelection] = useState<ItemOptionsSelection>(() => selectionFromItem(item));
+  const { t, locale } = useI18n();
+  const { theme } = useTheme();
+  const dark = theme === 'dark';
 
   return (
     <div
@@ -2955,47 +2913,39 @@ function ItemEditSheet({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-[430px] rounded-t-3xl bg-white"
+        className="w-full max-w-[430px] rounded-t-3xl bg-white dark:bg-[#1a1a1a] flex flex-col"
+        style={{ maxHeight: '88vh' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Drag handle */}
-        <div className="flex justify-center pt-3 pb-2">
-          <div className="w-9 h-1 rounded-full bg-gray-200" />
+        <div className="flex justify-center pt-3 pb-2 shrink-0">
+          <div className="w-9 h-1 rounded-full bg-gray-200 dark:bg-gray-700" />
         </div>
 
-        {/* Image preview */}
-        <div className="px-5 pt-1 pb-2">
-          <div className="w-full rounded-2xl overflow-hidden relative bg-gray-50" style={{ aspectRatio: '1/1' }}>
-            <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized />
+        <div className="overflow-y-auto px-5">
+          {/* Image preview */}
+          <div className="pt-1 pb-2">
+            <div className="w-full rounded-2xl overflow-hidden relative bg-gray-50 dark:bg-[#222]" style={{ aspectRatio: '1/1' }}>
+              <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized />
+            </div>
           </div>
-        </div>
 
-        {/* Current category label */}
-        <div className="px-5 pb-1">
-          <span className="text-[15px] font-semibold text-gray-900">{catLabel(selectedCat, t.cats)}</span>
-        </div>
+          {/* Current type label */}
+          <div className="pb-3">
+            <span className="text-[15px] font-semibold text-gray-900 dark:text-white">
+              {taxLabel(selection.subcategory, locale)}
+            </span>
+            <span className="text-[13px] text-gray-400"> · {taxLabel(selection.section, locale)}</span>
+          </div>
 
-        {/* Category chips */}
-        <div className="px-5 py-3">
-          <div className="flex flex-wrap gap-2">
-            {groupCats.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCat(cat)}
-                className={`px-3.5 py-[7px] rounded-full text-[12px] transition-colors border
-                  ${selectedCat === cat
-                    ? 'bg-black text-white font-semibold border-transparent'
-                    : 'bg-transparent text-gray-700 font-medium border-gray-200'
-                  }`}
-              >
-                {catLabel(cat, t.cats)}
-              </button>
-            ))}
+          {/* Full taxonomy picker */}
+          <div className="pb-3">
+            <ItemOptionsPicker value={selection} onChange={setSelection} dark={dark} />
           </div>
         </div>
 
         {/* Delete + Save buttons */}
-        <div className="flex gap-2.5 px-5 pt-3 pb-8">
+        <div className="flex gap-2.5 px-5 pt-3 pb-8 shrink-0">
           <button
             onClick={() => onDelete(item.id)}
             className="flex-1 h-12 rounded-full flex items-center justify-center text-[14px] font-semibold text-red-500"
@@ -3004,8 +2954,9 @@ function ItemEditSheet({
             {t.delete}
           </button>
           <button
-            onClick={() => onSave(item.id, selectedCat)}
-            className="flex-1 h-12 rounded-full bg-black text-white flex items-center justify-center text-[14px] font-semibold"
+            onClick={() => onSave(item.id, selection)}
+            disabled={!isSelectionComplete(selection)}
+            className="flex-1 h-12 rounded-full bg-black dark:bg-white text-white dark:text-black flex items-center justify-center text-[14px] font-semibold disabled:opacity-30"
           >
             {t.save}
           </button>

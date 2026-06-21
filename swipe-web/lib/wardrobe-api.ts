@@ -3,6 +3,9 @@ import { watchWithSse } from '@/lib/sse-client';
 import type {
   WardrobeCategory,
   WardrobeSubcategory,
+  WardrobeItemType,
+  WardrobeLength,
+  WardrobeFitType,
   WardrobeUploadInitResponse,
   WardrobeUploadStatus,
   WardrobeItemResponse,
@@ -99,19 +102,30 @@ function mapUploadStatus(raw: Record<string, unknown>): WardrobeUploadStatus {
   };
 }
 
+// Optional taxonomy fields shared by the upload-init and item-update calls.
+export interface WardrobeItemOptions {
+  category?: WardrobeCategory;
+  subcategory?: WardrobeSubcategory;
+  itemType?: WardrobeItemType | null;
+  length?: WardrobeLength | null;
+  fitType?: WardrobeFitType | null;
+}
+
 export async function initiateUpload(
   contentType: string,
   idempotencyKey: string,
-  category?: WardrobeCategory,
-  subcategory?: WardrobeSubcategory,
+  options: WardrobeItemOptions = {},
   fileSizeBytes?: number,
 ): Promise<WardrobeUploadInitResponse> {
   const body: Record<string, unknown> = {
     contentType,
     idempotencyKey,
   };
-  if (category) body.category = category;
-  if (subcategory) body.subcategory = subcategory;
+  if (options.category) body.category = options.category;
+  if (options.subcategory) body.subcategory = options.subcategory;
+  if (options.itemType) body.itemType = options.itemType;
+  if (options.length) body.length = options.length;
+  if (options.fitType) body.fitType = options.fitType;
   if (fileSizeBytes && fileSizeBytes > 0) body.fileSizeBytes = fileSizeBytes;
   const res = await api.post('/wardrobe/uploads', body);
   const raw = unwrapData<Record<string, unknown>>(res);
@@ -254,6 +268,9 @@ function mapWardrobeItem(raw: Record<string, unknown>): WardrobeItemResponse {
     id: (raw.id ?? '') as string,
     category: (raw.category ?? 'OTHER') as WardrobeCategory,
     subcategory: (raw.subcategory ?? 'ACCESSORIES') as WardrobeSubcategory,
+    itemType: (raw.itemType ?? raw.item_type ?? null) as WardrobeItemType | null,
+    length: (raw.length ?? null) as WardrobeLength | null,
+    fitType: (raw.fitType ?? raw.fit_type ?? null) as WardrobeFitType | null,
     layer: (raw.layer ?? null) as WardrobeItemResponse['layer'],
     status: (raw.status ?? 'READY') as string,
     imageUrl: (raw.imageUrl ?? raw.image_url ?? '') as string,
@@ -311,6 +328,9 @@ export async function updateWardrobeItem(
     isClean?: boolean;
     category?: WardrobeCategory;
     subcategory?: WardrobeSubcategory;
+    itemType?: WardrobeItemType | null;
+    length?: WardrobeLength | null;
+    fitType?: WardrobeFitType | null;
   },
 ): Promise<WardrobeItemResponse> {
   const body: Record<string, unknown> = {};
@@ -320,6 +340,9 @@ export async function updateWardrobeItem(
   if (updates.isClean !== undefined) body.isClean = updates.isClean;
   if (updates.category !== undefined) body.category = updates.category;
   if (updates.subcategory !== undefined) body.subcategory = updates.subcategory;
+  if (updates.itemType !== undefined) body.itemType = updates.itemType;
+  if (updates.length !== undefined) body.length = updates.length;
+  if (updates.fitType !== undefined) body.fitType = updates.fitType;
   const res = await api.patch(`/wardrobe/items/${id}`, body);
   return mapWardrobeItem(unwrapData<Record<string, unknown>>(res));
 }
@@ -337,8 +360,7 @@ export async function deleteWardrobeItem(id: string): Promise<void> {
 
 export async function uploadWardrobeItem(
   file: File,
-  category?: WardrobeCategory,
-  subcategory?: WardrobeSubcategory,
+  options: WardrobeItemOptions = {},
   onProgress?: (status: WardrobeUploadStatus) => void,
   onJobId?: (jobId: string) => void,
 ): Promise<WardrobeUploadStatus> {
@@ -346,7 +368,7 @@ export async function uploadWardrobeItem(
   const contentType = file.type || 'image/jpeg';
 
   // 1. Initiate upload
-  const { uploadJobId, putUrl } = await initiateUpload(contentType, idempotencyKey, category, subcategory, file.size);
+  const { uploadJobId, putUrl } = await initiateUpload(contentType, idempotencyKey, options, file.size);
 
   // Fire early so the caller can persist a preview before the slow blob upload
   onJobId?.(uploadJobId);

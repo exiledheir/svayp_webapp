@@ -79,6 +79,14 @@ export default function InteractiveCanvas({
   const [swapTarget, setSwapTarget] = useState<number | null>(null);
   const [addPicker, setAddPicker] = useState(false);
   const [saveWarning, setSaveWarning] = useState(false);
+  // In onboarding, hold the Save/Continue button disabled for a moment so the
+  // user reads the instruction and watches the move demo before advancing.
+  const [continueReady, setContinueReady] = useState(!alwaysShowHint);
+  useEffect(() => {
+    if (!alwaysShowHint) return;
+    const id = setTimeout(() => setContinueReady(true), 3000);
+    return () => clearTimeout(id);
+  }, [alwaysShowHint]);
   // Pinch zoom state — stores the target item index so handleTouchMove doesn't rely on selectedIdx closure
   const pinchRef = useRef<{ initialDist: number; initialScale: number; itemIdx: number } | null>(null);
 
@@ -108,11 +116,10 @@ export default function InteractiveCanvas({
   const demoTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const demoIdx = useRef<{ upper: number; lower: number; u: { x: number; y: number }; l: { x: number; y: number } } | null>(null);
 
-  // The demo only makes sense with both a top and a bottom item to swap.
-  const demoEligible =
-    alwaysShowHint &&
-    canvasItems.some((c) => c.group === 'upper') &&
-    canvasItems.some((c) => c.group === 'lower');
+  // Play the demo whenever there's at least one item on the canvas — it adapts
+  // to whatever the user added (top+bottom, dress+shoes, top+shoes, or a single
+  // item), so the pieces always visibly move.
+  const demoEligible = alwaysShowHint && canvasItems.length >= 1;
 
   const cancelDemo = useCallback(() => {
     demoTimers.current.forEach(clearTimeout);
@@ -134,40 +141,59 @@ export default function InteractiveCanvas({
 
   useEffect(() => {
     if (!demoEligible) return;
-    const upperIdx = canvasItems.findIndex((c) => c.group === 'upper');
-    const lowerIdx = canvasItems.findIndex((c) => c.group === 'lower');
-    if (upperIdx === -1 || lowerIdx === -1 || upperIdx === lowerIdx) return;
+    const at = (ms: number, fn: () => void) => demoTimers.current.push(setTimeout(fn, ms));
 
-    const u = { x: canvasItems[upperIdx].x, y: canvasItems[upperIdx].y };
-    const l = { x: canvasItems[lowerIdx].x, y: canvasItems[lowerIdx].y };
-    demoIdx.current = { upper: upperIdx, lower: lowerIdx, u, l };
+    // Anchor on the top item when present, otherwise the first item; the partner
+    // is the first *other* item of any group (so top+shoes / dress+shoes work too).
+    let aIdx = canvasItems.findIndex((c) => c.group === 'upper');
+    if (aIdx === -1) aIdx = 0;
+    const bIdx = canvasItems.findIndex((_, i) => i !== aIdx);
+    const a = { x: canvasItems[aIdx].x, y: canvasItems[aIdx].y };
+
+    // ── Single item — wiggle it around so it's obviously draggable. ──
+    if (bIdx === -1) {
+      demoIdx.current = { upper: aIdx, lower: aIdx, u: a, l: a };
+      const move = (x: number, y: number) =>
+        setCanvasItems((prev) => prev.map((c, i) => (i === aIdx ? { ...c, x, y } : c)));
+      at(700,  () => setDemo({ active: true, text: t.canvasDemoIntro, moving: false }));
+      at(1500, () => { setDemo({ active: true, text: t.canvasDemoSwap, moving: true }); move(a.x + 22, a.y); });
+      at(2300, () => move(a.x - 22, a.y));
+      at(3100, () => move(a.x, a.y + 14));
+      at(3900, () => { setDemo({ active: true, text: t.canvasDemoDone, moving: true }); move(a.x, a.y); });
+      at(4900, () => setDemo({ active: true, text: t.canvasDemoDone, moving: false }));
+      at(5800, () => { setDemo({ active: false, text: '', moving: false }); setShowDragHint(false); setCanvasHintSeen(); });
+      return () => { demoTimers.current.forEach(clearTimeout); demoTimers.current = []; };
+    }
+
+    // ── Two items — slide apart and trade places (any two groups). ──
+    const b = { x: canvasItems[bIdx].x, y: canvasItems[bIdx].y };
+    demoIdx.current = { upper: aIdx, lower: bIdx, u: a, l: b };
 
     // Horizontal gap that pulls the two items into separate columns while they
     // trade rows, so their paths never cross (no overlapping/“blob” moment).
     const OFS = 24;
-    const place = (up: { x: number; y: number }, lo: { x: number; y: number }) =>
+    const place = (ap: { x: number; y: number }, bp: { x: number; y: number }) =>
       setCanvasItems((prev) =>
         prev.map((c, i) =>
-          i === upperIdx ? { ...c, x: up.x, y: up.y } :
-          i === lowerIdx ? { ...c, x: lo.x, y: lo.y } : c
+          i === aIdx ? { ...c, x: ap.x, y: ap.y } :
+          i === bIdx ? { ...c, x: bp.x, y: bp.y } : c
         )
       );
-    const at = (ms: number, fn: () => void) => demoTimers.current.push(setTimeout(fn, ms));
 
     // Beat 1 — caption appears, items still in place.
     at(700,  () => setDemo({ active: true, text: t.canvasDemoIntro, moving: false }));
     // Beat 2 — items lift and slide apart into two columns.
     at(1700, () => { setDemo({ active: true, text: t.canvasDemoSwap, moving: true });
-                     place({ x: u.x - OFS, y: u.y }, { x: l.x + OFS, y: l.y }); });
-    // Beat 3 — they trade rows (top ↔ bottom) without ever overlapping.
-    at(2500, () => place({ x: u.x - OFS, y: l.y }, { x: l.x + OFS, y: u.y }));
+                     place({ x: a.x - OFS, y: a.y }, { x: b.x + OFS, y: b.y }); });
+    // Beat 3 — they trade rows without ever overlapping.
+    at(2500, () => place({ x: a.x - OFS, y: b.y }, { x: b.x + OFS, y: a.y }));
     // Beat 4 — settle in the swapped position, hold so the change registers.
     at(3300, () => setDemo({ active: true, text: t.canvasDemoSwap, moving: false }));
     // Beat 5 — trade rows back (still in separate columns).
     at(4100, () => { setDemo({ active: true, text: t.canvasDemoDone, moving: true });
-                     place({ x: u.x - OFS, y: u.y }, { x: l.x + OFS, y: l.y }); });
+                     place({ x: a.x - OFS, y: a.y }, { x: b.x + OFS, y: b.y }); });
     // Beat 6 — merge back to the original centered layout.
-    at(4900, () => place({ x: u.x, y: u.y }, { x: l.x, y: l.y }));
+    at(4900, () => place({ x: a.x, y: a.y }, { x: b.x, y: b.y }));
     at(5700, () => setDemo({ active: true, text: t.canvasDemoDone, moving: false }));
     // Beat 7 — hand control to the user.
     at(6600, () => {
@@ -362,6 +388,17 @@ export default function InteractiveCanvas({
       return;
     }
 
+    // If the user taps Continue while the intro demo is still playing, persist
+    // the items' original (generated) positions, not their mid-animation offset.
+    const d = demoIdx.current;
+    const posFor = (idx: number, ci: CanvasItem) => {
+      if (demo.active && d) {
+        if (idx === d.upper) return d.u;
+        if (idx === d.lower) return d.l;
+      }
+      return { x: ci.x, y: ci.y };
+    };
+
     const seen = new Set<string>();
     const deduped: SavedCanvasLayout = [];
     // Iterate in reverse so the last (top) occurrence wins
@@ -369,9 +406,11 @@ export default function InteractiveCanvas({
       const ci = canvasItems[i];
       if (!seen.has(ci.item.id)) {
         seen.add(ci.item.id);
-        deduped.unshift({ id: ci.item.id, x: ci.x, y: ci.y, scale: ci.scale, zIndex: ci.zIndex, group: ci.group });
+        const p = posFor(i, ci);
+        deduped.unshift({ id: ci.item.id, x: p.x, y: p.y, scale: ci.scale, zIndex: ci.zIndex, group: ci.group });
       }
     }
+    if (demo.active) cancelDemo();
     onSave(deduped);
   }
 
@@ -396,7 +435,7 @@ export default function InteractiveCanvas({
           <h2 className="text-[22px] font-black tracking-tight text-gray-900 leading-tight">{t.ob_edit_title}</h2>
           <p
             key={demo.active ? demo.text : 'body'}
-            className="text-[14px] text-gray-500 leading-snug mt-1 min-h-[38px]"
+            className="text-[15px] font-medium text-gray-600 leading-snug mt-1.5 min-h-[40px]"
             style={{ animation: 'demoTextPop 0.4s ease both' }}
           >
             {demo.active ? demo.text : t.ob_edit_body}
@@ -580,7 +619,7 @@ export default function InteractiveCanvas({
       >
         <button
           onClick={handleSave}
-          disabled={canvasItems.length === 0}
+          disabled={canvasItems.length === 0 || !continueReady}
           className="w-full py-3.5 rounded-2xl text-white text-[15px] font-semibold disabled:opacity-40 transition-opacity flex items-center justify-center"
           style={{ backgroundColor: '#F370A7' }}
         >

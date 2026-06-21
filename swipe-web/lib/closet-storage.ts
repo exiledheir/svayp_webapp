@@ -1,10 +1,15 @@
-import type { WardrobeCategory, WardrobeSubcategory, WardrobeItemResponse, WardrobeUploadStatus } from '@/types';
+import type {
+  WardrobeCategory, WardrobeSubcategory, WardrobeItemType, WardrobeLength, WardrobeFitType,
+  WardrobeItemResponse, WardrobeUploadStatus,
+} from '@/types';
 import {
   getWardrobeItems,
   deleteWardrobeItem,
   updateWardrobeItem,
   uploadWardrobeItem,
+  type WardrobeItemOptions,
 } from '@/lib/wardrobe-api';
+import { subcategoryToLocal } from '@/lib/wardrobe-taxonomy';
 
 export type ClosetCategory =
   | 'tops' | 'dresses' | 'jackets' | 'blouses' | 'jumpsuits'
@@ -46,12 +51,21 @@ export interface ClosetItem {
   isFavorite?: boolean;
   isClean?: boolean;
   createdAt: string;
+  // Richer taxonomy (migration V96) — present for items created/edited via the
+  // new picker. The local `category` above is still the source of truth for
+  // layout/grouping; these carry the precise type + AI-detected attributes.
+  subcategory?: WardrobeSubcategory;
+  itemType?: WardrobeItemType | null;
+  length?: WardrobeLength | null;
+  fitType?: WardrobeFitType | null;
 }
 
 // ── Category mapping ──────────────────────────────────────────────────────────
-// Backend uses WardrobeSubcategory (uppercase) directly matching our local categories
+// Backend uses WardrobeSubcategory (uppercase) directly matching our local categories.
+// Only the legacy 1:1 values live here; new section-level subcategories are
+// resolved through the taxonomy (see toLocalCategory below).
 
-const SUBCATEGORY_TO_LOCAL: Record<WardrobeSubcategory, ClosetCategory> = {
+const SUBCATEGORY_TO_LOCAL: Partial<Record<WardrobeSubcategory, ClosetCategory>> = {
   TOPS: 'tops',
   TSHIRTS: 'tshirts',
   BLOUSES: 'blouses',
@@ -125,7 +139,9 @@ const LOCAL_TO_CATEGORY: Record<ClosetCategory, WardrobeCategory> = {
 };
 
 export function toLocalCategory(subcategory: WardrobeSubcategory): ClosetCategory {
-  return SUBCATEGORY_TO_LOCAL[subcategory] ?? 'accessories';
+  // Delegate to the taxonomy mapping which understands BOTH the new section-level
+  // subcategories (TROUSERS_JEANS, ANKLE_BOOTS, …) and the legacy ones.
+  return SUBCATEGORY_TO_LOCAL[subcategory] ?? subcategoryToLocal(subcategory);
 }
 
 export function toApiSubcategory(localCategory: ClosetCategory): WardrobeSubcategory {
@@ -147,6 +163,10 @@ function mapApiItemToClosetItem(item: WardrobeItemResponse): ClosetItem {
     isFavorite: item.isFavorite,
     isClean: item.isClean,
     createdAt: item.createdAt,
+    subcategory: item.subcategory,
+    itemType: item.itemType ?? null,
+    length: item.length ?? null,
+    fitType: item.fitType ?? null,
   };
 }
 
@@ -157,15 +177,32 @@ export async function fetchClosetItems(): Promise<ClosetItem[]> {
   return page.content.map(mapApiItemToClosetItem);
 }
 
+// Extra taxonomy options chosen in the new picker. When `section`/`subcategory`
+// are provided they take precedence over the legacy mapping derived from the
+// local `category`.
+export interface AddItemExtras {
+  section?: WardrobeCategory;
+  subcategory?: WardrobeSubcategory;
+  itemType?: WardrobeItemType | null;
+  length?: WardrobeLength | null;
+  fitType?: WardrobeFitType | null;
+}
+
 export async function addClosetItemFromFile(
   file: File,
   category: ClosetCategory,
+  extras?: AddItemExtras,
   onProgress?: (status: WardrobeUploadStatus) => void,
   onJobId?: (jobId: string) => void,
 ): Promise<WardrobeUploadStatus> {
-  const apiCategory = toApiCategory(category);
-  const apiSubcategory = toApiSubcategory(category);
-  return uploadWardrobeItem(file, apiCategory, apiSubcategory, onProgress, onJobId);
+  const options: WardrobeItemOptions = {
+    category: extras?.section ?? toApiCategory(category),
+    subcategory: extras?.subcategory ?? toApiSubcategory(category),
+    itemType: extras?.itemType ?? undefined,
+    length: extras?.length ?? undefined,
+    fitType: extras?.fitType ?? undefined,
+  };
+  return uploadWardrobeItem(file, options, onProgress, onJobId);
 }
 
 export async function removeClosetItem(id: string): Promise<void> {
@@ -174,7 +211,20 @@ export async function removeClosetItem(id: string): Promise<void> {
 
 export async function updateClosetItemApi(
   id: string,
-  updates: { userLabel?: string | null; userNotes?: string | null; isFavorite?: boolean; isClean?: boolean; category?: ClosetCategory },
+  updates: {
+    userLabel?: string | null;
+    userNotes?: string | null;
+    isFavorite?: boolean;
+    isClean?: boolean;
+    category?: ClosetCategory;
+    // Precise taxonomy. When `section`/`subcategory` are given they override the
+    // legacy mapping derived from `category`.
+    section?: WardrobeCategory;
+    subcategory?: WardrobeSubcategory;
+    itemType?: WardrobeItemType | null;
+    length?: WardrobeLength | null;
+    fitType?: WardrobeFitType | null;
+  },
 ): Promise<void> {
   const apiUpdates: Parameters<typeof updateWardrobeItem>[1] = {};
   if (updates.userLabel !== undefined) apiUpdates.userLabel = updates.userLabel;
@@ -185,6 +235,12 @@ export async function updateClosetItemApi(
     apiUpdates.category = toApiCategory(updates.category);
     apiUpdates.subcategory = toApiSubcategory(updates.category);
   }
+  // Precise taxonomy overrides the legacy mapping above.
+  if (updates.section !== undefined) apiUpdates.category = updates.section;
+  if (updates.subcategory !== undefined) apiUpdates.subcategory = updates.subcategory;
+  if (updates.itemType !== undefined) apiUpdates.itemType = updates.itemType;
+  if (updates.length !== undefined) apiUpdates.length = updates.length;
+  if (updates.fitType !== undefined) apiUpdates.fitType = updates.fitType;
   await updateWardrobeItem(id, apiUpdates);
 }
 

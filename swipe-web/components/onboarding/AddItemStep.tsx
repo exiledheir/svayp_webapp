@@ -2,9 +2,10 @@ import React, { useRef, useState } from 'react';
 import Image from 'next/image';
 import { Camera, Image as ImageIcon, Check, Plus } from 'lucide-react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
-import { addClosetItemFromFile, CLOSET_CATEGORIES, type ClosetCategory } from '@/lib/closet-storage';
+import { addClosetItemFromFile, type ClosetCategory } from '@/lib/closet-storage';
 import { compressImageForUpload } from '@/lib/image-utils';
-import { UPPER_CATS, LOWER_CATS, SHOES_CATS, FULL_BODY_CATS } from '@/lib/closet-types';
+import ItemOptionsPicker, { defaultSelectionForSection, isSelectionComplete, type ItemOptionsSelection } from '@/components/closet/ItemOptionsPicker';
+import { sectionsForGroup, subcategoryToLocal } from '@/lib/wardrobe-taxonomy';
 import { useI18n } from '@/lib/i18n';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
@@ -44,18 +45,13 @@ export default function AddItemStep({
   const imgRef = useRef<HTMLImageElement>(null);
   const fileRef = useRef<File | null>(null);
 
-  const cats = group === 'upper' ? UPPER_CATS : group === 'lower' ? LOWER_CATS : SHOES_CATS;
-  // For upper group: put full-body categories (dresses, jumpsuits) last so
-  // they're not accidentally tapped by users adding a regular top.
-  const chipCats = group === 'upper'
-    ? [...cats.filter((c) => !FULL_BODY_CATS.includes(c)), ...cats.filter((c) => FULL_BODY_CATS.includes(c))]
-    : cats;
+  // Constrain the picker to the sections relevant for this onboarding step.
+  const allowedSections = sectionsForGroup(group);
 
   const [rawImage, setRawImage] = useState('');
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
-  // Default to the first non-full-body category for upper, first category for lower.
-  const [category, setCategory] = useState<ClosetCategory>(chipCats[0]);
+  const [selection, setSelection] = useState<ItemOptionsSelection>(() => defaultSelectionForSection(allowedSections[0]));
   const [showPicker, setShowPicker] = useState(false);
 
   const heroSrc = group === 'upper'
@@ -91,7 +87,16 @@ export default function AddItemStep({
       w: imgRef.current?.width ?? 0,
       h: imgRef.current?.height ?? 0,
     };
-    const cat = category;
+    const sel = selection;
+    if (!sel.subcategory) return;
+    const cat = subcategoryToLocal(sel.subcategory);
+    const extras = {
+      section: sel.section,
+      subcategory: sel.subcategory,
+      itemType: sel.itemType,
+      length: sel.length,
+      fitType: sel.fitType,
+    };
 
     const uploadPromise = (async () => {
       let f = currentFile;
@@ -101,7 +106,7 @@ export default function AddItemStep({
         f = new File([blob], f.name, { type: 'image/png' });
       }
       f = await compressImageForUpload(f);
-      await addClosetItemFromFile(f, cat, () => {});
+      await addClosetItemFromFile(f, cat, extras, () => {});
       logAnalyticsEvent(Events.ADD_ITEM_SAVED, { [Params.CATEGORY]: cat, [Params.HAS_BG_REMOVED]: true });
     })().catch(() => {
       logAnalyticsEvent(Events.ADD_ITEM_BG_REMOVAL_FAILED);
@@ -121,40 +126,31 @@ export default function AddItemStep({
             <img ref={imgRef} src={rawImage} alt="to crop" style={{ maxHeight: '42vh', objectFit: 'contain' }} />
           </ReactCrop>
         </div>
-        <div className="flex-none px-5 pt-4 pb-2">
-          <p className="text-[14px] font-semibold text-gray-500 mb-2">{t.ob_add_choose_category}</p>
-          <div className="flex flex-wrap gap-2 mb-4">
-            {chipCats.map((c) => {
-              const label = t.categoryLabels?.[c] ?? CLOSET_CATEGORIES.find((x) => x.value === c)?.label ?? c;
-              const active = category === c;
-              return (
-                <button
-                  key={c}
-                  onClick={() => setCategory(c)}
-                  className="px-3.5 py-2 rounded-full text-[13px] font-medium transition-colors"
-                  style={{ background: active ? '#F370A7' : 'rgba(0,0,0,0.05)', color: active ? '#fff' : '#555' }}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => { setRawImage(''); fileRef.current = null; }}
-              className="px-5 h-12 rounded-full bg-gray-100 text-gray-600 text-[13px] font-semibold"
-            >
-              {t.ob_add_change_photo}
-            </button>
-            <button
-              onClick={handleSave}
-              className="flex-1 h-12 rounded-full text-white text-[15px] font-semibold flex items-center justify-center gap-2"
-              style={{ background: '#F370A7' }}
-            >
-              <Check size={17} />
-              {t.ob_add_save}
-            </button>
-          </div>
+        <div className="flex-none px-5 pt-4 overflow-y-auto" style={{ maxHeight: '34vh' }}>
+          <p className="text-[14px] font-semibold text-gray-500 mb-3">{t.ob_add_choose_category}</p>
+          <ItemOptionsPicker
+            value={selection}
+            onChange={setSelection}
+            allowedSections={allowedSections}
+            hideSection={allowedSections.length <= 1}
+          />
+        </div>
+        <div className="flex-none flex gap-3 px-5 pt-3 pb-2">
+          <button
+            onClick={() => { setRawImage(''); fileRef.current = null; }}
+            className="px-5 h-12 rounded-full bg-gray-100 text-gray-600 text-[13px] font-semibold"
+          >
+            {t.ob_add_change_photo}
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!isSelectionComplete(selection)}
+            className="flex-1 h-12 rounded-full text-white text-[15px] font-semibold flex items-center justify-center gap-2 disabled:opacity-40"
+            style={{ background: '#F370A7' }}
+          >
+            <Check size={17} />
+            {t.ob_add_save}
+          </button>
         </div>
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
         <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFile} />
@@ -167,7 +163,7 @@ export default function AddItemStep({
     <div className="flex-1 flex flex-col relative">
       <div className="px-6 pt-4 pb-2">
         <h2 className="text-[28px] font-black tracking-tight text-gray-900 dark:text-white mb-2 leading-tight">{title}</h2>
-        <p className="text-[16px] text-gray-500 leading-relaxed">{body}</p>
+        <p className="text-[16px] font-medium leading-relaxed text-gray-600 dark:text-gray-300 max-w-[34ch]">{body}</p>
       </div>
 
       {/* Clothing hero image */}

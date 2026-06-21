@@ -136,7 +136,7 @@ export default function TryOnStep({
     <div className="flex-1 flex flex-col">
       <div className="px-6 pt-4 pb-2">
         <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-2">{title}</h2>
-        <p className="text-base text-gray-500 leading-relaxed">{body}</p>
+        <p className="text-[16px] font-medium leading-relaxed text-gray-600 dark:text-gray-300 max-w-[34ch]">{body}</p>
       </div>
 
       {/* Canvas: white bg, items positioned naturally top→bottom */}
