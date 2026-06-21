@@ -238,7 +238,7 @@ export default function OnboardingPage() {
           </div>
           <div className="px-6 pb-4">
             <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-2">{t.ob_welcome_title}</h2>
-            <p className="text-sm text-gray-500 leading-relaxed">{t.ob_welcome_body}</p>
+            <p className="text-[16px] font-medium leading-relaxed text-gray-600 dark:text-gray-300 max-w-[34ch]">{t.ob_welcome_body}</p>
           </div>
           <div className="flex-none px-6 pb-2" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}>
             <button
@@ -293,7 +293,7 @@ export default function OnboardingPage() {
             </div>
             <div className="text-center">
               <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-2">{t.ob_done_title}</h2>
-              <p className="text-sm text-gray-500 leading-relaxed">{t.ob_done_body}</p>
+              <p className="text-[16px] font-medium leading-relaxed text-gray-600 dark:text-gray-300 max-w-[34ch]">{t.ob_done_body}</p>
             </div>
           </div>
           <div className="flex-none px-6 pb-2" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}>
