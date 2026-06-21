@@ -235,7 +235,6 @@ export interface Translations {
   canvasDemoSwap: string;
   canvasDemoDone: string;
   profile: string;
-  replayTour: string;
   logout: string;
   theme: string;
   themeLight: string;
@@ -563,7 +562,6 @@ const en: Translations = {
   canvasDemoSwap: 'Just drag to rearrange ✨',
   canvasDemoDone: 'Now try it yourself!',
   profile: 'Profile',
-  replayTour: 'Replay app tour',
   logout: 'Log out',
   theme: 'Theme',
   themeLight: 'light',
@@ -914,7 +912,6 @@ const ru: Translations = {
   canvasDemoSwap: 'Просто перетащите ✨',
   canvasDemoDone: 'Теперь попробуйте сами!',
   profile: 'Профиль',
-  replayTour: 'Повторить обучение',
   logout: 'Выйти',
   theme: 'Тема',
   themeLight: 'светлая',
@@ -1263,7 +1260,6 @@ const uz: Translations = {
   canvasDemoSwap: "Shunchaki torting ✨",
   canvasDemoDone: "Endi o'zingiz sinab ko'ring!",
   profile: 'Profil',
-  replayTour: "Qo'llanmani qayta ko'rsatish",
   logout: 'Chiqish',
   theme: 'Mavzu',
   themeLight: 'oq',
