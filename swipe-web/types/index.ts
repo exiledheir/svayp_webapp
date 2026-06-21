@@ -197,6 +197,7 @@ export interface PlanLimits {
 }
 
 export interface PlanUsage {
+  wardrobeItemsUsed: number;
   regenerationsUsed: number;
   tryItOnsUsed: number;
   itemCountByCategory: Record<string, number>;

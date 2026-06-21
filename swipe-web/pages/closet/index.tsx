@@ -116,7 +116,7 @@ const PLAN_COLORS: Record<UserPlan, { bg: string; text: string; crownColor: stri
 function usePlan() {
   const [plan, setPlan] = useState<UserPlan>('free');
   const [limits, setLimits] = useState<PlanLimits>(PLAN_LIMITS_FALLBACK.free);
-  const [usage, setUsage] = useState<PlanUsage>({ regenerationsUsed: 0, tryItOnsUsed: 0, itemCountByCategory: {} });
+  const [usage, setUsage] = useState<PlanUsage>({ wardrobeItemsUsed: 0, regenerationsUsed: 0, tryItOnsUsed: 0, itemCountByCategory: {} });
 
   const fetchPlan = useCallback(async () => {
     try {
@@ -125,7 +125,7 @@ function usePlan() {
       // but guard here too in case of unexpected nulls.
       setPlan(data.plan ?? 'free');
       setLimits({ ...PLAN_LIMITS_FALLBACK.free, ...data.limits });
-      setUsage({ ...{ regenerationsUsed: 0, tryItOnsUsed: 0, itemCountByCategory: {} }, ...data.usage });
+      setUsage({ ...{ wardrobeItemsUsed: 0, regenerationsUsed: 0, tryItOnsUsed: 0, itemCountByCategory: {} }, ...data.usage });
     } catch {
       setPlan('free');
       setLimits(PLAN_LIMITS_FALLBACK.free);
@@ -144,7 +144,9 @@ function usePlan() {
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [fetchPlan]);
 
-  const totalItems = Object.values(usage.itemCountByCategory ?? {}).reduce((s, n) => s + n, 0);
+  // Prefer the backend's authoritative READY count; fall back to summing per-category usage.
+  const totalItems = usage.wardrobeItemsUsed
+    ?? Object.values(usage.itemCountByCategory ?? {}).reduce((s, n) => s + n, 0);
 
   return {
     plan,

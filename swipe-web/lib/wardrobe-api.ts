@@ -50,6 +50,7 @@ function mapPlanResponse(raw: Record<string, unknown>): UserPlanResponse {
       calendarDays:     (limits.calendarDays ?? 2) as number,
     },
     usage: {
+      wardrobeItemsUsed:    (usage.wardrobeItemsUsed ?? usage.itemsUsed ?? 0) as number,
       regenerationsUsed:    (usage.regenThisMonth ?? usage.regenerationsUsed ?? usage.regenUsed ?? 0) as number,
       tryItOnsUsed:         (usage.tryOnThisMonth ?? usage.tryOnsThisMonth ?? usage.tryItOnsThisMonth ?? usage.tryItOnsUsed ?? usage.tryOnsUsed ?? 0) as number,
       itemCountByCategory:  (usage.itemCountByCategory ?? {}) as Record<string, number>,
