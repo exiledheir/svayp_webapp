@@ -1,6 +1,7 @@
 import React from 'react';
 import { useRouter } from 'next/router';
 import { Compass, Search, Camera, Send, Shirt, Heart, ShoppingCart } from 'lucide-react';
+import { useTheme } from '@/lib/theme';
 
 // Maps display slot (0-4) → tab route; slot 2 is center VS button (no route)
 const SLOTS = [
@@ -112,7 +113,10 @@ export default function BottomNav() {
   );
 }
 
-// Floating glass top bar used on all main screens (matches Flutter MainTopBar)
+// Floating glass top bar used on all main screens (matches Flutter MainTopBar).
+// Glass material, border, radius, blur and title type are kept in lockstep with
+// svayp_mobile/lib/shared/widgets/main_top_bar.dart so the WebView tabs (Closet,
+// Market) look identical to the native tabs.
 export function TopBar({
   title,
   showCartLiked = true,
@@ -121,26 +125,36 @@ export function TopBar({
   showCartLiked?: boolean;
 }) {
   const router = useRouter();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+  const iconColor = isDark ? '#fff' : '#000';
   return (
     <div className="absolute top-0 left-0 right-0 z-50 px-4 pt-2 pb-1 pointer-events-none">
       <div
         className="flex items-center px-4 py-2.5 pointer-events-auto"
         style={{
-          background: 'rgba(255,255,255,0.72)',
+          background: isDark ? 'rgba(5,5,8,0.82)' : 'rgba(255,255,255,0.72)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           borderRadius: 22,
-          border: '0.5px solid rgba(0,0,0,0.16)',
+          border: isDark
+            ? '0.5px solid rgba(255,255,255,0.13)'
+            : '0.5px solid rgba(0,0,0,0.16)',
         }}
       >
-        <span className="flex-1 text-[19px] font-bold tracking-[-0.5px]">{title}</span>
+        <span
+          className="flex-1 text-[22px] font-bold tracking-[-0.5px]"
+          style={{ color: iconColor }}
+        >
+          {title}
+        </span>
         {showCartLiked && (
           <>
             <button onClick={() => router.push('/liked')} className="w-10 h-10 flex items-center justify-center" aria-label="Liked">
-              <Heart size={22} strokeWidth={1.8} />
+              <Heart size={22} strokeWidth={1.8} color={iconColor} />
             </button>
             <button onClick={() => router.push('/cart')} className="w-10 h-10 flex items-center justify-center" aria-label="Cart">
-              <ShoppingCart size={22} strokeWidth={1.8} />
+              <ShoppingCart size={22} strokeWidth={1.8} color={iconColor} />
             </button>
           </>
         )}
