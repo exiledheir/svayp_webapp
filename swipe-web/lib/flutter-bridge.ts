@@ -15,7 +15,8 @@ export type BridgeMessageType =
   | 'google_auth_start'
   | 'apple_auth_start'
   | 'set_language'
-  | 'set_theme';
+  | 'set_theme'
+  | 'save_image';
 
 export interface AuthCompletePayload {
   type: 'auth_complete';
@@ -102,6 +103,21 @@ export interface SetThemePayload {
   theme: 'light' | 'dark';
 }
 
+/**
+ * Sent when the user taps "Save Look" inside the WebView. Browser downloads
+ * (`<a download>`) don't work in a WebView, so the web page hands the rendered
+ * image to the native app, which writes it to the device photo gallery.
+ */
+export interface SaveImagePayload {
+  type: 'save_image';
+  /** Base64-encoded image bytes (no `data:` URI prefix). */
+  base64: string;
+  /** Suggested file name, e.g. `libas-tryon-1700000000000.jpg`. */
+  filename: string;
+  /** MIME type of the bytes, e.g. `image/jpeg`. */
+  mimeType: string;
+}
+
 export type BridgePayload =
   | AuthCompletePayload
   | OnboardingCompletePayload
@@ -111,7 +127,8 @@ export type BridgePayload =
   | GoogleAuthStartPayload
   | AppleAuthStartPayload
   | SetLanguagePayload
-  | SetThemePayload;
+  | SetThemePayload
+  | SaveImagePayload;
 
 type FlutterBridgeChannel = {
   postMessage: (message: string) => void;
@@ -137,6 +154,39 @@ export function sendToFlutter(payload: BridgePayload): void {
   const channel = getChannel();
   if (!channel) return;
   channel.postMessage(JSON.stringify(payload));
+}
+
+/**
+ * Hand an image blob to the native app to save into the device photo gallery.
+ * Returns true when running inside the Flutter WebView (and the message was
+ * sent), false otherwise — callers should fall back to a browser download.
+ */
+export async function saveImageToGallery(
+  blob: Blob,
+  filename: string,
+): Promise<boolean> {
+  if (!isInFlutterWebView()) return false;
+  const base64 = await blobToBase64(blob);
+  sendToFlutter({
+    type: 'save_image',
+    base64,
+    filename,
+    mimeType: blob.type || 'image/jpeg',
+  });
+  return true;
+}
+
+/** Read a Blob as a bare base64 string (strips the `data:...;base64,` prefix). */
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      resolve(result.slice(result.indexOf(',') + 1));
+    };
+    reader.onerror = () => reject(new Error('blob read failed'));
+    reader.readAsDataURL(blob);
+  });
 }
 
 export type HostPlatform = 'ios' | 'android';

@@ -1,5 +1,6 @@
 import type { ClosetItem } from '@/lib/closet-storage';
 import type { SavedCanvasLayout } from '@/lib/closet-types';
+import { saveImageToGallery } from '@/lib/flutter-bridge';
 
 /**
  * Render a flat-lay canvas layout to a PNG blob (used as the try-on snapshot input).
@@ -84,19 +85,31 @@ export async function downloadWithWatermark(resultUrl: string): Promise<void> {
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur = 0;
 
-  return new Promise<void>((resolve) => {
-    canvas.toBlob((blob) => {
-      if (blob) {
-        const blobUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = `libas-tryon-${Date.now()}.jpg`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+  return new Promise<void>((resolve, reject) => {
+    canvas.toBlob(async (blob) => {
+      if (!blob) {
+        resolve();
+        return;
       }
-      resolve();
+      const filename = `libas-tryon-${Date.now()}.jpg`;
+      try {
+        // Inside the Flutter WebView, `<a download>` is a no-op — hand the
+        // image to the native app so it lands in the device photo gallery.
+        const savedNatively = await saveImageToGallery(blob, filename);
+        if (!savedNatively) {
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+        }
+        resolve();
+      } catch (err) {
+        reject(err);
+      }
     }, 'image/jpeg', 0.95);
   });
 }
