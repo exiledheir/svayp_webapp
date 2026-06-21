@@ -449,6 +449,23 @@ export default function ClosetPage() {
     pullStartYRef.current = null;
   }
 
+  // React's onTouchMove listener is passive, so it can't call preventDefault().
+  // Inside the native WebView (iOS/Android) that means the OS overscroll/bounce
+  // swallows the downward drag and the pull-to-refresh above never engages.
+  // Attach a non-passive listener that claims the gesture while pulling at the
+  // very top, so the JS pull-to-refresh works in-app, not just in the browser.
+  useEffect(() => {
+    const el = mainScrollRef.current;
+    if (!el) return;
+    const onMove = (e: TouchEvent) => {
+      if (pullStartYRef.current === null || el.scrollTop > 0) return;
+      const dy = e.touches[0].clientY - pullStartYRef.current;
+      if (dy > 0) e.preventDefault();
+    };
+    el.addEventListener('touchmove', onMove, { passive: false });
+    return () => el.removeEventListener('touchmove', onMove);
+  }, []);
+
   function openAdd(section: WardrobeSection = 'TOPS') {
     if (plansEnabled && !canAddItem()) {
       setShowPremiumGate('items');
@@ -1281,7 +1298,7 @@ export default function ClosetPage() {
       </header>
 
       {/* ── Promo Banner: 20% sale ────────────────────────────────── */}
-      {/* Gated by the premium feature flag like the rest of subscription UI. */}
+      {/* Temporarily disabled — banner hidden for now. Re-enable when needed.
       {plansEnabled && plan === 'free' && promoSecondsLeft > 0 && (
       <div
         onClick={() => setShowPremiumGate('generation')}
@@ -1320,6 +1337,7 @@ export default function ClosetPage() {
         />
       </div>
       )}
+      */}
       <style jsx>{`
         @keyframes shimmer {
           0%   { background-position: -200% 0; }
@@ -1345,7 +1363,7 @@ export default function ClosetPage() {
       <main
         ref={mainScrollRef}
         className="flex-1 overflow-y-auto pb-4"
-        style={{ paddingTop: 0 }}
+        style={{ paddingTop: 0, overscrollBehaviorY: 'contain' }}
         onTouchStart={handlePullTouchStart}
         onTouchMove={handlePullTouchMove}
         onTouchEnd={handlePullTouchEnd}
