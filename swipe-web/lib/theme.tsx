@@ -56,6 +56,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [theme]);
 
+  // Expose a setter the native app calls (via injected JS) to push its own
+  // theme into this already-loaded page WITHOUT a reload. It deliberately does
+  // NOT notify Flutter back — that would bounce the change and loop.
+  useEffect(() => {
+    const w = window as unknown as { __setNativeTheme?: (t: Theme) => void };
+    w.__setNativeTheme = (t: Theme) => {
+      if (t !== 'light' && t !== 'dark') return;
+      setThemeState(t);
+      localStorage.setItem('svayp_theme', t);
+    };
+    return () => { delete w.__setNativeTheme; };
+  }, []);
+
   function setTheme(t: Theme) {
     setThemeState(t);
     localStorage.setItem('svayp_theme', t);

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Locale, Translations, translations } from './translations';
 import { sendToFlutter } from './flutter-bridge';
 
@@ -47,6 +47,19 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     // Keep the native app's locale in sync (no-op in a plain browser).
     sendToFlutter({ type: 'set_language', code: l });
   }
+
+  // Expose a setter the native app calls (via injected JS) to push its own
+  // locale into this already-loaded page WITHOUT a reload. It deliberately
+  // does NOT notify Flutter back — that would bounce the change and loop.
+  useEffect(() => {
+    const w = window as unknown as { __setNativeLocale?: (l: string) => void };
+    w.__setNativeLocale = (l: string) => {
+      if (!(l in translations)) return;
+      setLocaleState(l as Locale);
+      localStorage.setItem('svayp_locale', l);
+    };
+    return () => { delete w.__setNativeLocale; };
+  }, []);
 
   return (
     <I18nContext.Provider value={{ locale, setLocale, t: translations[locale] }}>
