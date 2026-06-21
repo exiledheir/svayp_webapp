@@ -1281,7 +1281,8 @@ export default function ClosetPage() {
       </header>
 
       {/* ── Promo Banner: 20% sale ────────────────────────────────── */}
-      {plan === 'free' && promoSecondsLeft > 0 && (
+      {/* Gated by the premium feature flag like the rest of subscription UI. */}
+      {plansEnabled && plan === 'free' && promoSecondsLeft > 0 && (
       <div
         onClick={() => setShowPremiumGate('generation')}
         className="shrink-0 mx-3 mb-2 rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform select-none"
