@@ -100,6 +100,10 @@ export interface Translations {
   signInTitle: string;
   signInSubtitle: string;
   continueWithTelegram: string;
+  continueWithGoogle: string;
+  continueWithApple: string;
+  signingIn: string;
+  socialAuthError: string;
   orSeparator: string;
   telegramVerifying: string;
   telegramAuthError: string;
@@ -375,6 +379,10 @@ const en: Translations = {
   signInTitle: 'Sign in to LIBΛS',
   signInSubtitle: 'Sign in or create your account',
   continueWithTelegram: 'Continue with Telegram',
+  continueWithGoogle: 'Continue with Google',
+  continueWithApple: 'Continue with Apple',
+  signingIn: 'Signing in…',
+  socialAuthError: 'Sign-in failed. Please try again.',
   orSeparator: 'or',
   telegramVerifying: 'Signing in with Telegram…',
   telegramAuthError: 'Telegram sign-in failed. Please try again.',
@@ -722,6 +730,10 @@ const ru: Translations = {
   signInTitle: 'Вход в LIBLΛS',
   signInSubtitle: 'Войдите или создайте аккаунт',
   continueWithTelegram: 'Продолжить через Telegram',
+  continueWithGoogle: 'Продолжить с Google',
+  continueWithApple: 'Продолжить с Apple',
+  signingIn: 'Вход…',
+  socialAuthError: 'Не удалось войти. Попробуйте снова.',
   orSeparator: 'или',
   telegramVerifying: 'Вход через Telegram…',
   telegramAuthError: 'Ошибка входа через Telegram. Попробуйте ещё раз.',
@@ -1069,6 +1081,10 @@ const uz: Translations = {
   signInTitle: 'LIBLΛS ga kirish',
   signInSubtitle: 'Hisobingizga kiring yoki roʻxatdan oʻing',
   continueWithTelegram: 'Telegram orqali davom etish',
+  continueWithGoogle: 'Google bilan davom etish',
+  continueWithApple: 'Apple bilan davom etish',
+  signingIn: 'Kirilmoqda…',
+  socialAuthError: 'Kirib bo‘lmadi. Qayta urinib ko‘ring.',
   orSeparator: 'yoki',
   telegramVerifying: 'Telegram orqali kirilmoqda…',
   telegramAuthError: 'Telegram orqali kirish muvaffaqiyatsiz. Qayta urinib koʻing.',

@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { sendOtp } from '@/lib/api';
-import { buildTelegramAuthUrl } from '@/lib/telegram-auth';
-import { sendToFlutter, isInFlutterWebView } from '@/lib/flutter-bridge';
+import {
+  sendToFlutter,
+  isInFlutterWebView,
+  getHostPlatform,
+  type HostPlatform,
+} from '@/lib/flutter-bridge';
 import { useI18n } from '@/lib/i18n';
 
 export default function VerifyMethodPage() {
@@ -10,9 +14,16 @@ export default function VerifyMethodPage() {
   const { t } = useI18n();
   const phone = (router.query.phone as string) ?? '';
 
-  const [telegramLoading, setTelegramLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState(false);
   const [smsLoading, setSmsLoading] = useState(false);
   const [error, setError] = useState('');
+  // iOS → Apple, Android → Google (mirrors the native app). Resolved on the
+  // client to avoid an SSR/CSR mismatch.
+  const [platform, setPlatform] = useState<HostPlatform>('android');
+
+  useEffect(() => {
+    setPlatform(getHostPlatform());
+  }, []);
 
   // Format phone as +998 (90) 123-12-12
   function formatPhone(p: string): string {
@@ -23,36 +34,21 @@ export default function VerifyMethodPage() {
     return p;
   }
 
-  async function handleTelegram() {
-    setTelegramLoading(true);
+  // Hand off to Flutter, which runs the native Google/Apple SDK and completes
+  // the auth flow itself (saving tokens + navigating). The button stays in its
+  // loading state while Flutter drives the rest. Outside the WebView there is no
+  // provider available, so we surface an error.
+  function handleSocial() {
     setError('');
-    try {
-      const { url, session } = await buildTelegramAuthUrl();
-
-      // Inside Flutter WebView: hand the auth URL + PKCE session to Flutter so it
-      // opens the URL in an EXTERNAL browser (which launches the native Telegram
-      // app) and intercepts the com.svaypai.app:// deep-link callback itself.
-      // We must NOT navigate the WebView here — that would just load the consent
-      // page inside the WebView and never open the Telegram app.
-      if (isInFlutterWebView()) {
-        sendToFlutter({
-          type: 'telegram_auth_start',
-          url,
-          codeVerifier: session.codeVerifier,
-          state: session.state,
-          nonce: session.nonce,
-          redirectUri: session.redirectUri,
-          phone, // fallback for the backend if Telegram omits the number
-        });
-        return; // keep button in loading state; Flutter drives the rest
-      }
-
-      // Regular browser: navigate to the Telegram consent page as before.
-      window.location.href = url;
-    } catch {
-      setError(t.telegramAuthError);
-      setTelegramLoading(false);
+    if (!isInFlutterWebView()) {
+      setError(t.socialAuthError);
+      return;
     }
+    setSocialLoading(true);
+    sendToFlutter({
+      type: platform === 'ios' ? 'apple_auth_start' : 'google_auth_start',
+      phone, // fallback for the backend
+    });
   }
 
   async function handleSms() {
@@ -69,13 +65,14 @@ export default function VerifyMethodPage() {
     }
   }
 
-  const isAnyLoading = telegramLoading || smsLoading;
+  const isAnyLoading = socialLoading || smsLoading;
+  const socialLabel = platform === 'ios' ? t.continueWithApple : t.continueWithGoogle;
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
+    <div className="flex flex-col min-h-[100dvh] bg-white">
 
       {/* ── Scrollable content ── */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-10">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 sm:py-10">
         <div className="w-full max-w-sm flex flex-col gap-6">
 
           {/* Back */}
@@ -127,25 +124,34 @@ export default function VerifyMethodPage() {
       </div>
 
       {/* ── Sticky bottom ── */}
-      <div className="sticky bottom-0 bg-white border-t border-gray-100 px-6 pt-4 pb-8
+      <div className="sticky bottom-0 bg-white border-t border-gray-100 px-6 pt-4
+                      pb-[max(2rem,env(safe-area-inset-bottom))]
                       sm:relative sm:border-t-0 sm:pt-0 sm:pb-10">
         <div className="w-full max-w-sm mx-auto flex flex-col gap-3">
 
-          {/* Primary: Telegram */}
+          {/* Primary: Google (Android) / Apple (iOS) */}
           <button
             type="button"
-            onClick={handleTelegram}
+            onClick={handleSocial}
             disabled={isAnyLoading}
             className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl
-                       bg-black text-white text-sm font-semibold
-                       disabled:opacity-40 active:scale-[0.98] transition-transform"
+                       border border-gray-200 bg-white text-gray-900 text-sm font-semibold
+                       hover:border-gray-400 disabled:opacity-40 active:scale-[0.98]
+                       transition-all"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="12" fill="#229ED9" />
-              <path d="M17.207 7.228 5.648 11.66c-.783.314-.779.752-.143.947l2.937.916 6.8-4.293c.321-.195.614-.09.373.124l-5.503 4.966-.213 3.1c.312 0 .45-.143.623-.31l1.496-1.455 3.109 2.295c.573.316.985.153 1.127-.531l2.04-9.617c.21-.84-.32-1.22-.887-.947z"
-                fill="white" />
-            </svg>
-            {telegramLoading ? t.telegramVerifying : t.continueWithTelegram}
+            {platform === 'ios' ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                <path d="M16.365 1.43c0 1.14-.42 2.2-1.13 3.02-.83.96-2.18 1.7-3.34 1.61-.14-1.13.42-2.32 1.1-3.07.78-.85 2.13-1.5 3.37-1.56zM20.5 17.2c-.6 1.38-.89 2-1.66 3.22-1.08 1.7-2.6 3.82-4.48 3.83-1.67.02-2.1-1.09-4.37-1.08-2.27.01-2.74 1.1-4.41 1.08-1.88-.02-3.32-1.93-4.4-3.63C-1.3 16.65-1.6 11-.36 8.07.97 5.16 3.5 3.78 5.88 3.78c1.86 0 3.03 1.02 4.57 1.02 1.49 0 2.4-1.02 4.57-1.02 1.65 0 3.4.9 4.65 2.46-4.08 2.24-3.42 8.06.83 8.96z" />
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z" fill="#34A853" />
+                <path d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z" fill="#FBBC05" />
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38z" fill="#EA4335" />
+              </svg>
+            )}
+            {socialLoading ? t.signingIn : socialLabel}
           </button>
 
           {/* Secondary: SMS */}
