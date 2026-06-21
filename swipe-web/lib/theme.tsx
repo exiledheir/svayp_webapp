@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { sendToFlutter } from './flutter-bridge';
 
 export type Theme = 'light' | 'dark';
 
@@ -58,6 +59,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   function setTheme(t: Theme) {
     setThemeState(t);
     localStorage.setItem('svayp_theme', t);
+    // Keep the native app's theme in sync (no-op in a plain browser).
+    sendToFlutter({ type: 'set_theme', theme: t });
   }
 
   return (
