@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useI18n } from '@/lib/i18n';
 import type { Locale } from '@/lib/translations';
-import { sendToFlutter } from '@/lib/flutter-bridge';
+import { getHostPlatform } from '@/lib/flutter-bridge';
 
 const UZ_PREFIX = '+998';
 
@@ -30,6 +30,13 @@ export default function PhonePage() {
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Persist the host platform (from the ?platform= param the Flutter WebView
+  // injects) so the next screen can show the right social button after the
+  // param is dropped on navigation.
+  useEffect(() => {
+    getHostPlatform();
   }, []);
 
   // 5-tap logo easter egg → partner login
@@ -61,9 +68,9 @@ export default function PhonePage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
+    <div className="flex flex-col min-h-[100dvh] bg-white">
       {/* ── Scrollable content ── */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-10">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 sm:py-10">
         <div className="w-full max-w-sm flex flex-col gap-6">
 
           {/* Logo */}
@@ -167,10 +174,11 @@ export default function PhonePage() {
         </div>
       </div>
 
-      {/* ── Sticky bottom buttons ── */}
-      <div className="sticky bottom-0 bg-white border-t border-gray-100 px-6 pt-4 pb-8
+      {/* ── Sticky bottom button ── */}
+      <div className="sticky bottom-0 bg-white border-t border-gray-100 px-6 pt-4
+                      pb-[max(2rem,env(safe-area-inset-bottom))]
                       sm:relative sm:border-t-0 sm:pt-0 sm:pb-10">
-        <div className="w-full max-w-sm mx-auto flex flex-col gap-3">
+        <div className="w-full max-w-sm mx-auto">
           <button
             type="submit"
             form="phone-form"
@@ -179,15 +187,6 @@ export default function PhonePage() {
                        disabled:opacity-40 active:scale-[0.98] transition-transform"
           >
             {loading ? t.sending : t.continueBtn}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => sendToFlutter({ type: 'guest_mode' })}
-            className="w-full py-3 rounded-2xl text-sm font-medium text-gray-500
-                       hover:text-gray-800 hover:bg-gray-50 transition-colors"
-          >
-            {t.browseAsGuest}
           </button>
         </div>
       </div>
