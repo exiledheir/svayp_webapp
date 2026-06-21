@@ -30,7 +30,7 @@ function unwrapData<T>(res: { data: unknown }): T {
 
 // Map the backend plan response (field names differ from frontend types).
 // Backend: { tier: "FREE"|"TRIAL"|"PRO"|"PREMIUM", limits: { wardrobeItems, canvases, tryOnPerMonth, regenPerMonth }, usage: { wardrobeItems, tryOnThisMonth, regenThisMonth } }
-// Frontend: { plan: "free"|"pro"|"premium", limits: { itemsPerCategory, outfitCanvases, tryItOns, regenerations }, usage: { regenerationsUsed, tryItOnsUsed, itemCountByCategory } }
+// Frontend: { plan: "free"|"pro"|"premium", limits: { wardrobeItems, outfitCanvases, tryItOns, regenerations }, usage: { regenerationsUsed, tryItOnsUsed, itemCountByCategory } }
 function mapPlanResponse(raw: Record<string, unknown>): UserPlanResponse {
   const tierMap: Record<string, PlanTier> = { FREE: 'free', TRIAL: 'pro', PRO: 'pro', PREMIUM: 'premium' };
   const tier = ((raw.tier ?? raw.plan ?? 'FREE') as string).toUpperCase();
@@ -40,7 +40,7 @@ function mapPlanResponse(raw: Record<string, unknown>): UserPlanResponse {
     userId: (raw.userId ?? '') as string,
     plan: tierMap[tier] ?? 'free',
     limits: {
-      itemsPerCategory: (limits.wardrobeItems ?? limits.itemsPerCategory ?? 20) as number,
+      wardrobeItems:    (limits.wardrobeItems ?? limits.itemsPerCategory ?? 5) as number,
       outfitCanvases:   (limits.canvases ?? limits.outfitCanvases ?? 1) as number,
       tryItOns:         (limits.tryOnPerMonth ?? limits.tryItOns ?? 2) as number,
       regenerations:    (limits.regenPerMonth ?? limits.regenerations ?? 5) as number,

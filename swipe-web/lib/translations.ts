@@ -53,9 +53,9 @@ export interface Translations {
   yearly: string;
   sumPerMo: string;
   sumPerYear: string;
-  itemsPerCat: string;
   outfitCanvases: string;
   regens: string;
+  ruleBasedOutfits: string;
   tryOns: string;
   calDays: string;
   reachedRegenLimit: string;
@@ -322,15 +322,15 @@ const en: Translations = {
   yearly: 'Yearly',
   sumPerMo: 'sum/mo',
   sumPerYear: 'sum/year',
-  itemsPerCat: 'items per category',
   outfitCanvases: 'outfit boards',
   regens: 'outfit generations',
+  ruleBasedOutfits: 'rule-based outfits',
   tryOns: 'virtual try-ons',
   calDays: 'days in calendar',
-  reachedRegenLimit: "You've used your {n} regenerations. Upgrade for more.",
+  reachedRegenLimit: "You've used your {n} outfit generations. Upgrade for more.",
   reachedCanvasLimit: 'This outfit board is locked. Your current plan includes {n} board(s). Upgrade to unlock all your boards.',
   reachedTryOnLimit: "You've used all {n} try-ons. Upgrade to try on more outfits.",
-  reachedItemLimit: 'You\'ve reached the {n} items/category limit.',
+  reachedItemLimit: "You've reached your {n}-item wardrobe limit. Upgrade for more.",
   categoryFullError: 'This category is full ({n}/{n}). Try another category or upgrade for more slots.',
 
   discoverFashion: 'Discover fashion you love',
@@ -664,15 +664,15 @@ const ru: Translations = {
   yearly: 'Ежегодно',
   sumPerMo: 'сум/мес',
   sumPerYear: 'сум/год',
-  itemsPerCat: 'вещей на категорию',
   outfitCanvases: 'досок образов',
   regens: 'генераций образов',
+  ruleBasedOutfits: 'образы по правилам',
   tryOns: 'примерок',
   calDays: 'дней в календаре',
-  reachedRegenLimit: 'Вы использовали {n} генераций. Улучшите план для большего.',
+  reachedRegenLimit: 'Вы использовали {n} генераций образов. Улучшите план для большего.',
   reachedCanvasLimit: 'Эта доска нарядов заблокирована. Ваш текущий план включает {n} досок(у). Обновите план, чтобы разблокировать все.',
   reachedTryOnLimit: 'Вы использовали все {n} примерок. Улучшите план, чтобы примерять больше образов.',
-  reachedItemLimit: 'Достигнут лимит {n} вещей на категорию.',
+  reachedItemLimit: 'Достигнут лимит гардероба — {n} вещей. Улучшите план для большего.',
   categoryFullError: 'Эта категория заполнена ({n}/{n}). Добавьте в другую или улучшите план.',
 
   discoverFashion: 'Откройте моду, которую вы любите',
@@ -1006,15 +1006,15 @@ const uz: Translations = {
   yearly: 'Yillik',
   sumPerMo: "so'm/oy",
   sumPerYear: "so'm/yil",
-  itemsPerCat: 'ta kiyim/kategoriya',
   outfitCanvases: 'ta Obrazlar doskasi',
-  regens: 'ta re-generatsiya',
+  regens: 'ta obraz yaratish',
+  ruleBasedOutfits: 'qoidaga asoslangan obrazlar',
   tryOns: "ta kiyib ko'rish",
   calDays: 'kun kalendarda',
   reachedRegenLimit: "Siz {n} ta obraz yaratish imkoniyatidan foydalandingiz. Ko'proq uchun obunangizni yangilang.",
   reachedCanvasLimit: "Bu obrazlar doskasi qulflangan. Joriy rejangizda {n} ta doska mavjud. Barchasini ochish uchun obunangizni yangilang.",
   reachedTryOnLimit: "{n} ta kiyib ko'rishdan foydalandingiz. Ko'proq uchun rejani yangilang.",
-  reachedItemLimit: 'Kategoriyada {n} ta kiyim chegarasiga yetdingiz.',
+  reachedItemLimit: "Garderob uchun {n} ta kiyim chegarasiga yetdingiz. Ko'proq uchun rejani yangilang.",
   categoryFullError: "Bu kategoriya to'lgan ({n}/{n}). Boshqasiga qo'shing yoki rejani yangilang.",
 
   discoverFashion: "Sevimli modangizni toping",

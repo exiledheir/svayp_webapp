@@ -154,7 +154,7 @@ export interface PageResponse<T> {
 export type PlanTier = 'free' | 'pro' | 'premium';
 
 export interface PlanLimits {
-  itemsPerCategory: number;
+  wardrobeItems: number;
   outfitCanvases: number;
   tryItOns: number;
   regenerations: number;

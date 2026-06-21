@@ -88,9 +88,9 @@ const OCCASION_CONFIG = [
 type UserPlan = PlanTier;
 
 const PLAN_LIMITS_FALLBACK: Record<UserPlan, PlanLimits> = {
-  free:    { itemsPerCategory: 5,   outfitCanvases: 1, tryItOns: 2,  regenerations: 5,  calendarDays: 2 },
-  pro:     { itemsPerCategory: 15,  outfitCanvases: 3, tryItOns: 10, regenerations: 15, calendarDays: 7 },
-  premium: { itemsPerCategory: 50,  outfitCanvases: 7, tryItOns: 30, regenerations: 50, calendarDays: 7 },
+  free:    { wardrobeItems: 5,   outfitCanvases: 1, tryItOns: 2,  regenerations: 5,  calendarDays: 2 },
+  pro:     { wardrobeItems: 40,  outfitCanvases: 3, tryItOns: 10, regenerations: 20, calendarDays: 7 },
+  premium: { wardrobeItems: 100, outfitCanvases: 7, tryItOns: 30, regenerations: 50, calendarDays: 7 },
 };
 
 const PLAN_COLORS: Record<UserPlan, { bg: string; text: string; crownColor: string }> = {
@@ -132,10 +132,6 @@ function usePlan() {
 
   const totalItems = Object.values(usage.itemCountByCategory ?? {}).reduce((s, n) => s + n, 0);
 
-  function canAddToCategory(cat: string): boolean {
-    return (usage.itemCountByCategory?.[cat] ?? 0) < limits.itemsPerCategory;
-  }
-
   return {
     plan,
     limits,
@@ -143,7 +139,7 @@ function usePlan() {
     fetchPlan,
     canGenerate: usage.regenerationsUsed < limits.regenerations,
     canTryOn: usage.tryItOnsUsed < limits.tryItOns,
-    canAddToCategory,
+    canAddItem: totalItems < limits.wardrobeItems,
     calendarDays: limits.calendarDays,
     totalItems,
   };
@@ -245,7 +241,7 @@ export default function ClosetPage() {
   const [canvases, setCanvases] = useState<{ id: string | null; layout: SavedCanvasLayout }[]>([]);
   const [editingCanvasIdx, setEditingCanvasIdx] = useState<number | null>(null);
   const [canvasInitialLayout, setCanvasInitialLayout] = useState<SavedCanvasLayout | null>(null);
-  const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | 'categoryFull' | 'tryOn' | 'canvas' | null>(null);
+  const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | 'tryOn' | 'canvas' | null>(null);
   const { plan, limits, usage, fetchPlan, canGenerate, canTryOn, calendarDays } = usePlan();
 
   // ── 24h promo countdown timer ─────────────────────────────────────────────────
@@ -276,19 +272,14 @@ export default function ClosetPage() {
   const promoSS = String(promoSecondsLeft % 60).padStart(2, '0');
   const promoTimeStr = `${promoHH}:${promoMM}:${promoSS}`;
 
-  // Count per group (upper/lower/shoes/acc) — the limit is per group, not per subcategory.
+  // Single overall wardrobe item limit (across all categories), not per category.
   // Demo items don't count toward the limit.
   // Pending (in-flight) uploads are included so rapid back-to-back submissions
   // can't bypass the cap before any upload completes.
-  function canAddToCategory(cat: string): boolean {
-    const groupCats = UPPER_CATS.includes(cat as ClosetCategory) ? UPPER_CATS
-      : LOWER_CATS.includes(cat as ClosetCategory) ? LOWER_CATS
-      : SHOES_CATS.includes(cat as ClosetCategory) ? SHOES_CATS
-      : ACC_CATS.includes(cat as ClosetCategory) ? ACC_CATS
-      : [cat as ClosetCategory];
-    const completedCount = items.filter((i) => groupCats.includes(i.category) && !DEMO_ITEM_IDS.has(i.id)).length;
-    const pendingCount = Array.from(pendingUploads.values()).filter((p) => groupCats.includes(p.category)).length;
-    return completedCount + pendingCount < limits.itemsPerCategory;
+  function canAddItem(): boolean {
+    const completedCount = items.filter((i) => !DEMO_ITEM_IDS.has(i.id)).length;
+    const pendingCount = pendingUploads.size;
+    return completedCount + pendingCount < limits.wardrobeItems;
   }
 
   // ── Analytics: upgrade modal shown ──────────────────────────────────────
@@ -436,8 +427,8 @@ export default function ClosetPage() {
   function openAdd(group: string, category: ClosetCategory) {
     // When group === '' (FAB flow) we don't know the target group yet — the user
     // picks it inside the picker. Skip the gate here; handleAddSave re-checks.
-    if (group !== '' && plansEnabled && !canAddToCategory(category)) {
-      setShowPremiumGate('categoryFull');
+    if (group !== '' && plansEnabled && !canAddItem()) {
+      setShowPremiumGate('items');
       return;
     }
     setAddGroup(group);
@@ -476,10 +467,10 @@ export default function ClosetPage() {
 
   async function handleAddSave() {
     if (!addRawImage) return;
-    // Re-check the per-category limit here — the user may have changed the
-    // category inside the picker after the initial openAdd gate was passed.
-    if (plansEnabled && !canAddToCategory(addCategory)) {
-      setShowPremiumGate('categoryFull');
+    // Re-check the overall item limit here — a pending upload may have completed
+    // (or another tab added an item) after the initial openAdd gate was passed.
+    if (plansEnabled && !canAddItem()) {
+      setShowPremiumGate('items');
       return;
     }
     setAddSaving(true);
@@ -1419,7 +1410,6 @@ export default function ClosetPage() {
           filter={upperFilter}
           items={itemsFor(UPPER_CATS, upperFilter)}
           totalCount={items.filter((i) => UPPER_CATS.includes(i.category)).length}
-          maxCount={limits.itemsPerCategory}
           pendingItems={pendingFor(UPPER_CATS)}
           onFilterChange={setUpperFilter}
           onTapItem={setEditItem}
@@ -1435,7 +1425,6 @@ export default function ClosetPage() {
           filter={lowerFilter}
           items={itemsFor(LOWER_CATS, lowerFilter)}
           totalCount={items.filter((i) => LOWER_CATS.includes(i.category)).length}
-          maxCount={limits.itemsPerCategory}
           pendingItems={pendingFor(LOWER_CATS)}
           onFilterChange={setLowerFilter}
           onTapItem={setEditItem}
@@ -1451,7 +1440,6 @@ export default function ClosetPage() {
           filter={null}
           items={itemsFor(SHOES_CATS, null)}
           totalCount={items.filter((i) => SHOES_CATS.includes(i.category)).length}
-          maxCount={limits.itemsPerCategory}
           pendingItems={pendingFor(SHOES_CATS)}
           onFilterChange={() => {}}
           onTapItem={setEditItem}
@@ -1467,7 +1455,6 @@ export default function ClosetPage() {
           filter={accFilter}
           items={itemsFor(ACC_CATS, accFilter)}
           totalCount={items.filter((i) => ACC_CATS.includes(i.category)).length}
-          maxCount={limits.itemsPerCategory}
           pendingItems={pendingFor(ACC_CATS)}
           onFilterChange={setAccFilter}
           onTapItem={setEditItem}
@@ -2458,7 +2445,6 @@ interface ClothingSectionProps {
   filter: ClosetCategory | null;
   items: ClosetItem[];
   totalCount: number;
-  maxCount: number;
   pendingItems?: { id: string; category: ClosetCategory; imageData: string; step: string; progress: number; startedAt: number }[];
   onFilterChange: (cat: ClosetCategory | null) => void;
   onTapItem: (item: ClosetItem) => void;
@@ -2467,7 +2453,7 @@ interface ClothingSectionProps {
   onAddItem?: () => void;
 }
 
-function ClothingSection({ title, cats, filter, items, totalCount, maxCount, pendingItems = [], onFilterChange, onTapItem, onViewAll, onRemovePending, onAddItem }: ClothingSectionProps) {
+function ClothingSection({ title, cats, filter, items, totalCount, pendingItems = [], onFilterChange, onTapItem, onViewAll, onRemovePending, onAddItem }: ClothingSectionProps) {
   const { t } = useI18n();
   const isEmpty = items.length === 0 && pendingItems.length === 0;
   return (
@@ -2477,7 +2463,7 @@ function ClothingSection({ title, cats, filter, items, totalCount, maxCount, pen
         <div className="flex items-center gap-2">
           <h2 className="text-[17px] font-bold text-gray-900 tracking-tight">{title}</h2>
           <span className="px-1.5 py-0.5 rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500">
-            {totalCount}/{maxCount}
+            {totalCount}
           </span>
         </div>
         <button onClick={onViewAll} className="text-[12px] text-gray-400 font-medium">
@@ -3035,7 +3021,7 @@ function PremiumGateSheet({
   currentPlan,
   onClose,
 }: {
-  reason: 'generation' | 'items' | 'categoryFull' | 'tryOn' | 'canvas';
+  reason: 'generation' | 'items' | 'tryOn' | 'canvas';
   currentPlan: UserPlan;
   onClose: () => void;
 }) {
@@ -3072,9 +3058,9 @@ function PremiumGateSheet({
     {
       key: 'premium' as UserPlan,
       label: 'Premium',
-      monthlyPrice: 39_000,
-      yearlyPrice: 374_400,
-      yearlyOriginal: 468_000,
+      monthlyPrice: 79_000,
+      yearlyPrice: 758_400,
+      yearlyOriginal: 948_000,
       color: '#B8860B',
       gradient: 'linear-gradient(135deg, #B8860B 0%, #8B6914 100%)',
     },
@@ -3127,9 +3113,7 @@ function PremiumGateSheet({
               ? t.reachedCanvasLimit.replace('{n}', String(PLAN_LIMITS_FALLBACK[currentPlan].outfitCanvases))
               : reason === 'tryOn'
               ? t.reachedTryOnLimit.replace('{n}', String(PLAN_LIMITS_FALLBACK[currentPlan].tryItOns))
-              : reason === 'categoryFull'
-              ? t.categoryFullError.replace(/\{n\}/g, String(PLAN_LIMITS_FALLBACK[currentPlan].itemsPerCategory))
-              : t.reachedItemLimit.replace('{n}', String(PLAN_LIMITS_FALLBACK[currentPlan].itemsPerCategory))}
+              : t.reachedItemLimit.replace('{n}', String(PLAN_LIMITS_FALLBACK[currentPlan].wardrobeItems))}
           </p>
 
           {/* Monthly / Yearly toggle */}
@@ -3220,15 +3204,25 @@ function PremiumGateSheet({
 
                   {/* Features */}
                   <div className="flex flex-col gap-1 mb-3 flex-1">
-                    <span className="text-[9px] text-gray-500">{PLAN_LIMITS_FALLBACK[p.key].itemsPerCategory} {t.itemsPerCat}</span>
+                    <span className="text-[9px] text-gray-500">{PLAN_LIMITS_FALLBACK[p.key].wardrobeItems} {t.items}</span>
                     <span className="text-[9px] text-gray-500">{PLAN_LIMITS_FALLBACK[p.key].outfitCanvases} {t.outfitCanvases}</span>
-                    <span className="text-[9px] text-gray-500">{PLAN_LIMITS_FALLBACK[p.key].regenerations} {t.regens}</span>
+                    <span className="text-[9px] text-gray-500">
+                      {PLAN_LIMITS_FALLBACK[p.key].regenerations > 0
+                        ? `${PLAN_LIMITS_FALLBACK[p.key].regenerations} ${t.regens}`
+                        : t.ruleBasedOutfits}
+                    </span>
                     <span className="text-[9px] text-gray-500">{PLAN_LIMITS_FALLBACK[p.key].tryItOns} {t.tryOns}</span>
-                    <span className="text-[9px] text-gray-500">{PLAN_LIMITS_FALLBACK[p.key].calendarDays} {t.calDays}</span>
+                    {PLAN_LIMITS_FALLBACK[p.key].calendarDays > 0 && (
+                      <span className="text-[9px] text-gray-500">{PLAN_LIMITS_FALLBACK[p.key].calendarDays} {t.calDays}</span>
+                    )}
                   </div>
 
                   {/* CTA */}
-                  {!isCurrent && !isFree && (
+                  {isCurrent ? (
+                    <div className="w-full py-2 rounded-xl text-center text-gray-400 font-medium text-[10px] bg-gray-50">
+                      {t.currentPlan}
+                    </div>
+                  ) : !isFree ? (
                     <button
                       onClick={() => handleUpgrade(p.key)}
                       className="w-full py-2 rounded-xl text-white font-bold text-[10px] active:scale-[0.97] transition-transform"
@@ -3236,12 +3230,7 @@ function PremiumGateSheet({
                     >
                       {t.upgrade}
                     </button>
-                  )}
-                  {isFree && !isCurrent && (
-                    <div className="w-full py-2 rounded-xl text-center text-gray-400 font-medium text-[10px] bg-gray-50">
-                      {t.currentPlan}
-                    </div>
-                  )}
+                  ) : null}
                 </div>
               );
             })}
