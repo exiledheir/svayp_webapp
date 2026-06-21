@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
 import { Locale, Translations, translations } from './translations';
+import { sendToFlutter } from './flutter-bridge';
 
 interface I18nContextValue {
   locale: Locale;
@@ -43,6 +44,8 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   function setLocale(l: Locale) {
     setLocaleState(l);
     localStorage.setItem('svayp_locale', l);
+    // Keep the native app's locale in sync (no-op in a plain browser).
+    sendToFlutter({ type: 'set_language', code: l });
   }
 
   return (

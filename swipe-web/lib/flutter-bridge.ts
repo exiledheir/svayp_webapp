@@ -13,7 +13,9 @@ export type BridgeMessageType =
   | 'guest_mode'
   | 'telegram_auth_start'
   | 'google_auth_start'
-  | 'apple_auth_start';
+  | 'apple_auth_start'
+  | 'set_language'
+  | 'set_theme';
 
 export interface AuthCompletePayload {
   type: 'auth_complete';
@@ -81,6 +83,25 @@ export interface AppleAuthStartPayload {
   phone?: string;
 }
 
+/**
+ * Sent whenever the user changes the language inside the web view, so the
+ * native app updates its own locale and stays in sync. `code` is one of the
+ * supported locales ('uz' | 'ru' | 'en').
+ */
+export interface SetLanguagePayload {
+  type: 'set_language';
+  code: string;
+}
+
+/**
+ * Sent whenever the user toggles the theme inside the web view, so the native
+ * app updates its own ThemeMode and both surfaces stay on the same theme.
+ */
+export interface SetThemePayload {
+  type: 'set_theme';
+  theme: 'light' | 'dark';
+}
+
 export type BridgePayload =
   | AuthCompletePayload
   | OnboardingCompletePayload
@@ -88,7 +109,9 @@ export type BridgePayload =
   | GuestModePayload
   | TelegramAuthStartPayload
   | GoogleAuthStartPayload
-  | AppleAuthStartPayload;
+  | AppleAuthStartPayload
+  | SetLanguagePayload
+  | SetThemePayload;
 
 type FlutterBridgeChannel = {
   postMessage: (message: string) => void;
