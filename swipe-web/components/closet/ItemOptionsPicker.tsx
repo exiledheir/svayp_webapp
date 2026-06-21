@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useI18n } from '@/lib/i18n';
 import {
   WARDROBE_TAXONOMY,
@@ -86,9 +86,28 @@ export default function ItemOptionsPicker({
     );
   }
 
-  function row(label: string, chips: React.ReactNode) {
+  // The next field the user still has to fill in — used to auto-scroll it into
+  // view so it's obvious what's missing (and why the Save button is disabled).
+  const targetStep: string | null =
+    !value.subcategory ? 'type'
+    : (subDef?.itemTypes && subDef.itemTypes.length > 0 && !value.itemType) ? 'subtype'
+    : (subDef?.lengths && subDef.lengths.length > 0 && !value.length) ? 'length'
+    : (subDef?.hasFit && !value.fitType) ? 'fit'
+    : null;
+
+  const targetRef = useRef<HTMLDivElement | null>(null);
+  const endRef = useRef<HTMLDivElement | null>(null);
+  const firstRun = useRef(true);
+  useEffect(() => {
+    // Don't jump on first mount; only after a selection reveals the next field.
+    if (firstRun.current) { firstRun.current = false; return; }
+    const el = targetStep ? targetRef.current : endRef.current;
+    el?.scrollIntoView({ behavior: 'smooth', block: targetStep ? 'center' : 'end' });
+  }, [targetStep]);
+
+  function row(stepKey: string, label: string, chips: React.ReactNode) {
     return (
-      <div>
+      <div ref={stepKey === targetStep ? targetRef : undefined}>
         <p className="text-[12px] font-semibold mb-2" style={{ color: labelColor }}>{label}</p>
         <div className="flex flex-wrap gap-2">{chips}</div>
       </div>
@@ -124,29 +143,33 @@ export default function ItemOptionsPicker({
     <div className="flex flex-col gap-3.5">
       {/* Section */}
       {!hideSection && sections.length > 1 &&
-        row(t.optSection, sections.map((s) => chip(value.section === s, taxLabel(s, locale), () => selectSection(s), s)))}
+        row('section', t.optSection, sections.map((s) => chip(value.section === s, taxLabel(s, locale), () => selectSection(s), s)))}
 
       {/* Type (subcategory) */}
       {sectionDef &&
-        row(t.optType, sectionDef.subcategories.map((sub) =>
+        row('type', t.optType, sectionDef.subcategories.map((sub) =>
           chip(value.subcategory === sub.value, taxLabel(sub.value, locale), () => selectSubcategory(sub.value), sub.value),
         ))}
 
       {/* Subtype (itemType) */}
       {typeChosen && subDef?.itemTypes && subDef.itemTypes.length > 0 &&
-        row(t.optSubtype, subDef.itemTypes.map((it) =>
+        row('subtype', t.optSubtype, subDef.itemTypes.map((it) =>
           chip(value.itemType === it, taxLabel(it, locale), () => selectItemType(it), it),
         ))}
 
       {/* Length / cut */}
       {typeChosen && subDef?.lengths && subDef.lengths.length > 0 &&
-        row(t.optLength, subDef.lengths.map((l) =>
+        row('length', t.optLength, subDef.lengths.map((l) =>
           chip(value.length === l, taxLabel(l, locale), () => selectLength(l), l),
         ))}
 
       {/* Fit — only after the subtype/length above it is chosen */}
       {typeChosen && subDef?.hasFit && itemTypeSatisfied && lengthSatisfied &&
-        row(t.optFit, FIT_TYPES.map((f) => chip(value.fitType === f, taxLabel(f, locale), () => selectFit(f), f)))}
+        row('fit', t.optFit, FIT_TYPES.map((f) => chip(value.fitType === f, taxLabel(f, locale), () => selectFit(f), f)))}
+
+      {/* Scroll anchor — brought into view once everything is chosen so the
+          (now-enabled) Save button below is visible. */}
+      <div ref={endRef} aria-hidden className="h-px w-px" />
     </div>
   );
 }

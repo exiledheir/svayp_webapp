@@ -45,12 +45,6 @@ export default function TryOnStep({
     return () => clearInterval(id);
   }, [phase]);
 
-  // Derive upper/lower items from layout positions
-  const upperEntry = (layout ?? []).find((e) => e.group === 'upper');
-  const lowerEntry = (layout ?? []).find((e) => e.group === 'lower');
-  const upperItem = upperEntry ? items.find((i) => i.id === upperEntry.id) : null;
-  const lowerItem = lowerEntry ? items.find((i) => i.id === lowerEntry.id) : null;
-
   // Full layout preview — mirrors the editor canvas and GenerateStep, honoring
   // each item's saved position AND scale so nothing renders oversized.
   const previewEntries = (layout ?? [])
@@ -60,8 +54,15 @@ export default function TryOnStep({
     })
     .filter(Boolean) as (SavedCanvasLayout[number] & { item: ClosetItem })[];
 
-  // Cycle active scan item during processing
-  const scanImages = [upperItem, lowerItem].filter(Boolean) as ClosetItem[];
+  // Cycle active scan item during processing — include EVERY item in the look
+  // (top, bottom, shoes, accessories), ordered top→bottom, not just top+bottom.
+  const GROUP_RANK: Record<string, number> = { upper: 0, lower: 1, shoes: 2, acc: 3 };
+  const seenScan = new Set<string>();
+  const scanImages = previewEntries
+    .slice()
+    .sort((a, b) => (GROUP_RANK[a.group] ?? 9) - (GROUP_RANK[b.group] ?? 9))
+    .map((e) => e.item)
+    .filter((it) => (seenScan.has(it.id) ? false : (seenScan.add(it.id), true)));
   useEffect(() => {
     if (phase !== 'processing' || scanImages.length < 2) return;
     const id = setInterval(() => setActiveItemIdx((i) => (i + 1) % scanImages.length), 1500);

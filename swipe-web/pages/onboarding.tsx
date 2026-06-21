@@ -41,6 +41,9 @@ export default function OnboardingPage() {
   const [step, setStep] = useState<number>(WELCOME);
   const [ready, setReady] = useState(false);
   const [addedItems, setAddedItems] = useState<ClosetItem[]>([]);
+  // True once the user has added at least one item this session (uploads run in
+  // the background, so addedItems isn't populated until the generate step).
+  const [hasAddedItem, setHasAddedItem] = useState(false);
   const [layout, setLayout] = useState<SavedCanvasLayout | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const didStart = useRef(false);
@@ -59,12 +62,6 @@ export default function OnboardingPage() {
     }
     (async () => {
       const saved = getOnboardingStep();
-      if (saved > WELCOME) {
-        try {
-          const its = await fetchClosetItems();
-          setAddedItems(its);
-        } catch { /* ignore */ }
-      }
       // Resume rules:
       // - ADD_LOWER / ADD_SHOES: restart from ADD_UPPER so the user always adds
       //   both items fresh rather than landing mid-add-phase and being confused.
@@ -74,6 +71,15 @@ export default function OnboardingPage() {
         : saved;
       setStep(resume);
       setReady(true);
+      // Always check the existing closet — both to restore items on resume and to
+      // decide whether the Skip button is offered (users with items can skip).
+      try {
+        const its = await fetchClosetItems();
+        if (its.length > 0) {
+          setHasAddedItem(true);
+          if (saved > WELCOME) setAddedItems(its);
+        }
+      } catch { /* ignore */ }
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -130,6 +136,7 @@ export default function OnboardingPage() {
   // ── Step transitions ───────────────────────────────────────────────────────
   function handleUpperAdded(category: ClosetCategory, uploadP: Promise<unknown>) {
     completeStep('add_upper');
+    setHasAddedItem(true);
     pendingUploadsRef.current.push(uploadP);
     if (FULL_BODY_CATS.includes(category)) {
       // A dress/jumpsuit is a complete top+bottom — pair it with shoes instead
@@ -143,12 +150,14 @@ export default function OnboardingPage() {
 
   function handleLowerAdded(_cat: ClosetCategory, uploadP: Promise<unknown>) {
     completeStep('add_lower');
+    setHasAddedItem(true);
     pendingUploadsRef.current.push(uploadP);
     setStep(GENERATE);
   }
 
   function handleShoesAdded(_cat: ClosetCategory, uploadP: Promise<unknown>) {
     completeStep('add_shoes');
+    setHasAddedItem(true);
     pendingUploadsRef.current.push(uploadP);
     setStep(GENERATE);
   }
@@ -214,7 +223,9 @@ export default function OnboardingPage() {
             );
           })}
         </div>
-        {step !== WELCOME && step !== DONE && (
+        {/* Skip is offered only once the user has at least one item — with an
+            empty closet we keep them in the guided flow. */}
+        {step !== WELCOME && step !== DONE && (hasAddedItem || addedItems.length > 0) && (
           <button onClick={skip} className="text-[13px] font-medium text-gray-400 active:opacity-60">
             {t.ob_skip}
           </button>
