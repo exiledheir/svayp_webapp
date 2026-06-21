@@ -4,6 +4,9 @@ export interface Translations {
   today: string;
   weekend: string;
   nextSevenDays: string;
+  marketTitle: string;
+  marketComingSoonTitle: string;
+  marketComingSoonText: string;
   myOutfits: string;
   newOutfit: string;
   addPiecesToBuildIt: string;
@@ -282,6 +285,9 @@ const en: Translations = {
   today: 'Today',
   weekend: 'Weekend',
   nextSevenDays: 'Next 7 Days',
+  marketTitle: 'Market',
+  marketComingSoonTitle: 'Coming soon',
+  marketComingSoonText: 'Soon, the place where you can sell your things',
   myOutfits: 'My Outfits',
   newOutfit: 'New Outfit',
   addPiecesToBuildIt: 'Add pieces to build it',
@@ -632,6 +638,9 @@ const ru: Translations = {
   today: 'Сегодня',
   weekend: 'Выходные',
   nextSevenDays: 'Ближайшие 7 дней',
+  marketTitle: 'Маркет',
+  marketComingSoonTitle: 'Скоро',
+  marketComingSoonText: 'Скоро здесь вы сможете продавать свои вещи',
   myOutfits: 'Мои образы',
   newOutfit: 'Новый образ',
   addPiecesToBuildIt: 'Добавьте вещи для образа',
@@ -982,6 +991,9 @@ const uz: Translations = {
   today: 'Bugun',
   weekend: 'Dam olish',
   nextSevenDays: 'Keyingi 7 kun',
+  marketTitle: 'Bozor',
+  marketComingSoonTitle: 'Tez orada',
+  marketComingSoonText: "Tez orada, bu yerda siz o'z buyumlaringizni sotishingiz mumkin",
   myOutfits: 'Obrazlarim',
   newOutfit: 'Yangi obraz',
   addPiecesToBuildIt: "Qismlar qo'shib yarating",
