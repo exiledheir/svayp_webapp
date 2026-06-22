@@ -64,7 +64,11 @@ export default function PhonePage() {
       return;
     }
     const fullPhone = `${UZ_PREFIX}${digits}`;
-    router.push(`/auth/verify-method?phone=${encodeURIComponent(fullPhone)}`);
+    const redirect = typeof router.query.redirect === 'string' ? router.query.redirect : '';
+    router.push(
+      `/auth/verify-method?phone=${encodeURIComponent(fullPhone)}` +
+      (redirect ? `&redirect=${encodeURIComponent(redirect)}` : '')
+    );
   }
 
   return (

@@ -75,10 +75,17 @@ export default function OtpPage() {
           phone,
           username,
         });
-        // Fallback for browser (non-WebView) testing
-        router.replace('/closet');
+        // Fallback for browser (non-WebView) testing. Honor an optional
+        // ?redirect= target (e.g. the market create wizard) so flows that
+        // bounce through auth return where they started.
+        const redirect = typeof router.query.redirect === 'string' ? router.query.redirect : '';
+        router.replace(redirect || '/closet');
       } else {
-        router.push(`/auth/basic-info?phone=${encodeURIComponent(phone)}`);
+        const redirect = typeof router.query.redirect === 'string' ? router.query.redirect : '';
+        router.push(
+          `/auth/basic-info?phone=${encodeURIComponent(phone)}` +
+          (redirect ? `&redirect=${encodeURIComponent(redirect)}` : '')
+        );
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : t.enterFull6Digit;

@@ -62,7 +62,11 @@ export default function VerifyMethodPage() {
     setError('');
     try {
       await sendOtp(phone);
-      router.push(`/auth/otp?phone=${encodeURIComponent(phone)}`);
+      const redirect = typeof router.query.redirect === 'string' ? router.query.redirect : '';
+      router.push(
+        `/auth/otp?phone=${encodeURIComponent(phone)}` +
+        (redirect ? `&redirect=${encodeURIComponent(redirect)}` : '')
+      );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to send SMS';
       setError(msg);
