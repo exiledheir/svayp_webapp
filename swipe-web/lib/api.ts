@@ -182,6 +182,28 @@ export async function getSubscriptionBadgeEnabled(): Promise<boolean> {
   }
 }
 
+// Reads the `feature.market_enabled` flag from the backend feature-flag map
+// (GET /app/feature-flags → { data: { "feature.*": "true"|"false" } }). Gates
+// the C2C Market: when this is on the Market is live for everyone; when off it
+// is restricted to the phone allowlist in feature-flags-context.tsx (everyone
+// else sees the "coming soon" placeholder). Unauthenticated so guests resolve
+// it too. Defaults to false on error / missing key so Market stays hidden
+// unless explicitly enabled.
+//
+// NOTE: backend values are STRINGS ("true"/"false"), so they must be compared
+// explicitly — the string "false" is truthy in JS.
+export async function getMarketEnabled(): Promise<boolean> {
+  try {
+    const res = await api.get<{ data?: Record<string, unknown> }>('/app/feature-flags');
+    const flags = (res.data?.data ?? res.data) as Record<string, unknown> | undefined;
+    const value = flags?.['feature.market_enabled'];
+    if (typeof value === 'boolean') return value;
+    return String(value).toLowerCase() === 'true';
+  } catch {
+    return false;
+  }
+}
+
 export async function adminLogin(username: string, password: string) {
   const res = await api.post('/auth/admin/login', { username, password });
   const payload = unwrapSingle(res.data) as Record<string, unknown>;

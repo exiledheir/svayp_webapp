@@ -45,6 +45,21 @@ export const Events = {
   ONBOARDING_SKIPPED: 'onboarding_skipped',
   ONBOARDING_STEP_VIEWED: 'onboarding_step_viewed',
   ONBOARDING_STEP_COMPLETED: 'onboarding_step_completed',
+
+  // ── Market (C2C) Funnel ────────────────────────────────────────────────────
+  MARKET_FEED_VIEWED: 'market_feed_viewed',
+  MARKET_LISTING_VIEWED: 'market_listing_viewed',
+  MARKET_ONBOARDING_VIEWED: 'market_onboarding_viewed',
+  MARKET_ONBOARDING_COMPLETED: 'market_onboarding_completed',
+  MARKET_LISTING_STARTED: 'market_listing_started',
+  MARKET_LISTING_STEP_VIEWED: 'market_listing_step_viewed',
+  MARKET_LISTING_STEP_COMPLETED: 'market_listing_step_completed',
+  MARKET_LISTING_DRAFT_SAVED: 'market_listing_draft_saved',
+  MARKET_LISTING_PUBLISHED: 'market_listing_published',
+  MARKET_LISTING_ABANDONED: 'market_listing_abandoned',
+  MARKET_CONTACT_CHAT_TAPPED: 'market_contact_chat_tapped',
+  MARKET_CONTACT_TELEGRAM_TAPPED: 'market_contact_telegram_tapped',
+  MARKET_FAVORITE_TOGGLED: 'market_favorite_toggled',
 } as const;
 
 export const Params = {
@@ -67,4 +82,9 @@ export const Params = {
   ITEM_COUNT_IN_WARDROBE: 'item_count_in_wardrobe',
   AT_SLIDE_INDEX: 'at_slide_index',
   OB_STEP: 'ob_step',
+  MK_STEP: 'mk_step',
+  MK_CATEGORY: 'mk_category',
+  MK_DEAL_TYPE: 'mk_deal_type',
+  MK_CONTACT_METHOD: 'mk_contact_method',
+  MK_HAS_TELEGRAM_USERNAME: 'mk_has_telegram_username',
 } as const;

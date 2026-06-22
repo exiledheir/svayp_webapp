@@ -7,6 +7,133 @@ export interface Translations {
   marketTitle: string;
   marketComingSoonTitle: string;
   marketComingSoonText: string;
+  // ── Market (C2C) ──────────────────────────────────────────────────────────
+  mk_post_cta: string;
+  mk_sell_short: string;
+  mk_my_listings: string;
+  mk_empty_feed: string;
+  mk_categories: string;
+  mk_all_categories: string;
+  mk_search_placeholder: string;
+  mk_free: string;
+  mk_negotiable: string;
+  mk_courier_available: string;
+  mk_intro_title: string;
+  mk_intro_subtitle: string;
+  mk_intro_step1: string;
+  mk_intro_step2: string;
+  mk_intro_step3: string;
+  mk_intro_done: string;
+  mk_save_exit: string;
+  mk_apply: string;
+  mk_continue: string;
+  mk_details_title: string;
+  mk_status_review: string;
+  mk_photos_title: string;
+  mk_photos_hint: string;
+  mk_photos_tips_title: string;
+  mk_photos_tips_cta: string;
+  mk_photos_from_gallery: string;
+  mk_photos_from_camera: string;
+  mk_photos_min_error: string;
+  mk_photos_size_error: string;
+  mk_photos_max_error: string;
+  mk_crop_title: string;
+  mk_title_title: string;
+  mk_title_placeholder: string;
+  mk_category_title: string;
+  mk_category_suggested: string;
+  mk_category_other: string;
+  mk_char_title: string;
+  mk_char_condition: string;
+  mk_char_brand: string;
+  mk_char_size: string;
+  mk_char_season: string;
+  mk_char_length: string;
+  mk_char_color: string;
+  mk_char_select: string;
+  mk_char_yes: string;
+  mk_char_no: string;
+  mk_cond_used_good: string;
+  mk_cond_used_visible: string;
+  mk_cond_used_defects: string;
+  mk_cond_new_with_tag: string;
+  mk_season_demi: string;
+  mk_season_winter: string;
+  mk_season_summer: string;
+  mk_season_all: string;
+  mk_length_maxi: string;
+  mk_length_midi: string;
+  mk_length_mini: string;
+  mk_color_black: string;
+  mk_color_white: string;
+  mk_color_beige: string;
+  mk_color_gray: string;
+  mk_color_blue: string;
+  mk_color_lightblue: string;
+  mk_color_red: string;
+  mk_color_green: string;
+  mk_color_yellow: string;
+  mk_color_pink: string;
+  mk_color_brown: string;
+  mk_color_purple: string;
+  mk_color_orange: string;
+  mk_color_multicolor: string;
+  mk_deal_title: string;
+  mk_deal_conditions: string;
+  mk_deal_sell: string;
+  mk_deal_free: string;
+  mk_deal_price: string;
+  mk_currency_uzs: string;
+  mk_currency_usd: string;
+  mk_deal_urgent: string;
+  mk_desc_title: string;
+  mk_desc_placeholder: string;
+  mk_loc_title: string;
+  mk_loc_search: string;
+  mk_loc_map: string;
+  mk_loc_landmark_label: string;
+  mk_loc_landmark_ph: string;
+  mk_loc_courier_note: string;
+  mk_loc_courier: string;
+  mk_phone_title: string;
+  mk_phone_subtitle: string;
+  mk_phone_confirm: string;
+  mk_phone_send_code: string;
+  mk_phone_authed_note: string;
+  mk_promote_title: string;
+  mk_promote_skip: string;
+  mk_promote_maxi: string;
+  mk_promote_up: string;
+  mk_promote_premium: string;
+  mk_contacts_title: string;
+  mk_contacts_name: string;
+  mk_contacts_name_ph: string;
+  mk_contacts_methods: string;
+  mk_contact_chat: string;
+  mk_contact_chat_note: string;
+  mk_contact_telegram: string;
+  mk_publish_cta: string;
+  mk_published_title: string;
+  mk_published_body: string;
+  mk_published_view: string;
+  mk_published_back: string;
+  mk_detail_characteristics: string;
+  mk_detail_description: string;
+  mk_detail_location: string;
+  mk_detail_seller: string;
+  mk_write: string;
+  mk_mine_title: string;
+  mk_mine_drafts: string;
+  mk_mine_published: string;
+  mk_mine_empty: string;
+  mk_mine_continue: string;
+  mk_mine_delete: string;
+  mk_draft_label: string;
+  mk_chat_compose_ph: string;
+  mk_chat_send: string;
+  mk_chat_title: string;
+  mk_chat_seller_reply: string;
   myOutfits: string;
   tabBoards: string;
   tabOutfits: string;
@@ -296,6 +423,133 @@ const en: Translations = {
   marketTitle: 'Market',
   marketComingSoonTitle: 'Coming soon',
   marketComingSoonText: 'Soon, the place where you can sell your things',
+  // ── Market (C2C) ──
+  mk_post_cta: 'Post a listing',
+  mk_sell_short: 'Sell',
+  mk_my_listings: 'My listings',
+  mk_empty_feed: 'No listings yet',
+  mk_categories: 'Categories',
+  mk_all_categories: 'All categories',
+  mk_search_placeholder: 'Search listings',
+  mk_free: 'Free',
+  mk_negotiable: 'Negotiable',
+  mk_courier_available: 'Courier delivery',
+  mk_intro_title: 'How to post listings?',
+  mk_intro_subtitle: '3 simple steps',
+  mk_intro_step1: 'Title and 3–4 photos',
+  mk_intro_step2: 'Price and all details',
+  mk_intro_step3: 'Contacts and deal place',
+  mk_intro_done: 'Listing is live in the feed',
+  mk_save_exit: 'Save and exit',
+  mk_apply: 'Apply',
+  mk_continue: 'Continue',
+  mk_details_title: 'Tell us about the item',
+  mk_status_review: 'Under review',
+  mk_photos_title: 'Add listing photos',
+  mk_photos_hint: 'You can add 1 to 10 photos. Each photo must be under 10 MB and at least 300×300.',
+  mk_photos_tips_title: 'How to take the perfect photo?',
+  mk_photos_tips_cta: 'See tips',
+  mk_photos_from_gallery: 'Gallery',
+  mk_photos_from_camera: 'Camera',
+  mk_photos_min_error: 'Photo must be at least 300×300',
+  mk_photos_size_error: 'Photo must be under 10 MB',
+  mk_photos_max_error: 'You can add up to 10 photos',
+  mk_crop_title: 'Crop photo',
+  mk_title_title: 'Enter the listing title',
+  mk_title_placeholder: 'E.g. Polo skirt',
+  mk_category_title: 'Choose a category',
+  mk_category_suggested: 'Suggested for you',
+  mk_category_other: 'Other category',
+  mk_char_title: 'Specify characteristics',
+  mk_char_condition: 'Condition',
+  mk_char_brand: 'Brand',
+  mk_char_size: 'Size',
+  mk_char_season: 'Season',
+  mk_char_length: 'Item length',
+  mk_char_color: 'Color',
+  mk_char_select: 'Select a value',
+  mk_char_yes: 'Yes',
+  mk_char_no: 'No',
+  mk_cond_used_good: 'Used (excellent, like new)',
+  mk_cond_used_visible: 'Used (signs of wear)',
+  mk_cond_used_defects: 'Used (noticeable defects)',
+  mk_cond_new_with_tag: 'New (with tag, in package)',
+  mk_season_demi: 'Mid-season',
+  mk_season_winter: 'Winter',
+  mk_season_summer: 'Summer',
+  mk_season_all: 'All seasons',
+  mk_length_maxi: 'Maxi',
+  mk_length_midi: 'Midi',
+  mk_length_mini: 'Mini',
+  mk_color_black: 'Black',
+  mk_color_white: 'White',
+  mk_color_beige: 'Beige',
+  mk_color_gray: 'Gray',
+  mk_color_blue: 'Blue',
+  mk_color_lightblue: 'Light blue',
+  mk_color_red: 'Red',
+  mk_color_green: 'Green',
+  mk_color_yellow: 'Yellow',
+  mk_color_pink: 'Pink',
+  mk_color_brown: 'Brown',
+  mk_color_purple: 'Purple',
+  mk_color_orange: 'Orange',
+  mk_color_multicolor: 'Multicolor',
+  mk_deal_title: 'Specify deal terms',
+  mk_deal_conditions: 'Terms',
+  mk_deal_sell: 'Set a price',
+  mk_deal_free: 'Give away free',
+  mk_deal_price: 'Price',
+  mk_currency_uzs: 'UZS',
+  mk_currency_usd: 'c.u.',
+  mk_deal_urgent: 'Selling urgently. Negotiable',
+  mk_desc_title: 'Add a description',
+  mk_desc_placeholder: 'Describe the item: material, features, reason for selling',
+  mk_loc_title: 'Specify the meeting place with the buyer',
+  mk_loc_search: 'Address, store or metro',
+  mk_loc_map: 'Pick on map',
+  mk_loc_landmark_label: 'Specify a landmark',
+  mk_loc_landmark_ph: 'E.g. Alay bazaar',
+  mk_loc_courier_note: 'You arrange delivery yourself',
+  mk_loc_courier: 'Ready to send by courier',
+  mk_phone_title: 'Enter your phone number',
+  mk_phone_subtitle: 'Buyers will use it to contact you. You can also use it to sign in.',
+  mk_phone_confirm: 'Confirm your phone number',
+  mk_phone_send_code: 'Send SMS code',
+  mk_phone_authed_note: 'Signed in as',
+  mk_promote_title: 'Make your listing stand out',
+  mk_promote_skip: 'Skip',
+  mk_promote_maxi: 'Maxi card',
+  mk_promote_up: 'Bump up',
+  mk_promote_premium: 'Premium',
+  mk_contacts_title: 'Profile details and contacts',
+  mk_contacts_name: 'Name',
+  mk_contacts_name_ph: 'Your name',
+  mk_contacts_methods: 'Preferred ways to contact you',
+  mk_contact_chat: 'In-app chat',
+  mk_contact_chat_note: 'Enabled by default',
+  mk_contact_telegram: 'Telegram chat',
+  mk_publish_cta: 'Post listing',
+  mk_published_title: 'Listing under review',
+  mk_published_body: "We'll review it and publish it soon. You can find it in My listings.",
+  mk_published_view: 'View listing',
+  mk_published_back: 'Back to Market',
+  mk_detail_characteristics: 'Characteristics',
+  mk_detail_description: 'Description',
+  mk_detail_location: 'Deal place',
+  mk_detail_seller: 'Seller',
+  mk_write: 'Message',
+  mk_mine_title: 'My listings',
+  mk_mine_drafts: 'Drafts',
+  mk_mine_published: 'Published',
+  mk_mine_empty: 'You have no listings yet',
+  mk_mine_continue: 'Continue',
+  mk_mine_delete: 'Delete',
+  mk_draft_label: 'Draft',
+  mk_chat_compose_ph: 'Hello! Is this still available?',
+  mk_chat_send: 'Send',
+  mk_chat_title: 'Chat with seller',
+  mk_chat_seller_reply: 'Hi! Yes, it is available. When would you like to meet?',
   myOutfits: 'My Outfits',
   tabBoards: 'Boards',
   tabOutfits: 'Outfits',
@@ -657,6 +911,133 @@ const ru: Translations = {
   marketTitle: 'Маркет',
   marketComingSoonTitle: 'Скоро',
   marketComingSoonText: 'Скоро здесь вы сможете продавать свои вещи',
+  // ── Market (C2C) ──
+  mk_post_cta: 'Поставить объявление',
+  mk_sell_short: 'Продать',
+  mk_my_listings: 'Мои объявления',
+  mk_empty_feed: 'Пока нет объявлений',
+  mk_categories: 'Категории',
+  mk_all_categories: 'Все категории',
+  mk_search_placeholder: 'Поиск объявлений',
+  mk_free: 'Даром',
+  mk_negotiable: 'Торг уместен',
+  mk_courier_available: 'Доставка курьером',
+  mk_intro_title: 'Как публиковать объявления?',
+  mk_intro_subtitle: '3 простых шага',
+  mk_intro_step1: 'Название и 3–4 фото',
+  mk_intro_step2: 'Цена и все детали',
+  mk_intro_step3: 'Контакты и место сделки',
+  mk_intro_done: 'Объявление уже в ленте',
+  mk_save_exit: 'Сохранить и выйти',
+  mk_apply: 'Применить',
+  mk_continue: 'Продолжить',
+  mk_details_title: 'Расскажите о товаре',
+  mk_status_review: 'На проверке',
+  mk_photos_title: 'Добавьте фото объявления',
+  mk_photos_hint: 'Можно добавить от 1 до 10 фото. Фото должно быть меньше 10 МБ и с разрешением не ниже 300×300.',
+  mk_photos_tips_title: 'Как сделать идеальное фото?',
+  mk_photos_tips_cta: 'Смотреть советы',
+  mk_photos_from_gallery: 'Из галереи',
+  mk_photos_from_camera: 'Камера',
+  mk_photos_min_error: 'Фото должно быть не меньше 300×300',
+  mk_photos_size_error: 'Фото должно быть меньше 10 МБ',
+  mk_photos_max_error: 'Можно добавить до 10 фото',
+  mk_crop_title: 'Обрежьте фото',
+  mk_title_title: 'Введите название объявления',
+  mk_title_placeholder: 'Например, Юбка Polo',
+  mk_category_title: 'Выберите категорию',
+  mk_category_suggested: 'Подобрали для вас',
+  mk_category_other: 'Другая категория',
+  mk_char_title: 'Укажите характеристики',
+  mk_char_condition: 'Состояние',
+  mk_char_brand: 'Бренд',
+  mk_char_size: 'Размер',
+  mk_char_season: 'Сезон',
+  mk_char_length: 'Длина изделия',
+  mk_char_color: 'Цвет',
+  mk_char_select: 'Выберите значение',
+  mk_char_yes: 'Да',
+  mk_char_no: 'Нет',
+  mk_cond_used_good: 'Б/у (отличное, как новое)',
+  mk_cond_used_visible: 'Б/у (есть следы носки)',
+  mk_cond_used_defects: 'Б/у (есть заметные дефекты)',
+  mk_cond_new_with_tag: 'Новое (с биркой, в упаковке)',
+  mk_season_demi: 'Демисезон',
+  mk_season_winter: 'Зима',
+  mk_season_summer: 'Лето',
+  mk_season_all: 'На все сезоны',
+  mk_length_maxi: 'Макси',
+  mk_length_midi: 'Миди',
+  mk_length_mini: 'Мини',
+  mk_color_black: 'Чёрный',
+  mk_color_white: 'Белый',
+  mk_color_beige: 'Бежевый',
+  mk_color_gray: 'Серый',
+  mk_color_blue: 'Синий',
+  mk_color_lightblue: 'Голубой',
+  mk_color_red: 'Красный',
+  mk_color_green: 'Зелёный',
+  mk_color_yellow: 'Жёлтый',
+  mk_color_pink: 'Розовый',
+  mk_color_brown: 'Коричневый',
+  mk_color_purple: 'Фиолетовый',
+  mk_color_orange: 'Оранжевый',
+  mk_color_multicolor: 'Разноцветный',
+  mk_deal_title: 'Укажите условия сделки',
+  mk_deal_conditions: 'Условия',
+  mk_deal_sell: 'Указать цену',
+  mk_deal_free: 'Отдам даром',
+  mk_deal_price: 'Стоимость',
+  mk_currency_uzs: 'Сум',
+  mk_currency_usd: 'у.е.',
+  mk_deal_urgent: 'Продам срочно. Торг',
+  mk_desc_title: 'Добавьте описание',
+  mk_desc_placeholder: 'Опишите товар: материал, особенности, причину продажи',
+  mk_loc_title: 'Укажите место встречи с покупателем',
+  mk_loc_search: 'Адрес, магазин или метро',
+  mk_loc_map: 'Указать на карте',
+  mk_loc_landmark_label: 'Укажите ориентир',
+  mk_loc_landmark_ph: 'Например, алайский рынок',
+  mk_loc_courier_note: 'Вы самостоятельно организовываете доставку',
+  mk_loc_courier: 'Готов отправить курьером',
+  mk_phone_title: 'Укажите номер телефона',
+  mk_phone_subtitle: 'По нему покупатели смогут связаться с вами. Вы также сможете использовать его для авторизации.',
+  mk_phone_confirm: 'Подтвердите номер телефона',
+  mk_phone_send_code: 'Отправить СМС код',
+  mk_phone_authed_note: 'Вы вошли как',
+  mk_promote_title: 'Сделайте объявление заметнее',
+  mk_promote_skip: 'Пропустить',
+  mk_promote_maxi: 'Макси карточка',
+  mk_promote_up: 'Вверх',
+  mk_promote_premium: 'Премиум',
+  mk_contacts_title: 'Данные профиля и контакты для связи',
+  mk_contacts_name: 'Имя',
+  mk_contacts_name_ph: 'Ваше имя',
+  mk_contacts_methods: 'Предпочтительные способы связи с вами',
+  mk_contact_chat: 'Чат в приложении',
+  mk_contact_chat_note: 'Включён по умолчанию',
+  mk_contact_telegram: 'Чат в телеграм',
+  mk_publish_cta: 'Поставить объявление',
+  mk_published_title: 'Объявление на проверке',
+  mk_published_body: 'Мы проверим его и скоро опубликуем. Объявление доступно в разделе «Мои объявления».',
+  mk_published_view: 'Посмотреть объявление',
+  mk_published_back: 'Вернуться в Маркет',
+  mk_detail_characteristics: 'Характеристики',
+  mk_detail_description: 'Описание',
+  mk_detail_location: 'Место сделки',
+  mk_detail_seller: 'Продавец',
+  mk_write: 'Написать',
+  mk_mine_title: 'Мои объявления',
+  mk_mine_drafts: 'Черновики',
+  mk_mine_published: 'Опубликованные',
+  mk_mine_empty: 'У вас пока нет объявлений',
+  mk_mine_continue: 'Продолжить',
+  mk_mine_delete: 'Удалить',
+  mk_draft_label: 'Черновик',
+  mk_chat_compose_ph: 'Здравствуйте! Ещё актуально?',
+  mk_chat_send: 'Отправить',
+  mk_chat_title: 'Чат с продавцом',
+  mk_chat_seller_reply: 'Здравствуйте! Да, актуально. Когда вам удобно встретиться?',
   myOutfits: 'Мои образы',
   tabBoards: 'Доски',
   tabOutfits: 'Образы',
@@ -1018,6 +1399,133 @@ const uz: Translations = {
   marketTitle: 'Bozor',
   marketComingSoonTitle: 'Tez orada',
   marketComingSoonText: "Tez orada, bu yerda siz o'z buyumlaringizni sotishingiz mumkin",
+  // ── Market (C2C) ──
+  mk_post_cta: "E'lon joylash",
+  mk_sell_short: 'Sotish',
+  mk_my_listings: "Mening e'lonlarim",
+  mk_empty_feed: "Hozircha e'lonlar yo'q",
+  mk_categories: 'Kategoriyalar',
+  mk_all_categories: 'Barcha kategoriyalar',
+  mk_search_placeholder: "E'lonlarni qidirish",
+  mk_free: 'Tekin',
+  mk_negotiable: 'Savdolashish mumkin',
+  mk_courier_available: 'Kuryer yetkazib berish',
+  mk_intro_title: "E'lonlarni qanday joylash mumkin?",
+  mk_intro_subtitle: '3 oddiy qadam',
+  mk_intro_step1: 'Nomi va 3–4 ta rasm',
+  mk_intro_step2: 'Narxi va barcha tafsilotlar',
+  mk_intro_step3: 'Kontaktlar va uchrashuv joyi',
+  mk_intro_done: "E'lon allaqachon lentada",
+  mk_save_exit: 'Saqlash va chiqish',
+  mk_apply: 'Qoʻllash',
+  mk_continue: 'Davom etish',
+  mk_details_title: 'Mahsulot haqida gapiring',
+  mk_status_review: 'Tekshiruvda',
+  mk_photos_title: "E'lon rasmlarini qo'shing",
+  mk_photos_hint: "1 dan 10 tagacha rasm qo'shish mumkin. Har bir rasm 10 MB dan kichik va 300×300 dan kam bo'lmasligi kerak.",
+  mk_photos_tips_title: 'Mukammal rasmni qanday olish mumkin?',
+  mk_photos_tips_cta: "Maslahatlarni ko'rish",
+  mk_photos_from_gallery: 'Galereyadan',
+  mk_photos_from_camera: 'Kamera',
+  mk_photos_min_error: "Rasm kamida 300×300 bo'lishi kerak",
+  mk_photos_size_error: "Rasm 10 MB dan kichik bo'lishi kerak",
+  mk_photos_max_error: "10 tagacha rasm qo'shish mumkin",
+  mk_crop_title: 'Rasmni kesing',
+  mk_title_title: "E'lon nomini kiriting",
+  mk_title_placeholder: 'Masalan, Polo yubka',
+  mk_category_title: 'Kategoriyani tanlang',
+  mk_category_suggested: 'Siz uchun tanladik',
+  mk_category_other: 'Boshqa kategoriya',
+  mk_char_title: 'Xususiyatlarni kiriting',
+  mk_char_condition: 'Holati',
+  mk_char_brand: 'Brend',
+  mk_char_size: "O'lcham",
+  mk_char_season: 'Mavsum',
+  mk_char_length: 'Mahsulot uzunligi',
+  mk_char_color: 'Rang',
+  mk_char_select: 'Qiymatni tanlang',
+  mk_char_yes: 'Ha',
+  mk_char_no: "Yo'q",
+  mk_cond_used_good: "Ishlatilgan (a'lo, yangidek)",
+  mk_cond_used_visible: 'Ishlatilgan (kiyilgan izlari bor)',
+  mk_cond_used_defects: 'Ishlatilgan (sezilarli nuqsonlar bor)',
+  mk_cond_new_with_tag: 'Yangi (yorliq bilan, qadoqda)',
+  mk_season_demi: 'Demi-mavsum',
+  mk_season_winter: 'Qish',
+  mk_season_summer: 'Yoz',
+  mk_season_all: 'Barcha mavsumlar',
+  mk_length_maxi: 'Maksi',
+  mk_length_midi: 'Midi',
+  mk_length_mini: 'Mini',
+  mk_color_black: 'Qora',
+  mk_color_white: 'Oq',
+  mk_color_beige: 'Bej',
+  mk_color_gray: 'Kulrang',
+  mk_color_blue: "Ko'k",
+  mk_color_lightblue: 'Havorang',
+  mk_color_red: 'Qizil',
+  mk_color_green: 'Yashil',
+  mk_color_yellow: 'Sariq',
+  mk_color_pink: 'Pushti',
+  mk_color_brown: 'Jigarrang',
+  mk_color_purple: 'Binafsha',
+  mk_color_orange: "To'q sariq",
+  mk_color_multicolor: 'Rang-barang',
+  mk_deal_title: 'Bitim shartlarini kiriting',
+  mk_deal_conditions: 'Shartlar',
+  mk_deal_sell: 'Narx belgilash',
+  mk_deal_free: 'Tekin beraman',
+  mk_deal_price: 'Narxi',
+  mk_currency_uzs: "So'm",
+  mk_currency_usd: 'sh.b.',
+  mk_deal_urgent: 'Shoshilinch sotaman. Savdo bor',
+  mk_desc_title: "Tavsif qo'shing",
+  mk_desc_placeholder: 'Mahsulotni tavsiflang: material, xususiyatlar, sotish sababi',
+  mk_loc_title: 'Xaridor bilan uchrashuv joyini kiriting',
+  mk_loc_search: "Manzil, do'kon yoki metro",
+  mk_loc_map: "Xaritada ko'rsatish",
+  mk_loc_landmark_label: "Mo'ljal kiriting",
+  mk_loc_landmark_ph: 'Masalan, Oloy bozori',
+  mk_loc_courier_note: 'Yetkazib berishni mustaqil tashkil qilasiz',
+  mk_loc_courier: 'Kuryer orqali yuborishga tayyor',
+  mk_phone_title: 'Telefon raqamingizni kiriting',
+  mk_phone_subtitle: 'U orqali xaridorlar siz bilan bogʻlanadi. Undan avtorizatsiya uchun ham foydalanishingiz mumkin.',
+  mk_phone_confirm: 'Telefon raqamini tasdiqlang',
+  mk_phone_send_code: 'SMS kodni yuborish',
+  mk_phone_authed_note: 'Siz kirgansiz:',
+  mk_promote_title: "E'loningizni ko'zga ko'rinarli qiling",
+  mk_promote_skip: "O'tkazib yuborish",
+  mk_promote_maxi: 'Maksi kartochka',
+  mk_promote_up: 'Yuqoriga',
+  mk_promote_premium: 'Premium',
+  mk_contacts_title: 'Profil maʻlumotlari va aloqa uchun kontaktlar',
+  mk_contacts_name: 'Ism',
+  mk_contacts_name_ph: 'Ismingiz',
+  mk_contacts_methods: 'Siz bilan bogʻlanishning afzal usullari',
+  mk_contact_chat: 'Ilovadagi chat',
+  mk_contact_chat_note: 'Sukut boʻyicha yoqilgan',
+  mk_contact_telegram: 'Telegram chat',
+  mk_publish_cta: "E'lon joylash",
+  mk_published_title: "E'lon tekshiruvda",
+  mk_published_body: "Biz uni tekshirib, tez orada e'lon qilamiz. Uni «Mening e'lonlarim» bo'limida topishingiz mumkin.",
+  mk_published_view: "E'lonni ko'rish",
+  mk_published_back: 'Bozorga qaytish',
+  mk_detail_characteristics: 'Xususiyatlar',
+  mk_detail_description: 'Tavsif',
+  mk_detail_location: 'Bitim joyi',
+  mk_detail_seller: 'Sotuvchi',
+  mk_write: 'Yozish',
+  mk_mine_title: "Mening e'lonlarim",
+  mk_mine_drafts: 'Qoralamalar',
+  mk_mine_published: 'Eʼlon qilingan',
+  mk_mine_empty: "Sizda hali e'lonlar yo'q",
+  mk_mine_continue: 'Davom etish',
+  mk_mine_delete: "O'chirish",
+  mk_draft_label: 'Qoralama',
+  mk_chat_compose_ph: 'Assalomu alaykum! Hali ham aktualmi?',
+  mk_chat_send: 'Yuborish',
+  mk_chat_title: 'Sotuvchi bilan chat',
+  mk_chat_seller_reply: 'Assalomu alaykum! Ha, aktual. Qachon uchrashsak qulay?',
   myOutfits: 'Obrazlarim',
   tabBoards: 'Doskalar',
   tabOutfits: 'Obrazlar',
