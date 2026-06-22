@@ -160,6 +160,28 @@ export async function getSmsOtpEnabled(): Promise<boolean> {
   }
 }
 
+// Reads the `feature.subscription_badge.enabled` flag from the backend
+// feature-flag map (GET /app/feature-flags → { data: { "feature.*": "true"|"false" } }).
+// This is a FRONTEND-ONLY flag controlling the subscription badge / premium UI
+// visibility; it is independent of the backend `feature.premium.enabled` flag
+// (which gates entitlements server-side). Defaults to true so the badge stays
+// visible if the key is missing or the request fails.
+//
+// NOTE: backend values are STRINGS ("true"/"false"), so they must be compared
+// explicitly — the string "false" is truthy in JS.
+export async function getSubscriptionBadgeEnabled(): Promise<boolean> {
+  try {
+    const res = await api.get<{ data?: Record<string, unknown> }>('/app/feature-flags');
+    const flags = (res.data?.data ?? res.data) as Record<string, unknown> | undefined;
+    const value = flags?.['feature.subscription_badge.enabled'];
+    if (value === undefined || value === null) return true; // missing key → default on
+    if (typeof value === 'boolean') return value;
+    return String(value).toLowerCase() === 'true';
+  } catch {
+    return true;
+  }
+}
+
 export async function adminLogin(username: string, password: string) {
   const res = await api.post('/auth/admin/login', { username, password });
   const payload = unwrapSingle(res.data) as Record<string, unknown>;

@@ -141,11 +141,31 @@ function getChannel(): FlutterBridgeChannel | null {
   );
 }
 
-/** Returns true when running inside the Flutter WebView. */
+/** Returns true when running inside the Flutter WebView (iOS or Android). */
 export function isInFlutterWebView(): boolean {
+  if (typeof window === 'undefined') return false;
+  // 1. Android: the app injects a `window.FlutterBridge` JS-channel object.
   if (getChannel() !== null) return true;
-  // Fallback: Flutter embeds "flutter" in the User-Agent
+  // 2. iOS (WKWebView): JS channels are registered under
+  //    `window.webkit.messageHandlers`, not as a plain window property.
+  const webkit = (window as unknown as {
+    webkit?: { messageHandlers?: Record<string, unknown> };
+  }).webkit;
+  if (webkit?.messageHandlers?.FlutterBridge) return true;
+  // 3. Some setups expose the flutter_inappwebview global.
+  if ((window as unknown as { flutter_inappwebview?: unknown }).flutter_inappwebview) return true;
+  // 4. User-Agent marker (Android default WebView / custom UAs).
   if (typeof navigator !== 'undefined' && /flutter/i.test(navigator.userAgent)) return true;
+  // 5. The app injects `?platform=ios|android` on entry and we persist it to
+  //    localStorage; a standalone browser never sets this key. This is the
+  //    reliable signal on iOS, where the WKWebView UA mimics mobile Safari.
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get('platform');
+    if (fromUrl === 'ios' || fromUrl === 'android') return true;
+    if (localStorage.getItem(PLATFORM_STORAGE_KEY)) return true;
+  } catch {
+    /* ignore storage failures */
+  }
   return false;
 }
 
@@ -165,7 +185,10 @@ export async function saveImageToGallery(
   blob: Blob,
   filename: string,
 ): Promise<boolean> {
-  if (!isInFlutterWebView()) return false;
+  // Requires a real messaging channel to post the image to — fall back to a
+  // browser download if there isn't one (e.g. iOS, where the channel isn't a
+  // plain window property even though isInFlutterWebView() is true).
+  if (getChannel() === null) return false;
   const base64 = await blobToBase64(blob);
   sendToFlutter({
     type: 'save_image',
