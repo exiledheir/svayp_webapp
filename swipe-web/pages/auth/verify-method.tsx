@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { sendOtp } from '@/lib/api';
+import { sendOtp, getSmsOtpEnabled } from '@/lib/api';
 import {
   sendToFlutter,
   isInFlutterWebView,
@@ -20,9 +20,14 @@ export default function VerifyMethodPage() {
   // iOS → Apple, Android → Google (mirrors the native app). Resolved on the
   // client to avoid an SSR/CSR mismatch.
   const [platform, setPlatform] = useState<HostPlatform>('android');
+  // Gated behind the `feature.sms_otp_enabled` backend flag. Defaults to false
+  // so SMS stays hidden until the flag resolves true — Google/Apple is the
+  // intended primary path.
+  const [smsEnabled, setSmsEnabled] = useState(false);
 
   useEffect(() => {
     setPlatform(getHostPlatform());
+    getSmsOtpEnabled().then(setSmsEnabled).catch(() => setSmsEnabled(false));
   }, []);
 
   // Format phone as +998 (90) 123-12-12
@@ -154,16 +159,20 @@ export default function VerifyMethodPage() {
             {socialLoading ? t.signingIn : socialLabel}
           </button>
 
-          {/* Secondary: SMS */}
-          <button
-            type="button"
-            onClick={handleSms}
-            disabled={isAnyLoading}
-            className="w-full py-3 text-sm font-medium text-gray-400
-                       hover:text-gray-700 transition-colors disabled:opacity-40"
-          >
-            {smsLoading ? t.sending : t.verifyWithSms}
-          </button>
+          {/* Secondary: SMS — only when `feature.sms_otp_enabled` is on.
+              Deliberately understated (small, light grey) so Google/Apple
+              reads as the primary action. */}
+          {smsEnabled && (
+            <button
+              type="button"
+              onClick={handleSms}
+              disabled={isAnyLoading}
+              className="w-full py-2 text-xs font-normal text-gray-400
+                         hover:text-gray-500 transition-colors disabled:opacity-40"
+            >
+              {smsLoading ? t.sending : t.verifyWithSms}
+            </button>
+          )}
 
         </div>
       </div>

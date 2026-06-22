@@ -140,6 +140,26 @@ export async function verifyOtp(phoneNumber: string, otpCode: string) {
   };
 }
 
+// Reads the `feature.sms_otp_enabled` flag from the backend feature-flag map
+// (GET /app/feature-flags → { data: { "feature.*": "true"|"false" } }), the
+// same source the native app reads. Unauthenticated so it can run on the
+// pre-OTP verify-method screen. Defaults to false on any error / missing key so
+// SMS stays hidden and Google/Apple is the only path.
+//
+// NOTE: backend values are STRINGS ("true"/"false"), so they must be compared
+// explicitly — the string "false" is truthy in JS.
+export async function getSmsOtpEnabled(): Promise<boolean> {
+  try {
+    const res = await api.get<{ data?: Record<string, unknown> }>('/app/feature-flags');
+    const flags = (res.data?.data ?? res.data) as Record<string, unknown> | undefined;
+    const value = flags?.['feature.sms_otp_enabled'];
+    if (typeof value === 'boolean') return value;
+    return String(value).toLowerCase() === 'true';
+  } catch {
+    return false;
+  }
+}
+
 export async function adminLogin(username: string, password: string) {
   const res = await api.post('/auth/admin/login', { username, password });
   const payload = unwrapSingle(res.data) as Record<string, unknown>;
