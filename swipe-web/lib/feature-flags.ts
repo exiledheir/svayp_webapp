@@ -38,6 +38,7 @@ export const FEATURES = {
    */
   plansEnabled: envFlag('NEXT_PUBLIC_FF_PLANS_ENABLED', true),
 
-  // profileEnabled is no longer a static flag — it is fetched at runtime from
-  // GET /api/v1/app/premium-enabled.  See lib/feature-flags-context.tsx.
+  // profileEnabled is no longer a static flag — it is driven at runtime by the
+  // `feature.subscription_badge.enabled` flag (scoped to one account).
+  // See lib/feature-flags-context.tsx.
 } as const;
