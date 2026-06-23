@@ -5,12 +5,17 @@
 
 import type {
   Translations,
+  Locale,
 } from './translations';
+import { WARDROBE_TAXONOMY, taxLabel } from '@/lib/wardrobe-taxonomy';
 import type {
   MarketCondition,
   MarketSeason,
   MarketLength,
 } from '@/types/market';
+
+// Re-export the taxonomy fit options so the market UI shares the closet's set.
+export { FIT_TYPES } from '@/lib/wardrobe-taxonomy';
 
 export const MARKET_CONDITIONS: MarketCondition[] = [
   'used_good',
@@ -60,28 +65,106 @@ export const MARKET_BRANDS: string[] = [
   'Gucci', 'Prada', 'Massimo Dutti', '12storeez', 'Другая марка',
 ];
 
-// ── Categories ──────────────────────────────────────────────────────────────
-export interface MarketCategory {
-  key: string;
-  label: string; // RU label (display); kept inline since these are localized in the AI-style card
-  parent: string;
+// ── Materials (most popular for UZ resale first) ─────────────────────────────
+export const MARKET_MATERIALS: string[] = [
+  'cotton', 'polyester', 'silk', 'linen', 'wool', 'chiffon', 'satin', 'velvet',
+  'denim', 'leather', 'suede', 'jersey', 'modal', 'rayon', 'spandex', 'lycra',
+  'nylon', 'viscose', 'bamboo', 'cashmere', 'mixed',
+];
+
+const MATERIAL_LABELS: Record<Locale, Record<string, string>> = {
+  en: {
+    cotton: 'Cotton', polyester: 'Polyester', silk: 'Silk', linen: 'Linen', wool: 'Wool',
+    chiffon: 'Chiffon', satin: 'Satin', velvet: 'Velvet', denim: 'Denim', leather: 'Leather',
+    suede: 'Suede', jersey: 'Jersey', modal: 'Modal', rayon: 'Rayon', spandex: 'Spandex',
+    lycra: 'Lycra', nylon: 'Nylon', viscose: 'Viscose', bamboo: 'Bamboo', cashmere: 'Cashmere',
+    mixed: 'Mixed',
+  },
+  ru: {
+    cotton: 'Хлопок', polyester: 'Полиэстер', silk: 'Шёлк', linen: 'Лён', wool: 'Шерсть',
+    chiffon: 'Шифон', satin: 'Атлас', velvet: 'Бархат', denim: 'Деним', leather: 'Кожа',
+    suede: 'Замша', jersey: 'Джерси', modal: 'Модал', rayon: 'Район', spandex: 'Спандекс',
+    lycra: 'Лайкра', nylon: 'Нейлон', viscose: 'Вискоза', bamboo: 'Бамбук', cashmere: 'Кашемир',
+    mixed: 'Смешанный',
+  },
+  uz: {
+    cotton: 'Paxta', polyester: 'Polyester', silk: 'Ipak', linen: 'Zigʻir', wool: 'Jun',
+    chiffon: 'Shifon', satin: 'Atlas', velvet: 'Baxmal', denim: 'Denim', leather: 'Charm',
+    suede: 'Zamsha', jersey: 'Jersi', modal: 'Modal', rayon: 'Rayon', spandex: 'Spandeks',
+    lycra: 'Laykra', nylon: 'Neylon', viscose: 'Viskoza', bamboo: 'Bambuk', cashmere: 'Kashemir',
+    mixed: 'Aralash',
+  },
+};
+
+export function materialLabel(value: string, locale: Locale): string {
+  return MATERIAL_LABELS[locale]?.[value] ?? MATERIAL_LABELS.en[value] ?? value;
 }
 
-export const MARKET_CATEGORIES: MarketCategory[] = [
-  { key: 'skirts', label: 'Юбки', parent: 'Женская одежда' },
-  { key: 'dresses', label: 'Платья', parent: 'Женская одежда' },
-  { key: 'tops', label: 'Топы и футболки', parent: 'Женская одежда' },
-  { key: 'blouses', label: 'Блузки и рубашки', parent: 'Женская одежда' },
-  { key: 'pants', label: 'Брюки', parent: 'Женская одежда' },
-  { key: 'jeans', label: 'Джинсы', parent: 'Женская одежда' },
-  { key: 'outerwear', label: 'Верхняя одежда', parent: 'Женская одежда' },
-  { key: 'knitwear', label: 'Свитеры и кофты', parent: 'Женская одежда' },
-  { key: 'mens', label: 'Мужская одежда', parent: 'Одежда' },
-  { key: 'kids', label: 'Детская одежда', parent: 'Одежда' },
-  { key: 'shoes', label: 'Обувь', parent: 'Обувь и аксессуары' },
-  { key: 'bags', label: 'Сумки', parent: 'Обувь и аксессуары' },
-  { key: 'accessories', label: 'Аксессуары', parent: 'Обувь и аксессуары' },
+// ── Country of origin (most popular for UZ first, then the rest of the world) ─
+// Stored as ISO 3166-1 alpha-2 codes; names are localized at render time via
+// Intl.DisplayNames, so we don't hand-maintain ~190 names × 3 languages.
+const POPULAR_COUNTRIES = [
+  'UZ', 'TR', 'CN', 'RU', 'KZ', 'KG', 'KR', 'TJ', 'TM', 'AE', 'IN', 'IT',
+  'FR', 'DE', 'GB', 'US', 'JP', 'BD', 'PK', 'VN', 'ID', 'TH', 'PL', 'ES',
 ];
+const ALL_COUNTRIES = [
+  'AD', 'AE', 'AF', 'AG', 'AL', 'AM', 'AO', 'AR', 'AT', 'AU', 'AZ', 'BA', 'BB', 'BD', 'BE',
+  'BF', 'BG', 'BH', 'BI', 'BJ', 'BN', 'BO', 'BR', 'BS', 'BT', 'BW', 'BY', 'BZ', 'CA', 'CD',
+  'CG', 'CH', 'CI', 'CL', 'CM', 'CN', 'CO', 'CR', 'CU', 'CV', 'CY', 'CZ', 'DE', 'DJ', 'DK',
+  'DM', 'DO', 'DZ', 'EC', 'EE', 'EG', 'ER', 'ES', 'ET', 'FI', 'FJ', 'FM', 'FR', 'GA', 'GB',
+  'GD', 'GE', 'GH', 'GM', 'GN', 'GQ', 'GR', 'GT', 'GW', 'GY', 'HN', 'HR', 'HT', 'HU', 'ID',
+  'IE', 'IL', 'IN', 'IQ', 'IR', 'IS', 'IT', 'JM', 'JO', 'JP', 'KE', 'KG', 'KH', 'KI', 'KM',
+  'KN', 'KP', 'KR', 'KW', 'KZ', 'LA', 'LB', 'LC', 'LI', 'LK', 'LR', 'LS', 'LT', 'LU', 'LV',
+  'LY', 'MA', 'MC', 'MD', 'ME', 'MG', 'MH', 'MK', 'ML', 'MM', 'MN', 'MR', 'MT', 'MU', 'MV',
+  'MW', 'MX', 'MY', 'MZ', 'NA', 'NE', 'NG', 'NI', 'NL', 'NO', 'NP', 'NR', 'NZ', 'OM', 'PA',
+  'PE', 'PG', 'PH', 'PK', 'PL', 'PT', 'PW', 'PY', 'QA', 'RO', 'RS', 'RU', 'RW', 'SA', 'SB',
+  'SC', 'SD', 'SE', 'SG', 'SI', 'SK', 'SL', 'SM', 'SN', 'SO', 'SR', 'SS', 'ST', 'SV', 'SY',
+  'SZ', 'TD', 'TG', 'TH', 'TJ', 'TL', 'TM', 'TN', 'TO', 'TR', 'TT', 'TV', 'TW', 'TZ', 'UA',
+  'UG', 'US', 'UY', 'UZ', 'VA', 'VC', 'VE', 'VN', 'VU', 'WS', 'YE', 'ZA', 'ZM', 'ZW',
+];
+
+export const MARKET_COUNTRY_CODES: string[] = [
+  ...POPULAR_COUNTRIES,
+  ...ALL_COUNTRIES.filter((c) => !POPULAR_COUNTRIES.includes(c)),
+];
+
+type RegionNamer = { of(code: string): string | undefined };
+function regionNamer(locale: Locale): RegionNamer | null {
+  const DN = (Intl as unknown as { DisplayNames?: new (l: string[], o: { type: string }) => RegionNamer }).DisplayNames;
+  if (!DN) return null;
+  try { return new DN([locale], { type: 'region' }); } catch { return null; }
+}
+
+export function countryLabel(code: string, locale: Locale): string {
+  return regionNamer(locale)?.of(code) ?? code;
+}
+
+/** Localized {value,label} list for the country picker (one namer instance). */
+export function countryOptions(locale: Locale): { value: string; label: string }[] {
+  const dn = regionNamer(locale);
+  return MARKET_COUNTRY_CODES.map((code) => ({ value: code, label: dn?.of(code) ?? code }));
+}
+
+// ── Categories ──────────────────────────────────────────────────────────────
+// Sourced from the same wardrobe taxonomy the closet uses (single source of
+// truth), so the Market offers exactly the closet's sections/subcategories.
+// `key` is the taxonomy subcategory value (e.g. 'SKIRTS'); labels are RU display
+// strings resolved from the taxonomy.
+export interface MarketCategory {
+  key: string;
+  label: string; // RU label (display)
+  parent: string; // RU section label
+  section: string; // taxonomy section value (for attribute flags)
+}
+
+export const MARKET_CATEGORIES: MarketCategory[] = WARDROBE_TAXONOMY.flatMap((section) =>
+  section.subcategories.map((sub) => ({
+    key: sub.value,
+    label: taxLabel(sub.value, 'ru'),
+    parent: taxLabel(section.value, 'ru'),
+    section: section.value,
+  })),
+);
 
 export function getCategory(key: string | undefined): MarketCategory | undefined {
   if (!key) return undefined;
@@ -97,6 +180,10 @@ export interface CategoryAttributeFlags {
   showLength: boolean;
   showColor: boolean;
   shoeSizes: boolean; // use MARKET_SHOE_SIZES instead of MARKET_SIZES
+  showModesty: boolean; // «Подходит для покрытых» (clothing only)
+  showFit: boolean; // fit type (clothing only)
+  showMaterial: boolean; // optional, all categories
+  showCountry: boolean; // optional, all categories
 }
 
 export function attributesForCategory(key: string | undefined): CategoryAttributeFlags {
@@ -108,45 +195,63 @@ export function attributesForCategory(key: string | undefined): CategoryAttribut
     showLength: false,
     showColor: true,
     shoeSizes: false,
+    showModesty: true,
+    showFit: true,
+    showMaterial: true,
+    showCountry: true,
   };
-  switch (key) {
-    case 'skirts':
-    case 'dresses':
-      return { ...base, showLength: true };
-    case 'shoes':
-      return { ...base, shoeSizes: true, showLength: false };
-    case 'bags':
-    case 'accessories':
-      return { ...base, showSize: false, showSeason: false };
-    default:
-      return base;
-  }
+  const section = getCategory(key)?.section;
+  // Modesty / fit apply to garments, not footwear or accessories.
+  if (section === 'FOOTWEAR') return { ...base, shoeSizes: true, showModesty: false, showFit: false };
+  if (section === 'ACCESSORIES') return { ...base, showSize: false, showSeason: false, showModesty: false, showFit: false };
+  if (key === 'SKIRTS' || key === 'DRESSES') return { ...base, showLength: true };
+  return base;
 }
 
 // ── Mock "AI" category suggestion (keyword heuristic over the title) ──────────
 const KEYWORD_MAP: Array<{ rx: RegExp; key: string }> = [
-  { rx: /(юбк|skirt|yubka)/i, key: 'skirts' },
-  { rx: /(плать|dress|koylak|ko'ylak)/i, key: 'dresses' },
-  { rx: /(джинс|jean)/i, key: 'jeans' },
-  { rx: /(брюк|штан|pant|trouser)/i, key: 'pants' },
-  { rx: /(рубашк|блуз|shirt|blouse)/i, key: 'blouses' },
-  { rx: /(футболк|топ|tshirt|t-shirt|top)/i, key: 'tops' },
-  { rx: /(свитер|кофт|худи|hoodie|sweater)/i, key: 'knitwear' },
-  { rx: /(куртк|пальт|пуховик|jacket|coat)/i, key: 'outerwear' },
-  { rx: /(кроссовк|туфл|ботин|обув|shoe|sneaker|boot)/i, key: 'shoes' },
-  { rx: /(сумк|рюкзак|bag|backpack)/i, key: 'bags' },
+  { rx: /(юбк|skirt|yubka)/i, key: 'SKIRTS' },
+  { rx: /(плать|dress|koylak|ko'ylak)/i, key: 'DRESSES' },
+  { rx: /(джинс|брюк|штан|jean|pant|trouser|shim)/i, key: 'TROUSERS_JEANS' },
+  { rx: /(шорт|short)/i, key: 'SHORTS' },
+  { rx: /(рубашк|блуз|shirt|blouse|tunika|туник)/i, key: 'SHIRTS_BLOUSES' },
+  { rx: /(футболк|майк|топ|tshirt|t-shirt|top|polo|поло)/i, key: 'TSHIRTS_TOPS' },
+  { rx: /(свитер|кофт|худи|кардиган|водолазк|hoodie|sweater|cardigan)/i, key: 'SWEATERS_KNITS' },
+  { rx: /(пуховик|puffer)/i, key: 'PUFFER' },
+  { rx: /(тренч|trench)/i, key: 'TRENCH' },
+  { rx: /(пальт|coat)/i, key: 'COAT' },
+  { rx: /(куртк|jacket)/i, key: 'JACKET' },
+  { rx: /(комбинезон|костюм|двойк|тройк|set|suit|jumpsuit)/i, key: 'SETS' },
+  { rx: /(кроссовк|sneaker)/i, key: 'SNEAKERS' },
+  { rx: /(сапог|high.?boot)/i, key: 'HIGH_BOOTS' },
+  { rx: /(ботин|ankle.?boot)/i, key: 'ANKLE_BOOTS' },
+  { rx: /(каблук|heel)/i, key: 'HEELS' },
+  { rx: /(туфл|pump)/i, key: 'PUMPS' },
+  { rx: /(сандал|sandal)/i, key: 'SANDALS' },
+  { rx: /(балетк|flat)/i, key: 'FLATS' },
+  { rx: /(сумк|рюкзак|bag|backpack)/i, key: 'BAGS' },
+  { rx: /(серьг|кольц|браслет|цепочк|час[ыо]|украшен|jewel|ring|earring|watch)/i, key: 'JEWELRY' },
+  { rx: /(платок|хиджаб|hijab|headscarf)/i, key: 'HEADSCARF_HIJAB' },
+  { rx: /(шарф|scarf)/i, key: 'SCARF' },
+  { rx: /(очк|glass)/i, key: 'GLASSES' },
+  { rx: /(ремен|belt)/i, key: 'BELT' },
 ];
 
-/** Mock AI category suggestion from the listing title. */
-export function suggestCategory(title: string | undefined): MarketCategory {
+/**
+ * Mock AI category suggestion from the listing title. Returns null when nothing
+ * matches — callers must not fall back to a default category (we no longer
+ * pre-fill "Юбки"); the user picks one explicitly instead.
+ */
+export function suggestCategory(title: string | undefined): MarketCategory | null {
   const t = (title ?? '').trim();
+  if (!t) return null;
   for (const { rx, key } of KEYWORD_MAP) {
     if (rx.test(t)) {
       const c = getCategory(key);
       if (c) return c;
     }
   }
-  return MARKET_CATEGORIES[0]; // default → Юбки (matches the screenshot demo)
+  return null;
 }
 
 // ── i18n label helpers ───────────────────────────────────────────────────────

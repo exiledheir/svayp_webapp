@@ -63,9 +63,11 @@ export default function PhotosStep({ form, patch, onNext }: StepProps) {
   }
 
   const overCap = images.length > MAX_STORED_PHOTOS;
+  const canAdd = images.length < MAX_PHOTOS;
 
   return (
     <>
+      {/* Gallery input allows selecting MANY images at once (multiple). */}
       <input ref={galleryRef} type="file" accept="image/*" multiple hidden onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }} />
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }} />
 
@@ -88,7 +90,7 @@ export default function PhotosStep({ form, patch, onNext }: StepProps) {
           <Camera size={40} strokeWidth={1.4} className="text-black/30 dark:text-white/40 shrink-0" />
         </div>
 
-        {/* Thumbnails grid */}
+        {/* Grid: thumbnails + one image-sized empty tile to add more (no icon/text). */}
         <div className="grid grid-cols-3 gap-2.5">
           {images.map((src, i) => (
             <div key={i} className="relative rounded-2xl overflow-hidden" style={{ aspectRatio: '1', background: '#F7F7F8' }}>
@@ -108,18 +110,18 @@ export default function PhotosStep({ form, patch, onNext }: StepProps) {
               )}
             </div>
           ))}
-          {images.length < MAX_PHOTOS && (
+          {canAdd && (
             <button
               onClick={() => setShowSheet(true)}
               disabled={busy}
-              className="rounded-2xl flex items-center justify-center disabled:opacity-50"
-              style={{ aspectRatio: '1', background: 'rgba(128,128,128,0.10)' }}
-              aria-label="Add photo"
+              className="rounded-2xl flex items-center justify-center"
+              style={{ aspectRatio: '1', background: 'rgba(128,128,128,0.06)', border: '1.5px dashed rgba(243,112,167,0.45)' }}
+              aria-label={t.mk_photos_add}
             >
               {busy ? (
                 <div className="w-6 h-6 rounded-full border-2 border-[#F370A7] border-t-transparent animate-spin" />
               ) : (
-                <Plus size={30} strokeWidth={2} className="text-black/40 dark:text-white/50" />
+                <Plus size={28} strokeWidth={2} className="text-[#F370A7]/70" />
               )}
             </button>
           )}
@@ -132,6 +134,26 @@ export default function PhotosStep({ form, patch, onNext }: StepProps) {
           </p>
         )}
       </StepScaffold>
+
+      {/* Pink pulsing FAB — same as the closet add-item flow. Sits above the CTA. */}
+      {canAdd && (
+        <div className="absolute right-5 z-[55]" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)' }}>
+          <span className="absolute inset-0 rounded-full animate-ping" style={{ backgroundColor: '#F370A7', opacity: 0.3 }} />
+          <button
+            onClick={() => setShowSheet(true)}
+            disabled={busy}
+            className="relative w-16 h-16 rounded-full flex items-center justify-center shadow-xl active:scale-[0.95] transition-transform disabled:opacity-60"
+            style={{ backgroundColor: '#F370A7' }}
+            aria-label={t.mk_photos_add}
+          >
+            {busy ? (
+              <div className="w-6 h-6 rounded-full border-2 border-white border-t-transparent animate-spin" />
+            ) : (
+              <Plus size={28} strokeWidth={2.5} color="white" />
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Source sheet */}
       {showSheet && (

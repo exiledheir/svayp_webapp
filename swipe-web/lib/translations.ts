@@ -15,6 +15,14 @@ export interface Translations {
   mk_categories: string;
   mk_all_categories: string;
   mk_search_placeholder: string;
+  mk_visual_search: string;
+  mk_ad_label: string;
+  mk_banner_sell_title: string;
+  mk_banner_sell_sub: string;
+  mk_banner_new_title: string;
+  mk_banner_new_sub: string;
+  mk_banner_local_title: string;
+  mk_banner_local_sub: string;
   mk_free: string;
   mk_negotiable: string;
   mk_courier_available: string;
@@ -52,6 +60,11 @@ export interface Translations {
   mk_char_length: string;
   mk_char_color: string;
   mk_char_select: string;
+  mk_char_modesty: string;
+  mk_char_fit: string;
+  mk_char_material: string;
+  mk_char_country: string;
+  mk_search: string;
   mk_char_yes: string;
   mk_char_no: string;
   mk_cond_used_good: string;
@@ -92,6 +105,17 @@ export interface Translations {
   mk_loc_title: string;
   mk_loc_search: string;
   mk_loc_map: string;
+  mk_loc_map_change: string;
+  mk_loc_pick_title: string;
+  mk_loc_pick_hint: string;
+  mk_loc_map_confirm: string;
+  mk_loc_use_current: string;
+  mk_loc_map_error: string;
+  mk_loc_pinned: string;
+  mk_photos_add: string;
+  mk_category_choose: string;
+  mk_contact_tg_note: string;
+  mk_contact_tg_username_ph: string;
   mk_loc_landmark_label: string;
   mk_loc_landmark_ph: string;
   mk_loc_courier_note: string;
@@ -121,6 +145,7 @@ export interface Translations {
   mk_detail_characteristics: string;
   mk_detail_description: string;
   mk_detail_location: string;
+  mk_detail_open_map: string;
   mk_detail_seller: string;
   mk_write: string;
   mk_mine_title: string;
@@ -431,6 +456,14 @@ const en: Translations = {
   mk_categories: 'Categories',
   mk_all_categories: 'All categories',
   mk_search_placeholder: 'Search listings',
+  mk_visual_search: 'Visual search',
+  mk_ad_label: 'Ad',
+  mk_banner_sell_title: 'Sell faster',
+  mk_banner_sell_sub: 'List your items in minutes',
+  mk_banner_new_title: 'Fresh finds daily',
+  mk_banner_new_sub: 'New listings every day',
+  mk_banner_local_title: 'Deals near you',
+  mk_banner_local_sub: 'Meet and trade nearby',
   mk_free: 'Free',
   mk_negotiable: 'Negotiable',
   mk_courier_available: 'Courier delivery',
@@ -468,6 +501,11 @@ const en: Translations = {
   mk_char_length: 'Item length',
   mk_char_color: 'Color',
   mk_char_select: 'Select a value',
+  mk_char_modesty: 'Suitable for covered',
+  mk_char_fit: 'Fit',
+  mk_char_material: 'Material',
+  mk_char_country: 'Country of origin',
+  mk_search: 'Search',
   mk_char_yes: 'Yes',
   mk_char_no: 'No',
   mk_cond_used_good: 'Used (excellent, like new)',
@@ -508,6 +546,17 @@ const en: Translations = {
   mk_loc_title: 'Specify the meeting place with the buyer',
   mk_loc_search: 'Address, store or metro',
   mk_loc_map: 'Pick on map',
+  mk_loc_map_change: 'Change location on map',
+  mk_loc_pick_title: 'Choose location',
+  mk_loc_pick_hint: 'Move the map so the pin marks the exact spot.',
+  mk_loc_map_confirm: 'Confirm location',
+  mk_loc_use_current: 'Use my location',
+  mk_loc_map_error: "Couldn't load the map. Check your connection.",
+  mk_loc_pinned: 'Location selected',
+  mk_photos_add: 'Add photos',
+  mk_category_choose: 'Choose a category',
+  mk_contact_tg_note: "We'll forward buyers to this phone number, or you can add your own Telegram username.",
+  mk_contact_tg_username_ph: 'username (optional)',
   mk_loc_landmark_label: 'Specify a landmark',
   mk_loc_landmark_ph: 'E.g. Alay bazaar',
   mk_loc_courier_note: 'You arrange delivery yourself',
@@ -537,6 +586,7 @@ const en: Translations = {
   mk_detail_characteristics: 'Characteristics',
   mk_detail_description: 'Description',
   mk_detail_location: 'Deal place',
+  mk_detail_open_map: 'Open map',
   mk_detail_seller: 'Seller',
   mk_write: 'Message',
   mk_mine_title: 'My listings',
@@ -919,7 +969,15 @@ const ru: Translations = {
   mk_categories: 'Категории',
   mk_all_categories: 'Все категории',
   mk_search_placeholder: 'Поиск объявлений',
-  mk_free: 'Даром',
+  mk_visual_search: 'Визуальный поиск',
+  mk_ad_label: 'Реклама',
+  mk_banner_sell_title: 'Продавайте быстрее',
+  mk_banner_sell_sub: 'Разместите объявление за пару минут',
+  mk_banner_new_title: 'Новинки каждый день',
+  mk_banner_new_sub: 'Свежие объявления ежедневно',
+  mk_banner_local_title: 'Сделки рядом с вами',
+  mk_banner_local_sub: 'Встречайтесь и договаривайтесь рядом',
+  mk_free:'Даром',
   mk_negotiable: 'Торг уместен',
   mk_courier_available: 'Доставка курьером',
   mk_intro_title: 'Как публиковать объявления?',
@@ -956,6 +1014,11 @@ const ru: Translations = {
   mk_char_length: 'Длина изделия',
   mk_char_color: 'Цвет',
   mk_char_select: 'Выберите значение',
+  mk_char_modesty: 'Подходит для покрытых',
+  mk_char_fit: 'Посадка',
+  mk_char_material: 'Материал',
+  mk_char_country: 'Страна-производитель',
+  mk_search: 'Поиск',
   mk_char_yes: 'Да',
   mk_char_no: 'Нет',
   mk_cond_used_good: 'Б/у (отличное, как новое)',
@@ -996,6 +1059,17 @@ const ru: Translations = {
   mk_loc_title: 'Укажите место встречи с покупателем',
   mk_loc_search: 'Адрес, магазин или метро',
   mk_loc_map: 'Указать на карте',
+  mk_loc_map_change: 'Изменить место на карте',
+  mk_loc_pick_title: 'Выберите место',
+  mk_loc_pick_hint: 'Двигайте карту, чтобы метка указывала на нужное место.',
+  mk_loc_map_confirm: 'Подтвердить место',
+  mk_loc_use_current: 'Моё местоположение',
+  mk_loc_map_error: 'Не удалось загрузить карту. Проверьте соединение.',
+  mk_loc_pinned: 'Место выбрано',
+  mk_photos_add: 'Добавить фото',
+  mk_category_choose: 'Выбрать категорию',
+  mk_contact_tg_note: 'Покупателей перенаправим на этот номер, либо вы можете указать свой Telegram username.',
+  mk_contact_tg_username_ph: 'username (необязательно)',
   mk_loc_landmark_label: 'Укажите ориентир',
   mk_loc_landmark_ph: 'Например, алайский рынок',
   mk_loc_courier_note: 'Вы самостоятельно организовываете доставку',
@@ -1025,6 +1099,7 @@ const ru: Translations = {
   mk_detail_characteristics: 'Характеристики',
   mk_detail_description: 'Описание',
   mk_detail_location: 'Место сделки',
+  mk_detail_open_map: 'Открыть карту',
   mk_detail_seller: 'Продавец',
   mk_write: 'Написать',
   mk_mine_title: 'Мои объявления',
@@ -1407,6 +1482,14 @@ const uz: Translations = {
   mk_categories: 'Kategoriyalar',
   mk_all_categories: 'Barcha kategoriyalar',
   mk_search_placeholder: "E'lonlarni qidirish",
+  mk_visual_search: 'Vizual qidiruv',
+  mk_ad_label: 'Reklama',
+  mk_banner_sell_title: 'Tezroq soting',
+  mk_banner_sell_sub: "E'loningizni bir necha daqiqada joylang",
+  mk_banner_new_title: 'Har kuni yangi tovarlar',
+  mk_banner_new_sub: "Har kuni yangi e'lonlar",
+  mk_banner_local_title: 'Yaqin atrofdagi bitimlar',
+  mk_banner_local_sub: 'Yaqin atrofda uchrashing va kelishing',
   mk_free: 'Tekin',
   mk_negotiable: 'Savdolashish mumkin',
   mk_courier_available: 'Kuryer yetkazib berish',
@@ -1444,6 +1527,11 @@ const uz: Translations = {
   mk_char_length: 'Mahsulot uzunligi',
   mk_char_color: 'Rang',
   mk_char_select: 'Qiymatni tanlang',
+  mk_char_modesty: 'Yopinganlar uchun mos',
+  mk_char_fit: "Oʻtirishi",
+  mk_char_material: 'Material',
+  mk_char_country: 'Ishlab chiqaruvchi davlat',
+  mk_search: 'Qidirish',
   mk_char_yes: 'Ha',
   mk_char_no: "Yo'q",
   mk_cond_used_good: "Ishlatilgan (a'lo, yangidek)",
@@ -1483,7 +1571,18 @@ const uz: Translations = {
   mk_desc_placeholder: 'Mahsulotni tavsiflang: material, xususiyatlar, sotish sababi',
   mk_loc_title: 'Xaridor bilan uchrashuv joyini kiriting',
   mk_loc_search: "Manzil, do'kon yoki metro",
-  mk_loc_map: "Xaritada ko'rsatish",
+  mk_loc_map: 'Xaritada belgilash',
+  mk_loc_map_change: "Xaritada joyni o'zgartirish",
+  mk_loc_pick_title: 'Joyni tanlang',
+  mk_loc_pick_hint: "Belgini kerakli joyga qo'yish uchun xaritani suring.",
+  mk_loc_map_confirm: 'Joyni tasdiqlash',
+  mk_loc_use_current: 'Mening joylashuvim',
+  mk_loc_map_error: "Xaritani yuklab bo'lmadi. Aloqani tekshiring.",
+  mk_loc_pinned: 'Joy tanlandi',
+  mk_photos_add: "Rasm qo'shish",
+  mk_category_choose: 'Kategoriyani tanlash',
+  mk_contact_tg_note: "Xaridorlarni shu raqamga yo'naltiramiz yoki o'z Telegram username'ingizni qo'shishingiz mumkin.",
+  mk_contact_tg_username_ph: 'username (ixtiyoriy)',
   mk_loc_landmark_label: "Mo'ljal kiriting",
   mk_loc_landmark_ph: 'Masalan, Oloy bozori',
   mk_loc_courier_note: 'Yetkazib berishni mustaqil tashkil qilasiz',
@@ -1513,6 +1612,7 @@ const uz: Translations = {
   mk_detail_characteristics: 'Xususiyatlar',
   mk_detail_description: 'Tavsif',
   mk_detail_location: 'Bitim joyi',
+  mk_detail_open_map: 'Xaritani ochish',
   mk_detail_seller: 'Sotuvchi',
   mk_write: 'Yozish',
   mk_mine_title: "Mening e'lonlarim",

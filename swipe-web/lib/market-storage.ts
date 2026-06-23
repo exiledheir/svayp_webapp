@@ -23,7 +23,9 @@ const DRAFT_KEY = 'market_draft';
 const FAV_KEY = 'market_favorites';
 const ONBOARDING_KEY = 'svayp_market_onboarding_complete';
 const WIZARD_STEP_KEY = 'svayp_market_wizard_step';
-const SEED_FLAG_KEY = 'market_seeded';
+// Bump the suffix whenever the seed shape changes (e.g. category keys) so
+// existing installs re-seed with the new data on next load.
+const SEED_FLAG_KEY = 'market_seeded_v3';
 
 export const MAX_STORED_PHOTOS = 4;
 
@@ -203,8 +205,9 @@ function img(seed: string): string {
 const SEED_LISTINGS: MarketListing[] = [
   {
     id: 'seed_1', title: 'Юбка Polo', images: [img('mk-skirt1'), img('mk-skirt2')],
-    category: 'skirts', condition: 'used_good', brand: 'Polo', size: '46 (M)',
-    color: 'black', season: 'all', length: 'midi', dealType: 'sell', price: 50000,
+    category: 'SKIRTS', condition: 'used_good', brand: 'Polo', size: '46 (M)',
+    color: 'black', season: 'all', length: 'midi', hijabFriendly: true, material: 'cotton', country: 'TR',
+    dealType: 'sell', price: 50000,
     currency: 'UZS', isUrgent: false, description: 'Простая юбка Polo. Носили пару раз, в отличном состоянии.',
     location: { address: 'массив Юнусабад', landmark: 'Алайский рынок', latitude: 41.36, longitude: 69.29, courier: true },
     seller: { id: 'seed_seller_1', name: 'Дилноза', phone: '+998901234567', telegramUsername: 'dilnoza_sells' },
@@ -212,8 +215,9 @@ const SEED_LISTINGS: MarketListing[] = [
   },
   {
     id: 'seed_2', title: 'Платье летнее зелёное', images: [img('mk-dress1')],
-    category: 'dresses', condition: 'new_with_tag', brand: 'Zara', size: '44 (S)',
-    color: 'green', season: 'summer', length: 'mini', dealType: 'sell', price: 180000,
+    category: 'DRESSES', condition: 'new_with_tag', brand: 'Zara', size: '44 (S)',
+    color: 'green', season: 'summer', length: 'mini', hijabFriendly: false, material: 'chiffon', country: 'UZ', fit: 'REGULAR',
+    dealType: 'sell', price: 180000,
     currency: 'UZS', isUrgent: true, description: 'Новое платье с биркой, не подошёл размер.',
     location: { address: 'Чиланзар', courier: true },
     seller: { id: 'seed_seller_2', name: 'Madina', phone: '+998905556677' },
@@ -221,7 +225,7 @@ const SEED_LISTINGS: MarketListing[] = [
   },
   {
     id: 'seed_3', title: 'Джинсы синие mom', images: [img('mk-jeans1'), img('mk-jeans2')],
-    category: 'jeans', condition: 'used_visible', brand: 'Bershka', size: '46 (M)',
+    category: 'TROUSERS_JEANS', condition: 'used_visible', brand: 'Bershka', size: '46 (M)',
     color: 'blue', season: 'all', dealType: 'sell', price: 90000,
     currency: 'UZS', isUrgent: false, description: 'Удобные mom jeans, есть лёгкие следы носки.',
     location: { address: 'Юнусабад' },
@@ -230,7 +234,7 @@ const SEED_LISTINGS: MarketListing[] = [
   },
   {
     id: 'seed_4', title: 'Кроссовки Nike Air', images: [img('mk-shoes1')],
-    category: 'shoes', condition: 'used_good', brand: 'Nike', size: '40',
+    category: 'SNEAKERS', condition: 'used_good', brand: 'Nike', size: '40',
     color: 'white', dealType: 'sell', price: 350000,
     currency: 'UZS', isUrgent: false, description: 'Оригинальные кроссовки, носились аккуратно.',
     location: { address: 'Мирзо-Улугбек', courier: true },
@@ -239,7 +243,7 @@ const SEED_LISTINGS: MarketListing[] = [
   },
   {
     id: 'seed_5', title: 'Сумка кожаная бежевая', images: [img('mk-bag1')],
-    category: 'bags', condition: 'used_good', brand: 'Mango',
+    category: 'BAGS', condition: 'used_good', brand: 'Mango',
     color: 'beige', dealType: 'sell', price: 120000,
     currency: 'UZS', isUrgent: false, description: 'Вместительная сумка, натуральная кожа.',
     location: { address: 'Сергели' },
@@ -248,7 +252,7 @@ const SEED_LISTINGS: MarketListing[] = [
   },
   {
     id: 'seed_6', title: 'Свитер тёплый, отдам даром', images: [img('mk-sweater1')],
-    category: 'knitwear', condition: 'used_visible', brand: 'Без бренда', size: '48 (L)',
+    category: 'SWEATERS_KNITS', condition: 'used_visible', brand: 'Без бренда', size: '48 (L)',
     color: 'gray', season: 'winter', dealType: 'free', price: 0,
     currency: 'UZS', isUrgent: false, description: 'Тёплый свитер, отдам даром. Самовывоз.',
     location: { address: 'Яккасарай' },
@@ -257,7 +261,7 @@ const SEED_LISTINGS: MarketListing[] = [
   },
   {
     id: 'seed_7', title: 'Пальто демисезонное', images: [img('mk-coat1'), img('mk-coat2')],
-    category: 'outerwear', condition: 'used_good', brand: 'Massimo Dutti', size: '46 (M)',
+    category: 'COAT', condition: 'used_good', brand: 'Massimo Dutti', size: '46 (M)',
     color: 'brown', season: 'demi', dealType: 'sell', price: 420000,
     currency: 'UZS', isUrgent: false, description: 'Стильное пальто, отличное состояние.',
     location: { address: 'Центр', courier: true },
@@ -266,7 +270,7 @@ const SEED_LISTINGS: MarketListing[] = [
   },
   {
     id: 'seed_8', title: 'Блузка белая офисная', images: [img('mk-blouse1')],
-    category: 'blouses', condition: 'new_with_tag', brand: 'H&M', size: '44 (S)',
+    category: 'SHIRTS_BLOUSES', condition: 'new_with_tag', brand: 'H&M', size: '44 (S)',
     color: 'white', season: 'all', dealType: 'sell', price: 70000,
     currency: 'UZS', isUrgent: false, description: 'Новая блузка с биркой, классический крой.',
     location: { address: 'Алмазар' },
@@ -290,13 +294,17 @@ export function finalizeDraft(d: MarketDraft, sellerName?: string): MarketListin
     id: `local_${Date.now()}`,
     title: (d.title ?? '').trim() || 'Без названия',
     images: (d.images ?? []).slice(0, MAX_STORED_PHOTOS),
-    category: d.category ?? 'skirts',
+    category: d.category ?? 'TSHIRTS_TOPS',
     condition: d.condition ?? 'used_good',
     brand: d.brand,
     size: d.size,
     color: d.color,
     season: d.season,
     length: d.length,
+    hijabFriendly: d.hijabFriendly,
+    fit: d.fit,
+    material: d.material,
+    country: d.country,
     customAttrs: d.customAttrs,
     dealType: d.dealType ?? 'sell',
     price: d.dealType === 'free' ? 0 : d.price ?? 0,
