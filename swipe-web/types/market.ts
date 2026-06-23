@@ -15,9 +15,11 @@ export type MarketLength = 'maxi' | 'midi' | 'mini';
 export type MarketCurrency = 'UZS' | 'USD'; // Сум / у.е.
 export type MarketDealType = 'sell' | 'free'; // Указать цену / Отдам даром
 export type MarketListingStatus = 'draft' | 'pending' | 'active' | 'sold' | 'archived';
-export type MarketContactMethod = 'chat' | 'telegram';
+export type MarketContactMethod = 'chat' | 'phone' | 'telegram';
 
 export interface MarketLocation {
+  region?: string; // UZ region key — see MARKET_REGIONS in lib/market-attributes
+  district?: string; // district (район/tuman) key within the region
   address?: string;
   landmark?: string; // ориентир
   latitude?: number;

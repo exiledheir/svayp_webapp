@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { X, Sparkles, ChevronRight, Check } from 'lucide-react';
+import { X, Sparkles, ChevronRight } from 'lucide-react';
 import MarketCategorySheet from '@/components/market/MarketCategorySheet';
 import { suggestCategory, getCategory } from '@/lib/market-attributes';
 import { useI18n } from '@/lib/i18n';
@@ -8,6 +8,8 @@ import type { StepProps } from './types';
 
 const TITLE_MAX = 50;
 const DESC_MAX = 1000;
+// Brand purple — matches the Market palette.
+const PURPLE = '#8E5BD6';
 
 /** Combined step: title + AI-suggested category + description, on one page. */
 export default function DetailsStep({ form, patch, onNext }: StepProps) {
@@ -28,7 +30,7 @@ export default function DetailsStep({ form, patch, onNext }: StepProps) {
       <StepScaffold
         title={t.mk_details_title}
         ctaLabel={t.mk_continue}
-        ctaDisabled={title.trim().length < 2 || !effective}
+        ctaDisabled={title.trim().length < 2 || !effective || desc.trim().length === 0}
         onCta={() => { if (effective) patch({ category: effective.key }); onNext(); }}
       >
         {/* Title */}
@@ -50,37 +52,35 @@ export default function DetailsStep({ form, patch, onNext }: StepProps) {
         </div>
         <p className="text-right text-[12px] text-black/40 dark:text-white/40 mt-1.5">{title.length}/{TITLE_MAX}</p>
 
-        {/* Category — chosen card (explicit pick or AI suggestion), then picker. */}
+        {/* Category — single self-updating selector. Opens the picker; reflects the
+            current pick (or the AI suggestion). No redundant "other category" row. */}
         <label className="block text-[15px] font-bold text-black dark:text-white mt-6 mb-2">
           {t.mk_categories}{isSuggestion ? ' ✨' : ''}
         </label>
-        {effective && (
-          <button
-            onClick={() => patch({ category: effective.key })}
-            className="w-full flex items-center gap-3 p-4 rounded-2xl text-left"
-            style={{ border: '1.5px solid #F370A7' }}
-          >
-            <Sparkles size={18} className="text-[#F370A7] shrink-0" />
-            <span className="flex-1">
-              <span className="block text-[15px] font-semibold text-black dark:text-white">{effective.label}</span>
-              <span className="block text-[12px] text-black/45 dark:text-white/45">
-                {effective.parent}{isSuggestion ? ` · ${t.mk_category_suggested}` : ''}
-              </span>
-            </span>
-            <span className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: '#F370A7' }}>
-              <Check size={14} strokeWidth={3} color="white" />
-            </span>
-          </button>
-        )}
         <button
           onClick={() => setShowSheet(true)}
-          className="w-full flex items-center justify-between p-3.5 mt-2.5 rounded-2xl"
-          style={{ background: 'rgba(128,128,128,0.10)' }}
+          className="w-full flex items-center gap-3 p-4 rounded-2xl text-left"
+          style={{
+            border: effective ? `1.5px solid ${PURPLE}` : '1.5px solid transparent',
+            background: effective ? 'transparent' : 'rgba(128,128,128,0.10)',
+          }}
         >
-          <span className="text-[14px] font-semibold text-black dark:text-white">
-            {effective ? t.mk_category_other : t.mk_category_choose}
+          <span className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(142,91,214,0.12)' }}>
+            <Sparkles size={18} style={{ color: PURPLE }} />
           </span>
-          <ChevronRight size={18} className="text-black/35 dark:text-white/35" />
+          <span className="flex-1 min-w-0">
+            {effective ? (
+              <>
+                <span className="block text-[15px] font-semibold text-black dark:text-white truncate">{effective.label}</span>
+                <span className="block text-[12px] text-black/45 dark:text-white/45 truncate">
+                  {effective.parent}{isSuggestion ? ` · ${t.mk_category_suggested}` : ''}
+                </span>
+              </>
+            ) : (
+              <span className="text-[15px] font-semibold text-black/40 dark:text-white/40">{t.mk_category_choose}</span>
+            )}
+          </span>
+          <ChevronRight size={18} className="text-black/35 dark:text-white/35 shrink-0" />
         </button>
 
         {/* Description */}

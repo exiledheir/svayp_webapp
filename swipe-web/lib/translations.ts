@@ -103,6 +103,9 @@ export interface Translations {
   mk_desc_title: string;
   mk_desc_placeholder: string;
   mk_loc_title: string;
+  mk_loc_region_label: string;
+  mk_loc_district_label: string;
+  mk_loc_district_ph: string;
   mk_loc_search: string;
   mk_loc_map: string;
   mk_loc_map_change: string;
@@ -137,6 +140,11 @@ export interface Translations {
   mk_contact_chat: string;
   mk_contact_chat_note: string;
   mk_contact_telegram: string;
+  mk_contact_call: string;
+  mk_contact_call_note: string;
+  mk_seller_contacts: string;
+  mk_contact_chat_libas: string;
+  mk_contact_via_telegram: string;
   mk_publish_cta: string;
   mk_published_title: string;
   mk_published_body: string;
@@ -149,6 +157,8 @@ export interface Translations {
   mk_detail_seller: string;
   mk_write: string;
   mk_mine_title: string;
+  mk_liked_title: string;
+  mk_liked_empty: string;
   mk_mine_drafts: string;
   mk_mine_published: string;
   mk_mine_empty: string;
@@ -544,6 +554,9 @@ const en: Translations = {
   mk_desc_title: 'Add a description',
   mk_desc_placeholder: 'Describe the item: material, features, reason for selling',
   mk_loc_title: 'Specify the meeting place with the buyer',
+  mk_loc_region_label: 'Region',
+  mk_loc_district_label: 'District',
+  mk_loc_district_ph: 'Choose a district',
   mk_loc_search: 'Address, store or metro',
   mk_loc_map: 'Pick on map',
   mk_loc_map_change: 'Change location on map',
@@ -578,6 +591,11 @@ const en: Translations = {
   mk_contact_chat: 'In-app chat',
   mk_contact_chat_note: 'Enabled by default',
   mk_contact_telegram: 'Telegram chat',
+  mk_contact_call: 'Phone call',
+  mk_contact_call_note: 'Buyers will see your phone number',
+  mk_seller_contacts: 'Seller contacts',
+  mk_contact_chat_libas: 'Chat in LIBΛS',
+  mk_contact_via_telegram: 'Contact via Telegram',
   mk_publish_cta: 'Post listing',
   mk_published_title: 'Listing under review',
   mk_published_body: "We'll review it and publish it soon. You can find it in My listings.",
@@ -590,6 +608,8 @@ const en: Translations = {
   mk_detail_seller: 'Seller',
   mk_write: 'Message',
   mk_mine_title: 'My listings',
+  mk_liked_title: 'Liked',
+  mk_liked_empty: 'No liked listings yet',
   mk_mine_drafts: 'Drafts',
   mk_mine_published: 'Published',
   mk_mine_empty: 'You have no listings yet',
@@ -1057,6 +1077,9 @@ const ru: Translations = {
   mk_desc_title: 'Добавьте описание',
   mk_desc_placeholder: 'Опишите товар: материал, особенности, причину продажи',
   mk_loc_title: 'Укажите место встречи с покупателем',
+  mk_loc_region_label: 'Регион',
+  mk_loc_district_label: 'Район',
+  mk_loc_district_ph: 'Выберите район',
   mk_loc_search: 'Адрес, магазин или метро',
   mk_loc_map: 'Указать на карте',
   mk_loc_map_change: 'Изменить место на карте',
@@ -1091,6 +1114,11 @@ const ru: Translations = {
   mk_contact_chat: 'Чат в приложении',
   mk_contact_chat_note: 'Включён по умолчанию',
   mk_contact_telegram: 'Чат в телеграм',
+  mk_contact_call: 'Звонок по телефону',
+  mk_contact_call_note: 'Покупатели увидят ваш номер',
+  mk_seller_contacts: 'Контакты продавца',
+  mk_contact_chat_libas: 'Чат внутри LIBΛS',
+  mk_contact_via_telegram: 'Связаться по Telegram',
   mk_publish_cta: 'Поставить объявление',
   mk_published_title: 'Объявление на проверке',
   mk_published_body: 'Мы проверим его и скоро опубликуем. Объявление доступно в разделе «Мои объявления».',
@@ -1103,6 +1131,8 @@ const ru: Translations = {
   mk_detail_seller: 'Продавец',
   mk_write: 'Написать',
   mk_mine_title: 'Мои объявления',
+  mk_liked_title: 'Избранное',
+  mk_liked_empty: 'Пока нет избранных объявлений',
   mk_mine_drafts: 'Черновики',
   mk_mine_published: 'Опубликованные',
   mk_mine_empty: 'У вас пока нет объявлений',
@@ -1570,6 +1600,9 @@ const uz: Translations = {
   mk_desc_title: "Tavsif qo'shing",
   mk_desc_placeholder: 'Mahsulotni tavsiflang: material, xususiyatlar, sotish sababi',
   mk_loc_title: 'Xaridor bilan uchrashuv joyini kiriting',
+  mk_loc_region_label: 'Hudud',
+  mk_loc_district_label: 'Tuman',
+  mk_loc_district_ph: 'Tumanni tanlang',
   mk_loc_search: "Manzil, do'kon yoki metro",
   mk_loc_map: 'Xaritada belgilash',
   mk_loc_map_change: "Xaritada joyni o'zgartirish",
@@ -1604,6 +1637,11 @@ const uz: Translations = {
   mk_contact_chat: 'Ilovadagi chat',
   mk_contact_chat_note: 'Sukut boʻyicha yoqilgan',
   mk_contact_telegram: 'Telegram chat',
+  mk_contact_call: "Telefon orqali qoʻngʻiroq",
+  mk_contact_call_note: "Xaridorlar telefon raqamingizni koʻradi",
+  mk_seller_contacts: 'Sotuvchi kontaktlari',
+  mk_contact_chat_libas: 'LIBΛS ichidagi chat',
+  mk_contact_via_telegram: "Telegram orqali bogʻlanish",
   mk_publish_cta: "E'lon joylash",
   mk_published_title: "E'lon tekshiruvda",
   mk_published_body: "Biz uni tekshirib, tez orada e'lon qilamiz. Uni «Mening e'lonlarim» bo'limida topishingiz mumkin.",
@@ -1616,6 +1654,8 @@ const uz: Translations = {
   mk_detail_seller: 'Sotuvchi',
   mk_write: 'Yozish',
   mk_mine_title: "Mening e'lonlarim",
+  mk_liked_title: 'Saralangan',
+  mk_liked_empty: "Hozircha saralangan e'lonlar yo'q",
   mk_mine_drafts: 'Qoralamalar',
   mk_mine_published: 'Eʼlon qilingan',
   mk_mine_empty: "Sizda hali e'lonlar yo'q",

@@ -1,103 +1,87 @@
-import React, { useState } from 'react';
-import { Search, Navigation, Building2, Truck, MapPin } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
-import MapPickerSheet from '@/components/market/MapPickerSheet';
+import { MARKET_REGIONS, regionLabel } from '@/lib/market-attributes';
+import { getDistrictOptions } from '@/lib/market-districts';
+import OptionSheet, { type OptionItem } from '@/components/market/OptionSheet';
 import StepScaffold from './StepScaffold';
 import type { StepProps } from './types';
 
-function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+type Sheet = 'region' | 'district' | null;
+
+function SelectRow({ label, value, placeholder, disabled, onClick }: {
+  label: string; value?: string; placeholder: string; disabled?: boolean; onClick: () => void;
+}) {
   return (
-    <button
-      onClick={() => onChange(!on)}
-      className="w-[52px] h-[30px] rounded-full shrink-0 transition-colors relative"
-      style={{ background: on ? '#F370A7' : 'rgba(128,128,128,0.35)' }}
-      aria-pressed={on}
-    >
-      <span className="absolute top-[3px] w-6 h-6 rounded-full bg-white transition-all" style={{ left: on ? 25 : 3 }} />
-    </button>
+    <div className="mb-4">
+      <p className="text-[15px] font-bold text-black dark:text-white mb-2">{label}</p>
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        className="w-full flex items-center justify-between px-4 h-14 rounded-2xl disabled:opacity-50"
+        style={{ background: 'rgba(128,128,128,0.10)' }}
+      >
+        <span className={`text-[15px] ${value ? 'font-semibold text-black dark:text-white' : 'text-black/40 dark:text-white/40'}`}>
+          {value || placeholder}
+        </span>
+        <ChevronRight size={18} className="text-black/35 dark:text-white/35" />
+      </button>
+    </div>
   );
 }
 
 export default function LocationStep({ form, patch, onNext }: StepProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const loc = form.location ?? {};
-  const [showMap, setShowMap] = useState(false);
+  const [sheet, setSheet] = useState<Sheet>(null);
 
   function setLoc(p: Partial<typeof loc>) {
     patch({ location: { ...loc, ...p } });
   }
 
-  const hasAddress = !!loc.address?.trim();
-  const hasPin = loc.latitude != null && loc.longitude != null;
-  const previewUrl = hasPin
-    ? `https://static-maps.yandex.ru/1.x/?ll=${loc.longitude},${loc.latitude}&z=15&size=600,260&l=map&pt=${loc.longitude},${loc.latitude},pm2rdm`
-    : null;
+  const regionOptions: OptionItem[] = MARKET_REGIONS.map((key) => ({ value: key, label: regionLabel(key, locale) }));
+  const districtOptions = useMemo(() => getDistrictOptions(loc.region, locale), [loc.region, locale]);
 
   return (
     <StepScaffold
       title={t.mk_loc_title}
       ctaLabel={t.mk_continue}
-      ctaDisabled={!hasAddress && !hasPin}
+      ctaDisabled={!loc.region || !loc.district}
       onCta={onNext}
     >
-      <div className="flex items-center gap-2 px-4 h-14 rounded-2xl mb-3" style={{ background: 'rgba(128,128,128,0.10)' }}>
-        <Search size={18} className="text-black/40 dark:text-white/40 shrink-0" />
-        <input
-          value={loc.address ?? ''}
-          onChange={(e) => setLoc({ address: e.target.value })}
-          placeholder={t.mk_loc_search}
-          className="flex-1 bg-transparent outline-none text-[15px] text-black dark:text-white"
-        />
-      </div>
-
-      <button
-        onClick={() => setShowMap(true)}
-        className="w-full flex items-center justify-center gap-2 h-12 rounded-2xl mb-3 text-[15px] font-semibold"
-        style={{ background: 'rgba(243,112,167,0.10)', color: '#F370A7' }}
-      >
-        <Navigation size={17} strokeWidth={2} />
-        {hasPin ? t.mk_loc_map_change : t.mk_loc_map}
-      </button>
-
-      {/* Picked-location preview (tap to refine) */}
-      {previewUrl && (
-        <button onClick={() => setShowMap(true)} className="block w-full rounded-2xl overflow-hidden mb-6 relative" style={{ aspectRatio: '2.3/1', background: '#F7F7F8' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={previewUrl} alt="map" className="w-full h-full object-cover" />
-          <span className="absolute bottom-2 left-2 flex items-center gap-1 text-white text-[11px] font-semibold px-2 py-1 rounded-full" style={{ background: 'rgba(0,0,0,0.55)' }}>
-            <MapPin size={12} strokeWidth={2} />
-            {t.mk_loc_pinned}
-          </span>
-        </button>
-      )}
-      {!previewUrl && <div className="mb-6" />}
-
-      <MapPickerSheet
-        open={showMap}
-        initial={{ lat: loc.latitude, lon: loc.longitude }}
-        onPick={(lat, lon, address) => setLoc({ latitude: lat, longitude: lon, address: address || loc.address })}
-        onClose={() => setShowMap(false)}
+      <SelectRow
+        label={t.mk_loc_region_label}
+        value={loc.region ? regionLabel(loc.region, locale) : undefined}
+        placeholder={t.mk_loc_region_label}
+        onClick={() => setSheet('region')}
       />
 
-      <p className="text-[15px] font-bold text-black dark:text-white mb-2">{t.mk_loc_landmark_label}</p>
-      <div className="flex items-center gap-2 px-4 h-14 rounded-2xl mb-6" style={{ background: 'rgba(128,128,128,0.10)' }}>
-        <Building2 size={18} className="text-black/40 dark:text-white/40 shrink-0" />
-        <input
-          value={loc.landmark ?? ''}
-          onChange={(e) => setLoc({ landmark: e.target.value })}
-          placeholder={t.mk_loc_landmark_ph}
-          className="flex-1 bg-transparent outline-none text-[15px] text-black dark:text-white"
-        />
-      </div>
+      <SelectRow
+        label={t.mk_loc_district_label}
+        value={loc.district ? districtOptions.find((o) => o.value === loc.district)?.label : undefined}
+        placeholder={t.mk_loc_district_ph}
+        disabled={!loc.region}
+        onClick={() => setSheet('district')}
+      />
 
-      <p className="text-[13px] text-black/45 dark:text-white/45 mb-2">{t.mk_loc_courier_note}</p>
-      <div className="flex items-center gap-3 p-3.5 rounded-2xl" style={{ background: 'rgba(128,128,128,0.08)' }}>
-        <span className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: '#3BA55D' }}>
-          <Truck size={18} color="white" />
-        </span>
-        <span className="flex-1 text-[15px] font-medium text-black dark:text-white">{t.mk_loc_courier}</span>
-        <Toggle on={!!loc.courier} onChange={(v) => setLoc({ courier: v })} />
-      </div>
+      <OptionSheet
+        open={sheet === 'region'}
+        title={t.mk_loc_region_label}
+        options={regionOptions}
+        value={loc.region ?? null}
+        onSelect={(v) => setLoc({ region: v, district: undefined })}
+        onClose={() => setSheet(null)}
+        searchable
+      />
+      <OptionSheet
+        open={sheet === 'district'}
+        title={t.mk_loc_district_label}
+        options={districtOptions}
+        value={loc.district ?? null}
+        onSelect={(v) => setLoc({ district: v })}
+        onClose={() => setSheet(null)}
+        searchable
+      />
     </StepScaffold>
   );
 }

@@ -30,6 +30,9 @@ export default function DealStep({ form, patch, onNext }: StepProps) {
 
   const priceValid = isFree || (form.price ?? 0) > 0;
 
+  // Display the price with a space as the thousands separator (1000 → "1 000").
+  const priceDisplay = form.price ? form.price.toLocaleString('en-US').replace(/,/g, ' ') : '';
+
   return (
     <StepScaffold
       title={t.mk_deal_title}
@@ -72,10 +75,13 @@ export default function DealStep({ form, patch, onNext }: StepProps) {
           </div>
           <div className="flex items-center gap-2 px-4 h-14 rounded-2xl" style={{ background: 'rgba(128,128,128,0.10)' }}>
             <input
-              type="number"
+              type="text"
               inputMode="numeric"
-              value={form.price ? String(form.price) : ''}
-              onChange={(e) => patch({ price: Math.max(0, parseInt(e.target.value || '0', 10) || 0) })}
+              value={priceDisplay}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, '');
+                patch({ price: digits ? Math.max(0, parseInt(digits, 10)) : 0 });
+              }}
               placeholder="0"
               className="flex-1 bg-transparent text-[18px] font-semibold outline-none text-black dark:text-white"
             />

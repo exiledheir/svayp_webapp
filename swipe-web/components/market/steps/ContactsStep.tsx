@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MessageCircle, Send, Check } from 'lucide-react';
+import { MessageCircle, Send, Check, Phone } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { getUser } from '@/lib/auth';
 import { getUserProfile } from '@/lib/wardrobe-api';
@@ -57,6 +57,7 @@ export default function ContactsStep({ form, patch, authed, onNeedAuth, onPublis
   const clean = national.replace(DIGITS, '');
   const fullPhone = `+998${clean}`;
   const telegramOn = methods.includes('telegram');
+  const callOn = methods.includes('phone');
   const valid = clean.length === 9 && name.trim().length > 0;
 
   function setSeller(p: Partial<NonNullable<MarketDraft['seller']>>) {
@@ -156,6 +157,18 @@ export default function ContactsStep({ form, patch, authed, onNeedAuth, onPublis
             <span className="block text-[13px] text-black/45 dark:text-white/45">{t.mk_contact_chat_note}</span>
           </span>
           <Toggle on disabled onChange={() => {}} />
+        </div>
+
+        {/* Phone call */}
+        <div className="flex items-center gap-3 p-3.5 rounded-2xl" style={{ background: 'rgba(128,128,128,0.08)' }}>
+          <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#6366F1' }}>
+            <Phone size={20} color="white" />
+          </span>
+          <span className="flex-1">
+            <span className="block text-[15px] font-semibold text-black dark:text-white">{t.mk_contact_call}</span>
+            <span className="block text-[13px] text-black/45 dark:text-white/45">{t.mk_contact_call_note}</span>
+          </span>
+          <Toggle on={callOn} onChange={(v) => setMethod('phone', v)} />
         </div>
 
         <div className="flex items-center gap-3 p-3.5 rounded-2xl" style={{ background: 'rgba(128,128,128,0.08)' }}>

@@ -2,14 +2,16 @@ import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Heart, MapPin, Truck, User } from 'lucide-react';
+import { ArrowLeft, Heart, MapPin, User } from 'lucide-react';
 import type { MarketListing } from '@/types/market';
 import { getListingById, toggleFavorite } from '@/lib/market-storage';
 import {
-  conditionLabel, seasonLabel, lengthLabel, colorLabel, materialLabel, countryLabel, getCategory,
+  conditionLabel, seasonLabel, lengthLabel, colorLabel, materialLabel, countryLabel, getCategory, regionLabel,
 } from '@/lib/market-attributes';
+import { districtLabel } from '@/lib/market-districts';
 import { taxLabel } from '@/lib/wardrobe-taxonomy';
 import ListingContactBar from '@/components/market/ListingContactBar';
+import CarouselDots from '@/components/market/CarouselDots';
 import MarketGuard from '@/components/market/MarketGuard';
 import { formatPrice } from '@/lib/cart-storage';
 import { useI18n } from '@/lib/i18n';
@@ -23,6 +25,7 @@ function ListingDetailPageInner() {
   const [listing, setListing] = useState<MarketListing | null>(null);
   const [liked, setLiked] = useState(false);
   const [ready, setReady] = useState(false);
+  const [imgIdx, setImgIdx] = useState(0);
 
   useEffect(() => {
     if (typeof id !== 'string') return;
@@ -72,14 +75,10 @@ function ListingDetailPageInner() {
   }
 
   const loc = listing.location;
-  const hasCoords = loc.latitude != null && loc.longitude != null;
-  const mapUrl = hasCoords
-    ? `https://static-maps.yandex.ru/1.x/?ll=${loc.longitude},${loc.latitude}&z=15&size=600,300&l=map&pt=${loc.longitude},${loc.latitude},pm2rdm`
-    : null;
-  // Tapping the map opens the location in the user's maps app.
-  const externalMapUrl = hasCoords
-    ? `https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`
-    : null;
+  // New listings store region + district; older ones may have a free-text address.
+  const regionText = loc.region ? regionLabel(loc.region, locale) : (loc.address ?? '');
+  const districtText = districtLabel(loc.region, loc.district, locale);
+  const locationText = [regionText, districtText].filter(Boolean).join(', ');
 
   return (
     <>
@@ -110,12 +109,22 @@ function ListingDetailPageInner() {
 
         <main className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(84px + env(safe-area-inset-bottom, 0px))' }}>
           {/* Image carousel */}
-          <div className="flex overflow-x-auto" style={{ scrollSnapType: 'x mandatory' }}>
-            {(listing.images.length ? listing.images : ['']).map((src, i) => (
-              <div key={i} className="relative shrink-0 w-full" style={{ aspectRatio: '4/5', background: '#F7F7F8', scrollSnapAlign: 'start' }}>
-                {src && <Image src={src} alt={`${listing.title} ${i + 1}`} fill sizes="430px" className="object-cover" unoptimized />}
-              </div>
-            ))}
+          <div className="relative">
+            <div
+              className="flex overflow-x-auto hide-scrollbar"
+              style={{ scrollSnapType: 'x mandatory' }}
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                if (el.clientWidth) setImgIdx(Math.round(el.scrollLeft / el.clientWidth));
+              }}
+            >
+              {(listing.images.length ? listing.images : ['']).map((src, i) => (
+                <div key={i} className="relative shrink-0 w-full" style={{ aspectRatio: '4/5', background: '#F7F7F8', scrollSnapAlign: 'start' }}>
+                  {src && <Image src={src} alt={`${listing.title} ${i + 1}`} fill sizes="430px" className="object-cover" unoptimized />}
+                </div>
+              ))}
+            </div>
+            <CarouselDots count={listing.images.length} active={imgIdx} />
           </div>
 
           {/* Price + title */}
@@ -169,42 +178,14 @@ function ListingDetailPageInner() {
             </div>
           </div>
 
-          {/* Location */}
-          {(loc.address || mapUrl) && (
+          {/* Location — region + district */}
+          {locationText && (
             <div className="px-4 pt-5">
               <h2 className="text-[15px] font-bold mb-2 text-black dark:text-white">{t.mk_detail_location}</h2>
-              {loc.address && (
-                <div className="flex items-center gap-2 text-[14px] mb-2 text-black/70 dark:text-white/70">
-                  <MapPin size={15} strokeWidth={1.8} />
-                  <span>{loc.address}{loc.landmark ? `, ${loc.landmark}` : ''}</span>
-                </div>
-              )}
-              {mapUrl && (
-                <a
-                  href={externalMapUrl ?? undefined}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="relative block w-full rounded-2xl overflow-hidden active:opacity-90"
-                  style={{ aspectRatio: '2/1', background: '#F7F7F8' }}
-                  aria-label={t.mk_detail_location}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={mapUrl} alt="map" className="w-full h-full object-cover" />
-                  <span
-                    className="absolute bottom-2 right-2 flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-semibold text-black"
-                    style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(6px)' }}
-                  >
-                    <MapPin size={13} strokeWidth={2} />
-                    {t.mk_detail_open_map}
-                  </span>
-                </a>
-              )}
-              {loc.courier && (
-                <div className="flex items-center gap-2 text-[13px] mt-2 text-[#3BA55D] font-semibold">
-                  <Truck size={15} strokeWidth={1.8} />
-                  <span>{t.mk_courier_available}</span>
-                </div>
-              )}
+              <div className="flex items-center gap-2 text-[14px] text-black/70 dark:text-white/70">
+                <MapPin size={15} strokeWidth={1.8} />
+                <span>{locationText}</span>
+              </div>
             </div>
           )}
         </main>
