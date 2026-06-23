@@ -44,6 +44,10 @@ export interface MarketListing {
   color?: string; // MARKET_COLORS key
   season?: MarketSeason;
   length?: MarketLength;
+  hijabFriendly?: boolean; // «Подходит для покрытых» (Да/Нет)
+  fit?: string; // taxonomy fit: 'REGULAR' | 'LOOSE' | 'SLIM'
+  material?: string; // MATERIALS key
+  country?: string; // ISO 3166-1 alpha-2 country-of-origin code
   customAttrs?: Record<string, string | boolean>;
   dealType: MarketDealType;
   price: number; // 0 when free

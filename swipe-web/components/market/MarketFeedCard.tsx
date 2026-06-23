@@ -31,7 +31,9 @@ export default function MarketFeedCard({ listing, onToggleFavorite }: Props) {
 
   const imageUrl = listing.images[0] ?? '';
   const priceText =
-    listing.dealType === 'free' ? t.mk_free : formatPrice(listing.price, t.mk_currency_uzs);
+    listing.dealType === 'free'
+      ? t.mk_free
+      : formatPrice(listing.price, listing.currency === 'USD' ? 'USD' : t.mk_currency_uzs);
 
   return (
     <div

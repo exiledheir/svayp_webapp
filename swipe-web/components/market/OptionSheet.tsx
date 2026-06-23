@@ -1,5 +1,5 @@
-import React from 'react';
-import { Check } from 'lucide-react';
+import React, { useState } from 'react';
+import { Check, Search } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 
 export interface OptionItem {
@@ -15,15 +15,21 @@ interface Props {
   value: string | null;
   onSelect: (value: string) => void;
   onClose: () => void;
+  /** Show a filter input above the list (for long lists like countries). */
+  searchable?: boolean;
 }
 
 /**
  * Generic bottom-sheet single-select list (Бренд / Размер / Цвет …). Mirrors the
  * shop category sheet chrome. Color options render a swatch when `hex` is set.
  */
-export default function OptionSheet({ open, title, options, value, onSelect, onClose }: Props) {
+export default function OptionSheet({ open, title, options, value, onSelect, onClose, searchable }: Props) {
   const { t } = useI18n();
+  const [query, setQuery] = useState('');
   if (!open) return null;
+
+  const q = query.trim().toLowerCase();
+  const shown = q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options;
 
   return (
     <div
@@ -39,9 +45,21 @@ export default function OptionSheet({ open, title, options, value, onSelect, onC
         <div className="px-5 pt-4 pb-2 shrink-0">
           <div className="w-9 h-1 rounded-full mx-auto mb-3" style={{ background: 'rgba(128,128,128,0.4)' }} />
           <h2 className="text-[16px] font-bold text-center text-black dark:text-white">{title}</h2>
+          {searchable && (
+            <div className="flex items-center gap-2 px-3.5 h-11 rounded-xl mt-3" style={{ background: 'rgba(128,128,128,0.10)' }}>
+              <Search size={16} className="text-black/40 dark:text-white/40 shrink-0" />
+              <input
+                value={query}
+                autoFocus
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t.mk_search}
+                className="flex-1 bg-transparent outline-none text-[15px] text-black dark:text-white"
+              />
+            </div>
+          )}
         </div>
         <div className="px-5 overflow-y-auto flex-1">
-          {options.map((opt) => {
+          {shown.map((opt) => {
             const active = opt.value === value;
             return (
               <button

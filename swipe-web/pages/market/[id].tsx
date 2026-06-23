@@ -6,8 +6,9 @@ import { ArrowLeft, Heart, MapPin, Truck, User } from 'lucide-react';
 import type { MarketListing } from '@/types/market';
 import { getListingById, toggleFavorite } from '@/lib/market-storage';
 import {
-  conditionLabel, seasonLabel, lengthLabel, colorLabel, getCategory,
+  conditionLabel, seasonLabel, lengthLabel, colorLabel, materialLabel, countryLabel, getCategory,
 } from '@/lib/market-attributes';
+import { taxLabel } from '@/lib/wardrobe-taxonomy';
 import ListingContactBar from '@/components/market/ListingContactBar';
 import MarketGuard from '@/components/market/MarketGuard';
 import { formatPrice } from '@/lib/cart-storage';
@@ -17,7 +18,7 @@ import { Events } from '@/lib/analytics-events';
 
 function ListingDetailPageInner() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { id } = router.query;
   const [listing, setListing] = useState<MarketListing | null>(null);
   const [liked, setLiked] = useState(false);
@@ -47,17 +48,23 @@ function ListingDetailPageInner() {
     return <div className="phone-container bg-white dark:bg-[#111111]" style={{ height: '100dvh' }} />;
   }
 
-  const priceText = listing.dealType === 'free' ? t.mk_free : formatPrice(listing.price, t.mk_currency_uzs);
+  const priceText = listing.dealType === 'free'
+    ? t.mk_free
+    : formatPrice(listing.price, listing.currency === 'USD' ? 'USD' : t.mk_currency_uzs);
   const category = getCategory(listing.category);
 
   const rows: Array<{ label: string; value: string }> = [];
   rows.push({ label: t.mk_char_condition, value: conditionLabel(t, listing.condition) });
+  if (listing.hijabFriendly != null) rows.push({ label: t.mk_char_modesty, value: listing.hijabFriendly ? t.mk_char_yes : t.mk_char_no });
   if (category) rows.push({ label: t.mk_categories, value: category.label });
   if (listing.brand) rows.push({ label: t.mk_char_brand, value: listing.brand });
   if (listing.size) rows.push({ label: t.mk_char_size, value: listing.size });
+  if (listing.fit) rows.push({ label: t.mk_char_fit, value: taxLabel(listing.fit, locale) });
   if (listing.color) rows.push({ label: t.mk_char_color, value: colorLabel(t, listing.color) });
   if (listing.season) rows.push({ label: t.mk_char_season, value: seasonLabel(t, listing.season) });
   if (listing.length) rows.push({ label: t.mk_char_length, value: lengthLabel(t, listing.length) });
+  if (listing.material) rows.push({ label: t.mk_char_material, value: materialLabel(listing.material, locale) });
+  if (listing.country) rows.push({ label: t.mk_char_country, value: countryLabel(listing.country, locale) });
 
   function handleLike() {
     const next = toggleFavorite(listing!.id);
@@ -65,10 +72,14 @@ function ListingDetailPageInner() {
   }
 
   const loc = listing.location;
-  const mapUrl =
-    loc.latitude != null && loc.longitude != null
-      ? `https://static-maps.yandex.ru/1.x/?ll=${loc.longitude},${loc.latitude}&z=15&size=600,300&l=map&pt=${loc.longitude},${loc.latitude},pm2rdm`
-      : null;
+  const hasCoords = loc.latitude != null && loc.longitude != null;
+  const mapUrl = hasCoords
+    ? `https://static-maps.yandex.ru/1.x/?ll=${loc.longitude},${loc.latitude}&z=15&size=600,300&l=map&pt=${loc.longitude},${loc.latitude},pm2rdm`
+    : null;
+  // Tapping the map opens the location in the user's maps app.
+  const externalMapUrl = hasCoords
+    ? `https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`
+    : null;
 
   return (
     <>
@@ -169,10 +180,24 @@ function ListingDetailPageInner() {
                 </div>
               )}
               {mapUrl && (
-                <div className="relative w-full rounded-2xl overflow-hidden" style={{ aspectRatio: '2/1', background: '#F7F7F8' }}>
+                <a
+                  href={externalMapUrl ?? undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="relative block w-full rounded-2xl overflow-hidden active:opacity-90"
+                  style={{ aspectRatio: '2/1', background: '#F7F7F8' }}
+                  aria-label={t.mk_detail_location}
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={mapUrl} alt="map" className="w-full h-full object-cover" />
-                </div>
+                  <span
+                    className="absolute bottom-2 right-2 flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-semibold text-black"
+                    style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(6px)' }}
+                  >
+                    <MapPin size={13} strokeWidth={2} />
+                    {t.mk_detail_open_map}
+                  </span>
+                </a>
               )}
               {loc.courier && (
                 <div className="flex items-center gap-2 text-[13px] mt-2 text-[#3BA55D] font-semibold">

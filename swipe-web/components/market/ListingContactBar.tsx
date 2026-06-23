@@ -65,12 +65,12 @@ export default function ListingContactBar({ listing }: { listing: MarketListing 
         {hasTelegram && (
           <button
             onClick={openTelegram}
-            className={`${hasChat ? 'w-[52px]' : 'flex-1'} flex items-center justify-center gap-1.5 text-[15px] font-semibold active:opacity-90`}
+            className="flex-1 flex items-center justify-center gap-1.5 text-[15px] font-semibold active:opacity-90"
             style={{ height: 52, borderRadius: 14, background: '#229ED9', color: 'white' }}
             aria-label="Telegram"
           >
             <Send size={18} strokeWidth={2} />
-            {!hasChat && 'Telegram'}
+            Telegram
           </button>
         )}
       </div>

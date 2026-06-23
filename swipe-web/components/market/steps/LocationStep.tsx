@@ -1,6 +1,7 @@
-import React from 'react';
-import { Search, Navigation, Building2, Truck } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, Navigation, Building2, Truck, MapPin } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
+import MapPickerSheet from '@/components/market/MapPickerSheet';
 import StepScaffold from './StepScaffold';
 import type { StepProps } from './types';
 
@@ -20,21 +21,23 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
 export default function LocationStep({ form, patch, onNext }: StepProps) {
   const { t } = useI18n();
   const loc = form.location ?? {};
+  const [showMap, setShowMap] = useState(false);
 
   function setLoc(p: Partial<typeof loc>) {
     patch({ location: { ...loc, ...p } });
   }
 
-  // Mock "pick on map": drop a default Tashkent pin so the detail map renders.
-  function pickOnMap() {
-    setLoc({ latitude: 41.311081, longitude: 69.240562, address: loc.address || 'Ташкент' });
-  }
+  const hasAddress = !!loc.address?.trim();
+  const hasPin = loc.latitude != null && loc.longitude != null;
+  const previewUrl = hasPin
+    ? `https://static-maps.yandex.ru/1.x/?ll=${loc.longitude},${loc.latitude}&z=15&size=600,260&l=map&pt=${loc.longitude},${loc.latitude},pm2rdm`
+    : null;
 
   return (
     <StepScaffold
       title={t.mk_loc_title}
       ctaLabel={t.mk_continue}
-      ctaDisabled={!loc.address?.trim()}
+      ctaDisabled={!hasAddress && !hasPin}
       onCta={onNext}
     >
       <div className="flex items-center gap-2 px-4 h-14 rounded-2xl mb-3" style={{ background: 'rgba(128,128,128,0.10)' }}>
@@ -48,13 +51,33 @@ export default function LocationStep({ form, patch, onNext }: StepProps) {
       </div>
 
       <button
-        onClick={pickOnMap}
-        className="w-full flex items-center justify-center gap-2 h-12 rounded-2xl mb-6 text-[15px] font-semibold"
+        onClick={() => setShowMap(true)}
+        className="w-full flex items-center justify-center gap-2 h-12 rounded-2xl mb-3 text-[15px] font-semibold"
         style={{ background: 'rgba(243,112,167,0.10)', color: '#F370A7' }}
       >
         <Navigation size={17} strokeWidth={2} />
-        {t.mk_loc_map}
+        {hasPin ? t.mk_loc_map_change : t.mk_loc_map}
       </button>
+
+      {/* Picked-location preview (tap to refine) */}
+      {previewUrl && (
+        <button onClick={() => setShowMap(true)} className="block w-full rounded-2xl overflow-hidden mb-6 relative" style={{ aspectRatio: '2.3/1', background: '#F7F7F8' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={previewUrl} alt="map" className="w-full h-full object-cover" />
+          <span className="absolute bottom-2 left-2 flex items-center gap-1 text-white text-[11px] font-semibold px-2 py-1 rounded-full" style={{ background: 'rgba(0,0,0,0.55)' }}>
+            <MapPin size={12} strokeWidth={2} />
+            {t.mk_loc_pinned}
+          </span>
+        </button>
+      )}
+      {!previewUrl && <div className="mb-6" />}
+
+      <MapPickerSheet
+        open={showMap}
+        initial={{ lat: loc.latitude, lon: loc.longitude }}
+        onPick={(lat, lon, address) => setLoc({ latitude: lat, longitude: lon, address: address || loc.address })}
+        onClose={() => setShowMap(false)}
+      />
 
       <p className="text-[15px] font-bold text-black dark:text-white mb-2">{t.mk_loc_landmark_label}</p>
       <div className="flex items-center gap-2 px-4 h-14 rounded-2xl mb-6" style={{ background: 'rgba(128,128,128,0.10)' }}>

@@ -33,6 +33,33 @@ const STEP_NAMES: Record<number, string> = {
   [DEAL]: 'deal', [LOCATION]: 'location', [CONTACTS]: 'contacts',
 };
 
+/**
+ * Tracks the *visual* viewport height so the page shrinks to the area above the
+ * on-screen keyboard. Without this, the `100dvh` container stays full-height
+ * when the keyboard opens, the browser scrolls it to keep the focused input in
+ * view, and the pinned footer (Continue / nav) appears to jump to the top.
+ * Pinning the container to `visualViewport.height` keeps the footer just above
+ * the keyboard instead. Falls back to `100dvh` where the API is unavailable.
+ */
+function useViewportHeight(): string {
+  const [h, setH] = useState('100dvh');
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setH(`${Math.round(vv.height)}px`);
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    window.addEventListener('orientationchange', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      window.removeEventListener('orientationchange', update);
+    };
+  }, []);
+  return h;
+}
+
 function MarketCreatePageInner() {
   const router = useRouter();
   const { t } = useI18n();
@@ -40,6 +67,7 @@ function MarketCreatePageInner() {
   const [form, setForm] = useState<MarketDraft>(() => emptyDraft());
   const [ready, setReady] = useState(false);
   const didStart = useRef(false);
+  const viewportH = useViewportHeight();
 
   // ── Mount: gate + resume ────────────────────────────────────────────────────
   useEffect(() => {
@@ -94,12 +122,6 @@ function MarketCreatePageInner() {
     else setStep((s) => s - 1);
   }
 
-  function saveExit() {
-    saveDraft(form);
-    logAnalyticsEvent(Events.MARKET_LISTING_DRAFT_SAVED, { [Params.MK_STEP]: STEP_NAMES[step] ?? 'unknown' });
-    router.replace('/market/mine');
-  }
-
   // Contacts step → unauthenticated users: persist draft + step, bounce through auth.
   function needAuth(phone: string) {
     const next = { ...form, seller: { ...(form.seller ?? { id: '', name: '' }), phone } };
@@ -122,13 +144,13 @@ function MarketCreatePageInner() {
   }
 
   if (!ready) {
-    return <div className="phone-container bg-white dark:bg-[#111111]" style={{ height: '100dvh' }} />;
+    return <div className="phone-container bg-white dark:bg-[#111111]" style={{ height: viewportH }} />;
   }
 
   // ── Published success screen (inline) ───────────────────────────────────────
   if (step === PUBLISHED) {
     return (
-      <div className="phone-container flex flex-col bg-white dark:bg-[#111111]" style={{ height: '100dvh' }}>
+      <div className="phone-container flex flex-col bg-white dark:bg-[#111111]" style={{ height: viewportH }}>
         <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
           <div className="w-24 h-24 rounded-full flex items-center justify-center" style={{ background: 'rgba(243,112,167,0.12)' }}>
             <Check size={48} color="#F370A7" strokeWidth={2.5} />
@@ -163,8 +185,8 @@ function MarketCreatePageInner() {
       <Head>
         <title>{t.mk_post_cta}</title>
       </Head>
-      <div className="phone-container flex flex-col bg-white dark:bg-[#111111] overflow-hidden" style={{ height: '100dvh' }}>
-        <WizardHeader step={step} totalSteps={TOTAL_STEPS} onBack={goBack} onSaveExit={saveExit} />
+      <div className="phone-container flex flex-col bg-white dark:bg-[#111111] overflow-hidden" style={{ height: viewportH }}>
+        <WizardHeader step={step} totalSteps={TOTAL_STEPS} onBack={goBack} />
 
         {step === PHOTOS && <PhotosStep {...stepProps} />}
         {step === DETAILS && <DetailsStep {...stepProps} />}

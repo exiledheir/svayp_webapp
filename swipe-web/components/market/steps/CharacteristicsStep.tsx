@@ -1,17 +1,19 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import {
   MARKET_CONDITIONS, MARKET_SEASONS, MARKET_LENGTHS, MARKET_BRANDS,
-  MARKET_SIZES, MARKET_SHOE_SIZES, MARKET_COLORS,
-  conditionLabel, seasonLabel, lengthLabel, colorLabel, attributesForCategory,
+  MARKET_SIZES, MARKET_SHOE_SIZES, MARKET_COLORS, MARKET_MATERIALS, FIT_TYPES,
+  conditionLabel, seasonLabel, lengthLabel, colorLabel, materialLabel,
+  countryOptions, attributesForCategory,
 } from '@/lib/market-attributes';
+import { taxLabel } from '@/lib/wardrobe-taxonomy';
 import OptionSheet, { type OptionItem } from '@/components/market/OptionSheet';
 import { useI18n } from '@/lib/i18n';
 import StepScaffold from './StepScaffold';
 import type { StepProps } from './types';
 import type { MarketSeason, MarketLength } from '@/types/market';
 
-type SheetKind = 'brand' | 'size' | 'color' | null;
+type SheetKind = 'brand' | 'size' | 'color' | 'material' | 'country' | null;
 
 function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
@@ -47,13 +49,15 @@ function SelectRow({ label, value, placeholder, onClick }: { label: string; valu
 }
 
 export default function CharacteristicsStep({ form, patch, onNext }: StepProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [sheet, setSheet] = useState<SheetKind>(null);
   const flags = attributesForCategory(form.category);
 
   const brandOptions: OptionItem[] = MARKET_BRANDS.map((b) => ({ value: b, label: b }));
   const sizeOptions: OptionItem[] = (flags.shoeSizes ? MARKET_SHOE_SIZES : MARKET_SIZES).map((s) => ({ value: s, label: s }));
   const colorOptions: OptionItem[] = MARKET_COLORS.map((c) => ({ value: c.key, label: colorLabel(t, c.key), hex: c.hex }));
+  const materialOptions: OptionItem[] = MARKET_MATERIALS.map((m) => ({ value: m, label: materialLabel(m, locale) }));
+  const countryOpts = useMemo<OptionItem[]>(() => countryOptions(locale), [locale]);
 
   return (
     <>
@@ -77,10 +81,25 @@ export default function CharacteristicsStep({ form, patch, onNext }: StepProps) 
           </div>
         )}
 
+        {/* Modesty — «Подходит для покрытых» (optional Да/Нет) */}
+        {flags.showModesty && (
+          <div className="mb-5">
+            <p className="text-[15px] font-bold text-black dark:text-white mb-2">{t.mk_char_modesty}</p>
+            <div className="flex gap-2">
+              <Chip active={form.hijabFriendly === true} onClick={() => patch({ hijabFriendly: form.hijabFriendly === true ? undefined : true })}>
+                {t.mk_char_yes}
+              </Chip>
+              <Chip active={form.hijabFriendly === false} onClick={() => patch({ hijabFriendly: form.hijabFriendly === false ? undefined : false })}>
+                {t.mk_char_no}
+              </Chip>
+            </div>
+          </div>
+        )}
+
         {/* Brand */}
         {flags.showBrand && (
           <div className="mb-5">
-            <SelectRow label={t.mk_char_brand} value={form.brand} placeholder={t.mk_char_select} onClick={() => setSheet('brand')} />
+            <SelectRow label={t.mk_char_brand} value={form.brand} placeholder="—" onClick={() => setSheet('brand')} />
           </div>
         )}
 
@@ -88,6 +107,20 @@ export default function CharacteristicsStep({ form, patch, onNext }: StepProps) 
         {flags.showSize && (
           <div className="mb-5">
             <SelectRow label={t.mk_char_size} value={form.size} placeholder={t.mk_char_select} onClick={() => setSheet('size')} />
+          </div>
+        )}
+
+        {/* Fit (optional) */}
+        {flags.showFit && (
+          <div className="mb-5">
+            <p className="text-[15px] font-bold text-black dark:text-white mb-2">{t.mk_char_fit}</p>
+            <div className="flex flex-wrap gap-2">
+              {FIT_TYPES.map((f) => (
+                <Chip key={f} active={form.fit === f} onClick={() => patch({ fit: form.fit === f ? undefined : f })}>
+                  {taxLabel(f, locale)}
+                </Chip>
+              ))}
+            </div>
           </div>
         )}
 
@@ -121,11 +154,35 @@ export default function CharacteristicsStep({ form, patch, onNext }: StepProps) 
 
         {/* Color */}
         {flags.showColor && (
+          <div className="mb-5">
+            <SelectRow
+              label={t.mk_char_color}
+              value={form.color ? colorLabel(t, form.color) : undefined}
+              placeholder="—"
+              onClick={() => setSheet('color')}
+            />
+          </div>
+        )}
+
+        {/* Material (optional) */}
+        {flags.showMaterial && (
+          <div className="mb-5">
+            <SelectRow
+              label={t.mk_char_material}
+              value={form.material ? materialLabel(form.material, locale) : undefined}
+              placeholder="—"
+              onClick={() => setSheet('material')}
+            />
+          </div>
+        )}
+
+        {/* Country of origin (optional) */}
+        {flags.showCountry && (
           <SelectRow
-            label={t.mk_char_color}
-            value={form.color ? colorLabel(t, form.color) : undefined}
-            placeholder={t.mk_char_select}
-            onClick={() => setSheet('color')}
+            label={t.mk_char_country}
+            value={form.country ? countryOpts.find((o) => o.value === form.country)?.label : undefined}
+            placeholder="—"
+            onClick={() => setSheet('country')}
           />
         )}
       </StepScaffold>
@@ -133,6 +190,8 @@ export default function CharacteristicsStep({ form, patch, onNext }: StepProps) 
       <OptionSheet open={sheet === 'brand'} title={t.mk_char_brand} options={brandOptions} value={form.brand ?? null} onSelect={(v) => patch({ brand: v })} onClose={() => setSheet(null)} />
       <OptionSheet open={sheet === 'size'} title={t.mk_char_size} options={sizeOptions} value={form.size ?? null} onSelect={(v) => patch({ size: v })} onClose={() => setSheet(null)} />
       <OptionSheet open={sheet === 'color'} title={t.mk_char_color} options={colorOptions} value={form.color ?? null} onSelect={(v) => patch({ color: v })} onClose={() => setSheet(null)} />
+      <OptionSheet open={sheet === 'material'} title={t.mk_char_material} options={materialOptions} value={form.material ?? null} onSelect={(v) => patch({ material: v })} onClose={() => setSheet(null)} />
+      <OptionSheet open={sheet === 'country'} title={t.mk_char_country} options={countryOpts} value={form.country ?? null} onSelect={(v) => patch({ country: v })} onClose={() => setSheet(null)} searchable />
     </>
   );
 }

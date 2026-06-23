@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { MessageCircle, Send, Check } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
+import { getUser } from '@/lib/auth';
+import { getUserProfile } from '@/lib/wardrobe-api';
 import StepScaffold from './StepScaffold';
 import type { MarketContactMethod, MarketDraft } from '@/types/market';
 
@@ -35,19 +37,55 @@ function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean
  * then publish. The phone replaces the standalone PhoneStep — it doubles as the
  * auth gate (unauthenticated users get bounced through OTP, keeping the draft).
  */
+/** Normalise any stored phone to the 9-digit national part (drops +998 / 998). */
+function toNational(raw?: string): string {
+  let d = (raw ?? '').replace(DIGITS, '');
+  if (d.startsWith('998')) d = d.slice(3);
+  return d.slice(-9);
+}
+
 export default function ContactsStep({ form, patch, authed, onNeedAuth, onPublish }: ContactsStepProps) {
   const { t } = useI18n();
   const methods = form.contactMethods ?? ['chat'];
   const name = form.seller?.name ?? '';
-  const [national, setNational] = useState((form.seller?.phone ?? '').replace(/^\+998/, ''));
+  const telegramUsername = form.seller?.telegramUsername ?? '';
+  const [national, setNational] = useState(toNational(form.seller?.phone));
+  // Prefill name/phone from the signed-in user's profile, once, without
+  // clobbering anything the user (or a resumed draft) already filled in.
+  const prefilled = useRef(false);
 
   const clean = national.replace(DIGITS, '');
   const fullPhone = `+998${clean}`;
+  const telegramOn = methods.includes('telegram');
   const valid = clean.length === 9 && name.trim().length > 0;
 
   function setSeller(p: Partial<NonNullable<MarketDraft['seller']>>) {
     patch({ seller: { ...(form.seller ?? { id: '', name: '' }), ...p } });
   }
+
+  useEffect(() => {
+    if (prefilled.current) return;
+    prefilled.current = true;
+
+    const apply = (rawName?: string, rawPhone?: string) => {
+      const nat = toNational(rawPhone);
+      const patchSeller: Partial<NonNullable<MarketDraft['seller']>> = {};
+      // Only set a name that looks like a name (skip phone-number usernames).
+      if (!form.seller?.name && rawName && /[^\d+\s]/.test(rawName)) patchSeller.name = rawName;
+      if (!toNational(form.seller?.phone) && nat.length === 9) {
+        patchSeller.phone = `+998${nat}`;
+        setNational(nat);
+      }
+      if (Object.keys(patchSeller).length) setSeller(patchSeller);
+    };
+
+    // Fast local prefill (Flutter WebView injects the user), then backend profile.
+    const u = getUser();
+    apply((u?.name ?? u?.username) as string | undefined, (u?.phone ?? u?.username) as string | undefined);
+    getUserProfile()
+      .then((p) => apply(p.name, p.phoneNumber))
+      .catch(() => { /* ignore — manual entry still works */ });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function onPhoneChange(v: string) {
     setNational(v);
@@ -125,8 +163,26 @@ export default function ContactsStep({ form, patch, authed, onNeedAuth, onPublis
             <Send size={20} color="white" />
           </span>
           <span className="flex-1 text-[15px] font-semibold text-black dark:text-white">{t.mk_contact_telegram}</span>
-          <Toggle on={methods.includes('telegram')} onChange={(v) => setMethod('telegram', v)} />
+          <Toggle on={telegramOn} onChange={(v) => setMethod('telegram', v)} />
         </div>
+
+        {/* When Telegram is on: explain the phone redirect + offer a username. */}
+        {telegramOn && (
+          <div className="rounded-2xl p-3.5" style={{ background: 'rgba(34,158,217,0.08)' }}>
+            <p className="text-[13px] leading-relaxed text-black/60 dark:text-white/60 mb-2.5">
+              {t.mk_contact_tg_note} <span className="font-semibold text-black/75 dark:text-white/75">{fullPhone}</span>
+            </p>
+            <div className="flex items-center px-3.5 h-12 rounded-xl bg-white dark:bg-[#2c2c2e]">
+              <span className="text-[15px] font-semibold text-black/40 dark:text-white/40">@</span>
+              <input
+                value={telegramUsername.replace(/^@/, '')}
+                onChange={(e) => setSeller({ telegramUsername: e.target.value.replace(/[^A-Za-z0-9_]/g, '') })}
+                placeholder={t.mk_contact_tg_username_ph}
+                className="flex-1 bg-transparent outline-none text-[15px] ml-1 text-black dark:text-white"
+              />
+            </div>
+          </div>
+        )}
       </div>
     </StepScaffold>
   );

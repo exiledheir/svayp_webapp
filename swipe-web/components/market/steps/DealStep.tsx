@@ -66,19 +66,23 @@ export default function DealStep({ form, patch, onNext }: StepProps) {
                 className="flex-1 h-11 rounded-xl text-[14px] font-semibold"
                 style={{ background: currency === c ? '#fff' : 'rgba(128,128,128,0.10)', border: currency === c ? '1.5px solid #111' : '1.5px solid transparent' }}
               >
-                <span className="text-black dark:text-white">{c === 'UZS' ? t.mk_currency_uzs : t.mk_currency_usd}</span>
+                <span className="text-black dark:text-white">{c === 'UZS' ? t.mk_currency_uzs : '$'}</span>
               </button>
             ))}
           </div>
-          <input
-            type="number"
-            inputMode="numeric"
-            value={form.price ? String(form.price) : ''}
-            onChange={(e) => patch({ price: Math.max(0, parseInt(e.target.value || '0', 10) || 0) })}
-            placeholder="0"
-            className="w-full px-4 h-14 rounded-2xl text-[18px] font-semibold outline-none text-black dark:text-white"
-            style={{ background: 'rgba(128,128,128,0.10)' }}
-          />
+          <div className="flex items-center gap-2 px-4 h-14 rounded-2xl" style={{ background: 'rgba(128,128,128,0.10)' }}>
+            <input
+              type="number"
+              inputMode="numeric"
+              value={form.price ? String(form.price) : ''}
+              onChange={(e) => patch({ price: Math.max(0, parseInt(e.target.value || '0', 10) || 0) })}
+              placeholder="0"
+              className="flex-1 bg-transparent text-[18px] font-semibold outline-none text-black dark:text-white"
+            />
+            <span className="text-[16px] font-semibold text-black/45 dark:text-white/45">
+              {currency === 'UZS' ? t.mk_currency_uzs : '$'}
+            </span>
+          </div>
         </>
       )}
 
