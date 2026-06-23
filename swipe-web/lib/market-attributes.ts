@@ -171,6 +171,48 @@ export function getCategory(key: string | undefined): MarketCategory | undefined
   return MARKET_CATEGORIES.find((c) => c.key === key);
 }
 
+// ── Meeting-place regions (UZ) ───────────────────────────────────────────────
+// The listing's meeting place is just the seller's region (no precise address /
+// map). Stored as a stable key; names are localized at render time.
+export const MARKET_REGIONS: string[] = [
+  'tashkent_city', 'tashkent_region', 'andijan', 'bukhara', 'fergana',
+  'jizzakh', 'namangan', 'navoi', 'kashkadarya', 'samarkand', 'sirdarya',
+  'surkhandarya', 'khorezm', 'karakalpakstan',
+];
+
+const REGION_LABELS: Record<Locale, Record<string, string>> = {
+  en: {
+    tashkent_city: 'Tashkent (city)', tashkent_region: 'Tashkent region',
+    andijan: 'Andijan', bukhara: 'Bukhara', fergana: 'Fergana', jizzakh: 'Jizzakh',
+    namangan: 'Namangan', navoi: 'Navoi', kashkadarya: 'Kashkadarya',
+    samarkand: 'Samarkand', sirdarya: 'Sirdarya', surkhandarya: 'Surkhandarya',
+    khorezm: 'Khorezm', karakalpakstan: 'Karakalpakstan',
+  },
+  ru: {
+    tashkent_city: 'Ташкент (город)', tashkent_region: 'Ташкентская область',
+    andijan: 'Андижанская область', bukhara: 'Бухарская область',
+    fergana: 'Ферганская область', jizzakh: 'Джизакская область',
+    namangan: 'Наманганская область', navoi: 'Навоийская область',
+    kashkadarya: 'Кашкадарьинская область', samarkand: 'Самаркандская область',
+    sirdarya: 'Сырдарьинская область', surkhandarya: 'Сурхандарьинская область',
+    khorezm: 'Хорезмская область', karakalpakstan: 'Республика Каракалпакстан',
+  },
+  uz: {
+    tashkent_city: 'Toshkent (shahar)', tashkent_region: 'Toshkent viloyati',
+    andijan: 'Andijon viloyati', bukhara: 'Buxoro viloyati',
+    fergana: "Fargʻona viloyati", jizzakh: 'Jizzax viloyati',
+    namangan: 'Namangan viloyati', navoi: 'Navoiy viloyati',
+    kashkadarya: 'Qashqadaryo viloyati', samarkand: 'Samarqand viloyati',
+    sirdarya: 'Sirdaryo viloyati', surkhandarya: 'Surxondaryo viloyati',
+    khorezm: 'Xorazm viloyati', karakalpakstan: "Qoraqalpogʻiston Respublikasi",
+  },
+};
+
+export function regionLabel(key: string | undefined, locale: Locale): string {
+  if (!key) return '';
+  return REGION_LABELS[locale]?.[key] ?? REGION_LABELS.en[key] ?? key;
+}
+
 // ── Which attribute rows a category shows ────────────────────────────────────
 export interface CategoryAttributeFlags {
   showCondition: boolean;

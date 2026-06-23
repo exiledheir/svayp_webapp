@@ -70,7 +70,9 @@ export default function CharacteristicsStep({ form, patch, onNext }: StepProps) 
         {/* Condition */}
         {flags.showCondition && (
           <div className="mb-5">
-            <p className="text-[15px] font-bold text-black dark:text-white mb-2">{t.mk_char_condition}</p>
+            <p className="text-[15px] font-bold text-black dark:text-white mb-2">
+              {t.mk_char_condition}<span style={{ color: '#F370A7' }}> *</span>
+            </p>
             <div className="flex flex-wrap gap-2">
               {MARKET_CONDITIONS.map((c) => (
                 <Chip key={c} active={form.condition === c} onClick={() => patch({ condition: c })}>

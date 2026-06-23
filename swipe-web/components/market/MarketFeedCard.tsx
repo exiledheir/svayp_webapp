@@ -4,8 +4,10 @@ import { useRouter } from 'next/router';
 import { Heart, MapPin } from 'lucide-react';
 import type { MarketListing } from '@/types/market';
 import { toggleFavorite } from '@/lib/market-storage';
+import { regionLabel } from '@/lib/market-attributes';
 import { formatPrice } from '@/lib/cart-storage';
 import { useI18n } from '@/lib/i18n';
+import CarouselDots from '@/components/market/CarouselDots';
 
 interface Props {
   listing: MarketListing;
@@ -15,12 +17,18 @@ interface Props {
 
 export default function MarketFeedCard({ listing, onToggleFavorite }: Props) {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [liked, setLiked] = React.useState(!!listing.isFavorite);
+  const [imgIdx, setImgIdx] = React.useState(0);
 
   React.useEffect(() => {
     setLiked(!!listing.isFavorite);
   }, [listing.isFavorite]);
+
+  function handleScroll(e: React.UIEvent<HTMLDivElement>) {
+    const el = e.currentTarget;
+    if (el.clientWidth) setImgIdx(Math.round(el.scrollLeft / el.clientWidth));
+  }
 
   function handleLike(e: React.MouseEvent) {
     e.stopPropagation();
@@ -29,7 +37,7 @@ export default function MarketFeedCard({ listing, onToggleFavorite }: Props) {
     onToggleFavorite?.(listing.id, next);
   }
 
-  const imageUrl = listing.images[0] ?? '';
+  const images = listing.images.length ? listing.images : [''];
   const priceText =
     listing.dealType === 'free'
       ? t.mk_free
@@ -41,22 +49,34 @@ export default function MarketFeedCard({ listing, onToggleFavorite }: Props) {
       style={{ borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
       onClick={() => router.push(`/market/${listing.id}`)}
     >
-      {/* Image — 4:5 ratio */}
+      {/* Image — 4:5 ratio, swipeable when there are multiple photos */}
       <div className="relative" style={{ aspectRatio: '4/5', background: '#F7F7F8' }}>
-        {imageUrl ? (
-          <Image
-            src={imageUrl}
-            alt={listing.title}
-            fill
-            sizes="(max-width: 430px) 50vw, 215px"
-            className="object-cover"
-            unoptimized
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-[12px]" style={{ color: 'rgba(0,0,0,0.3)' }}>
-            No image
-          </div>
-        )}
+        <div
+          className="absolute inset-0 flex overflow-x-auto hide-scrollbar"
+          style={{ scrollSnapType: 'x mandatory' }}
+          onScroll={handleScroll}
+        >
+          {images.map((src, i) => (
+            <div key={i} className="relative shrink-0 w-full h-full" style={{ scrollSnapAlign: 'start' }}>
+              {src ? (
+                <Image
+                  src={src}
+                  alt={`${listing.title} ${i + 1}`}
+                  fill
+                  sizes="(max-width: 430px) 50vw, 215px"
+                  className="object-cover"
+                  unoptimized
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-[12px]" style={{ color: 'rgba(0,0,0,0.3)' }}>
+                  No image
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <CarouselDots count={images.length} active={imgIdx} />
 
         <button
           className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center"
@@ -94,12 +114,17 @@ export default function MarketFeedCard({ listing, onToggleFavorite }: Props) {
         >
           {listing.title}
         </p>
-        {listing.location.address && (
-          <div className="flex items-center gap-1 mt-1.5 text-[11px] truncate" style={{ color: 'rgba(0,0,0,0.45)' }}>
-            <MapPin size={11} strokeWidth={1.8} className="shrink-0 text-black/45 dark:text-white/45" />
-            <span className="truncate text-black/45 dark:text-white/45">{listing.location.address}</span>
-          </div>
-        )}
+        {(() => {
+          const locText = listing.location.region
+            ? regionLabel(listing.location.region, locale)
+            : listing.location.address;
+          return locText ? (
+            <div className="flex items-center gap-1 mt-1.5 text-[11px] truncate" style={{ color: 'rgba(0,0,0,0.45)' }}>
+              <MapPin size={11} strokeWidth={1.8} className="shrink-0 text-black/45 dark:text-white/45" />
+              <span className="truncate text-black/45 dark:text-white/45">{locText}</span>
+            </div>
+          ) : null;
+        })()}
       </div>
     </div>
   );

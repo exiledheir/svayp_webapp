@@ -1237,26 +1237,16 @@ export default function ClosetPage() {
           {outfitToastMsg}
         </div>
       )}
-      {/* Header — mobile glass-morphism style */}
-      <header className="shrink-0 px-4 pt-2 pb-1 bg-white dark:bg-[#111111]">
-        <div
-          className="flex items-center justify-between px-4"
-          style={{
-            // Glass material kept in lockstep with the mobile MainTopBar and the
-            // shared web TopBar so Closet / Market / native tabs look identical.
-            background: theme === 'dark' ? 'rgba(5,5,8,0.82)' : 'rgba(255,255,255,0.72)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderRadius: 22,
-            border: theme === 'dark' ? '0.5px solid rgba(255,255,255,0.13)' : '0.5px solid rgba(0,0,0,0.16)',
-            minHeight: 56,
-          }}
-        >
-          {/* Left: LIBΛS logo */}
-          <h1 className="text-[22px] font-bold tracking-[0.12em] text-black dark:text-white">LIB<span style={{ color: '#F370A7' }}>Λ</span>S</h1>
+      {/* Header — flat style, matching the Market page (no glass border box) */}
+      <header
+        className="shrink-0 flex items-center justify-between px-4 pb-2 bg-white dark:bg-[#111111]"
+        style={{ paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))' }}
+      >
+        {/* Left: LIBΛS logo */}
+        <h1 className="text-[24px] font-bold tracking-[0.12em] text-black dark:text-white">LIB<span style={{ color: '#F370A7' }}>Λ</span>S</h1>
 
-          {/* Right: action buttons + profile */}
-          <div className="flex items-center gap-1.5">
+        {/* Right: action buttons + profile */}
+        <div className="flex items-center gap-1.5">
             {/* Calendar with text */}
             {/* Plan with text — hidden when plans are disabled */}
             {plansEnabled && (
@@ -1294,7 +1284,6 @@ export default function ClosetPage() {
               </button>
             )}
           </div>
-        </div>
       </header>
 
       {/* ── Promo Banner: 20% sale ────────────────────────────────── */}

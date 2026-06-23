@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { MessageCircle, Send, X } from 'lucide-react';
+import { MessageCircle, Send, Phone, Contact, X, ChevronRight } from 'lucide-react';
 import type { MarketListing } from '@/types/market';
 import { startMarketChat, buildTelegramLink, openTelegramLink } from '@/lib/market-chat';
 import { formatPrice } from '@/lib/cart-storage';
@@ -9,17 +9,23 @@ import { useI18n } from '@/lib/i18n';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
 
+// Matches the Market "Sell" FAB so the primary actions share one accent.
+const BRAND_PURPLE = '#F370A7';
+
 export default function ListingContactBar({ listing }: { listing: MarketListing }) {
   const router = useRouter();
   const { t } = useI18n();
+  const [showOptions, setShowOptions] = useState(false);
   const [showCompose, setShowCompose] = useState(false);
   const [message, setMessage] = useState('');
 
   const hasChat = listing.contactMethods.includes('chat');
+  const hasPhone = listing.contactMethods.includes('phone') && !!listing.seller.phone;
   const hasTelegram = listing.contactMethods.includes('telegram');
   const priceText = listing.dealType === 'free' ? t.mk_free : formatPrice(listing.price, t.mk_currency_uzs);
 
   function openCompose() {
+    setShowOptions(false);
     setMessage(t.mk_chat_compose_ph);
     setShowCompose(true);
   }
@@ -31,7 +37,13 @@ export default function ListingContactBar({ listing }: { listing: MarketListing 
     router.push(`/market/chat/${thread.id}`);
   }
 
+  function callPhone() {
+    setShowOptions(false);
+    if (listing.seller.phone) window.location.href = `tel:${listing.seller.phone}`;
+  }
+
   function openTelegram() {
+    setShowOptions(false);
     logAnalyticsEvent(Events.MARKET_CONTACT_TELEGRAM_TAPPED, {
       listing_id: listing.id,
       [Params.MK_HAS_TELEGRAM_USERNAME]: !!listing.seller.telegramUsername,
@@ -44,7 +56,7 @@ export default function ListingContactBar({ listing }: { listing: MarketListing 
   return (
     <>
       <div
-        className="absolute bottom-0 left-0 right-0 px-4 pt-3 flex gap-3"
+        className="absolute bottom-0 left-0 right-0 px-4 pt-3"
         style={{
           paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
           background: 'rgba(255,255,255,0.96)',
@@ -52,28 +64,49 @@ export default function ListingContactBar({ listing }: { listing: MarketListing 
           borderTop: '0.5px solid rgba(0,0,0,0.08)',
         }}
       >
-        {hasChat && (
-          <button
-            onClick={openCompose}
-            className="flex-1 flex items-center justify-center gap-1.5 text-[15px] font-bold text-white active:opacity-90"
-            style={{ height: 52, borderRadius: 14, background: '#000' }}
-          >
-            <MessageCircle size={17} strokeWidth={2.2} />
-            {t.mk_write}
-          </button>
-        )}
-        {hasTelegram && (
-          <button
-            onClick={openTelegram}
-            className="flex-1 flex items-center justify-center gap-1.5 text-[15px] font-semibold active:opacity-90"
-            style={{ height: 52, borderRadius: 14, background: '#229ED9', color: 'white' }}
-            aria-label="Telegram"
-          >
-            <Send size={18} strokeWidth={2} />
-            Telegram
-          </button>
-        )}
+        <button
+          onClick={() => setShowOptions(true)}
+          className="w-full flex items-center justify-center gap-2 text-[15px] font-bold text-white active:opacity-90"
+          style={{ height: 52, borderRadius: 14, background: BRAND_PURPLE }}
+        >
+          <Contact size={18} strokeWidth={2.2} />
+          {t.mk_seller_contacts}
+        </button>
       </div>
+
+      {/* Contact options sheet */}
+      {showOptions && (
+        <div
+          className="absolute inset-0 z-[80] flex flex-col justify-end"
+          style={{ background: 'rgba(0,0,0,0.4)' }}
+          onClick={() => setShowOptions(false)}
+        >
+          <div
+            className="px-5 pt-4 bg-white dark:bg-[#1c1c1e]"
+            style={{ borderRadius: '24px 24px 0 0', paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-[16px] font-bold text-black dark:text-white">{t.mk_seller_contacts}</h2>
+              <button onClick={() => setShowOptions(false)} aria-label="Close">
+                <X size={22} className="text-black/50 dark:text-white/50" />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-2.5">
+              {hasChat && (
+                <OptionRow icon={<MessageCircle size={20} color="white" />} color="#3BA55D" label={t.mk_contact_chat_libas} onClick={openCompose} />
+              )}
+              {hasPhone && (
+                <OptionRow icon={<Phone size={20} color="white" />} color="#6366F1" label={t.mk_contact_call} onClick={callPhone} />
+              )}
+              {hasTelegram && (
+                <OptionRow icon={<Send size={20} color="white" />} color="#229ED9" label={t.mk_contact_via_telegram} onClick={openTelegram} />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Compose sheet */}
       {showCompose && (
@@ -128,5 +161,21 @@ export default function ListingContactBar({ listing }: { listing: MarketListing 
         </div>
       )}
     </>
+  );
+}
+
+function OptionRow({ icon, color, label, onClick }: { icon: React.ReactNode; color: string; label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 p-3.5 rounded-2xl active:opacity-90"
+      style={{ background: 'rgba(128,128,128,0.08)' }}
+    >
+      <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: color }}>
+        {icon}
+      </span>
+      <span className="flex-1 text-left text-[15px] font-semibold text-black dark:text-white">{label}</span>
+      <ChevronRight size={18} className="text-black/30 dark:text-white/30" />
+    </button>
   );
 }

@@ -211,7 +211,7 @@ const SEED_LISTINGS: MarketListing[] = [
     currency: 'UZS', isUrgent: false, description: 'Простая юбка Polo. Носили пару раз, в отличном состоянии.',
     location: { address: 'массив Юнусабад', landmark: 'Алайский рынок', latitude: 41.36, longitude: 69.29, courier: true },
     seller: { id: 'seed_seller_1', name: 'Дилноза', phone: '+998901234567', telegramUsername: 'dilnoza_sells' },
-    contactMethods: ['chat', 'telegram'], status: 'active', postedAt: '2026-06-20T18:00:00.000Z',
+    contactMethods: ['chat', 'phone', 'telegram'], status: 'active', postedAt: '2026-06-20T18:00:00.000Z',
   },
   {
     id: 'seed_2', title: 'Платье летнее зелёное', images: [img('mk-dress1')],
@@ -221,7 +221,7 @@ const SEED_LISTINGS: MarketListing[] = [
     currency: 'UZS', isUrgent: true, description: 'Новое платье с биркой, не подошёл размер.',
     location: { address: 'Чиланзар', courier: true },
     seller: { id: 'seed_seller_2', name: 'Madina', phone: '+998905556677' },
-    contactMethods: ['chat'], status: 'active', postedAt: '2026-06-21T10:00:00.000Z',
+    contactMethods: ['chat', 'phone'], status: 'active', postedAt: '2026-06-21T10:00:00.000Z',
   },
   {
     id: 'seed_3', title: 'Джинсы синие mom', images: [img('mk-jeans1'), img('mk-jeans2')],

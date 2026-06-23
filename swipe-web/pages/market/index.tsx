@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { Plus, User, Search, Camera } from 'lucide-react';
+import { Plus, User, Search, Camera, Heart } from 'lucide-react';
 import MarketFeedCard from '@/components/market/MarketFeedCard';
 import { getFeed, isMarketOnboardingComplete } from '@/lib/market-storage';
 import { MARKET_CATEGORIES } from '@/lib/market-attributes';
@@ -77,14 +77,24 @@ export default function MarketFeedPage() {
           <h1 className="text-[26px] font-bold tracking-[-0.5px] text-black dark:text-white">
             {t.marketTitle}
           </h1>
-          <button
-            onClick={() => router.push('/market/mine')}
-            className="flex items-center gap-1.5 h-9 pl-3 pr-3.5 rounded-full active:opacity-80"
-            style={{ border: isDark ? '1px solid rgba(255,255,255,0.18)' : '1px solid rgba(0,0,0,0.13)' }}
-          >
-            <User size={15} strokeWidth={1.9} className="text-black dark:text-white" />
-            <span className="text-[13px] font-semibold text-black dark:text-white">{t.mk_my_listings}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.push('/market/liked')}
+              className="w-9 h-9 flex items-center justify-center rounded-full active:opacity-80"
+              style={{ border: isDark ? '1px solid rgba(255,255,255,0.18)' : '1px solid rgba(0,0,0,0.13)' }}
+              aria-label={t.mk_liked_title}
+            >
+              <Heart size={17} strokeWidth={1.9} className="text-black dark:text-white" />
+            </button>
+            <button
+              onClick={() => router.push('/market/mine')}
+              className="flex items-center gap-1.5 h-9 pl-3 pr-3.5 rounded-full active:opacity-80"
+              style={{ border: isDark ? '1px solid rgba(255,255,255,0.18)' : '1px solid rgba(0,0,0,0.13)' }}
+            >
+              <User size={15} strokeWidth={1.9} className="text-black dark:text-white" />
+              <span className="text-[13px] font-semibold text-black dark:text-white">{t.mk_my_listings}</span>
+            </button>
+          </div>
         </header>
 
         {/* ── Search bar + visual search ── */}
