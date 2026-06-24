@@ -71,7 +71,6 @@ export default function LocationStep({ form, patch, onNext }: StepProps) {
         value={loc.region ?? null}
         onSelect={(v) => setLoc({ region: v, district: undefined })}
         onClose={() => setSheet(null)}
-        searchable
       />
       <OptionSheet
         open={sheet === 'district'}
@@ -80,7 +79,6 @@ export default function LocationStep({ form, patch, onNext }: StepProps) {
         value={loc.district ?? null}
         onSelect={(v) => setLoc({ district: v })}
         onClose={() => setSheet(null)}
-        searchable
       />
     </StepScaffold>
   );

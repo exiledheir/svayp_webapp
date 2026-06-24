@@ -32,6 +32,16 @@ function MarketChatThreadPageInner() {
     reload();
   }
 
+  // `router.back()` is a no-op without in-app history (deep link / hard reload /
+  // first screen in the WebView). Fall back to the market feed so Back always works.
+  function handleBack() {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/market');
+    }
+  }
+
   return (
     <>
       <Head>
@@ -41,7 +51,7 @@ function MarketChatThreadPageInner() {
       <div className="phone-container flex flex-col bg-white dark:bg-[#111111]" style={{ height: '100dvh' }}>
         {/* Header */}
         <div className="shrink-0 flex items-center gap-3 px-3 py-3" style={{ borderBottom: '0.5px solid rgba(128,128,128,0.2)' }}>
-          <button onClick={() => router.back()} aria-label="Back" className="w-9 h-9 flex items-center justify-center">
+          <button onClick={handleBack} aria-label="Back" className="w-9 h-9 flex items-center justify-center">
             <ArrowLeft size={22} className="text-black dark:text-white" />
           </button>
           {thread && (

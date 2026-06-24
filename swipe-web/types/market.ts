@@ -14,7 +14,7 @@ export type MarketSeason = 'demi' | 'winter' | 'summer' | 'all';
 export type MarketLength = 'maxi' | 'midi' | 'mini';
 export type MarketCurrency = 'UZS' | 'USD'; // Сум / у.е.
 export type MarketDealType = 'sell' | 'free'; // Указать цену / Отдам даром
-export type MarketListingStatus = 'draft' | 'pending' | 'active' | 'sold' | 'archived';
+export type MarketListingStatus = 'draft' | 'pending' | 'active' | 'sold' | 'archived' | 'rejected';
 export type MarketContactMethod = 'chat' | 'phone' | 'telegram';
 
 export interface MarketLocation {
@@ -70,6 +70,8 @@ export interface MarketListing {
 export interface MarketDraft extends Partial<Omit<MarketListing, 'id'>> {
   id: string;
   updatedAt: string;
+  /** Free-text brand typed by the user when "Other brand" is chosen. */
+  customBrand?: string;
 }
 
 /** A fresh, empty draft for the create wizard. */

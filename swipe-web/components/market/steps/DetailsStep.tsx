@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { X, Sparkles, ChevronRight } from 'lucide-react';
 import MarketCategorySheet from '@/components/market/MarketCategorySheet';
-import { suggestCategory, getCategory } from '@/lib/market-attributes';
+import { suggestCategory, getCategory, categoryLabel, categoryParentLabel } from '@/lib/market-attributes';
 import { useI18n } from '@/lib/i18n';
 import StepScaffold from './StepScaffold';
 import type { StepProps } from './types';
@@ -13,7 +13,7 @@ const PURPLE = '#8E5BD6';
 
 /** Combined step: title + AI-suggested category + description, on one page. */
 export default function DetailsStep({ form, patch, onNext }: StepProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [showSheet, setShowSheet] = useState(false);
   const title = form.title ?? '';
   const desc = form.description ?? '';
@@ -39,7 +39,6 @@ export default function DetailsStep({ form, patch, onNext }: StepProps) {
           <input
             value={title}
             maxLength={TITLE_MAX}
-            autoFocus
             onChange={(e) => patch({ title: e.target.value })}
             placeholder={t.mk_title_placeholder}
             className="flex-1 bg-transparent outline-none text-[16px] text-black dark:text-white"
@@ -71,9 +70,9 @@ export default function DetailsStep({ form, patch, onNext }: StepProps) {
           <span className="flex-1 min-w-0">
             {effective ? (
               <>
-                <span className="block text-[15px] font-semibold text-black dark:text-white truncate">{effective.label}</span>
+                <span className="block text-[15px] font-semibold text-black dark:text-white truncate">{categoryLabel(effective.key, locale)}</span>
                 <span className="block text-[12px] text-black/45 dark:text-white/45 truncate">
-                  {effective.parent}{isSuggestion ? ` · ${t.mk_category_suggested}` : ''}
+                  {categoryParentLabel(effective, locale)}{isSuggestion ? ` · ${t.mk_category_suggested}` : ''}
                 </span>
               </>
             ) : (
