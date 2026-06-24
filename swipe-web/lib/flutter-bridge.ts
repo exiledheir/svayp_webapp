@@ -16,7 +16,8 @@ export type BridgeMessageType =
   | 'apple_auth_start'
   | 'set_language'
   | 'set_theme'
-  | 'save_image';
+  | 'save_image'
+  | 'open_chat';
 
 export interface AuthCompletePayload {
   type: 'auth_complete';
@@ -118,6 +119,16 @@ export interface SaveImagePayload {
   mimeType: string;
 }
 
+/**
+ * Sent when the user opens a chat from inside the WebView (e.g. tapping "Чат" on a
+ * marketplace listing). The native app navigates to its own chat detail screen for
+ * {@link chatId}, so C2C listing chats live in the native chat module alongside C2B.
+ */
+export interface OpenChatPayload {
+  type: 'open_chat';
+  chatId: string;
+}
+
 export type BridgePayload =
   | AuthCompletePayload
   | OnboardingCompletePayload
@@ -128,7 +139,8 @@ export type BridgePayload =
   | AppleAuthStartPayload
   | SetLanguagePayload
   | SetThemePayload
-  | SaveImagePayload;
+  | SaveImagePayload
+  | OpenChatPayload;
 
 type FlutterBridgeChannel = {
   postMessage: (message: string) => void;
@@ -174,6 +186,18 @@ export function sendToFlutter(payload: BridgePayload): void {
   const channel = getChannel();
   if (!channel) return;
   channel.postMessage(JSON.stringify(payload));
+}
+
+/**
+ * Hand a chat off to the native chat module. Returns true when the message was
+ * delivered to the Flutter host (so the caller should NOT also navigate the
+ * webapp); false in a plain browser, where the caller falls back to /chat/{id}.
+ */
+export function openNativeChat(chatId: string): boolean {
+  const channel = getChannel();
+  if (!channel) return false;
+  channel.postMessage(JSON.stringify({ type: 'open_chat', chatId }));
+  return true;
 }
 
 /**

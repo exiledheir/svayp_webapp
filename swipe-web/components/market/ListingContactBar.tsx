@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { MessageCircle, Send, Phone, Contact, X, ChevronRight } from 'lucide-react';
 import type { MarketListing } from '@/types/market';
 import { startListingChat } from '@/lib/market-api';
+import { openNativeChat } from '@/lib/flutter-bridge';
 import { buildTelegramLink, openTelegramLink } from '@/lib/market-chat';
 import { formatPrice } from '@/lib/cart-storage';
 import { useI18n } from '@/lib/i18n';
@@ -38,11 +39,14 @@ export default function ListingContactBar({ listing }: { listing: MarketListing 
     setSending(true);
     logAnalyticsEvent(Events.MARKET_CONTACT_CHAT_TAPPED, { listing_id: listing.id });
     try {
-      // Upsert the C2C thread (listingId, buyer, seller) + initial message, then open it
-      // in the unified chat UI (same list + thread as B2B, shown in webapp /chat and mobile).
+      // Upsert the C2C thread (listingId, buyer, seller) + initial message.
       const { id } = await startListingChat(listing.id, listing.seller.id, message);
       setShowCompose(false);
-      router.push(`/chat/${id}`);
+      // Inside the mobile app → hand off to the NATIVE chat module (same as C2B "Проверить
+      // наличие"). In a plain browser → fall back to the webapp chat thread.
+      if (!openNativeChat(id)) {
+        router.push(`/chat/${id}`);
+      }
     } catch {
       setSending(false);
     }
