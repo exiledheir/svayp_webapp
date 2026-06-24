@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import { ArrowLeft, Heart } from 'lucide-react';
 import MarketFeedCard from '@/components/market/MarketFeedCard';
 import MarketGuard from '@/components/market/MarketGuard';
-import { getFavoriteListings } from '@/lib/market-storage';
+import { getFavorites } from '@/lib/market-api';
 import type { MarketListing } from '@/types/market';
 import { useI18n } from '@/lib/i18n';
 
@@ -14,7 +14,11 @@ function LikedListingsPageInner() {
   const [listings, setListings] = useState<MarketListing[]>([]);
 
   useEffect(() => {
-    setListings(getFavoriteListings());
+    let cancelled = false;
+    getFavorites()
+      .then((page) => { if (!cancelled) setListings(page.content as unknown as MarketListing[]); })
+      .catch(() => { if (!cancelled) setListings([]); });
+    return () => { cancelled = true; };
   }, []);
 
   // Drop a card from the grid the moment it's un-liked.

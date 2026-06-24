@@ -57,6 +57,8 @@ export interface ChatMessage {
   senderId: string;
   senderName?: string;
   senderType: 'USER' | 'SELLER' | 'ADMIN';
+  /** Server-computed: true if sent by the requesting user. Authoritative bubble alignment. */
+  isMine?: boolean;
   content: string;
   messageType: 'TEXT' | 'IMAGE' | 'PRODUCT' | 'SYSTEM';
   isRead: boolean;

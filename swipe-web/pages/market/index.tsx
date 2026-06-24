@@ -3,7 +3,8 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { Plus, User, Search, Camera, Heart } from 'lucide-react';
 import MarketFeedCard from '@/components/market/MarketFeedCard';
-import { getFeed, isMarketOnboardingComplete } from '@/lib/market-storage';
+import { isMarketOnboardingComplete } from '@/lib/market-storage';
+import { getFeed as apiGetFeed, type ListingCard } from '@/lib/market-api';
 import { MARKET_CATEGORIES, categoryLabel } from '@/lib/market-attributes';
 import type { MarketListing } from '@/types/market';
 import { useI18n } from '@/lib/i18n';
@@ -37,18 +38,23 @@ export default function MarketFeedPage() {
     if (access === 'enabled') logAnalyticsEvent(Events.MARKET_FEED_VIEWED);
   }, [access]);
 
-  const loadFeed = useCallback(() => {
+  const loadFeed = useCallback(async () => {
     if (access !== 'enabled') return;
-    const { listings: l } = getFeed({
-      category: category ?? undefined,
-      search: search.trim() || undefined,
-    });
-    setListings(l);
+    // Live backend feed (GET /marketplace/listings).
+    try {
+      const page = await apiGetFeed({
+        category: category ? [category] : undefined,
+        q: search.trim() || undefined,
+      });
+      setListings(page.content.map(cardToListing));
+    } catch {
+      setListings([]);
+    }
   }, [access, category, search]);
 
   useEffect(() => { loadFeed(); }, [loadFeed]);
 
-  // ── Pull-to-refresh (mirrors the closet feed) ───────────────────────────────
+  // ── Pull-to-refresh ─────────────────────────────────────────────────────────
   const mainScrollRef = useRef<HTMLElement>(null);
   const pullStartYRef = useRef<number | null>(null);
   const [pullDistance, setPullDistance] = useState(0);
@@ -287,6 +293,22 @@ export default function MarketFeedPage() {
       </div>
     </>
   );
+}
+
+/** Adapt the backend feed card projection to the shape MarketFeedCard renders. */
+function cardToListing(c: ListingCard): MarketListing {
+  return {
+    id: c.id,
+    title: c.title,
+    images: c.coverImage ? [c.coverImage] : [],
+    price: c.price,
+    currency: c.currency as MarketListing['currency'],
+    dealType: c.dealType as MarketListing['dealType'],
+    isUrgent: c.isUrgent,
+    isFavorite: c.isFavorite,
+    location: { region: c.region ?? undefined },
+    postedAt: c.postedAt,
+  } as MarketListing;
 }
 
 function CategoryChip({

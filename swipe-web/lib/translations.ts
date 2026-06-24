@@ -176,6 +176,7 @@ export interface Translations {
   mk_contact_chat_libas: string;
   mk_contact_via_telegram: string;
   mk_publish_cta: string;
+  mk_publish_error: string;
   mk_published_title: string;
   mk_published_body: string;
   mk_published_view: string;
@@ -657,6 +658,7 @@ const en: Translations = {
   mk_contact_chat_libas: 'Chat in LIBΛS',
   mk_contact_via_telegram: 'Contact via Telegram',
   mk_publish_cta: 'Post listing',
+  mk_publish_error: "Couldn't publish. Please try again.",
   mk_published_title: 'Listing under review',
   mk_published_body: "We'll review it and publish it soon. You can find it in My listings.",
   mk_published_view: 'View listing',
@@ -1210,6 +1212,7 @@ const ru: Translations = {
   mk_contact_chat_libas: 'Чат внутри LIBΛS',
   mk_contact_via_telegram: 'Связаться по Telegram',
   mk_publish_cta: 'Поставить объявление',
+  mk_publish_error: 'Не удалось опубликовать. Попробуйте ещё раз.',
   mk_published_title: 'Объявление на проверке',
   mk_published_body: 'Мы проверим его и скоро опубликуем. Объявление доступно в разделе «Мои объявления».',
   mk_published_view: 'Посмотреть объявление',
@@ -1763,6 +1766,7 @@ const uz: Translations = {
   mk_contact_chat_libas: 'LIBΛS ichidagi chat',
   mk_contact_via_telegram: "Telegram orqali bogʻlanish",
   mk_publish_cta: "E'lon joylash",
+  mk_publish_error: "Joylab boʻlmadi. Qaytadan urinib koʻring.",
   mk_published_title: "E'lon tekshiruvda",
   mk_published_body: "Biz uni tekshirib, tez orada e'lon qilamiz. Uni «Mening e'lonlarim» bo'limida topishingiz mumkin.",
   mk_published_view: "E'lonni ko'rish",

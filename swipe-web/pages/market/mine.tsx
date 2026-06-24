@@ -7,10 +7,12 @@ import MarketFeedCard from '@/components/market/MarketFeedCard';
 import MarketStatusBadge from '@/components/market/MarketStatusBadge';
 import ListingStatusSheet from '@/components/market/ListingStatusSheet';
 import MarketGuard from '@/components/market/MarketGuard';
+import { getDraft, clearDraft } from '@/lib/market-storage';
 import {
-  getMyListings, getDraft, clearDraft, deleteListing, setListingStatus,
-} from '@/lib/market-storage';
-import type { MarketListing, MarketDraft, MarketListingStatus } from '@/types/market';
+  getMyListings, deleteListing, markSold, archiveListing, reactivateListing,
+  type MineListing,
+} from '@/lib/market-api';
+import type { MarketDraft, MarketListingStatus } from '@/types/market';
 import { statusLabel } from '@/lib/market-attributes';
 import { useI18n } from '@/lib/i18n';
 import { logAnalyticsEvent } from '@/lib/analytics';
@@ -21,18 +23,32 @@ const STATUS_RANK: Record<MarketListingStatus, number> = {
   pending: 0, rejected: 1, active: 2, sold: 3, archived: 4, draft: 5,
 };
 
+// Backend rejection-reason enum → display label (falls back to the raw key).
+const REJECT_REASON_LABEL: Record<string, string> = {
+  PROHIBITED_ITEM: 'Запрещённый товар',
+  BAD_PHOTOS: 'Плохие фото',
+  WRONG_CATEGORY: 'Неверная категория',
+  SPAM: 'Спам',
+  OTHER: 'Другое',
+};
+
 function MyListingsPageInner() {
   const router = useRouter();
   const { t } = useI18n();
-  const [listings, setListings] = useState<MarketListing[]>([]);
+  const [listings, setListings] = useState<MineListing[]>([]);
   const [draft, setDraft] = useState<MarketDraft | null>(null);
-  const [statusTarget, setStatusTarget] = useState<MarketListing | null>(null);
-  const [confirmStatus, setConfirmStatus] = useState<{ listing: MarketListing; target: MarketListingStatus } | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<MarketListing | null>(null);
+  const [statusTarget, setStatusTarget] = useState<MineListing | null>(null);
+  const [confirmStatus, setConfirmStatus] = useState<{ listing: MineListing; target: MarketListingStatus } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<MineListing | null>(null);
 
-  const reload = useCallback(() => {
-    setListings(getMyListings());
-    setDraft(getDraft());
+  const reload = useCallback(async () => {
+    setDraft(getDraft()); // wizard drafts stay client-side for the resume UX
+    try {
+      const page = await getMyListings();
+      setListings(page.content);
+    } catch {
+      setListings([]);
+    }
   }, []);
 
   useEffect(() => { reload(); }, [reload]);
@@ -42,24 +58,29 @@ function MyListingsPageInner() {
     reload();
   }
 
-  function doDelete(id: string) {
-    deleteListing(id);
+  async function doDelete(id: string) {
     setConfirmDelete(null);
+    try { await deleteListing(id); } catch { /* ignore — reload reflects server state */ }
     reload();
   }
 
   // Picking a status in the sheet asks for confirmation first (like delete).
-  function requestStatusChange(listing: MarketListing, target: MarketListingStatus) {
+  function requestStatusChange(listing: MineListing, target: MarketListingStatus) {
     setStatusTarget(null);
     setConfirmStatus({ listing, target });
   }
 
-  function applyStatusChange() {
+  async function applyStatusChange() {
     if (!confirmStatus) return;
     const { listing, target } = confirmStatus;
-    setListingStatus(listing.id, target);
-    logAnalyticsEvent(Events.MARKET_LISTING_STATUS_CHANGED, { listing_id: listing.id, status: target });
     setConfirmStatus(null);
+    try {
+      // Map the seller-controlled status to the backend lifecycle endpoint.
+      if (target === 'sold') await markSold(listing.id);
+      else if (target === 'archived') await archiveListing(listing.id);
+      else if (target === 'active') await reactivateListing(listing.id);
+      logAnalyticsEvent(Events.MARKET_LISTING_STATUS_CHANGED, { listing_id: listing.id, status: target });
+    } catch { /* ignore — reload reflects server state */ }
     reload();
   }
 
@@ -94,8 +115,7 @@ function MyListingsPageInner() {
     if (pullDistance >= PULL_THRESHOLD && !isPullRefreshing) {
       setIsPullRefreshing(true);
       setPullDistance(0);
-      reload();
-      await new Promise((r) => setTimeout(r, 450)); // perceptible spinner; reads are instant
+      await reload();
       setIsPullRefreshing(false);
     } else {
       setPullDistance(0);
@@ -180,18 +200,14 @@ function MyListingsPageInner() {
                       {draft.images?.[0] ? (
                         <Image src={draft.images[0]} alt="draft" fill sizes="56px" className="object-cover" unoptimized />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <FileEdit size={20} className="text-black/30" />
-                        </div>
+                        <div className="w-full h-full flex items-center justify-center"><FileEdit size={20} className="text-black/30" /></div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mb-1" style={{ background: 'rgba(243,112,167,0.15)', color: '#F370A7' }}>
                         {t.mk_draft_label}
                       </span>
-                      <p className="text-[14px] font-semibold truncate text-black dark:text-white">
-                        {draft.title || t.mk_title_placeholder}
-                      </p>
+                      <p className="text-[14px] font-semibold truncate text-black dark:text-white">{draft.title || t.mk_title_placeholder}</p>
                     </div>
                     <button onClick={removeDraft} aria-label={t.mk_mine_delete} className="w-9 h-9 flex items-center justify-center">
                       <Trash2 size={18} className="text-black/40 dark:text-white/40" />
@@ -204,7 +220,7 @@ function MyListingsPageInner() {
               )}
 
               {/* Listings grid — each card: trash (left) + edit (right) overlay,
-                  status badge, and a separate Manage button below for status. */}
+                  status badge, optional rejection reason, and a Manage button. */}
               <div className="grid grid-cols-2 gap-3">
                 {sorted.map((l) => (
                   <div key={l.id}>
@@ -238,6 +254,21 @@ function MyListingsPageInner() {
                         </>
                       }
                     />
+
+                    {/* Rejection reason — visible to the seller */}
+                    {l.status === 'rejected' && l.moderation && (
+                      <div className="mt-1.5 p-2 rounded-xl" style={{ background: 'rgba(226,59,59,0.10)' }}>
+                        <p className="text-[11px] font-bold text-[#E23B3B]">
+                          {l.moderation.rejectionReason
+                            ? (REJECT_REASON_LABEL[l.moderation.rejectionReason] ?? l.moderation.rejectionReason)
+                            : t.mk_status_rejected}
+                        </p>
+                        {l.moderation.rejectionMessage && (
+                          <p className="text-[11px] text-black/60 dark:text-white/60 mt-0.5 leading-snug">{l.moderation.rejectionMessage}</p>
+                        )}
+                      </div>
+                    )}
+
                     {/* Manage button — opens the status sheet */}
                     <button
                       onClick={() => setStatusTarget(l)}
