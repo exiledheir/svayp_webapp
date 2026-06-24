@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { Plus, User, Search, Camera, Heart } from 'lucide-react';
 import MarketFeedCard from '@/components/market/MarketFeedCard';
 import { getFeed, isMarketOnboardingComplete } from '@/lib/market-storage';
+import { isMarketApiEnabled, getFeed as apiGetFeed, type ListingCard } from '@/lib/market-api';
 import { MARKET_CATEGORIES } from '@/lib/market-attributes';
 import type { MarketListing } from '@/types/market';
 import { useI18n } from '@/lib/i18n';
@@ -35,11 +36,31 @@ export default function MarketFeedPage() {
 
   useEffect(() => {
     if (access !== 'enabled') return;
-    const { listings: l } = getFeed({
-      category: category ?? undefined,
-      search: search.trim() || undefined,
-    });
-    setListings(l);
+    let cancelled = false;
+
+    // Live backend behind feature.market_enabled; localStorage fallback when off.
+    if (isMarketApiEnabled()) {
+      apiGetFeed({
+        category: category ? [category] : undefined,
+        q: search.trim() || undefined,
+      })
+        .then((page) => {
+          if (!cancelled) setListings(page.content.map(cardToListing));
+        })
+        .catch(() => {
+          if (!cancelled) setListings([]);
+        });
+    } else {
+      const { listings: l } = getFeed({
+        category: category ?? undefined,
+        search: search.trim() || undefined,
+      });
+      setListings(l);
+    }
+
+    return () => {
+      cancelled = true;
+    };
   }, [category, search, access]);
 
   function handlePost() {
@@ -207,6 +228,22 @@ export default function MarketFeedPage() {
       </div>
     </>
   );
+}
+
+/** Adapt the backend feed card projection to the shape MarketFeedCard renders. */
+function cardToListing(c: ListingCard): MarketListing {
+  return {
+    id: c.id,
+    title: c.title,
+    images: c.coverImage ? [c.coverImage] : [],
+    price: c.price,
+    currency: c.currency as MarketListing['currency'],
+    dealType: c.dealType as MarketListing['dealType'],
+    isUrgent: c.isUrgent,
+    isFavorite: c.isFavorite,
+    location: { region: c.region ?? undefined },
+    postedAt: c.postedAt,
+  } as MarketListing;
 }
 
 function CategoryChip({
