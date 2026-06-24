@@ -334,8 +334,10 @@ export default function ChatDetailPage() {
           </div>
         ) : (
           messages.map((msg) => {
-            // The listing context card is shown in the header banner — skip the empty bubble.
-            if ((msg.messageType as string) === 'LISTING') return null;
+            // The C2C listing context renders as a card (like PRODUCT). Skip only if the listing
+            // snapshot didn't come through, to avoid an empty bubble.
+            const isListing = (msg.messageType as string) === 'LISTING';
+            if (isListing && !msg.productTitle) return null;
             // Own-message detection: prefer the server's authoritative is_mine (correct for B2B
             // and C2C alike); fall back to senderId / senderType for realtime/optimistic messages.
             const isOwn = msg.isMine != null
@@ -348,8 +350,8 @@ export default function ChatDetailPage() {
               !a.fileType?.startsWith('image/') && !a.fileUrl?.match(/\.(jpg|jpeg|png|webp|gif)(\?|$)/i)
             );
 
-            // Product card message — either explicit PRODUCT type or legacy 📦 text format
-            const isProductMsg = msg.messageType === 'PRODUCT' || msg.content?.startsWith('📦');
+            // Product/listing card message — explicit PRODUCT/LISTING type or legacy 📦 text format
+            const isProductMsg = msg.messageType === 'PRODUCT' || isListing || msg.content?.startsWith('📦');
             const title = msg.productTitle
               ?? (msg.content?.match(/📦 Product Inquiry: (.+?)\s*\|/)?.[1] ?? '');
             const sizeMatch = msg.content?.match(/Size:\s*([^|]+)/);
