@@ -7,8 +7,9 @@ import { isAuthenticated } from '@/lib/auth';
 import {
   isMarketOnboardingComplete, getDraft, saveDraft, clearDraft,
   getMarketWizardStep, setMarketWizardStep, clearMarketWizardStep,
-  clearMarketOnboarding, finalizeDraft, addListing,
+  clearMarketOnboarding,
 } from '@/lib/market-storage';
+import { createListing, uploadListingImage, type CreateListingPayload } from '@/lib/market-api';
 import { emptyDraft, type MarketDraft } from '@/types/market';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
@@ -32,6 +33,49 @@ const STEP_NAMES: Record<number, string> = {
   [PHOTOS]: 'photos', [DETAILS]: 'details', [CHARACTERISTICS]: 'characteristics',
   [DEAL]: 'deal', [LOCATION]: 'location', [CONTACTS]: 'contacts',
 };
+
+/** Decode a `data:` URL (compressed photo) into a Blob for upload. */
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [head, b64] = dataUrl.split(',');
+  const mime = head.match(/data:(.*?);base64/)?.[1] ?? 'image/jpeg';
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+/** Map the wizard draft + uploaded image ids to the create-listing API payload (publish). */
+function draftToPayload(form: MarketDraft, imageIds: string[]): CreateListingPayload {
+  return {
+    title: form.title,
+    description: form.description,
+    category: form.category,
+    condition: form.condition,
+    brand: form.brand,
+    size: form.size,
+    color: form.color,
+    season: form.season,
+    length: form.length,
+    hijabFriendly: form.hijabFriendly,
+    fit: form.fit,
+    material: form.material,
+    country: form.country,
+    customAttrs: form.customAttrs,
+    dealType: form.dealType,
+    price: form.price ?? 0,
+    currency: form.currency,
+    isUrgent: form.isUrgent,
+    location: form.location,
+    contactMethods: form.contactMethods,
+    sellerContact: {
+      name: form.seller?.name,
+      phone: form.seller?.phone,
+      telegramUsername: form.seller?.telegramUsername,
+    },
+    imageIds,
+    status: 'pending',
+  };
+}
 
 /**
  * Tracks the *visual* viewport height so the page shrinks to the area above the
@@ -66,6 +110,8 @@ function MarketCreatePageInner() {
   const [step, setStep] = useState<number>(PHOTOS);
   const [form, setForm] = useState<MarketDraft>(() => emptyDraft());
   const [ready, setReady] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState('');
   const didStart = useRef(false);
   const viewportH = useViewportHeight();
 
@@ -130,17 +176,37 @@ function MarketCreatePageInner() {
     router.push('/auth/phone?redirect=' + encodeURIComponent('/market/create'));
   }
 
-  function publish() {
-    const listing = finalizeDraft(form, form.seller?.name);
-    addListing(listing);
-    clearDraft();
-    clearMarketWizardStep();
-    logAnalyticsEvent(Events.MARKET_LISTING_PUBLISHED, {
-      listing_id: listing.id,
-      [Params.MK_CATEGORY]: listing.category,
-      [Params.MK_DEAL_TYPE]: listing.dealType,
-    });
-    setStep(PUBLISHED);
+  async function publish() {
+    if (publishing) return;
+    setPublishing(true);
+    setPublishError('');
+    try {
+      // 1. Upload each photo (dataURL → blob → POST /marketplace/uploads → confirm).
+      const imgs = form.images ?? [];
+      const imageIds: string[] = [];
+      for (let i = 0; i < imgs.length; i++) {
+        const blob = dataUrlToBlob(imgs[i]);
+        const file = new File([blob], `photo-${i}.jpg`, { type: blob.type || 'image/jpeg' });
+        const status = await uploadListingImage(file, undefined, i);
+        if (status.listingImageId) imageIds.push(status.listingImageId);
+      }
+
+      // 2. Publish → POST /marketplace/listings (status=pending → admin moderation).
+      const created = await createListing(draftToPayload(form, imageIds));
+
+      clearDraft();
+      clearMarketWizardStep();
+      logAnalyticsEvent(Events.MARKET_LISTING_PUBLISHED, {
+        listing_id: created.id,
+        [Params.MK_CATEGORY]: created.category,
+        [Params.MK_DEAL_TYPE]: created.dealType,
+      });
+      setStep(PUBLISHED);
+    } catch (e) {
+      setPublishError('Не удалось опубликовать. Попробуйте ещё раз.');
+    } finally {
+      setPublishing(false);
+    }
   }
 
   if (!ready) {
@@ -195,6 +261,20 @@ function MarketCreatePageInner() {
         {step === LOCATION && <LocationStep {...stepProps} />}
         {step === CONTACTS && (
           <ContactsStep form={form} patch={patch} authed={isAuthenticated()} onNeedAuth={needAuth} onPublish={publish} />
+        )}
+
+        {/* Publish overlay — uploading photos + creating the listing on the backend. */}
+        {publishing && (
+          <div className="absolute inset-0 z-[80] flex flex-col items-center justify-center gap-3" style={{ background: 'rgba(0,0,0,0.45)' }}>
+            <div className="w-10 h-10 rounded-full border-[3px] border-white border-t-transparent animate-spin" />
+            <p className="text-white text-[14px] font-semibold">{t.mk_publish_cta}…</p>
+          </div>
+        )}
+        {publishError && (
+          <div className="absolute left-4 right-4 z-[85] px-4 py-3 rounded-2xl text-white text-[13px] font-semibold text-center"
+               style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)', background: '#F370A7' }}>
+            {publishError}
+          </div>
         )}
       </div>
     </>
