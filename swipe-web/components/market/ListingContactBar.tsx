@@ -38,10 +38,11 @@ export default function ListingContactBar({ listing }: { listing: MarketListing 
     setSending(true);
     logAnalyticsEvent(Events.MARKET_CONTACT_CHAT_TAPPED, { listing_id: listing.id });
     try {
-      // Upsert the C2C thread (listingId, buyer, seller) + initial message, then open it.
+      // Upsert the C2C thread (listingId, buyer, seller) + initial message, then open it
+      // in the unified chat UI (same list + thread as B2B, shown in webapp /chat and mobile).
       const { id } = await startListingChat(listing.id, listing.seller.id, message);
       setShowCompose(false);
-      router.push(`/market/chat/${id}`);
+      router.push(`/chat/${id}`);
     } catch {
       setSending(false);
     }

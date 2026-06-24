@@ -34,7 +34,7 @@ const FLAG_SCOPED_PHONES = ['998909958022'];
 // Early-access allowlist for the C2C Market. These accounts get the full Market
 // even while `feature.market_enabled` is off; everyone else sees "coming soon"
 // until the flag is flipped on globally. Digits-only (no +, spaces).
-const MARKET_ALLOWED_PHONES = ['998909958022', '998946830545', '998900221201'];
+const MARKET_ALLOWED_PHONES = ['998909958022', '998946830545', '998900221201', '998971058844'];
 
 function normalizePhone(phone?: string): string {
   return (phone ?? '').replace(/\D/g, '');
