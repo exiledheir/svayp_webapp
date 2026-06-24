@@ -5,7 +5,8 @@ import { useRouter } from 'next/router';
 import { ArrowLeft, FileEdit, Trash2, ChevronRight } from 'lucide-react';
 import MarketFeedCard from '@/components/market/MarketFeedCard';
 import MarketGuard from '@/components/market/MarketGuard';
-import { getMyListings, getDraft, clearDraft, deleteListing } from '@/lib/market-storage';
+import { getDraft, clearDraft } from '@/lib/market-storage';
+import { getMyListings as getMyListingsApi, deleteListing as deleteListingApi } from '@/lib/market-api';
 import type { MarketListing, MarketDraft } from '@/types/market';
 import { useI18n } from '@/lib/i18n';
 
@@ -15,9 +16,14 @@ function MyListingsPageInner() {
   const [listings, setListings] = useState<MarketListing[]>([]);
   const [draft, setDraft] = useState<MarketDraft | null>(null);
 
-  function reload() {
-    setListings(getMyListings());
-    setDraft(getDraft());
+  async function reload() {
+    setDraft(getDraft()); // wizard drafts stay client-side for the resume UX
+    try {
+      const page = await getMyListingsApi();
+      setListings(page.content as unknown as MarketListing[]);
+    } catch {
+      setListings([]);
+    }
   }
 
   useEffect(() => { reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -27,8 +33,8 @@ function MyListingsPageInner() {
     reload();
   }
 
-  function removeListing(id: string) {
-    deleteListing(id);
+  async function removeListing(id: string) {
+    try { await deleteListingApi(id); } catch { /* ignore */ }
     reload();
   }
 
