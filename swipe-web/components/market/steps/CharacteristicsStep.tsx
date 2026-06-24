@@ -3,6 +3,7 @@ import { ChevronRight } from 'lucide-react';
 import {
   MARKET_CONDITIONS, MARKET_SEASONS, MARKET_LENGTHS, MARKET_BRANDS,
   MARKET_SIZES, MARKET_SHOE_SIZES, MARKET_COLORS, MARKET_MATERIALS, FIT_TYPES,
+  NO_BRAND, OTHER_BRAND, brandLabel, sizeLabel,
   conditionLabel, seasonLabel, lengthLabel, colorLabel, materialLabel,
   countryOptions, attributesForCategory,
 } from '@/lib/market-attributes';
@@ -53,8 +54,12 @@ export default function CharacteristicsStep({ form, patch, onNext }: StepProps) 
   const [sheet, setSheet] = useState<SheetKind>(null);
   const flags = attributesForCategory(form.category);
 
-  const brandOptions: OptionItem[] = MARKET_BRANDS.map((b) => ({ value: b, label: b }));
-  const sizeOptions: OptionItem[] = (flags.shoeSizes ? MARKET_SHOE_SIZES : MARKET_SIZES).map((s) => ({ value: s, label: s }));
+  const brandOptions: OptionItem[] = [
+    { value: NO_BRAND, label: t.mk_brand_none },
+    ...MARKET_BRANDS.map((b) => ({ value: b, label: b })),
+    { value: OTHER_BRAND, label: t.mk_brand_other },
+  ];
+  const sizeOptions: OptionItem[] = (flags.shoeSizes ? MARKET_SHOE_SIZES : MARKET_SIZES).map((s) => ({ value: s, label: sizeLabel(s, t) }));
   const colorOptions: OptionItem[] = MARKET_COLORS.map((c) => ({ value: c.key, label: colorLabel(t, c.key), hex: c.hex }));
   const materialOptions: OptionItem[] = MARKET_MATERIALS.map((m) => ({ value: m, label: materialLabel(m, locale) }));
   const countryOpts = useMemo<OptionItem[]>(() => countryOptions(locale), [locale]);
@@ -101,14 +106,32 @@ export default function CharacteristicsStep({ form, patch, onNext }: StepProps) 
         {/* Brand */}
         {flags.showBrand && (
           <div className="mb-5">
-            <SelectRow label={t.mk_char_brand} value={form.brand} placeholder="—" onClick={() => setSheet('brand')} />
+            <SelectRow
+              label={t.mk_char_brand}
+              value={form.brand === OTHER_BRAND
+                ? (form.customBrand?.trim() || t.mk_brand_other)
+                : (form.brand ? brandLabel(form.brand, t) : undefined)}
+              placeholder="—"
+              onClick={() => setSheet('brand')}
+            />
+            {/* "Other brand" → let the user type their own name. */}
+            {form.brand === OTHER_BRAND && (
+              <input
+                value={form.customBrand ?? ''}
+                onChange={(e) => patch({ customBrand: e.target.value })}
+                placeholder={t.mk_brand_custom_ph}
+                maxLength={40}
+                className="w-full mt-2 px-4 h-14 rounded-2xl text-[15px] outline-none text-black dark:text-white"
+                style={{ background: 'rgba(128,128,128,0.10)' }}
+              />
+            )}
           </div>
         )}
 
         {/* Size */}
         {flags.showSize && (
           <div className="mb-5">
-            <SelectRow label={t.mk_char_size} value={form.size} placeholder={t.mk_char_select} onClick={() => setSheet('size')} />
+            <SelectRow label={t.mk_char_size} value={form.size ? sizeLabel(form.size, t) : undefined} placeholder={t.mk_char_select} onClick={() => setSheet('size')} />
           </div>
         )}
 
@@ -189,11 +212,11 @@ export default function CharacteristicsStep({ form, patch, onNext }: StepProps) 
         )}
       </StepScaffold>
 
-      <OptionSheet open={sheet === 'brand'} title={t.mk_char_brand} options={brandOptions} value={form.brand ?? null} onSelect={(v) => patch({ brand: v })} onClose={() => setSheet(null)} />
+      <OptionSheet open={sheet === 'brand'} title={t.mk_char_brand} options={brandOptions} value={form.brand ?? null} onSelect={(v) => patch(v === OTHER_BRAND ? { brand: v } : { brand: v, customBrand: undefined })} onClose={() => setSheet(null)} />
       <OptionSheet open={sheet === 'size'} title={t.mk_char_size} options={sizeOptions} value={form.size ?? null} onSelect={(v) => patch({ size: v })} onClose={() => setSheet(null)} />
       <OptionSheet open={sheet === 'color'} title={t.mk_char_color} options={colorOptions} value={form.color ?? null} onSelect={(v) => patch({ color: v })} onClose={() => setSheet(null)} />
       <OptionSheet open={sheet === 'material'} title={t.mk_char_material} options={materialOptions} value={form.material ?? null} onSelect={(v) => patch({ material: v })} onClose={() => setSheet(null)} />
-      <OptionSheet open={sheet === 'country'} title={t.mk_char_country} options={countryOpts} value={form.country ?? null} onSelect={(v) => patch({ country: v })} onClose={() => setSheet(null)} searchable />
+      <OptionSheet open={sheet === 'country'} title={t.mk_char_country} options={countryOpts} value={form.country ?? null} onSelect={(v) => patch({ country: v })} onClose={() => setSheet(null)} />
     </>
   );
 }

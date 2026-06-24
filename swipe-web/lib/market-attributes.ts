@@ -12,6 +12,7 @@ import type {
   MarketCondition,
   MarketSeason,
   MarketLength,
+  MarketListingStatus,
 } from '@/types/market';
 
 // Re-export the taxonomy fit options so the market UI shares the closet's set.
@@ -59,10 +60,16 @@ export const MARKET_SHOE_SIZES: string[] = [
   '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45',
 ];
 
+// The two non-brand options ("No brand" / "Other brand") use stable sentinel
+// VALUES with localized labels (see brandLabel); the rest are proper nouns that
+// read the same in every language, so they stay as literals.
+export const NO_BRAND = 'no_brand';
+export const OTHER_BRAND = 'other_brand';
+
 export const MARKET_BRANDS: string[] = [
-  'Без бренда', 'Zara', 'H&M', 'Mango', 'Bershka', 'Pull&Bear', 'Uniqlo',
+  'Zara', 'H&M', 'Mango', 'Bershka', 'Pull&Bear', 'Uniqlo',
   'Nike', 'Adidas', 'Puma', 'Gloria Jeans', 'Befree', 'LC Waikiki',
-  'Gucci', 'Prada', 'Massimo Dutti', '12storeez', 'Другая марка',
+  'Gucci', 'Prada', 'Massimo Dutti', '12storeez',
 ];
 
 // ── Materials (most popular for UZ resale first) ─────────────────────────────
@@ -148,27 +155,39 @@ export function countryOptions(locale: Locale): { value: string; label: string }
 // ── Categories ──────────────────────────────────────────────────────────────
 // Sourced from the same wardrobe taxonomy the closet uses (single source of
 // truth), so the Market offers exactly the closet's sections/subcategories.
-// `key` is the taxonomy subcategory value (e.g. 'SKIRTS'); labels are RU display
-// strings resolved from the taxonomy.
+// Only stable taxonomy KEYS are stored here; display labels are resolved per
+// locale at render time via categoryLabel()/categoryParentLabel().
 export interface MarketCategory {
-  key: string;
-  label: string; // RU label (display)
-  parent: string; // RU section label
-  section: string; // taxonomy section value (for attribute flags)
+  key: string; // taxonomy subcategory value (e.g. 'SKIRTS'); stored on listings
+  section: string; // taxonomy section value (drives attribute flags)
+  parentKey: string; // taxonomy value whose localized label shows as the parent
 }
 
-export const MARKET_CATEGORIES: MarketCategory[] = WARDROBE_TAXONOMY.flatMap((section) =>
-  section.subcategories.map((sub) => ({
-    key: sub.value,
-    label: taxLabel(sub.value, 'ru'),
-    parent: taxLabel(section.value, 'ru'),
-    section: section.value,
-  })),
-);
+export const MARKET_CATEGORIES: MarketCategory[] = [
+  ...WARDROBE_TAXONOMY.flatMap((section) =>
+    section.subcategories.map((sub) => ({
+      key: sub.value,
+      section: section.value,
+      parentKey: section.value,
+    })),
+  ),
+  // Market-only category (not part of the closet taxonomy); shown under Accessories.
+  { key: 'UNDERWEAR', section: 'UNDERWEAR', parentKey: 'ACCESSORIES' },
+];
 
 export function getCategory(key: string | undefined): MarketCategory | undefined {
   if (!key) return undefined;
   return MARKET_CATEGORIES.find((c) => c.key === key);
+}
+
+/** Localized label for a category key (e.g. 'SKIRTS' → 'Юбки' / 'Skirts'). */
+export function categoryLabel(key: string | undefined, locale: Locale): string {
+  return taxLabel(key, locale);
+}
+
+/** Localized parent/section label shown under a category (e.g. 'Accessories'). */
+export function categoryParentLabel(cat: MarketCategory | undefined, locale: Locale): string {
+  return cat ? taxLabel(cat.parentKey, locale) : '';
 }
 
 // ── Meeting-place regions (UZ) ───────────────────────────────────────────────
@@ -246,6 +265,8 @@ export function attributesForCategory(key: string | undefined): CategoryAttribut
   // Modesty / fit apply to garments, not footwear or accessories.
   if (section === 'FOOTWEAR') return { ...base, shoeSizes: true, showModesty: false, showFit: false };
   if (section === 'ACCESSORIES') return { ...base, showSize: false, showSeason: false, showModesty: false, showFit: false };
+  // Underwear: size + brand + color + material, but no season / modesty / fit.
+  if (section === 'UNDERWEAR') return { ...base, showSeason: false, showModesty: false, showFit: false };
   if (key === 'SKIRTS' || key === 'DRESSES') return { ...base, showLength: true };
   return base;
 }
@@ -277,6 +298,7 @@ const KEYWORD_MAP: Array<{ rx: RegExp; key: string }> = [
   { rx: /(шарф|scarf)/i, key: 'SCARF' },
   { rx: /(очк|glass)/i, key: 'GLASSES' },
   { rx: /(ремен|belt)/i, key: 'BELT' },
+  { rx: /(бель[её]|трус|бюстгальтер|нижнее|underwear|lingerie|bra|ichki kiyim)/i, key: 'UNDERWEAR' },
 ];
 
 /**
@@ -297,6 +319,32 @@ export function suggestCategory(title: string | undefined): MarketCategory | nul
 }
 
 // ── i18n label helpers ───────────────────────────────────────────────────────
+/** Brand display: localize the two sentinel options; proper nouns pass through. */
+export function brandLabel(value: string | undefined, t: Translations): string {
+  if (!value) return '';
+  if (value === NO_BRAND) return t.mk_brand_none;
+  if (value === OTHER_BRAND) return t.mk_brand_other;
+  return value;
+}
+
+/** Size display: only 'One size' needs translating; numeric sizes are universal. */
+export function sizeLabel(value: string | undefined, t: Translations): string {
+  if (!value) return '';
+  return value === 'One size' ? t.mk_size_one : value;
+}
+
+/** Localized label for a listing's lifecycle status. */
+export function statusLabel(t: Translations, s: MarketListingStatus): string {
+  return {
+    draft: t.mk_draft_label,
+    pending: t.mk_status_review,
+    active: t.mk_status_active,
+    sold: t.mk_status_sold,
+    archived: t.mk_status_archived,
+    rejected: t.mk_status_rejected,
+  }[s];
+}
+
 export function conditionLabel(t: Translations, c: MarketCondition): string {
   return {
     used_good: t.mk_cond_used_good,

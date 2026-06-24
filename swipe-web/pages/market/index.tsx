@@ -1,14 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { Plus, User, Search, Camera, Heart } from 'lucide-react';
 import MarketFeedCard from '@/components/market/MarketFeedCard';
 import { getFeed, isMarketOnboardingComplete } from '@/lib/market-storage';
-import { MARKET_CATEGORIES } from '@/lib/market-attributes';
+import { MARKET_CATEGORIES, categoryLabel } from '@/lib/market-attributes';
 import type { MarketListing } from '@/types/market';
 import { useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
 import { useMarketAccess } from '@/lib/feature-flags-context';
+import { useRootBackGuard } from '@/lib/use-root-back-guard';
 import MarketComingSoon from '@/components/market/MarketComingSoon';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events } from '@/lib/analytics-events';
@@ -21,7 +22,7 @@ import { Events } from '@/lib/analytics-events';
  */
 export default function MarketFeedPage() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const access = useMarketAccess();
@@ -29,18 +30,76 @@ export default function MarketFeedPage() {
   const [category, setCategory] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
+  // Root tab page — trap Back so it doesn't exit to a blank WebView screen.
+  useRootBackGuard();
+
   useEffect(() => {
     if (access === 'enabled') logAnalyticsEvent(Events.MARKET_FEED_VIEWED);
   }, [access]);
 
-  useEffect(() => {
+  const loadFeed = useCallback(() => {
     if (access !== 'enabled') return;
     const { listings: l } = getFeed({
       category: category ?? undefined,
       search: search.trim() || undefined,
     });
     setListings(l);
-  }, [category, search, access]);
+  }, [access, category, search]);
+
+  useEffect(() => { loadFeed(); }, [loadFeed]);
+
+  // ── Pull-to-refresh (mirrors the closet feed) ───────────────────────────────
+  const mainScrollRef = useRef<HTMLElement>(null);
+  const pullStartYRef = useRef<number | null>(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+  const PULL_THRESHOLD = 72;
+
+  function handlePullTouchStart(e: React.TouchEvent<HTMLElement>) {
+    if (mainScrollRef.current && mainScrollRef.current.scrollTop === 0) {
+      pullStartYRef.current = e.touches[0].clientY;
+    }
+  }
+
+  function handlePullTouchMove(e: React.TouchEvent<HTMLElement>) {
+    if (pullStartYRef.current === null || isPullRefreshing) return;
+    const dy = e.touches[0].clientY - pullStartYRef.current;
+    if (dy > 0 && mainScrollRef.current && mainScrollRef.current.scrollTop === 0) {
+      setPullDistance(Math.min(dy * 0.45, PULL_THRESHOLD + 20)); // resist so it doesn't pull 1:1
+    } else {
+      setPullDistance(0);
+    }
+  }
+
+  async function handlePullTouchEnd() {
+    if (pullDistance >= PULL_THRESHOLD && !isPullRefreshing) {
+      setIsPullRefreshing(true);
+      setPullDistance(0);
+      loadFeed();
+      // Feed reads from localStorage (instant) — hold the spinner briefly so the
+      // refresh is perceptible.
+      await new Promise((r) => setTimeout(r, 450));
+      setIsPullRefreshing(false);
+    } else {
+      setPullDistance(0);
+    }
+    pullStartYRef.current = null;
+  }
+
+  // React's onTouchMove is passive and can't preventDefault, so inside the native
+  // WebView the OS overscroll swallows the drag. Claim the gesture with a
+  // non-passive listener while pulling at the very top.
+  useEffect(() => {
+    const el = mainScrollRef.current;
+    if (!el) return;
+    const onMove = (e: TouchEvent) => {
+      if (pullStartYRef.current === null || el.scrollTop > 0) return;
+      const dy = e.touches[0].clientY - pullStartYRef.current;
+      if (dy > 0) e.preventDefault();
+    };
+    el.addEventListener('touchmove', onMove, { passive: false });
+    return () => el.removeEventListener('touchmove', onMove);
+  }, []);
 
   function handlePost() {
     if (isMarketOnboardingComplete()) router.push('/market/create');
@@ -127,9 +186,30 @@ export default function MarketFeedPage() {
 
         {/* ── Scrollable content: banners · categories · grid ── */}
         <main
+          ref={mainScrollRef}
           className="flex-1 overflow-y-auto"
-          style={{ paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))' }}
+          style={{ paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', overscrollBehaviorY: 'contain' }}
+          onTouchStart={handlePullTouchStart}
+          onTouchMove={handlePullTouchMove}
+          onTouchEnd={handlePullTouchEnd}
         >
+          {/* Pull-to-refresh indicator */}
+          <div
+            className="flex items-center justify-center overflow-hidden transition-all duration-200"
+            style={{ height: isPullRefreshing ? 44 : pullDistance > 0 ? Math.min(pullDistance, 44) : 0 }}
+          >
+            <div
+              className="w-7 h-7 rounded-full border-2"
+              style={{
+                borderColor: '#F370A7',
+                borderTopColor: 'transparent',
+                animation: isPullRefreshing ? 'spin 0.7s linear infinite' : 'none',
+                transform: isPullRefreshing ? undefined : `rotate(${Math.min((pullDistance / PULL_THRESHOLD) * 270, 270)}deg)`,
+                opacity: isPullRefreshing ? 1 : Math.min(pullDistance / PULL_THRESHOLD, 1),
+              }}
+            />
+          </div>
+
           {/* Advertisement banners */}
           <div className="hide-scrollbar flex gap-3 overflow-x-auto px-4 pt-1 pb-3" style={{ scrollSnapType: 'x mandatory' }}>
             {banners.map((b, i) => (
@@ -168,7 +248,7 @@ export default function MarketFeedPage() {
             {MARKET_CATEGORIES.map((cat) => (
               <CategoryChip
                 key={cat.key}
-                label={cat.label}
+                label={categoryLabel(cat.key, locale)}
                 active={category === cat.key}
                 isDark={isDark}
                 onClick={() => setCategory(cat.key)}

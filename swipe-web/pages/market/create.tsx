@@ -8,8 +8,9 @@ import {
   isMarketOnboardingComplete, getDraft, saveDraft, clearDraft,
   getMarketWizardStep, setMarketWizardStep, clearMarketWizardStep,
   clearMarketOnboarding, finalizeDraft, addListing,
+  getListingById, applyDraftToListing,
 } from '@/lib/market-storage';
-import { emptyDraft, type MarketDraft } from '@/types/market';
+import { emptyDraft, type MarketDraft, type MarketListingStatus } from '@/types/market';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
 
@@ -33,32 +34,12 @@ const STEP_NAMES: Record<number, string> = {
   [DEAL]: 'deal', [LOCATION]: 'location', [CONTACTS]: 'contacts',
 };
 
-/**
- * Tracks the *visual* viewport height so the page shrinks to the area above the
- * on-screen keyboard. Without this, the `100dvh` container stays full-height
- * when the keyboard opens, the browser scrolls it to keep the focused input in
- * view, and the pinned footer (Continue / nav) appears to jump to the top.
- * Pinning the container to `visualViewport.height` keeps the footer just above
- * the keyboard instead. Falls back to `100dvh` where the API is unavailable.
- */
-function useViewportHeight(): string {
-  const [h, setH] = useState('100dvh');
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const update = () => setH(`${Math.round(vv.height)}px`);
-    update();
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    window.addEventListener('orientationchange', update);
-    return () => {
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
-      window.removeEventListener('orientationchange', update);
-    };
-  }, []);
-  return h;
-}
+// Static height like the rest of the app (closet/add, shop, …). We deliberately
+// do NOT track `visualViewport.height`: resizing the container when the keyboard
+// opens makes the layout — and the pinned Continue button — jump up and down,
+// which is jarring while typing. The on-screen keyboard simply overlays the
+// bottom; the scrollable content keeps the focused field in view on its own.
+const WIZARD_HEIGHT = '100dvh';
 
 function MarketCreatePageInner() {
   const router = useRouter();
@@ -66,8 +47,11 @@ function MarketCreatePageInner() {
   const [step, setStep] = useState<number>(PHOTOS);
   const [form, setForm] = useState<MarketDraft>(() => emptyDraft());
   const [ready, setReady] = useState(false);
+  // Edit mode: when set, the wizard updates an existing listing instead of
+  // creating one, and never touches the separate create-draft in localStorage.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingStatus, setEditingStatus] = useState<MarketListingStatus | null>(null);
   const didStart = useRef(false);
-  const viewportH = useViewportHeight();
 
   // ── Mount: gate + resume ────────────────────────────────────────────────────
   useEffect(() => {
@@ -78,6 +62,21 @@ function MarketCreatePageInner() {
       clearMarketWizardStep();
       router.replace('/market/onboarding');
       return;
+    }
+    // Edit mode: prefill the form from an existing listing. Skips the onboarding
+    // gate and the create-draft entirely.
+    const editId = params.get('edit');
+    if (editId) {
+      const listing = getListingById(editId);
+      if (listing) {
+        setForm({ ...listing, id: `edit_${listing.id}`, updatedAt: new Date().toISOString() });
+        setEditingId(editId);
+        setEditingStatus(listing.status);
+        setStep(PHOTOS);
+        setReady(true);
+        return;
+      }
+      // Listing gone → fall through to a normal create.
     }
     if (!isMarketOnboardingComplete()) {
       router.replace('/market/onboarding');
@@ -98,16 +97,17 @@ function MarketCreatePageInner() {
       logAnalyticsEvent(Events.MARKET_LISTING_STARTED);
     }
     if (step <= CONTACTS) {
-      setMarketWizardStep(step);
+      if (!editingId) setMarketWizardStep(step); // don't disturb create-flow resume while editing
       logAnalyticsEvent(Events.MARKET_LISTING_STEP_VIEWED, { [Params.MK_STEP]: STEP_NAMES[step] });
     }
-  }, [step, ready]);
+  }, [step, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function patch(p: Partial<MarketDraft>) {
     setForm((f) => ({ ...f, ...p }));
   }
 
   function persist(next: MarketDraft) {
+    if (editingId) return; // edit mode keeps changes in memory until publish
     saveDraft(next);
   }
 
@@ -118,7 +118,7 @@ function MarketCreatePageInner() {
   }
 
   function goBack() {
-    if (step === PHOTOS) router.push('/market');
+    if (step === PHOTOS) router.push(editingId ? '/market/mine' : '/market');
     else setStep((s) => s - 1);
   }
 
@@ -131,6 +131,15 @@ function MarketCreatePageInner() {
   }
 
   function publish() {
+    if (editingId) {
+      applyDraftToListing(editingId, form, form.seller?.name);
+      logAnalyticsEvent(Events.MARKET_LISTING_UPDATED, {
+        listing_id: editingId,
+        resubmitted: editingStatus === 'rejected',
+      });
+      setStep(PUBLISHED);
+      return;
+    }
     const listing = finalizeDraft(form, form.seller?.name);
     addListing(listing);
     clearDraft();
@@ -144,19 +153,23 @@ function MarketCreatePageInner() {
   }
 
   if (!ready) {
-    return <div className="phone-container bg-white dark:bg-[#111111]" style={{ height: viewportH }} />;
+    return <div className="phone-container bg-white dark:bg-[#111111]" style={{ height: WIZARD_HEIGHT }} />;
   }
 
-  // ── Published success screen (inline) ───────────────────────────────────────
+  // ── Published / saved success screen (inline) ───────────────────────────────
   if (step === PUBLISHED) {
+    // Copy depends on whether we created, edited, or resubmitted (rejected → review).
+    const resubmitted = editingId && editingStatus === 'rejected';
+    const doneTitle = !editingId ? t.mk_published_title : resubmitted ? t.mk_resubmit_title : t.mk_updated_title;
+    const doneBody = !editingId ? t.mk_published_body : resubmitted ? t.mk_resubmit_body : t.mk_updated_body;
     return (
-      <div className="phone-container flex flex-col bg-white dark:bg-[#111111]" style={{ height: viewportH }}>
+      <div className="phone-container flex flex-col bg-white dark:bg-[#111111]" style={{ height: WIZARD_HEIGHT }}>
         <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
           <div className="w-24 h-24 rounded-full flex items-center justify-center" style={{ background: 'rgba(243,112,167,0.12)' }}>
             <Check size={48} color="#F370A7" strokeWidth={2.5} />
           </div>
-          <h1 className="text-[24px] font-extrabold mt-6 text-black dark:text-white">{t.mk_published_title}</h1>
-          <p className="text-[15px] leading-relaxed text-black/55 dark:text-white/55 mt-2 max-w-[300px]">{t.mk_published_body}</p>
+          <h1 className="text-[24px] font-extrabold mt-6 text-black dark:text-white">{doneTitle}</h1>
+          <p className="text-[15px] leading-relaxed text-black/55 dark:text-white/55 mt-2 max-w-[300px]">{doneBody}</p>
         </div>
         <div className="flex-none px-6 pb-2 flex flex-col gap-2.5" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}>
           <button
@@ -185,7 +198,7 @@ function MarketCreatePageInner() {
       <Head>
         <title>{t.mk_post_cta}</title>
       </Head>
-      <div className="phone-container flex flex-col bg-white dark:bg-[#111111] overflow-hidden" style={{ height: viewportH }}>
+      <div className="phone-container flex flex-col bg-white dark:bg-[#111111] overflow-hidden" style={{ height: WIZARD_HEIGHT }}>
         <WizardHeader step={step} totalSteps={TOTAL_STEPS} onBack={goBack} />
 
         {step === PHOTOS && <PhotosStep {...stepProps} />}
@@ -194,7 +207,7 @@ function MarketCreatePageInner() {
         {step === DEAL && <DealStep {...stepProps} />}
         {step === LOCATION && <LocationStep {...stepProps} />}
         {step === CONTACTS && (
-          <ContactsStep form={form} patch={patch} authed={isAuthenticated()} onNeedAuth={needAuth} onPublish={publish} />
+          <ContactsStep form={form} patch={patch} authed={isAuthenticated()} onNeedAuth={needAuth} onPublish={publish} editing={!!editingId} />
         )}
       </div>
     </>

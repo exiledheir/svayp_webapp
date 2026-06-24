@@ -130,7 +130,7 @@ export default function PhotosStep({ form, patch, onNext }: StepProps) {
         {error && <p className="text-[13px] text-[#F370A7] mt-3 font-medium">{error}</p>}
         {overCap && (
           <p className="text-[12px] text-black/45 dark:text-white/45 mt-3">
-            {`Сохранится первых ${MAX_STORED_PHOTOS} фото (демо без бэкенда).`}
+            {t.mk_photos_over_cap.replace('{n}', String(MAX_STORED_PHOTOS))}
           </p>
         )}
       </StepScaffold>

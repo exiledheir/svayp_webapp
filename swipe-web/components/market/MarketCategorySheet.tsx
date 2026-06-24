@@ -1,5 +1,5 @@
 import React from 'react';
-import { MARKET_CATEGORIES } from '@/lib/market-attributes';
+import { MARKET_CATEGORIES, categoryLabel, categoryParentLabel } from '@/lib/market-attributes';
 import { useI18n } from '@/lib/i18n';
 
 interface Props {
@@ -12,7 +12,7 @@ interface Props {
 }
 
 export default function MarketCategorySheet({ open, value, onSelect, onClose, includeAll }: Props) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   if (!open) return null;
 
   return (
@@ -39,8 +39,8 @@ export default function MarketCategorySheet({ open, value, onSelect, onClose, in
           {MARKET_CATEGORIES.map((cat) => (
             <Row
               key={cat.key}
-              label={cat.label}
-              sub={cat.parent}
+              label={categoryLabel(cat.key, locale)}
+              sub={categoryParentLabel(cat, locale)}
               active={value === cat.key}
               onClick={() => { onSelect(cat.key); onClose(); }}
             />

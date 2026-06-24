@@ -13,9 +13,16 @@ interface Props {
   listing: MarketListing;
   /** Optional callback so parent feeds can re-sync favorite state. */
   onToggleFavorite?: (id: string, next: boolean) => void;
+  /** Hide the favorite (heart) button — e.g. on the user's own listings. */
+  hideFavorite?: boolean;
+  /**
+   * Custom overlay rendered over the image (e.g. manage actions in My listings).
+   * When provided, the promo badges (urgent / free) are suppressed to leave room.
+   */
+  overlay?: React.ReactNode;
 }
 
-export default function MarketFeedCard({ listing, onToggleFavorite }: Props) {
+export default function MarketFeedCard({ listing, onToggleFavorite, hideFavorite, overlay }: Props) {
   const router = useRouter();
   const { t, locale } = useI18n();
   const [liked, setLiked] = React.useState(!!listing.isFavorite);
@@ -69,7 +76,7 @@ export default function MarketFeedCard({ listing, onToggleFavorite }: Props) {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-[12px]" style={{ color: 'rgba(0,0,0,0.3)' }}>
-                  No image
+                  {t.mk_no_image}
                 </div>
               )}
             </div>
@@ -78,16 +85,19 @@ export default function MarketFeedCard({ listing, onToggleFavorite }: Props) {
 
         <CarouselDots count={images.length} active={imgIdx} />
 
-        <button
-          className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center"
-          style={{ background: 'rgba(255,255,255,0.85)' }}
-          onClick={handleLike}
-          aria-label="Like"
-        >
-          <Heart size={14} strokeWidth={2} fill={liked ? '#000' : 'none'} color={liked ? '#000' : 'rgba(0,0,0,0.5)'} />
-        </button>
+        {!hideFavorite && (
+          <button
+            className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center"
+            style={{ background: 'rgba(255,255,255,0.85)' }}
+            onClick={handleLike}
+            aria-label="Like"
+          >
+            <Heart size={14} strokeWidth={2} fill={liked ? '#000' : 'none'} color={liked ? '#000' : 'rgba(0,0,0,0.5)'} />
+          </button>
+        )}
 
-        {listing.isUrgent && (
+        {/* Promo badges — hidden when a custom (manage) overlay takes the corners. */}
+        {!overlay && listing.isUrgent && (
           <span
             className="absolute top-2 left-2 text-white text-[9px] font-bold px-1.5 py-0.5 rounded"
             style={{ background: '#F370A7' }}
@@ -95,7 +105,7 @@ export default function MarketFeedCard({ listing, onToggleFavorite }: Props) {
             ⚡ {t.mk_negotiable}
           </span>
         )}
-        {listing.dealType === 'free' && (
+        {!overlay && listing.dealType === 'free' && (
           <span
             className="absolute bottom-2 left-2 text-white text-[10px] font-bold px-2 py-0.5 rounded-full"
             style={{ background: '#3BA55D' }}
@@ -103,6 +113,8 @@ export default function MarketFeedCard({ listing, onToggleFavorite }: Props) {
             {t.mk_free}
           </span>
         )}
+
+        {overlay}
       </div>
 
       {/* Info */}

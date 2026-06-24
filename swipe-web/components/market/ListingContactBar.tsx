@@ -39,7 +39,19 @@ export default function ListingContactBar({ listing }: { listing: MarketListing 
 
   function callPhone() {
     setShowOptions(false);
-    if (listing.seller.phone) window.location.href = `tel:${listing.seller.phone}`;
+    const phone = listing.seller.phone;
+    if (!phone) return;
+    logAnalyticsEvent(Events.MARKET_CONTACT_CALL_TAPPED, { listing_id: listing.id });
+    // Open the native phone app (iOS/Android) with the number prefilled. A
+    // synthesised anchor click is handled by the WebView's navigation delegate
+    // — and by the browser elsewhere — more reliably than assigning
+    // window.location to a `tel:` URL, which some WebViews silently ignore.
+    const a = document.createElement('a');
+    a.href = `tel:${phone.replace(/[^\d+]/g, '')}`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
 
   function openTelegram() {

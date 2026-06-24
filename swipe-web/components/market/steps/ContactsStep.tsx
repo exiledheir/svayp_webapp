@@ -14,6 +14,8 @@ interface ContactsStepProps {
   onNeedAuth: (phone: string) => void;
   /** Authenticated users: publish the listing. */
   onPublish: () => void;
+  /** Editing an existing listing → CTA reads "Save changes" instead of "Publish". */
+  editing?: boolean;
 }
 
 const DIGITS = /\D/g;
@@ -44,7 +46,7 @@ function toNational(raw?: string): string {
   return d.slice(-9);
 }
 
-export default function ContactsStep({ form, patch, authed, onNeedAuth, onPublish }: ContactsStepProps) {
+export default function ContactsStep({ form, patch, authed, onNeedAuth, onPublish, editing }: ContactsStepProps) {
   const { t } = useI18n();
   const methods = form.contactMethods ?? ['chat'];
   const name = form.seller?.name ?? '';
@@ -58,7 +60,10 @@ export default function ContactsStep({ form, patch, authed, onNeedAuth, onPublis
   const fullPhone = `+998${clean}`;
   const telegramOn = methods.includes('telegram');
   const callOn = methods.includes('phone');
-  const valid = clean.length === 9 && name.trim().length > 0;
+  // Telegram can't be reached via a phone number, so an explicit username is
+  // required whenever the Telegram option is enabled.
+  const telegramOk = !telegramOn || telegramUsername.trim().length > 0;
+  const valid = clean.length === 9 && name.trim().length > 0 && telegramOk;
 
   function setSeller(p: Partial<NonNullable<MarketDraft['seller']>>) {
     patch({ seller: { ...(form.seller ?? { id: '', name: '' }), ...p } });
@@ -109,7 +114,7 @@ export default function ContactsStep({ form, patch, authed, onNeedAuth, onPublis
   return (
     <StepScaffold
       title={t.mk_contacts_title}
-      ctaLabel={t.mk_publish_cta}
+      ctaLabel={editing ? t.mk_save_changes : t.mk_publish_cta}
       ctaDisabled={!valid}
       onCta={handleCta}
     >
@@ -148,16 +153,33 @@ export default function ContactsStep({ form, patch, authed, onNeedAuth, onPublis
       {/* Contact methods */}
       <p className="text-[15px] font-bold text-black dark:text-white mt-6 mb-3">{t.mk_contacts_methods}</p>
       <div className="flex flex-col gap-3">
+        {/* Telegram — first option; requires a username when enabled */}
         <div className="flex items-center gap-3 p-3.5 rounded-2xl" style={{ background: 'rgba(128,128,128,0.08)' }}>
-          <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#3BA55D' }}>
-            <MessageCircle size={20} color="white" />
+          <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#229ED9' }}>
+            <Send size={20} color="white" />
           </span>
-          <span className="flex-1">
-            <span className="block text-[15px] font-semibold text-black dark:text-white">{t.mk_contact_chat}</span>
-            <span className="block text-[13px] text-black/45 dark:text-white/45">{t.mk_contact_chat_note}</span>
-          </span>
-          <Toggle on disabled onChange={() => {}} />
+          <span className="flex-1 text-[15px] font-semibold text-black dark:text-white">{t.mk_contact_telegram}</span>
+          <Toggle on={telegramOn} onChange={(v) => setMethod('telegram', v)} />
         </div>
+
+        {/* When Telegram is on: a username is required (a phone number can't be
+            used to reach someone on Telegram). */}
+        {telegramOn && (
+          <div className="rounded-2xl p-3.5" style={{ background: 'rgba(34,158,217,0.08)' }}>
+            <p className="text-[13px] leading-relaxed text-black/60 dark:text-white/60 mb-2.5">
+              {t.mk_contact_tg_note}
+            </p>
+            <div className="flex items-center px-3.5 h-12 rounded-xl bg-white dark:bg-[#2c2c2e]">
+              <span className="text-[15px] font-semibold text-black/40 dark:text-white/40">@</span>
+              <input
+                value={telegramUsername.replace(/^@/, '')}
+                onChange={(e) => setSeller({ telegramUsername: e.target.value.replace(/[^A-Za-z0-9_]/g, '') })}
+                placeholder={t.mk_contact_tg_username_ph}
+                className="flex-1 bg-transparent outline-none text-[15px] ml-1 text-black dark:text-white"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Phone call */}
         <div className="flex items-center gap-3 p-3.5 rounded-2xl" style={{ background: 'rgba(128,128,128,0.08)' }}>
@@ -171,31 +193,14 @@ export default function ContactsStep({ form, patch, authed, onNeedAuth, onPublis
           <Toggle on={callOn} onChange={(v) => setMethod('phone', v)} />
         </div>
 
+        {/* In-app chat — always on (last option) */}
         <div className="flex items-center gap-3 p-3.5 rounded-2xl" style={{ background: 'rgba(128,128,128,0.08)' }}>
-          <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#229ED9' }}>
-            <Send size={20} color="white" />
+          <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#3BA55D' }}>
+            <MessageCircle size={20} color="white" />
           </span>
-          <span className="flex-1 text-[15px] font-semibold text-black dark:text-white">{t.mk_contact_telegram}</span>
-          <Toggle on={telegramOn} onChange={(v) => setMethod('telegram', v)} />
+          <span className="flex-1 text-[15px] font-semibold text-black dark:text-white">{t.mk_contact_chat}</span>
+          <Toggle on disabled onChange={() => {}} />
         </div>
-
-        {/* When Telegram is on: explain the phone redirect + offer a username. */}
-        {telegramOn && (
-          <div className="rounded-2xl p-3.5" style={{ background: 'rgba(34,158,217,0.08)' }}>
-            <p className="text-[13px] leading-relaxed text-black/60 dark:text-white/60 mb-2.5">
-              {t.mk_contact_tg_note} <span className="font-semibold text-black/75 dark:text-white/75">{fullPhone}</span>
-            </p>
-            <div className="flex items-center px-3.5 h-12 rounded-xl bg-white dark:bg-[#2c2c2e]">
-              <span className="text-[15px] font-semibold text-black/40 dark:text-white/40">@</span>
-              <input
-                value={telegramUsername.replace(/^@/, '')}
-                onChange={(e) => setSeller({ telegramUsername: e.target.value.replace(/[^A-Za-z0-9_]/g, '') })}
-                placeholder={t.mk_contact_tg_username_ph}
-                className="flex-1 bg-transparent outline-none text-[15px] ml-1 text-black dark:text-white"
-              />
-            </div>
-          </div>
-        )}
       </div>
     </StepScaffold>
   );

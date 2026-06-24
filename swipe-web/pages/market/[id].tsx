@@ -6,7 +6,8 @@ import { ArrowLeft, Heart, MapPin, User } from 'lucide-react';
 import type { MarketListing } from '@/types/market';
 import { getListingById, toggleFavorite } from '@/lib/market-storage';
 import {
-  conditionLabel, seasonLabel, lengthLabel, colorLabel, materialLabel, countryLabel, getCategory, regionLabel,
+  conditionLabel, seasonLabel, lengthLabel, colorLabel, materialLabel, countryLabel, getCategory, categoryLabel,
+  brandLabel, sizeLabel, regionLabel,
 } from '@/lib/market-attributes';
 import { districtLabel } from '@/lib/market-districts';
 import { taxLabel } from '@/lib/wardrobe-taxonomy';
@@ -59,9 +60,9 @@ function ListingDetailPageInner() {
   const rows: Array<{ label: string; value: string }> = [];
   rows.push({ label: t.mk_char_condition, value: conditionLabel(t, listing.condition) });
   if (listing.hijabFriendly != null) rows.push({ label: t.mk_char_modesty, value: listing.hijabFriendly ? t.mk_char_yes : t.mk_char_no });
-  if (category) rows.push({ label: t.mk_categories, value: category.label });
-  if (listing.brand) rows.push({ label: t.mk_char_brand, value: listing.brand });
-  if (listing.size) rows.push({ label: t.mk_char_size, value: listing.size });
+  if (category) rows.push({ label: t.mk_categories, value: categoryLabel(listing.category, locale) });
+  if (listing.brand) rows.push({ label: t.mk_char_brand, value: brandLabel(listing.brand, t) });
+  if (listing.size) rows.push({ label: t.mk_char_size, value: sizeLabel(listing.size, t) });
   if (listing.fit) rows.push({ label: t.mk_char_fit, value: taxLabel(listing.fit, locale) });
   if (listing.color) rows.push({ label: t.mk_char_color, value: colorLabel(t, listing.color) });
   if (listing.season) rows.push({ label: t.mk_char_season, value: seasonLabel(t, listing.season) });
@@ -72,6 +73,18 @@ function ListingDetailPageInner() {
   function handleLike() {
     const next = toggleFavorite(listing!.id);
     setLiked(next);
+  }
+
+  // `router.back()` is a no-op when there's no in-app history to return to — e.g.
+  // the page was opened via a deep link, a share, a hard reload, or it's the
+  // first screen in the WebView. Detect that and fall back to the market feed so
+  // the back button always does something.
+  function handleBack() {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/market');
+    }
   }
 
   const loc = listing.location;
@@ -90,7 +103,7 @@ function ListingDetailPageInner() {
         {/* Header overlay */}
         <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-3 pt-3 pointer-events-none">
           <button
-            onClick={() => router.back()}
+            onClick={handleBack}
             className="w-10 h-10 rounded-full flex items-center justify-center pointer-events-auto"
             style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(8px)' }}
             aria-label="Back"

@@ -13,10 +13,12 @@
 
 import type {
   MarketListing,
+  MarketListingStatus,
   MarketDraft,
   MarketContactMethod,
 } from '@/types/market';
 import { getUser } from '@/lib/auth';
+import { NO_BRAND, OTHER_BRAND } from '@/lib/market-attributes';
 
 const FEED_KEY = 'market_listings';
 const DRAFT_KEY = 'market_draft';
@@ -128,6 +130,35 @@ export function updateListing(id: string, patch: Partial<MarketListing>): void {
     list[idx] = { ...list[idx], ...patch };
     writeListings(list);
   }
+}
+
+/** Change a listing's status (e.g. active ↔ sold ↔ archived). */
+export function setListingStatus(id: string, status: MarketListingStatus): void {
+  updateListing(id, { status });
+}
+
+/**
+ * Saves edits from the create wizard back onto an existing listing, preserving
+ * its identity (id, postedAt, seller.id). A rejected listing is resubmitted for
+ * review (→ pending); any other status is kept as-is. Returns the updated
+ * listing, or undefined when the id no longer exists.
+ */
+export function applyDraftToListing(id: string, d: MarketDraft, sellerName?: string): MarketListing | undefined {
+  const list = readListings();
+  const idx = list.findIndex((l) => l.id === id);
+  if (idx < 0) return undefined;
+  const prev = list[idx];
+  const fresh = finalizeDraft(d, sellerName); // fills/normalizes every editable field
+  const updated: MarketListing = {
+    ...fresh,
+    id: prev.id,
+    postedAt: prev.postedAt,
+    seller: { ...fresh.seller, id: prev.seller.id },
+    status: prev.status === 'rejected' ? 'pending' : prev.status,
+  };
+  list[idx] = updated;
+  writeListings(list);
+  return updated;
 }
 
 export function deleteListing(id: string): void {
@@ -252,7 +283,7 @@ const SEED_LISTINGS: MarketListing[] = [
   },
   {
     id: 'seed_6', title: 'Свитер тёплый, отдам даром', images: [img('mk-sweater1')],
-    category: 'SWEATERS_KNITS', condition: 'used_visible', brand: 'Без бренда', size: '48 (L)',
+    category: 'SWEATERS_KNITS', condition: 'used_visible', brand: NO_BRAND, size: '48 (L)',
     color: 'gray', season: 'winter', dealType: 'free', price: 0,
     currency: 'UZS', isUrgent: false, description: 'Тёплый свитер, отдам даром. Самовывоз.',
     location: { address: 'Яккасарай' },
@@ -296,7 +327,8 @@ export function finalizeDraft(d: MarketDraft, sellerName?: string): MarketListin
     images: (d.images ?? []).slice(0, MAX_STORED_PHOTOS),
     category: d.category ?? 'TSHIRTS_TOPS',
     condition: d.condition ?? 'used_good',
-    brand: d.brand,
+    // "Other brand" + a typed name → store the actual name; otherwise the value as-is.
+    brand: d.brand === OTHER_BRAND ? (d.customBrand?.trim() || OTHER_BRAND) : d.brand,
     size: d.size,
     color: d.color,
     season: d.season,

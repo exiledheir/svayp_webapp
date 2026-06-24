@@ -56,8 +56,11 @@ export const Events = {
   MARKET_LISTING_STEP_COMPLETED: 'market_listing_step_completed',
   MARKET_LISTING_DRAFT_SAVED: 'market_listing_draft_saved',
   MARKET_LISTING_PUBLISHED: 'market_listing_published',
+  MARKET_LISTING_UPDATED: 'market_listing_updated',
+  MARKET_LISTING_STATUS_CHANGED: 'market_listing_status_changed',
   MARKET_LISTING_ABANDONED: 'market_listing_abandoned',
   MARKET_CONTACT_CHAT_TAPPED: 'market_contact_chat_tapped',
+  MARKET_CONTACT_CALL_TAPPED: 'market_contact_call_tapped',
   MARKET_CONTACT_TELEGRAM_TAPPED: 'market_contact_telegram_tapped',
   MARKET_FAVORITE_TOGGLED: 'market_favorite_toggled',
 } as const;

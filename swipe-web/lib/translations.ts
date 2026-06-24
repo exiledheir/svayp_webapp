@@ -37,6 +37,30 @@ export interface Translations {
   mk_continue: string;
   mk_details_title: string;
   mk_status_review: string;
+  mk_status_active: string;
+  mk_status_sold: string;
+  mk_status_archived: string;
+  mk_status_rejected: string;
+  mk_manage_title: string;
+  mk_manage_edit: string;
+  mk_manage_edit_resubmit: string;
+  mk_manage_mark_active: string;
+  mk_manage_mark_sold: string;
+  mk_manage_archive: string;
+  mk_manage_status: string;
+  mk_status_locked_note: string;
+  mk_status_confirm_title: string;
+  mk_status_confirm_body: string;
+  mk_cancel: string;
+  mk_delete_confirm_title: string;
+  mk_delete_confirm_body: string;
+  mk_rejected_note: string;
+  mk_pending_note: string;
+  mk_updated_title: string;
+  mk_updated_body: string;
+  mk_resubmit_title: string;
+  mk_resubmit_body: string;
+  mk_save_changes: string;
   mk_photos_title: string;
   mk_photos_hint: string;
   mk_photos_tips_title: string;
@@ -55,6 +79,10 @@ export interface Translations {
   mk_char_title: string;
   mk_char_condition: string;
   mk_char_brand: string;
+  mk_brand_none: string;
+  mk_brand_other: string;
+  mk_brand_custom_ph: string;
+  mk_size_one: string;
   mk_char_size: string;
   mk_char_season: string;
   mk_char_length: string;
@@ -116,6 +144,8 @@ export interface Translations {
   mk_loc_map_error: string;
   mk_loc_pinned: string;
   mk_photos_add: string;
+  mk_photos_over_cap: string;
+  mk_no_image: string;
   mk_category_choose: string;
   mk_contact_tg_note: string;
   mk_contact_tg_username_ph: string;
@@ -488,6 +518,30 @@ const en: Translations = {
   mk_continue: 'Continue',
   mk_details_title: 'Tell us about the item',
   mk_status_review: 'Under review',
+  mk_status_active: 'Active',
+  mk_status_sold: 'Sold',
+  mk_status_archived: 'Archived',
+  mk_status_rejected: 'Rejected',
+  mk_manage_title: 'Manage',
+  mk_manage_edit: 'Edit listing',
+  mk_manage_edit_resubmit: 'Edit & resubmit',
+  mk_manage_mark_active: 'Mark as active',
+  mk_manage_mark_sold: 'Mark as sold',
+  mk_manage_archive: 'Archive',
+  mk_manage_status: 'Change status',
+  mk_status_locked_note: 'This listing is under review. You can change its status once it’s approved.',
+  mk_status_confirm_title: 'Change status?',
+  mk_status_confirm_body: 'Mark this listing as “{status}”?',
+  mk_cancel: 'Cancel',
+  mk_delete_confirm_title: 'Delete listing?',
+  mk_delete_confirm_body: "This can't be undone.",
+  mk_rejected_note: 'This listing was rejected. Edit it and resubmit for review.',
+  mk_pending_note: "It's under review — you can edit or delete it while you wait.",
+  mk_updated_title: 'Changes saved',
+  mk_updated_body: 'Your listing has been updated.',
+  mk_resubmit_title: 'Sent for review',
+  mk_resubmit_body: "We'll review your changes and publish it soon.",
+  mk_save_changes: 'Save changes',
   mk_photos_title: 'Add listing photos',
   mk_photos_hint: 'You can add 1 to 10 photos. Each photo must be under 10 MB and at least 300×300.',
   mk_photos_tips_title: 'How to take the perfect photo?',
@@ -506,6 +560,10 @@ const en: Translations = {
   mk_char_title: 'Specify characteristics',
   mk_char_condition: 'Condition',
   mk_char_brand: 'Brand',
+  mk_brand_none: 'No brand',
+  mk_brand_other: 'Other brand',
+  mk_brand_custom_ph: 'Enter brand name',
+  mk_size_one: 'One size',
   mk_char_size: 'Size',
   mk_char_season: 'Season',
   mk_char_length: 'Item length',
@@ -567,9 +625,11 @@ const en: Translations = {
   mk_loc_map_error: "Couldn't load the map. Check your connection.",
   mk_loc_pinned: 'Location selected',
   mk_photos_add: 'Add photos',
+  mk_photos_over_cap: 'Only the first {n} photos are saved (demo, no backend).',
+  mk_no_image: 'No image',
   mk_category_choose: 'Choose a category',
-  mk_contact_tg_note: "We'll forward buyers to this phone number, or you can add your own Telegram username.",
-  mk_contact_tg_username_ph: 'username (optional)',
+  mk_contact_tg_note: 'Add your Telegram username so buyers can message you on Telegram.',
+  mk_contact_tg_username_ph: 'username',
   mk_loc_landmark_label: 'Specify a landmark',
   mk_loc_landmark_ph: 'E.g. Alay bazaar',
   mk_loc_courier_note: 'You arrange delivery yourself',
@@ -590,7 +650,7 @@ const en: Translations = {
   mk_contacts_methods: 'Preferred ways to contact you',
   mk_contact_chat: 'In-app chat',
   mk_contact_chat_note: 'Enabled by default',
-  mk_contact_telegram: 'Telegram chat',
+  mk_contact_telegram: 'Telegram',
   mk_contact_call: 'Phone call',
   mk_contact_call_note: 'Buyers will see your phone number',
   mk_seller_contacts: 'Seller contacts',
@@ -1011,6 +1071,30 @@ const ru: Translations = {
   mk_continue: 'Продолжить',
   mk_details_title: 'Расскажите о товаре',
   mk_status_review: 'На проверке',
+  mk_status_active: 'Активно',
+  mk_status_sold: 'Продано',
+  mk_status_archived: 'В архиве',
+  mk_status_rejected: 'Отклонено',
+  mk_manage_title: 'Управление',
+  mk_manage_edit: 'Редактировать',
+  mk_manage_edit_resubmit: 'Изменить и отправить на проверку',
+  mk_manage_mark_active: 'Сделать активным',
+  mk_manage_mark_sold: 'Отметить проданным',
+  mk_manage_archive: 'В архив',
+  mk_manage_status: 'Изменить статус',
+  mk_status_locked_note: 'Объявление на проверке. Изменить статус можно будет после одобрения.',
+  mk_status_confirm_title: 'Изменить статус?',
+  mk_status_confirm_body: 'Отметить объявление как «{status}»?',
+  mk_cancel: 'Отмена',
+  mk_delete_confirm_title: 'Удалить объявление?',
+  mk_delete_confirm_body: 'Это действие нельзя отменить.',
+  mk_rejected_note: 'Объявление отклонено. Измените его и отправьте на повторную проверку.',
+  mk_pending_note: 'Объявление на проверке — пока его можно изменить или удалить.',
+  mk_updated_title: 'Изменения сохранены',
+  mk_updated_body: 'Ваше объявление обновлено.',
+  mk_resubmit_title: 'Отправлено на проверку',
+  mk_resubmit_body: 'Мы проверим изменения и скоро опубликуем.',
+  mk_save_changes: 'Сохранить',
   mk_photos_title: 'Добавьте фото объявления',
   mk_photos_hint: 'Можно добавить от 1 до 10 фото. Фото должно быть меньше 10 МБ и с разрешением не ниже 300×300.',
   mk_photos_tips_title: 'Как сделать идеальное фото?',
@@ -1029,6 +1113,10 @@ const ru: Translations = {
   mk_char_title: 'Укажите характеристики',
   mk_char_condition: 'Состояние',
   mk_char_brand: 'Бренд',
+  mk_brand_none: 'Без бренда',
+  mk_brand_other: 'Другая марка',
+  mk_brand_custom_ph: 'Введите название бренда',
+  mk_size_one: 'Один размер',
   mk_char_size: 'Размер',
   mk_char_season: 'Сезон',
   mk_char_length: 'Длина изделия',
@@ -1090,9 +1178,11 @@ const ru: Translations = {
   mk_loc_map_error: 'Не удалось загрузить карту. Проверьте соединение.',
   mk_loc_pinned: 'Место выбрано',
   mk_photos_add: 'Добавить фото',
+  mk_photos_over_cap: 'Сохранятся первые {n} фото (демо без бэкенда).',
+  mk_no_image: 'Нет фото',
   mk_category_choose: 'Выбрать категорию',
-  mk_contact_tg_note: 'Покупателей перенаправим на этот номер, либо вы можете указать свой Telegram username.',
-  mk_contact_tg_username_ph: 'username (необязательно)',
+  mk_contact_tg_note: 'Укажите свой Telegram username, чтобы покупатели могли написать вам в Telegram.',
+  mk_contact_tg_username_ph: 'username',
   mk_loc_landmark_label: 'Укажите ориентир',
   mk_loc_landmark_ph: 'Например, алайский рынок',
   mk_loc_courier_note: 'Вы самостоятельно организовываете доставку',
@@ -1113,7 +1203,7 @@ const ru: Translations = {
   mk_contacts_methods: 'Предпочтительные способы связи с вами',
   mk_contact_chat: 'Чат в приложении',
   mk_contact_chat_note: 'Включён по умолчанию',
-  mk_contact_telegram: 'Чат в телеграм',
+  mk_contact_telegram: 'Telegram',
   mk_contact_call: 'Звонок по телефону',
   mk_contact_call_note: 'Покупатели увидят ваш номер',
   mk_seller_contacts: 'Контакты продавца',
@@ -1534,6 +1624,30 @@ const uz: Translations = {
   mk_continue: 'Davom etish',
   mk_details_title: 'Mahsulot haqida gapiring',
   mk_status_review: 'Tekshiruvda',
+  mk_status_active: 'Faol',
+  mk_status_sold: 'Sotilgan',
+  mk_status_archived: 'Arxivda',
+  mk_status_rejected: 'Rad etilgan',
+  mk_manage_title: 'Boshqarish',
+  mk_manage_edit: 'Tahrirlash',
+  mk_manage_edit_resubmit: 'Tahrirlab, qayta yuborish',
+  mk_manage_mark_active: 'Faol qilish',
+  mk_manage_mark_sold: 'Sotilgan deb belgilash',
+  mk_manage_archive: 'Arxivlash',
+  mk_manage_status: "Holatni o'zgartirish",
+  mk_status_locked_note: "E'lon tekshiruvda. Holatni u tasdiqlangach o'zgartira olasiz.",
+  mk_status_confirm_title: "Holatni o'zgartirilsinmi?",
+  mk_status_confirm_body: 'E\'lon "{status}" deb belgilansinmi?',
+  mk_cancel: 'Bekor qilish',
+  mk_delete_confirm_title: "E'lonni o'chirilsinmi?",
+  mk_delete_confirm_body: "Buni qaytarib bo'lmaydi.",
+  mk_rejected_note: "E'lon rad etildi. Uni tahrirlab, qayta tekshiruvga yuboring.",
+  mk_pending_note: "E'lon tekshiruvda — kutish vaqtida uni tahrirlash yoki o'chirish mumkin.",
+  mk_updated_title: "O'zgarishlar saqlandi",
+  mk_updated_body: "E'loningiz yangilandi.",
+  mk_resubmit_title: 'Tekshiruvga yuborildi',
+  mk_resubmit_body: "O'zgarishlarni tekshirib, tez orada e'lon qilamiz.",
+  mk_save_changes: 'Saqlash',
   mk_photos_title: "E'lon rasmlarini qo'shing",
   mk_photos_hint: "1 dan 10 tagacha rasm qo'shish mumkin. Har bir rasm 10 MB dan kichik va 300×300 dan kam bo'lmasligi kerak.",
   mk_photos_tips_title: 'Mukammal rasmni qanday olish mumkin?',
@@ -1552,6 +1666,10 @@ const uz: Translations = {
   mk_char_title: 'Xususiyatlarni kiriting',
   mk_char_condition: 'Holati',
   mk_char_brand: 'Brend',
+  mk_brand_none: 'Brendsiz',
+  mk_brand_other: 'Boshqa brend',
+  mk_brand_custom_ph: 'Brend nomini kiriting',
+  mk_size_one: "Yagona o'lcham",
   mk_char_size: "O'lcham",
   mk_char_season: 'Mavsum',
   mk_char_length: 'Mahsulot uzunligi',
@@ -1568,7 +1686,7 @@ const uz: Translations = {
   mk_cond_used_visible: 'Ishlatilgan (kiyilgan izlari bor)',
   mk_cond_used_defects: 'Ishlatilgan (sezilarli nuqsonlar bor)',
   mk_cond_new_with_tag: 'Yangi (yorliq bilan, qadoqda)',
-  mk_season_demi: 'Demi-mavsum',
+  mk_season_demi: 'Kuz-bahor',
   mk_season_winter: 'Qish',
   mk_season_summer: 'Yoz',
   mk_season_all: 'Barcha mavsumlar',
@@ -1613,9 +1731,11 @@ const uz: Translations = {
   mk_loc_map_error: "Xaritani yuklab bo'lmadi. Aloqani tekshiring.",
   mk_loc_pinned: 'Joy tanlandi',
   mk_photos_add: "Rasm qo'shish",
+  mk_photos_over_cap: "Faqat dastlabki {n} ta rasm saqlanadi (demo, backendsiz).",
+  mk_no_image: "Rasm yo'q",
   mk_category_choose: 'Kategoriyani tanlash',
-  mk_contact_tg_note: "Xaridorlarni shu raqamga yo'naltiramiz yoki o'z Telegram username'ingizni qo'shishingiz mumkin.",
-  mk_contact_tg_username_ph: 'username (ixtiyoriy)',
+  mk_contact_tg_note: "Telegram username'ingizni qo'shing — xaridorlar sizga Telegramda yozadi.",
+  mk_contact_tg_username_ph: 'username',
   mk_loc_landmark_label: "Mo'ljal kiriting",
   mk_loc_landmark_ph: 'Masalan, Oloy bozori',
   mk_loc_courier_note: 'Yetkazib berishni mustaqil tashkil qilasiz',
@@ -1636,7 +1756,7 @@ const uz: Translations = {
   mk_contacts_methods: 'Siz bilan bogʻlanishning afzal usullari',
   mk_contact_chat: 'Ilovadagi chat',
   mk_contact_chat_note: 'Sukut boʻyicha yoqilgan',
-  mk_contact_telegram: 'Telegram chat',
+  mk_contact_telegram: 'Telegram',
   mk_contact_call: "Telefon orqali qoʻngʻiroq",
   mk_contact_call_note: "Xaridorlar telefon raqamingizni koʻradi",
   mk_seller_contacts: 'Sotuvchi kontaktlari',

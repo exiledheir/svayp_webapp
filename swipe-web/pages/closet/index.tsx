@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Image as ImageIcon, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2 } from 'lucide-react';
 import { getUser, clearTokens } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags-context';
+import { useRootBackGuard } from '@/lib/use-root-back-guard';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import { fetchClosetItems, addClosetItemFromFile, removeClosetItem, updateClosetItemApi, getClosetItems, addClosetItem, deleteClosetItem, updateClosetItem } from '@/lib/closet-storage';
 import type { ClosetItem, ClosetCategory } from '@/lib/closet-storage';
@@ -177,6 +178,9 @@ export default function ClosetPage() {
   const { t, locale, setLocale } = useI18n();
   const { theme, setTheme } = useTheme();
   const { plansEnabled, profileEnabled } = useFeatureFlags();
+
+  // Root tab page — trap Back so it doesn't exit to a blank WebView screen.
+  useRootBackGuard();
   const [showLangPicker, setShowLangPicker] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [userInfo, setUserInfo] = useState<{ name?: string; phoneNumber?: string } | null>(null);
