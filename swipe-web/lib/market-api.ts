@@ -156,8 +156,20 @@ export async function getDrafts(): Promise<MarketListing[]> {
 }
 
 // ── A6 · My listings ─────────────────────────────────────────────────────────
-export async function getMyListings(status?: MarketListingStatus, page = 0, size = 30): Promise<Page<MarketListing>> {
-  return asPage<MarketListing>(await api.get('/marketplace/listings/mine', { params: { status, page, size } }));
+export interface ListingModeration {
+  safetyFlag?: string | null;
+  rejectionReason?: string | null;
+  rejectionMessage?: string | null;
+  approvedAt?: string | null;
+  rejectedAt?: string | null;
+}
+/** A listing owned by the current user — carries the owner-only moderation block. */
+export interface MineListing extends MarketListing {
+  moderation?: ListingModeration | null;
+}
+
+export async function getMyListings(status?: MarketListingStatus, page = 0, size = 30): Promise<Page<MineListing>> {
+  return asPage<MineListing>(await api.get('/marketplace/listings/mine', { params: { status, page, size } }));
 }
 
 // ── A5 · Favorites ───────────────────────────────────────────────────────────

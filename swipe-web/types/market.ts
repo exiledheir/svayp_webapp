@@ -14,7 +14,7 @@ export type MarketSeason = 'demi' | 'winter' | 'summer' | 'all';
 export type MarketLength = 'maxi' | 'midi' | 'mini';
 export type MarketCurrency = 'UZS' | 'USD'; // Сум / у.е.
 export type MarketDealType = 'sell' | 'free'; // Указать цену / Отдам даром
-export type MarketListingStatus = 'draft' | 'pending' | 'active' | 'sold' | 'archived';
+export type MarketListingStatus = 'draft' | 'pending' | 'active' | 'sold' | 'archived' | 'rejected';
 export type MarketContactMethod = 'chat' | 'phone' | 'telegram';
 
 export interface MarketLocation {
