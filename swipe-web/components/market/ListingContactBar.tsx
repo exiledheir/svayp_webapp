@@ -7,6 +7,7 @@ import { startListingChat } from '@/lib/market-api';
 import { openNativeChat } from '@/lib/flutter-bridge';
 import { buildTelegramLink, openTelegramLink } from '@/lib/market-chat';
 import { formatPrice } from '@/lib/cart-storage';
+import { useKeyboardInset } from '@/lib/use-keyboard-inset';
 import { useI18n } from '@/lib/i18n';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
@@ -20,6 +21,9 @@ export default function ListingContactBar({ listing }: { listing: MarketListing 
   const [showOptions, setShowOptions] = useState(false);
   const [showCompose, setShowCompose] = useState(false);
   const [message, setMessage] = useState('');
+  // How far the keyboard covers the bottom — lifts the compose sheet to sit
+  // snug above the keys (the layout itself stays put, see _app viewport meta).
+  const kbInset = useKeyboardInset();
 
   const hasChat = listing.contactMethods.includes('chat');
   const hasPhone = listing.contactMethods.includes('phone') && !!listing.seller.phone;
@@ -139,12 +143,17 @@ export default function ListingContactBar({ listing }: { listing: MarketListing 
       {showCompose && (
         <div
           className="absolute inset-0 z-[80] flex flex-col justify-end"
-          style={{ background: 'rgba(0,0,0,0.4)' }}
+          style={{ background: 'rgba(0,0,0,0.4)', paddingBottom: kbInset }}
           onClick={() => setShowCompose(false)}
         >
           <div
             className="px-5 pt-4 pb-6 bg-white dark:bg-[#1c1c1e]"
-            style={{ borderRadius: '24px 24px 0 0', paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}
+            style={{
+              borderRadius: '24px 24px 0 0',
+              // No safe-area padding while the keyboard is up — it already sits
+              // above the keys, so a fixed comfortable gap keeps it snug.
+              paddingBottom: kbInset > 0 ? '0.75rem' : 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))',
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
