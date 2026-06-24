@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import Head from 'next/head';
 import axios from 'axios';
 import type { AppProps } from 'next/app';
 import { useRouter } from 'next/router';
@@ -113,12 +114,30 @@ export default function App({ Component, pageProps }: AppProps) {
   if (!ready) return null;
 
   return (
-    <FeatureFlagsProvider>
-      <ThemeProvider>
-        <I18nProvider>
-          <Component {...pageProps} />
-        </I18nProvider>
-      </ThemeProvider>
-    </FeatureFlagsProvider>
+    <>
+      {/*
+        `interactive-widget=resizes-visual` makes the on-screen keyboard overlay
+        the page (resizing only the *visual* viewport) instead of shrinking the
+        layout. Without it the Android WebView shrinks our `100dvh` containers
+        when the keyboard opens, which reflows the layout — pinned buttons jump
+        up against the keys and a white gap appears. With it the layout stays
+        put and the keyboard simply slides over the bottom; bottom-anchored
+        sheets lift themselves via `useKeyboardInset`. `viewport-fit=cover`
+        keeps the `env(safe-area-inset-*)` paddings the app already relies on.
+      */}
+      <Head>
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-visual"
+        />
+      </Head>
+      <FeatureFlagsProvider>
+        <ThemeProvider>
+          <I18nProvider>
+            <Component {...pageProps} />
+          </I18nProvider>
+        </ThemeProvider>
+      </FeatureFlagsProvider>
+    </>
   );
 }
