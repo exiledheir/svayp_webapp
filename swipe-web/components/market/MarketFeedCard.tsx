@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { Heart, MapPin } from 'lucide-react';
 import type { MarketListing } from '@/types/market';
-import { toggleFavorite } from '@/lib/market-storage';
+import { addFavorite, removeFavorite } from '@/lib/market-api';
 import { regionLabel } from '@/lib/market-attributes';
 import { formatPrice } from '@/lib/cart-storage';
 import { useI18n } from '@/lib/i18n';
@@ -30,11 +30,18 @@ export default function MarketFeedCard({ listing, onToggleFavorite }: Props) {
     if (el.clientWidth) setImgIdx(Math.round(el.scrollLeft / el.clientWidth));
   }
 
-  function handleLike(e: React.MouseEvent) {
+  async function handleLike(e: React.MouseEvent) {
     e.stopPropagation();
-    const next = toggleFavorite(listing.id);
-    setLiked(next);
+    const next = !liked;
+    setLiked(next); // optimistic
     onToggleFavorite?.(listing.id, next);
+    try {
+      if (next) await addFavorite(listing.id);
+      else await removeFavorite(listing.id);
+    } catch {
+      setLiked(!next); // revert on failure
+      onToggleFavorite?.(listing.id, !next);
+    }
   }
 
   const images = listing.images.length ? listing.images : [''];

@@ -3,7 +3,8 @@ import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { MessageCircle, Send, Phone, Contact, X, ChevronRight } from 'lucide-react';
 import type { MarketListing } from '@/types/market';
-import { startMarketChat, buildTelegramLink, openTelegramLink } from '@/lib/market-chat';
+import { startListingChat } from '@/lib/market-api';
+import { buildTelegramLink, openTelegramLink } from '@/lib/market-chat';
 import { formatPrice } from '@/lib/cart-storage';
 import { useI18n } from '@/lib/i18n';
 import { logAnalyticsEvent } from '@/lib/analytics';
@@ -30,11 +31,20 @@ export default function ListingContactBar({ listing }: { listing: MarketListing 
     setShowCompose(true);
   }
 
-  function sendMessage() {
+  const [sending, setSending] = useState(false);
+
+  async function sendMessage() {
+    if (sending) return;
+    setSending(true);
     logAnalyticsEvent(Events.MARKET_CONTACT_CHAT_TAPPED, { listing_id: listing.id });
-    const thread = startMarketChat(listing, message, t.mk_chat_seller_reply);
-    setShowCompose(false);
-    router.push(`/market/chat/${thread.id}`);
+    try {
+      // Upsert the C2C thread (listingId, buyer, seller) + initial message, then open it.
+      const { id } = await startListingChat(listing.id, listing.seller.id, message);
+      setShowCompose(false);
+      router.push(`/market/chat/${id}`);
+    } catch {
+      setSending(false);
+    }
   }
 
   function callPhone() {
@@ -150,7 +160,7 @@ export default function ListingContactBar({ listing }: { listing: MarketListing 
 
             <button
               onClick={sendMessage}
-              disabled={!message.trim()}
+              disabled={!message.trim() || sending}
               className="w-full mt-3 py-3.5 rounded-2xl text-white font-semibold text-[15px] active:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
               style={{ background: '#F370A7' }}
             >
