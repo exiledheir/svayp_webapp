@@ -411,6 +411,7 @@ function mapMessage(raw: unknown): ChatMessage {
     senderId: (m.sender_id ?? m.senderId ?? '') as string,
     senderName: (m.sender_name ?? m.senderName) as string | undefined,
     senderType: ((m.sender_type ?? m.senderType) ?? 'USER') as ChatMessage['senderType'],
+    isMine: (m.is_mine ?? m.isMine) as boolean | undefined,
     content: (m.content ?? '') as string,
     messageType: ((m.message_type ?? m.messageType) ?? 'TEXT') as ChatMessage['messageType'],
     isRead: (m.is_read ?? m.isRead ?? false) as boolean,

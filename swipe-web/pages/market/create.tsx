@@ -7,9 +7,13 @@ import { isAuthenticated } from '@/lib/auth';
 import {
   isMarketOnboardingComplete, getDraft, saveDraft, clearDraft,
   getMarketWizardStep, setMarketWizardStep, clearMarketWizardStep,
-  clearMarketOnboarding, finalizeDraft, addListing,
-  getListingById, applyDraftToListing,
+  clearMarketOnboarding,
 } from '@/lib/market-storage';
+import {
+  createListing, updateListing, uploadListingImage, getListing,
+  type CreateListingPayload,
+} from '@/lib/market-api';
+import { NO_BRAND, OTHER_BRAND } from '@/lib/market-attributes';
 import { emptyDraft, type MarketDraft, type MarketListingStatus } from '@/types/market';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
@@ -41,6 +45,58 @@ const STEP_NAMES: Record<number, string> = {
 // bottom; the scrollable content keeps the focused field in view on its own.
 const WIZARD_HEIGHT = '100dvh';
 
+/** Decode a `data:` URL (compressed photo) into a Blob for upload. */
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [head, b64] = dataUrl.split(',');
+  const mime = head.match(/data:(.*?);base64/)?.[1] ?? 'image/jpeg';
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+/** Resolve the brand sentinels to what the backend stores (free-text or none). */
+function resolveBrand(form: MarketDraft): string | undefined {
+  if (form.brand === NO_BRAND) return undefined;
+  if (form.brand === OTHER_BRAND) return form.customBrand?.trim() || undefined;
+  return form.brand;
+}
+
+/** Map the wizard draft + uploaded image ids to the create/update API payload. */
+function draftToPayload(form: MarketDraft, imageIds: string[], status?: 'draft' | 'pending'): CreateListingPayload {
+  return {
+    title: form.title,
+    description: form.description,
+    category: form.category,
+    condition: form.condition,
+    brand: resolveBrand(form),
+    size: form.size,
+    color: form.color,
+    season: form.season,
+    length: form.length,
+    hijabFriendly: form.hijabFriendly,
+    fit: form.fit,
+    material: form.material,
+    country: form.country,
+    customAttrs: form.customAttrs,
+    dealType: form.dealType,
+    price: form.price ?? 0,
+    currency: form.currency,
+    isUrgent: form.isUrgent,
+    location: form.location,
+    contactMethods: form.contactMethods,
+    sellerContact: {
+      name: form.seller?.name,
+      phone: form.seller?.phone,
+      telegramUsername: form.seller?.telegramUsername,
+    },
+    // Only send image ids when there are freshly-uploaded photos (on edit with no
+    // new photos we omit it so the backend keeps the existing images).
+    ...(imageIds.length ? { imageIds } : {}),
+    ...(status ? { status } : {}),
+  };
+}
+
 function MarketCreatePageInner() {
   const router = useRouter();
   const { t } = useI18n();
@@ -51,6 +107,8 @@ function MarketCreatePageInner() {
   // creating one, and never touches the separate create-draft in localStorage.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingStatus, setEditingStatus] = useState<MarketListingStatus | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState('');
   const didStart = useRef(false);
 
   // ── Mount: gate + resume ────────────────────────────────────────────────────
@@ -63,30 +121,35 @@ function MarketCreatePageInner() {
       router.replace('/market/onboarding');
       return;
     }
-    // Edit mode: prefill the form from an existing listing. Skips the onboarding
-    // gate and the create-draft entirely.
-    const editId = params.get('edit');
-    if (editId) {
-      const listing = getListingById(editId);
-      if (listing) {
-        setForm({ ...listing, id: `edit_${listing.id}`, updatedAt: new Date().toISOString() });
-        setEditingId(editId);
-        setEditingStatus(listing.status);
-        setStep(PHOTOS);
-        setReady(true);
+    // Normal create flow: onboarding gate + resume the saved draft/step.
+    const startCreate = () => {
+      if (!isMarketOnboardingComplete()) {
+        router.replace('/market/onboarding');
         return;
       }
-      // Listing gone → fall through to a normal create.
-    }
-    if (!isMarketOnboardingComplete()) {
-      router.replace('/market/onboarding');
+      const draft = getDraft();
+      if (draft) setForm(draft);
+      const saved = getMarketWizardStep();
+      setStep(saved >= PHOTOS && saved <= CONTACTS ? saved : PHOTOS);
+      setReady(true);
+    };
+
+    // Edit mode: load the listing from the backend, prefill the form, and skip
+    // the onboarding gate + the create-draft entirely.
+    const editId = params.get('edit');
+    if (editId) {
+      getListing(editId)
+        .then((listing) => {
+          setForm({ ...listing, id: `edit_${listing.id}`, updatedAt: new Date().toISOString() });
+          setEditingId(editId);
+          setEditingStatus(listing.status);
+          setStep(PHOTOS);
+          setReady(true);
+        })
+        .catch(startCreate); // listing gone / error → fall back to a normal create
       return;
     }
-    const draft = getDraft();
-    if (draft) setForm(draft);
-    const saved = getMarketWizardStep();
-    setStep(saved >= PHOTOS && saved <= CONTACTS ? saved : PHOTOS);
-    setReady(true);
+    startCreate();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Persist step + analytics on change ──────────────────────────────────────
@@ -130,26 +193,49 @@ function MarketCreatePageInner() {
     router.push('/auth/phone?redirect=' + encodeURIComponent('/market/create'));
   }
 
-  function publish() {
-    if (editingId) {
-      applyDraftToListing(editingId, form, form.seller?.name);
-      logAnalyticsEvent(Events.MARKET_LISTING_UPDATED, {
-        listing_id: editingId,
-        resubmitted: editingStatus === 'rejected',
-      });
+  async function publish() {
+    if (publishing) return;
+    setPublishing(true);
+    setPublishError('');
+    try {
+      // 1. Upload any photos still held as local dataURLs (newly added). Existing
+      //    already-uploaded images (edit mode) stay on the listing untouched.
+      const imgs = form.images ?? [];
+      const imageIds: string[] = [];
+      for (let i = 0; i < imgs.length; i++) {
+        if (!imgs[i].startsWith('data:')) continue;
+        const blob = dataUrlToBlob(imgs[i]);
+        const file = new File([blob], `photo-${i}.jpg`, { type: blob.type || 'image/jpeg' });
+        const status = await uploadListingImage(file, undefined, i, editingId ?? undefined);
+        if (status.listingImageId) imageIds.push(status.listingImageId);
+      }
+
+      if (editingId) {
+        // 2a. Edit → PATCH the fields (no `status`: the update endpoint rejects
+        //     it). The backend re-queues the edited listing for review on its
+        //     own (a rejected listing goes back to pending), so no extra call.
+        await updateListing(editingId, draftToPayload(form, imageIds));
+        logAnalyticsEvent(Events.MARKET_LISTING_UPDATED, {
+          listing_id: editingId,
+          resubmitted: editingStatus === 'rejected',
+        });
+      } else {
+        // 2b. Create → POST a new listing (status=pending → admin moderation).
+        const created = await createListing(draftToPayload(form, imageIds, 'pending'));
+        clearDraft();
+        clearMarketWizardStep();
+        logAnalyticsEvent(Events.MARKET_LISTING_PUBLISHED, {
+          listing_id: created.id,
+          [Params.MK_CATEGORY]: created.category,
+          [Params.MK_DEAL_TYPE]: created.dealType,
+        });
+      }
       setStep(PUBLISHED);
-      return;
+    } catch {
+      setPublishError(t.mk_publish_error);
+    } finally {
+      setPublishing(false);
     }
-    const listing = finalizeDraft(form, form.seller?.name);
-    addListing(listing);
-    clearDraft();
-    clearMarketWizardStep();
-    logAnalyticsEvent(Events.MARKET_LISTING_PUBLISHED, {
-      listing_id: listing.id,
-      [Params.MK_CATEGORY]: listing.category,
-      [Params.MK_DEAL_TYPE]: listing.dealType,
-    });
-    setStep(PUBLISHED);
   }
 
   if (!ready) {
@@ -208,6 +294,20 @@ function MarketCreatePageInner() {
         {step === LOCATION && <LocationStep {...stepProps} />}
         {step === CONTACTS && (
           <ContactsStep form={form} patch={patch} authed={isAuthenticated()} onNeedAuth={needAuth} onPublish={publish} editing={!!editingId} />
+        )}
+
+        {/* Publish overlay — uploading photos + creating the listing on the backend. */}
+        {publishing && (
+          <div className="absolute inset-0 z-[80] flex flex-col items-center justify-center gap-3" style={{ background: 'rgba(0,0,0,0.45)' }}>
+            <div className="w-10 h-10 rounded-full border-[3px] border-white border-t-transparent animate-spin" />
+            <p className="text-white text-[14px] font-semibold">{t.mk_publish_cta}…</p>
+          </div>
+        )}
+        {publishError && (
+          <div className="absolute left-4 right-4 z-[85] px-4 py-3 rounded-2xl text-white text-[13px] font-semibold text-center"
+               style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)', background: '#F370A7' }}>
+            {publishError}
+          </div>
         )}
       </div>
     </>

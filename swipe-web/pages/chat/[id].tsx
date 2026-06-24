@@ -334,7 +334,13 @@ export default function ChatDetailPage() {
           </div>
         ) : (
           messages.map((msg) => {
-            const isOwn = msg.senderId === userId || msg.senderType === 'USER';
+            // The listing context card is shown in the header banner — skip the empty bubble.
+            if ((msg.messageType as string) === 'LISTING') return null;
+            // Own-message detection: prefer the server's authoritative is_mine (correct for B2B
+            // and C2C alike); fall back to senderId / senderType for realtime/optimistic messages.
+            const isOwn = msg.isMine != null
+              ? msg.isMine
+              : (userId ? msg.senderId === userId : msg.senderType === 'USER');
             const images = (msg.attachments ?? []).filter((a) =>
               a.fileType?.startsWith('image/') || a.fileUrl?.match(/\.(jpg|jpeg|png|webp|gif)(\?|$)/i)
             );

@@ -3,7 +3,10 @@ import Head from 'next/head';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { ArrowLeft, Send } from 'lucide-react';
-import { getMarketChat, sendMarketMessage, type MarketChatThread } from '@/lib/market-chat';
+import {
+  getChatThread, getChatMessages, sendChatMessage, markChatRead,
+  type MarketChatThread, type MarketChatMessage,
+} from '@/lib/market-api';
 import MarketGuard from '@/components/market/MarketGuard';
 import { useI18n } from '@/lib/i18n';
 
@@ -12,24 +15,46 @@ function MarketChatThreadPageInner() {
   const { t } = useI18n();
   const { id } = router.query;
   const [thread, setThread] = useState<MarketChatThread | null>(null);
+  const [messages, setMessages] = useState<MarketChatMessage[]>([]);
   const [text, setText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  function reload() {
-    if (typeof id === 'string') setThread(getMarketChat(id) ?? null);
+  async function reload() {
+    if (typeof id !== 'string') return;
+    try {
+      const [th, msgs] = await Promise.all([getChatThread(id), getChatMessages(id, 0, 100)]);
+      setThread(th);
+      // Backend returns newest-first; show oldest-first. Skip the LISTING context card (no text).
+      setMessages(msgs.content.filter((m) => m.content).reverse());
+      markChatRead(id).catch(() => { /* non-blocking */ });
+    } catch {
+      setThread(null);
+    }
   }
 
   useEffect(() => { reload(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Light polling for the counterparty's replies (STOMP can replace this later).
+  useEffect(() => {
+    if (typeof id !== 'string') return;
+    const iv = setInterval(() => { reload(); }, 5000);
+    return () => clearInterval(iv);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [thread]);
+  }, [messages]);
 
-  function handleSend() {
+  async function handleSend() {
     if (typeof id !== 'string' || !text.trim()) return;
-    sendMarketMessage(id, text);
+    const body = text;
     setText('');
-    reload();
+    try {
+      await sendChatMessage(id, body);
+      await reload();
+    } catch {
+      setText(body); // restore on failure
+    }
   }
 
   // `router.back()` is a no-op without in-app history (deep link / hard reload /
@@ -45,7 +70,7 @@ function MarketChatThreadPageInner() {
   return (
     <>
       <Head>
-        <title>{thread?.sellerName ?? t.mk_chat_title}</title>
+        <title>{thread?.counterpartyName ?? t.mk_chat_title}</title>
       </Head>
 
       <div className="phone-container flex flex-col bg-white dark:bg-[#111111]" style={{ height: '100dvh' }}>
@@ -62,7 +87,7 @@ function MarketChatThreadPageInner() {
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[15px] font-bold truncate text-black dark:text-white">{thread.sellerName}</p>
+                <p className="text-[15px] font-bold truncate text-black dark:text-white">{thread.counterpartyName ?? t.mk_chat_title}</p>
                 <p className="text-[12px] truncate text-black/45 dark:text-white/45">{thread.listingTitle}</p>
               </div>
             </>
@@ -71,18 +96,21 @@ function MarketChatThreadPageInner() {
 
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-2">
-          {thread?.messages.map((m) => (
-            <div
-              key={m.id}
-              className={`max-w-[78%] px-3.5 py-2.5 text-[14px] leading-snug ${m.from === 'me' ? 'self-end text-white' : 'self-start text-black dark:text-white'}`}
-              style={{
-                borderRadius: m.from === 'me' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                background: m.from === 'me' ? '#F370A7' : 'rgba(128,128,128,0.14)',
-              }}
-            >
-              {m.text}
-            </div>
-          ))}
+          {messages.map((m) => {
+            const mine = m.senderId !== thread?.counterpartyId;
+            return (
+              <div
+                key={m.id}
+                className={`max-w-[78%] px-3.5 py-2.5 text-[14px] leading-snug ${mine ? 'self-end text-white' : 'self-start text-black dark:text-white'}`}
+                style={{
+                  borderRadius: mine ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                  background: mine ? '#F370A7' : 'rgba(128,128,128,0.14)',
+                }}
+              >
+                {m.content}
+              </div>
+            );
+          })}
         </div>
 
         {/* Input */}

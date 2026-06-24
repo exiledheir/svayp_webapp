@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { ArrowLeft, Heart, MapPin, User } from 'lucide-react';
 import type { MarketListing } from '@/types/market';
-import { getListingById, toggleFavorite } from '@/lib/market-storage';
+import { getListing, addFavorite, removeFavorite } from '@/lib/market-api';
 import {
   conditionLabel, seasonLabel, lengthLabel, colorLabel, materialLabel, countryLabel, getCategory, categoryLabel,
   brandLabel, sizeLabel, regionLabel,
@@ -30,11 +30,19 @@ function ListingDetailPageInner() {
 
   useEffect(() => {
     if (typeof id !== 'string') return;
-    const l = getListingById(id) ?? null;
-    setListing(l);
-    setLiked(!!l?.isFavorite);
-    setReady(true);
-    if (l) logAnalyticsEvent(Events.MARKET_LISTING_VIEWED, { listing_id: l.id, category: l.category });
+    let cancelled = false;
+    getListing(id)
+      .then((l) => {
+        if (cancelled) return;
+        setListing(l);
+        setLiked(!!l.isFavorite);
+        setReady(true);
+        logAnalyticsEvent(Events.MARKET_LISTING_VIEWED, { listing_id: l.id, category: l.category });
+      })
+      .catch(() => {
+        if (!cancelled) { setListing(null); setReady(true); }
+      });
+    return () => { cancelled = true; };
   }, [id]);
 
   if (ready && !listing) {
@@ -70,9 +78,16 @@ function ListingDetailPageInner() {
   if (listing.material) rows.push({ label: t.mk_char_material, value: materialLabel(listing.material, locale) });
   if (listing.country) rows.push({ label: t.mk_char_country, value: countryLabel(listing.country, locale) });
 
-  function handleLike() {
-    const next = toggleFavorite(listing!.id);
-    setLiked(next);
+  async function handleLike() {
+    if (!listing) return;
+    const next = !liked;
+    setLiked(next); // optimistic
+    try {
+      if (next) await addFavorite(listing.id);
+      else await removeFavorite(listing.id);
+    } catch {
+      setLiked(!next); // revert on failure
+    }
   }
 
   // `router.back()` is a no-op when there's no in-app history to return to — e.g.
