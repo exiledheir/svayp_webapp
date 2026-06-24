@@ -389,12 +389,19 @@ export default function ChatDetailPage() {
                       )}
                       <div className="flex-1 min-w-0 py-0.5">
                         <p className="text-[12px] font-semibold text-black leading-snug line-clamp-2">{title}</p>
-                        <div className="flex flex-wrap gap-1 mt-1.5">
+                        <div className="flex flex-wrap items-center gap-1 mt-1.5">
                           {pColor && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">{pColor}</span>
+                            /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(pColor) ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                                Цвет
+                                <span className="w-3 h-3 rounded-full border border-black/15" style={{ background: pColor }} />
+                              </span>
+                            ) : (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">{pColor}</span>
+                            )
                           )}
                           {pSize && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">Size {pSize}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">Размер {pSize}</span>
                           )}
                           {pQty && pQty > 0 && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">Qty {pQty}</span>
