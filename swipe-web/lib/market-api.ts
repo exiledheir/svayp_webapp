@@ -16,11 +16,6 @@ import type {
 } from '@/types/market';
 import type { SseHandle } from '@/types';
 
-// ── Feature flag (feature.market_enabled) ────────────────────────────────────
-export function isMarketApiEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_FEATURE_MARKET_API === '1';
-}
-
 // ── Envelope helpers ─────────────────────────────────────────────────────────
 function unwrap<T>(res: { data: unknown }): T {
   const d = res.data as Record<string, unknown>;
