@@ -110,6 +110,17 @@ export default function App({ Component, pageProps }: AppProps) {
     })();
   }, [router.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Make the Closet & Market sections feel like the native app: suppress web
+  // text selection / highlighting, the iOS long-press callout, and the grey
+  // tap-highlight flash. Toggled per-route on <body> so the rest of the web app
+  // keeps normal selection; form fields opt back in (see globals.css).
+  useEffect(() => {
+    const path = router.pathname;
+    const nativeFeel = path.startsWith('/closet') || path.startsWith('/market');
+    document.body.classList.toggle('app-no-select', nativeFeel);
+    return () => document.body.classList.remove('app-no-select');
+  }, [router.pathname]);
+
   // Render nothing until auth check is complete to prevent flash + API races.
   if (!ready) return null;
 
