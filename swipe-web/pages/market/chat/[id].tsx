@@ -57,14 +57,13 @@ function MarketChatThreadPageInner() {
     }
   }
 
-  // `router.back()` is a no-op without in-app history (deep link / hard reload /
-  // first screen in the WebView). Fall back to the market feed so Back always works.
+  // Always return to the market feed. router.back() is unreliable inside the
+  // native app's WebView: its initial about:blank→url load inflates
+  // window.history.length, so a history-based guard mis-fires and router.back()
+  // steps to a blank entry instead of the feed, making Back appear to do
+  // nothing. Navigate to the feed directly (matching /market/mine & /liked).
   function handleBack() {
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      router.back();
-    } else {
-      router.push('/market');
-    }
+    router.push('/market');
   }
 
   return (

@@ -392,6 +392,9 @@ export interface Translations {
   tryOnDidYouKnow: string;
   tryOnTips: string[];
   tryOnFailedTitle: string;
+  tryOnFailedSafety: string;
+  tryOnFailedTimeout: string;
+  tryOnFailedGeneric: string;
   close: string;
   retry: string;
   loadMore: string;
@@ -924,6 +927,11 @@ const en: Translations = {
     'Style is a way of saying who you are without speaking.',
   ],
   tryOnFailedTitle: 'Try-on failed',
+  tryOnFailedSafety:
+    "This photo couldn't be used — it didn't pass our content safety checks. Please try a different photo or outfit.",
+  tryOnFailedTimeout:
+    'This is taking longer than expected. Please try again in a moment.',
+  tryOnFailedGeneric: "We couldn't create your try-on. Please try again.",
   close: 'Close',
   retry: 'Retry',
   loadMore: 'Load more',
@@ -1478,6 +1486,12 @@ const ru: Translations = {
     'Стиль — это способ рассказать о себе без слов.',
   ],
   tryOnFailedTitle: 'Примерка не удалась',
+  tryOnFailedSafety:
+    'Это фото не подошло — оно не прошло проверку безопасности контента. Попробуйте другое фото или образ.',
+  tryOnFailedTimeout:
+    'Это занимает больше времени, чем обычно. Пожалуйста, попробуйте ещё раз через минуту.',
+  tryOnFailedGeneric:
+    'Не удалось создать примерку. Пожалуйста, попробуйте ещё раз.',
   close: 'Закрыть',
   retry: 'Повторить',
   loadMore: 'Показать ещё',
@@ -2030,6 +2044,12 @@ const uz: Translations = {
     "Uslub — so'zsiz o'zingizni ifodalash usuli.",
   ],
   tryOnFailedTitle: "Kiyib ko'rish amalga oshmadi",
+  tryOnFailedSafety:
+    "Bu surat ishlatib bo'lmadi — u kontent xavfsizligi tekshiruvidan o'tmadi. Boshqa surat yoki kiyimni sinab ko'ring.",
+  tryOnFailedTimeout:
+    "Bu kutilganidan ko'proq vaqt olmoqda. Iltimos, biroz o'tib qayta urinib ko'ring.",
+  tryOnFailedGeneric:
+    "Kiyib ko'rishni yaratib bo'lmadi. Iltimos, qayta urinib ko'ring.",
   close: 'Yopish',
   retry: 'Qayta urinish',
   loadMore: 'Yana koʻrsatish',
