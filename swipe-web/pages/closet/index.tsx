@@ -2894,7 +2894,10 @@ function CalendarTab({
       ) : (() => {
         const selDay = days[selectedDayIdx];
         const upper = pickItem(upperItems, selDay);
-        const lower = pickItem(lowerItems, selDay);
+        // A dress/jumpsuit is a complete outfit on its own — never pair it with a
+        // separate bottom (hard rule H1: no "dress + skirt/pants").
+        const upperIsFullBody = !!upper && FULL_BODY_CATS.includes(upper.category);
+        const lower = upperIsFullBody ? null : pickItem(lowerItems, selDay);
         const shoe = pickItem(shoeItems, selDay);
         const shawl = pickItem(shawlItems, selDay);
         const sideAcc = pickItem(sideAccItems, selDay);
