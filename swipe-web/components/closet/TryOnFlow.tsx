@@ -8,6 +8,36 @@ import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events } from '@/lib/analytics-events';
 import { downloadWithWatermark } from '@/lib/canvas-snapshot';
 
+/**
+ * Maps a raw backend try-on failure reason to a friendly, localized message.
+ *
+ * The backend's `failureReason` can be a raw provider error (e.g. an
+ * OpenAI/Azure content-safety rejection like
+ * `Error code: 400 - {'error': {'message': 'Your request was rejected by the
+ * safety system...'}}`). Those must never be shown to users verbatim, so we
+ * bucket them into a few meaningful, translated messages.
+ */
+export function mapTryOnFailure(
+  reason: string | undefined,
+  msgs: { safety: string; timeout: string; generic: string },
+): string {
+  const r = (reason ?? '').toLowerCase();
+  if (
+    r.includes('safety') ||
+    r.includes('content policy') ||
+    r.includes('content_policy') ||
+    r.includes('moderation') ||
+    r.includes('policy') ||
+    r.includes('rejected')
+  ) {
+    return msgs.safety;
+  }
+  if (r.includes('timed out') || r.includes('timeout')) {
+    return msgs.timeout;
+  }
+  return msgs.generic;
+}
+
 export function TryOnConfirmModal({
   savedLayout,
   items,
@@ -349,7 +379,13 @@ export function TryOnModal({
               </div>
               <div className="text-center">
                 <p className="text-[15px] font-semibold text-gray-900">{t.tryOnFailedTitle}</p>
-                <p className="text-[12px] text-gray-400 mt-1">{failureReason}</p>
+                <p className="text-[12px] text-gray-400 mt-1">
+                  {mapTryOnFailure(failureReason, {
+                    safety: t.tryOnFailedSafety,
+                    timeout: t.tryOnFailedTimeout,
+                    generic: t.tryOnFailedGeneric,
+                  })}
+                </p>
               </div>
             </div>
           )}

@@ -172,7 +172,7 @@ export default function TryOnStep({
                   )}
                   {phase === 'failed' && (
                     <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.85)' }}>
-                      <p className="text-[13px] text-gray-500 text-center px-8">Something went wrong. Try again or skip.</p>
+                      <p className="text-[13px] text-gray-500 text-center px-8">{t.tryOnFailedGeneric}</p>
                     </div>
                   )}
                 </>

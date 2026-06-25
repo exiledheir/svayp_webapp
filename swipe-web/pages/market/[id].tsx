@@ -90,16 +90,15 @@ function ListingDetailPageInner() {
     }
   }
 
-  // `router.back()` is a no-op when there's no in-app history to return to — e.g.
-  // the page was opened via a deep link, a share, a hard reload, or it's the
-  // first screen in the WebView. Detect that and fall back to the market feed so
-  // the back button always does something.
+  // Always return to the market feed. We can't rely on router.back() here:
+  // inside the native app's WebView the initial about:blank→url load inflates
+  // window.history.length, so a history-based guard mis-fires and router.back()
+  // steps to a blank history entry instead of the feed — the back button then
+  // appears to do nothing. The feed is the natural parent of a listing, so we
+  // navigate there directly (matching the back buttons on /market/mine and
+  // /market/liked, which work reliably).
   function handleBack() {
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      router.back();
-    } else {
-      router.push('/market');
-    }
+    router.push('/market');
   }
 
   const loc = listing.location;
