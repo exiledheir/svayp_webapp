@@ -83,6 +83,27 @@ body::-webkit-scrollbar,
   height: 100%;
 }
 
+/* ── App-like surfaces (Closet & Market) ──────────────────────────────────────
+   Suppress the web "select / highlight text" behaviour, the iOS long-press
+   callout menu, and the grey tap-highlight flash so these sections feel like the
+   native app instead of a web page. Toggled per-route on <body> from _app.tsx.
+   Form fields opt back in so users can still select and edit their own input. */
+body.app-no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+body.app-no-select input,
+body.app-no-select textarea,
+body.app-no-select [contenteditable]:not([contenteditable='false']) {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
 /* Bottom nav safe area */
 .pb-nav {
   padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
