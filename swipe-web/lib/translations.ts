@@ -232,6 +232,11 @@ export interface Translations {
   addCategory: string;
   saveToCloset: string;
   uploading: string;
+  // Add-item wizard (2 steps: crop → details)
+  closetCropTitle: string;
+  closetCropHint: string;
+  closetDetailsTitle: string;
+  closetDetailsHint: string;
   // Item options picker (new taxonomy)
   optSection: string;
   optType: string;
@@ -717,6 +722,10 @@ const en: Translations = {
   addCategory: 'Add category',
   saveToCloset: 'Save to Closet',
   uploading: 'Uploading…',
+  closetCropTitle: 'Add a photo',
+  closetCropHint: 'Drag the corners to crop your item. Cropping is optional.',
+  closetDetailsTitle: 'Choose details',
+  closetDetailsHint: 'Tell us what this item is so it lands in the right section.',
   optSection: 'Section',
   optType: 'Type',
   optSubtype: 'Subtype',
@@ -1276,6 +1285,10 @@ const ru: Translations = {
   addCategory: 'Выберите категорию',
   saveToCloset: 'Сохранить',
   uploading: 'Загрузка…',
+  closetCropTitle: 'Добавьте фото',
+  closetCropHint: 'Потяните за углы, чтобы обрезать вещь. Обрезка необязательна.',
+  closetDetailsTitle: 'Выберите детали',
+  closetDetailsHint: 'Укажите, что это за вещь, чтобы она попала в нужный раздел.',
   optSection: 'Раздел',
   optType: 'Тип вещи',
   optSubtype: 'Подкатегория',
@@ -1836,6 +1849,10 @@ const uz: Translations = {
   addCategory: "Kategoriyani tanlang",
   saveToCloset: 'Saqlash',
   uploading: 'Yuklanmoqda…',
+  closetCropTitle: "Surat qo'shing",
+  closetCropHint: 'Buyumni qirqish uchun burchaklardan torting. Qirqish ixtiyoriy.',
+  closetDetailsTitle: 'Tafsilotlarni tanlang',
+  closetDetailsHint: "Bu qanday buyum ekanini ko'rsating, shunda u kerakli bo'limga tushadi.",
   optSection: 'Boʻlim',
   optType: 'Tur',
   optSubtype: 'Quyi tur',

@@ -1,10 +1,12 @@
 import React, { useRef, useState } from 'react';
 import Image from 'next/image';
-import { Plus, X, Camera, ImageIcon, ArrowUpRight } from 'lucide-react';
+import { Plus, X, Camera, ArrowUpRight } from 'lucide-react';
 import { compressImageForUpload } from '@/lib/image-utils';
 import { MAX_STORED_PHOTOS } from '@/lib/market-storage';
 import { useI18n } from '@/lib/i18n';
 import StepScaffold from './StepScaffold';
+import PhotoSourceSheet from '@/components/PhotoSourceSheet';
+import PhotoTipsSheet from '@/components/PhotoTipsSheet';
 import type { StepProps } from './types';
 
 const MAX_PHOTOS = 10;
@@ -35,6 +37,7 @@ export default function PhotosStep({ form, patch, onNext }: StepProps) {
   const images = form.images ?? [];
   const [error, setError] = useState('');
   const [showSheet, setShowSheet] = useState(false);
+  const [showTips, setShowTips] = useState(false);
   const [busy, setBusy] = useState(false);
   const galleryRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -78,8 +81,12 @@ export default function PhotosStep({ form, patch, onNext }: StepProps) {
         ctaDisabled={images.length === 0 || busy}
         onCta={onNext}
       >
-        {/* Tips card */}
-        <div className="flex items-center justify-between p-3.5 rounded-2xl mb-4" style={{ background: 'rgba(243,112,167,0.08)' }}>
+        {/* Tips card — opens the "perfect photo" tips sheet. */}
+        <button
+          onClick={() => setShowTips(true)}
+          className="w-full text-left flex items-center justify-between p-3.5 rounded-2xl mb-4 active:scale-[0.99] transition-transform"
+          style={{ background: 'rgba(243,112,167,0.08)' }}
+        >
           <div>
             <p className="text-[14px] font-bold text-black dark:text-white leading-snug">{t.mk_photos_tips_title}</p>
             <span className="inline-flex items-center gap-1 mt-2 text-[12px] font-semibold px-3 py-1.5 rounded-full bg-white text-black">
@@ -88,7 +95,7 @@ export default function PhotosStep({ form, patch, onNext }: StepProps) {
             </span>
           </div>
           <Camera size={40} strokeWidth={1.4} className="text-black/30 dark:text-white/40 shrink-0" />
-        </div>
+        </button>
 
         {/* Grid: thumbnails + one image-sized empty tile to add more (no icon/text). */}
         <div className="grid grid-cols-3 gap-2.5">
@@ -155,36 +162,18 @@ export default function PhotosStep({ form, patch, onNext }: StepProps) {
         </div>
       )}
 
-      {/* Source sheet */}
+      {/* Source sheet (shared with the closet add flow) */}
       {showSheet && (
-        <div className="absolute inset-0 z-[70] flex flex-col justify-end" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setShowSheet(false)}>
-          <div
-            className="px-5 pt-4 pb-6 bg-white dark:bg-[#1c1c1e]"
-            style={{ borderRadius: '24px 24px 0 0', paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-9 h-1 rounded-full mx-auto mb-4" style={{ background: 'rgba(128,128,128,0.4)' }} />
-            <button
-              onClick={() => { setShowSheet(false); galleryRef.current?.click(); }}
-              className="w-full flex items-center gap-3 py-3.5 text-[15px] font-semibold text-black dark:text-white"
-            >
-              <span className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: '#F370A7' }}>
-                <ImageIcon size={18} color="white" />
-              </span>
-              {t.mk_photos_from_gallery}
-            </button>
-            <button
-              onClick={() => { setShowSheet(false); cameraRef.current?.click(); }}
-              className="w-full flex items-center gap-3 py-3.5 text-[15px] font-semibold text-black dark:text-white"
-            >
-              <span className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: '#111' }}>
-                <Camera size={18} color="white" />
-              </span>
-              {t.mk_photos_from_camera}
-            </button>
-          </div>
-        </div>
+        <PhotoSourceSheet
+          position="absolute"
+          onClose={() => setShowSheet(false)}
+          onGallery={() => { setShowSheet(false); galleryRef.current?.click(); }}
+          onCamera={() => { setShowSheet(false); cameraRef.current?.click(); }}
+        />
       )}
+
+      {/* "Perfect photo" tips for a listing */}
+      <PhotoTipsSheet open={showTips} kind="listing" position="absolute" onClose={() => setShowTips(false)} />
     </>
   );
 }

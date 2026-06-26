@@ -5,6 +5,8 @@ export const Events = {
   // ── Closet Screen ──────────────────────────────────────────────────────────
   CLOSET_SCREEN_VIEWED: 'closet_screen_viewed',
   CLOSET_ITEM_DELETED: 'closet_item_deleted',
+  CLOSET_GUIDE_OPENED: 'closet_guide_opened',
+  CLOSET_GUIDE_VIDEO_PLAYED: 'closet_guide_video_played',
 
   // ── Add Item Funnel ────────────────────────────────────────────────────────
   ADD_ITEM_STARTED: 'add_item_started',

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Image as ImageIcon, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2 } from 'lucide-react';
+import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2, ArrowUpRight, BookOpen } from 'lucide-react';
 import { getUser, clearTokens } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags-context';
 import { useRootBackGuard } from '@/lib/use-root-back-guard';
@@ -31,6 +31,12 @@ import {
 import { captureCanvasSnapshot, downloadWithWatermark } from '@/lib/canvas-snapshot';
 import InteractiveCanvas from '@/components/closet/InteractiveCanvas';
 import { TryOnConfirmModal, TryOnModal } from '@/components/closet/TryOnFlow';
+import WizardHeader from '@/components/market/WizardHeader';
+import StepScaffold from '@/components/market/steps/StepScaffold';
+import PhotoSourceSheet from '@/components/PhotoSourceSheet';
+import PhotoTipsSheet from '@/components/PhotoTipsSheet';
+import ClosetGuide from '@/components/closet/ClosetGuide';
+import { getGuideStrings } from '@/lib/closet-guide';
 
 // The precise taxonomy subcategory of an item — its stored subcategory when set
 // (new items), otherwise derived from the legacy local category.
@@ -183,6 +189,8 @@ export default function ClosetPage() {
   useRootBackGuard();
   const [showLangPicker, setShowLangPicker] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+  const [showItemTips, setShowItemTips] = useState(false);
   const [userInfo, setUserInfo] = useState<{ name?: string; phoneNumber?: string } | null>(null);
   // The native Flutter app has its own profile entry point, so hide the header
   // profile button when the closet is rendered inside the Flutter WebView. Keep
@@ -409,6 +417,11 @@ export default function ClosetPage() {
   const [addRawImage, setAddRawImage] = useState('');
   const [addCrop, setAddCrop] = useState<Crop>();
   const [addCompletedCrop, setAddCompletedCrop] = useState<PixelCrop>();
+  // Two-step add wizard (mirrors the market create flow): 'crop' → 'details'.
+  const [addStep, setAddStep] = useState<'crop' | 'details'>('crop');
+  // The cropped image is computed when leaving the crop step (the crop <img> is
+  // unmounted on the details step, so we can't read its dimensions at save time).
+  const [addCroppedPreview, setAddCroppedPreview] = useState<string | null>(null);
   const [addSaving, setAddSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [pendingUploads, setPendingUploads] = useState<Map<string, { category: ClosetCategory; imageData: string; step: string; progress: number; startedAt: number }>>(new Map());
@@ -479,7 +492,21 @@ export default function ClosetPage() {
     setAddRawImage('');
     setAddCrop(undefined);
     setAddCompletedCrop(undefined);
+    setAddCroppedPreview(null);
+    setAddStep('crop');
     setShowAddPicker(true);
+  }
+
+  // Continue from the crop step → details step. Apply the crop now (while the
+  // crop <img> is still mounted) and stash the result for handleAddSave.
+  async function goToDetailsStep() {
+    if (addCompletedCrop && cropImgRef.current) {
+      const cropped = await getCroppedImage(addRawImage, addCompletedCrop, cropImgRef.current.width, cropImgRef.current.height);
+      setAddCroppedPreview(cropped);
+    } else {
+      setAddCroppedPreview(null);
+    }
+    setAddStep('details');
   }
 
 
@@ -510,18 +537,15 @@ export default function ClosetPage() {
     }
     setAddSaving(true);
 
-    // Prepare file + image before closing sheet
+    // Prepare file + image before closing sheet. The crop (if any) was already
+    // applied when leaving the crop step, so reuse that pre-cropped preview.
     let fileToUpload = addFileRef.current;
-    let previewImage = addRawImage;
+    let previewImage = addCroppedPreview ?? addRawImage;
 
-    if (addCompletedCrop && cropImgRef.current) {
-      const croppedDataUrl = await getCroppedImage(addRawImage, addCompletedCrop, cropImgRef.current.width, cropImgRef.current.height);
-      previewImage = croppedDataUrl;
-      if (fileToUpload) {
-        const response = await fetch(croppedDataUrl);
-        const blob = await response.blob();
-        fileToUpload = new File([blob], fileToUpload.name, { type: 'image/jpeg' });
-      }
+    if (addCroppedPreview && fileToUpload) {
+      const response = await fetch(addCroppedPreview);
+      const blob = await response.blob();
+      fileToUpload = new File([blob], fileToUpload.name, { type: 'image/jpeg' });
     }
 
     // Compress large gallery photos before upload to reduce blob transfer time
@@ -1247,9 +1271,9 @@ export default function ClosetPage() {
         style={{ paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))' }}
       >
         {/* Left: LIBΛS logo */}
-        <h1 className="text-[24px] font-bold tracking-[0.12em] text-black dark:text-white">LIB<span style={{ color: '#F370A7' }}>Λ</span>S</h1>
+        <h1 className="text-[24px] font-bold tracking-[0.12em] text-black dark:text-white shrink-0">LIB<span style={{ color: '#F370A7' }}>Λ</span>S</h1>
 
-        {/* Right: action buttons + profile */}
+        {/* Right: action buttons + profile + guide */}
         <div className="flex items-center gap-1.5">
             {/* Calendar with text */}
             {/* Plan with text — hidden when plans are disabled */}
@@ -1287,6 +1311,21 @@ export default function ClosetPage() {
                 </span>
               </button>
             )}
+            {/* Catchy guide entry point — last item on the right */}
+            <button
+              onClick={() => { setShowGuide(true); logAnalyticsEvent(Events.CLOSET_GUIDE_OPENED); }}
+              className="relative shrink-0 flex items-center gap-1 pl-2 pr-2.5 h-8 rounded-full active:scale-[0.95] transition-transform shadow-sm"
+              style={{ background: 'linear-gradient(135deg, #F370A7 0%, #e0559a 100%)' }}
+              aria-label={getGuideStrings(locale).guide}
+            >
+              <BookOpen size={12} strokeWidth={2.4} color="#fff" />
+              <span className="text-[11px] font-bold text-white whitespace-nowrap">{getGuideStrings(locale).guide}</span>
+              {/* Pulsing dot to draw the eye on first visits */}
+              <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#F370A7' }} />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 border-2 border-white" style={{ background: '#F370A7' }} />
+              </span>
+            </button>
           </div>
       </header>
 
@@ -1618,95 +1657,96 @@ export default function ClosetPage() {
         </button>
       </div>
 
+      {/* ── How-to-use guide ── */}
+      <ClosetGuide open={showGuide} onClose={() => setShowGuide(false)} />
+
+      {/* ── "Perfect photo" tips for adding an item ── */}
+      <PhotoTipsSheet open={showItemTips} kind="item" position="fixed" onClose={() => setShowItemTips(false)} />
+
       {/* ── Hidden file inputs for add flow ── */}
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAddFileChange} />
       <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAddFileChange} />
 
-      {/* ── Photo Picker Sheet ── */}
+      {/* ── Photo Picker Sheet (shared with market/create) ── */}
       {showAddPicker && !addRawImage && (
-        <div
-          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/30"
-          onClick={() => setShowAddPicker(false)}
-        >
-          <div className="w-full max-w-[430px] rounded-t-3xl bg-white" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-center pt-3 pb-2">
-              <div className="w-9 h-1 rounded-full bg-gray-200" />
-            </div>
-            <div className="px-5 pb-8">
-              <h3 className="text-[15px] font-bold text-gray-900 mb-4">{t.addPhoto}</h3>
-              <div className="flex flex-col gap-2.5">
-                <button
-                  onClick={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'gallery' }); fileInputRef.current?.click(); setShowAddPicker(false); }}
-                  className="w-full h-14 rounded-2xl bg-gray-50 flex items-center gap-3.5 px-4 active:scale-[0.98] transition-transform"
-                >
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #F5576c 100%)' }}>
-                    <ImageIcon size={19} strokeWidth={1.8} color="#fff" />
-                  </div>
-                  <div className="text-left">
-                    <span className="text-[14px] font-semibold text-gray-900 block">{t.photoLibrary}</span>
-                    <span className="text-[11px] text-gray-400">{t.chooseFromYourPhotos}</span>
-                  </div>
-                </button>
-                <button
-                  onClick={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'camera' }); cameraInputRef.current?.click(); setShowAddPicker(false); }}
-                  className="w-full h-14 rounded-2xl bg-gray-50 flex items-center gap-3.5 px-4 active:scale-[0.98] transition-transform"
-                >
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: '#FF9800' }}>
-                    <Camera size={19} strokeWidth={1.8} color="#fff" />
-                  </div>
-                  <div className="text-left">
-                    <span className="text-[14px] font-semibold text-gray-900 block">{t.camera}</span>
-                    <span className="text-[11px] text-gray-400">{t.takeANewPhoto}</span>
-                  </div>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PhotoSourceSheet
+          position="fixed"
+          onClose={() => setShowAddPicker(false)}
+          onGallery={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'gallery' }); fileInputRef.current?.click(); setShowAddPicker(false); }}
+          onCamera={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'camera' }); cameraInputRef.current?.click(); setShowAddPicker(false); }}
+        />
       )}
 
-      {/* ── Crop & Save Sheet ── */}
+      {/* ── Add Item Wizard (2 steps: crop → details, mirrors market create) ── */}
       {addRawImage && (
-        <div className="fixed inset-0 z-[60] flex flex-col bg-white">
-          <header className="shrink-0 flex items-center gap-3 px-4 h-14">
-            <button
-              onClick={() => setAddRawImage('')}
-              className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center"
+        <div className="fixed inset-0 z-[60] flex flex-col bg-white dark:bg-[#111111]">
+          <WizardHeader
+            step={addStep === 'crop' ? 0 : 1}
+            totalSteps={2}
+            onBack={() => {
+              // Details → back to crop; crop → cancel the whole add flow.
+              if (addStep === 'details') { setAddStep('crop'); return; }
+              setAddRawImage('');
+              setShowAddPicker(false);
+            }}
+          />
+
+          {addStep === 'crop' ? (
+            <StepScaffold
+              title={t.closetCropTitle}
+              hint={t.closetCropHint}
+              ctaLabel={t.mk_continue}
+              ctaDisabled={!addRawImage}
+              onCta={goToDetailsStep}
             >
-              <X size={17} strokeWidth={2} className="text-gray-700" />
-            </button>
-            <span className="text-[15px] font-semibold text-gray-900">{t.addToCloset}</span>
-          </header>
-          <div className="flex-1 overflow-y-auto px-4 pb-8 flex flex-col gap-5 pt-2">
-            {/* Crop area — crop is optional, handles shown as hint */}
-            <div className="rounded-2xl flex justify-center" style={{ padding: '14px 14px 10px', backgroundColor: theme === 'dark' ? '#1a1a1a' : '#f3f4f6' }}>
-              <ReactCrop crop={addCrop} onChange={(c) => setAddCrop(c)} onComplete={(c) => setAddCompletedCrop(c)}>
+              {/* "How to take the perfect photo" tips card — opens the tips sheet. */}
+              <button
+                onClick={() => setShowItemTips(true)}
+                className="w-full text-left flex items-center justify-between p-3.5 rounded-2xl mb-4 active:scale-[0.99] transition-transform"
+                style={{ background: 'rgba(243,112,167,0.08)' }}
+              >
+                <div>
+                  <p className="text-[14px] font-bold text-black dark:text-white leading-snug">{t.mk_photos_tips_title}</p>
+                  <span className="inline-flex items-center gap-1 mt-2 text-[12px] font-semibold px-3 py-1.5 rounded-full bg-white text-black">
+                    {t.mk_photos_tips_cta}
+                    <ArrowUpRight size={13} strokeWidth={2.5} className="text-[#F370A7]" />
+                  </span>
+                </div>
+                <Camera size={40} strokeWidth={1.4} className="text-black/30 dark:text-white/40 shrink-0" />
+              </button>
+              {/* Crop area — cropping is optional; full image is used otherwise. */}
+              <div className="rounded-2xl flex justify-center" style={{ padding: '14px 14px 10px', backgroundColor: theme === 'dark' ? '#1a1a1a' : '#f3f4f6' }}>
+                <ReactCrop crop={addCrop} onChange={(c) => setAddCrop(c)} onComplete={(c) => setAddCompletedCrop(c)}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img ref={cropImgRef} src={addRawImage} alt="Crop" style={{ maxHeight: '55vh', maxWidth: '100%', display: 'block', margin: '0 auto', borderRadius: 12 }} />
+                </ReactCrop>
+              </div>
+            </StepScaffold>
+          ) : (
+            <StepScaffold
+              title={t.closetDetailsTitle}
+              hint={t.closetDetailsHint}
+              ctaLabel={addSaving ? t.uploading : t.saveToCloset}
+              ctaDisabled={addSaving || !isSelectionComplete(addSelection)}
+              onCta={handleAddSave}
+            >
+              {/* Cropped preview so the user sees what they're describing. */}
+              <div className="rounded-2xl flex justify-center mb-5" style={{ padding: 14, backgroundColor: theme === 'dark' ? '#1a1a1a' : '#f3f4f6' }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img ref={cropImgRef} src={addRawImage} alt="Crop" style={{ maxHeight: '55vh', maxWidth: '100%', display: 'block', margin: '0 auto', borderRadius: 12 }} />
-              </ReactCrop>
-            </div>
-            <ItemOptionsPicker
-              value={addSelection}
-              onChange={(next) => {
-                if (next.subcategory && next.subcategory !== addSelection.subcategory) {
-                  logAnalyticsEvent(Events.ADD_ITEM_CATEGORY_SELECTED, { [Params.CATEGORY]: subcategoryToLocal(next.subcategory) });
-                }
-                setAddSelection(next);
-              }}
-              dark={theme === 'dark'}
-            />
-            <button
-              onClick={handleAddSave}
-              disabled={addSaving || !isSelectionComplete(addSelection)}
-              className="w-full py-3.5 rounded-full text-[13px] font-semibold disabled:opacity-30 active:scale-[0.97] transition-transform"
-              style={{
-                backgroundColor: theme === 'dark' ? '#000000' : '#000000',
-                color: theme === 'dark' ? '#ffffff' : '#ffffff',
-              }}
-            >
-              {addSaving ? t.uploading : t.saveToCloset}
-            </button>
-          </div>
+                <img src={addCroppedPreview ?? addRawImage} alt="Item" style={{ maxHeight: '32vh', maxWidth: '100%', display: 'block', borderRadius: 12 }} />
+              </div>
+              <ItemOptionsPicker
+                value={addSelection}
+                onChange={(next) => {
+                  if (next.subcategory && next.subcategory !== addSelection.subcategory) {
+                    logAnalyticsEvent(Events.ADD_ITEM_CATEGORY_SELECTED, { [Params.CATEGORY]: subcategoryToLocal(next.subcategory) });
+                  }
+                  setAddSelection(next);
+                }}
+                dark={theme === 'dark'}
+              />
+            </StepScaffold>
+          )}
         </div>
       )}
 
