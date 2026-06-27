@@ -131,7 +131,12 @@ export default function CharacteristicsStep({ form, patch, onNext }: StepProps) 
         {/* Size */}
         {flags.showSize && (
           <div className="mb-5">
-            <SelectRow label={t.mk_char_size} value={form.size ? sizeLabel(form.size, t) : undefined} placeholder={t.mk_char_select} onClick={() => setSheet('size')} />
+            <SelectRow
+              label={t.mk_char_size}
+              value={form.sizes?.length ? form.sizes.map((s) => sizeLabel(s, t)).join(', ') : undefined}
+              placeholder={t.mk_char_select}
+              onClick={() => setSheet('size')}
+            />
           </div>
         )}
 
@@ -182,7 +187,7 @@ export default function CharacteristicsStep({ form, patch, onNext }: StepProps) 
           <div className="mb-5">
             <SelectRow
               label={t.mk_char_color}
-              value={form.color ? colorLabel(t, form.color) : undefined}
+              value={form.colors?.length ? form.colors.map((c) => colorLabel(t, c)).join(', ') : undefined}
               placeholder="—"
               onClick={() => setSheet('color')}
             />
@@ -213,8 +218,8 @@ export default function CharacteristicsStep({ form, patch, onNext }: StepProps) 
       </StepScaffold>
 
       <OptionSheet open={sheet === 'brand'} title={t.mk_char_brand} options={brandOptions} value={form.brand ?? null} onSelect={(v) => patch(v === OTHER_BRAND ? { brand: v } : { brand: v, customBrand: undefined })} onClose={() => setSheet(null)} />
-      <OptionSheet open={sheet === 'size'} title={t.mk_char_size} options={sizeOptions} value={form.size ?? null} onSelect={(v) => patch({ size: v })} onClose={() => setSheet(null)} />
-      <OptionSheet open={sheet === 'color'} title={t.mk_char_color} options={colorOptions} value={form.color ?? null} onSelect={(v) => patch({ color: v })} onClose={() => setSheet(null)} />
+      <OptionSheet multi open={sheet === 'size'} title={t.mk_char_size} options={sizeOptions} values={form.sizes ?? []} onSelect={(v) => patch({ sizes: v })} onClose={() => setSheet(null)} />
+      <OptionSheet multi open={sheet === 'color'} title={t.mk_char_color} options={colorOptions} values={form.colors ?? []} onSelect={(v) => patch({ colors: v })} onClose={() => setSheet(null)} />
       <OptionSheet open={sheet === 'material'} title={t.mk_char_material} options={materialOptions} value={form.material ?? null} onSelect={(v) => patch({ material: v })} onClose={() => setSheet(null)} />
       <OptionSheet open={sheet === 'country'} title={t.mk_char_country} options={countryOpts} value={form.country ?? null} onSelect={(v) => patch({ country: v })} onClose={() => setSheet(null)} />
     </>

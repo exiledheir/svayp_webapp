@@ -8,28 +8,61 @@ export interface OptionItem {
   hex?: string; // for color swatches
 }
 
-interface Props {
+interface SingleProps {
   open: boolean;
   title: string;
   options: OptionItem[];
   value: string | null;
   onSelect: (value: string) => void;
   onClose: () => void;
+  multi?: false;
 }
 
+interface MultiProps {
+  open: boolean;
+  title: string;
+  options: OptionItem[];
+  values: string[];
+  onSelect: (values: string[]) => void;
+  onClose: () => void;
+  multi: true;
+}
+
+type Props = SingleProps | MultiProps;
+
 /**
- * Generic bottom-sheet single-select list (Бренд / Размер / Цвет …). Mirrors the
- * shop category sheet chrome. Color options render a swatch when `hex` is set.
+ * Generic bottom-sheet select list (Бренд / Размер / Цвет …).
+ * Pass `multi={true}` + `values`/`onSelect(string[])` for multi-select.
  */
-export default function OptionSheet({ open, title, options, value, onSelect, onClose }: Props) {
+export default function OptionSheet(props: Props) {
   const { t } = useI18n();
-  if (!open) return null;
+  if (!props.open) return null;
+
+  const isMulti = props.multi === true;
+
+  function isActive(v: string) {
+    if (isMulti) return (props as MultiProps).values.includes(v);
+    return (props as SingleProps).value === v;
+  }
+
+  function handleClick(v: string) {
+    if (isMulti) {
+      const p = props as MultiProps;
+      const next = p.values.includes(v)
+        ? p.values.filter((x) => x !== v)
+        : [...p.values, v];
+      p.onSelect(next);
+    } else {
+      (props as SingleProps).onSelect(v);
+      props.onClose();
+    }
+  }
 
   return (
     <div
       className="absolute inset-0 z-[70] flex flex-col justify-end"
       style={{ background: 'rgba(0,0,0,0.4)' }}
-      onClick={onClose}
+      onClick={props.onClose}
     >
       <div
         className="flex flex-col bg-white dark:bg-[#1c1c1e]"
@@ -38,16 +71,16 @@ export default function OptionSheet({ open, title, options, value, onSelect, onC
       >
         <div className="px-5 pt-4 pb-2 shrink-0">
           <div className="w-9 h-1 rounded-full mx-auto mb-3" style={{ background: 'rgba(128,128,128,0.4)' }} />
-          <h2 className="text-[16px] font-bold text-center text-black dark:text-white">{title}</h2>
+          <h2 className="text-[16px] font-bold text-center text-black dark:text-white">{props.title}</h2>
         </div>
         <div className="px-5 overflow-y-auto flex-1">
-          {options.map((opt) => {
-            const active = opt.value === value;
+          {props.options.map((opt) => {
+            const active = isActive(opt.value);
             return (
               <button
                 key={opt.value}
                 className="w-full flex items-center gap-3 py-3.5 border-b border-black/5 dark:border-white/10 text-left"
-                onClick={() => { onSelect(opt.value); onClose(); }}
+                onClick={() => handleClick(opt.value)}
               >
                 {opt.hex && (
                   <span
@@ -73,7 +106,7 @@ export default function OptionSheet({ open, title, options, value, onSelect, onC
         </div>
         <div className="px-5 pt-3 pb-6 shrink-0" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}>
           <button
-            onClick={onClose}
+            onClick={props.onClose}
             className="w-full py-3.5 rounded-2xl text-white font-semibold text-[15px] active:opacity-90"
             style={{ background: '#F370A7' }}
           >

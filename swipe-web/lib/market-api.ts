@@ -101,8 +101,8 @@ export interface CreateListingPayload {
   category?: string;
   condition?: string;
   brand?: string;
-  size?: string;
-  color?: string;
+  sizes?: string[];
+  colors?: string[];
   season?: string;
   length?: string;
   hijabFriendly?: boolean;

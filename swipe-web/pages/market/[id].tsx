@@ -70,9 +70,9 @@ function ListingDetailPageInner() {
   if (listing.hijabFriendly != null) rows.push({ label: t.mk_char_modesty, value: listing.hijabFriendly ? t.mk_char_yes : t.mk_char_no });
   if (category) rows.push({ label: t.mk_categories, value: categoryLabel(listing.category, locale) });
   if (listing.brand) rows.push({ label: t.mk_char_brand, value: brandLabel(listing.brand, t) });
-  if (listing.size) rows.push({ label: t.mk_char_size, value: sizeLabel(listing.size, t) });
+  if (listing.sizes?.length) rows.push({ label: t.mk_char_size, value: listing.sizes.map((s) => sizeLabel(s, t)).join(', ') });
   if (listing.fit) rows.push({ label: t.mk_char_fit, value: taxLabel(listing.fit, locale) });
-  if (listing.color) rows.push({ label: t.mk_char_color, value: colorLabel(t, listing.color) });
+  if (listing.colors?.length) rows.push({ label: t.mk_char_color, value: listing.colors.map((c) => colorLabel(t, c)).join(', ') });
   if (listing.season) rows.push({ label: t.mk_char_season, value: seasonLabel(t, listing.season) });
   if (listing.length) rows.push({ label: t.mk_char_length, value: lengthLabel(t, listing.length) });
   if (listing.material) rows.push({ label: t.mk_char_material, value: materialLabel(listing.material, locale) });
