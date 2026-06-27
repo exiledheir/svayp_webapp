@@ -46,7 +46,7 @@ export default function LocationStep({ form, patch, onNext }: StepProps) {
     <StepScaffold
       title={t.mk_loc_title}
       ctaLabel={t.mk_continue}
-      ctaDisabled={!loc.region || !loc.district}
+      ctaDisabled={!loc.region}
       onCta={onNext}
     >
       <SelectRow
