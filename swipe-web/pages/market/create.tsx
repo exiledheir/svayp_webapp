@@ -152,6 +152,13 @@ function MarketCreatePageInner() {
     startCreate();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-dismiss the publish error so it never lingers over the CTA.
+  useEffect(() => {
+    if (!publishError) return;
+    const id = setTimeout(() => setPublishError(''), 4000);
+    return () => clearTimeout(id);
+  }, [publishError]);
+
   // ── Persist step + analytics on change ──────────────────────────────────────
   useEffect(() => {
     if (!ready) return;
@@ -304,8 +311,10 @@ function MarketCreatePageInner() {
           </div>
         )}
         {publishError && (
-          <div className="absolute left-4 right-4 z-[85] px-4 py-3 rounded-2xl text-white text-[13px] font-semibold text-center"
-               style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)', background: '#F370A7' }}>
+          // Sits ABOVE the pinned CTA and is click-through, so it can never
+          // cover or block the publish button. Auto-dismisses after a few sec.
+          <div className="absolute left-4 right-4 z-[85] px-4 py-3 rounded-2xl text-white text-[13px] font-semibold text-center pointer-events-none shadow-lg"
+               style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)', background: '#F370A7' }}>
             {publishError}
           </div>
         )}

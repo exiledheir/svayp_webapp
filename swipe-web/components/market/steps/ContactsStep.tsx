@@ -203,6 +203,11 @@ export default function ContactsStep({ form, patch, authed, onNeedAuth, onPublis
           <Toggle on={chatOn} onChange={(v) => setMethod('chat', v)} />
         </div>
       </div>
+
+      {/* At least one contact method is required to publish. */}
+      {methods.length === 0 && (
+        <p className="text-[13px] font-medium text-[#F370A7] mt-3">{t.mk_contacts_need_one}</p>
+      )}
     </StepScaffold>
   );
 }
