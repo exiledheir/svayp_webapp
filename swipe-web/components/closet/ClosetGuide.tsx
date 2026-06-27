@@ -25,15 +25,20 @@ export default function ClosetGuide({ open, onClose }: Props) {
   const steps = getGuideSteps(locale);
   const embedUrl = getYouTubeEmbedUrl(GUIDE_VIDEO_URL);
 
-  // Steps are shown one at a time, navigated left↔right with the arrow buttons.
+  // Steps are shown one at a time, navigated left↔right. `dir` drives the
+  // slide-in animation direction (+1 = forward, -1 = back).
   const [current, setCurrent] = useState(0);
+  const [dir, setDir] = useState(1);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const lastStep = steps.length - 1;
+
+  const goPrev = () => { setDir(-1); setCurrent((c) => Math.max(0, c - 1)); };
+  const goNext = () => { setDir(1); setCurrent((c) => Math.min(lastStep, c + 1)); };
+  const goTo = (i: number) => { setDir(i >= current ? 1 : -1); setCurrent(i); };
 
   // Start from the first step each time the guide is opened.
   useEffect(() => {
-    if (open) setCurrent(0);
+    if (open) { setDir(1); setCurrent(0); }
   }, [open]);
 
   // Scroll back to the top whenever the step changes so the new step's title is
@@ -42,27 +47,46 @@ export default function ClosetGuide({ open, onClose }: Props) {
     scrollRef.current?.scrollTo({ top: 0 });
   }, [current]);
 
+  // Swipe handling. A non-passive touchmove listener lets us preventDefault once
+  // a gesture is clearly horizontal, so the vertical scroll can't jiggle
+  // ("earthquake") while swiping between steps.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !open) return;
+    let startX = 0, startY = 0, axis: 'h' | 'v' | null = null, active = false;
+    const onStart = (e: TouchEvent) => {
+      const t = e.touches[0]; startX = t.clientX; startY = t.clientY; axis = null; active = true;
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!active) return;
+      const t = e.touches[0];
+      const dx = t.clientX - startX, dy = t.clientY - startY;
+      if (axis === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+        axis = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+      }
+      // Claim horizontal gestures so the page doesn't scroll/bounce under them.
+      if (axis === 'h' && e.cancelable) e.preventDefault();
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (!active) return; active = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - startX, dy = t.clientY - startY;
+      if (axis === 'h' && Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+        if (dx < 0) { setDir(1); setCurrent((c) => Math.min(lastStep, c + 1)); }
+        else { setDir(-1); setCurrent((c) => Math.max(0, c - 1)); }
+      }
+    };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchend', onEnd, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+    };
+  }, [open, lastStep]);
+
   if (!open) return null;
-
-  const goPrev = () => setCurrent((c) => Math.max(0, c - 1));
-  const goNext = () => setCurrent((c) => Math.min(lastStep, c + 1));
-
-  // Horizontal swipe to move between steps (ignores mostly-vertical scrolls).
-  const onTouchStart = (e: React.TouchEvent) => {
-    const t = e.touches[0];
-    touchStartRef.current = { x: t.clientX, y: t.clientY };
-  };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    const start = touchStartRef.current;
-    touchStartRef.current = null;
-    if (!start) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - start.x;
-    const dy = t.clientY - start.y;
-    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      if (dx < 0) goNext(); else goPrev();
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-[80] flex flex-col bg-white dark:bg-[#111111]">
@@ -85,13 +109,18 @@ export default function ClosetGuide({ open, onClose }: Props) {
         </button>
       </header>
 
-      {/* Scrollable body — swipe left/right to change step */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pb-4" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      {/* Body — flex column so each step fits the viewport (no cut-off footer).
+          Swipe left/right to change step (see the touch effect above). */}
+      <div
+        ref={scrollRef}
+        className="flex-1 flex flex-col overflow-y-auto px-4 pb-3"
+        style={{ touchAction: 'pan-y', overscrollBehavior: 'contain' }}
+      >
         {/* Video — plain YouTube player, present on every step. Kept as the
             first child so it isn't remounted (and doesn't restart) when the
             step changes. */}
         {embedUrl ? (
-          <div className="mt-3 rounded-2xl overflow-hidden bg-black" style={{ position: 'relative', paddingTop: '56.25%' }}>
+          <div className="mt-3 shrink-0 rounded-2xl overflow-hidden bg-black" style={{ position: 'relative', paddingTop: '56.25%' }}>
             <iframe
               src={`${embedUrl}?rel=0&playsinline=1`}
               title={strings.videoTitle}
@@ -101,19 +130,26 @@ export default function ClosetGuide({ open, onClose }: Props) {
             />
           </div>
         ) : (
-          <div className="mt-3 rounded-2xl p-4 text-center" style={{ background: dark ? '#1a1a1a' : '#f6f6f7' }}>
+          <div className="mt-3 shrink-0 rounded-2xl p-4 text-center" style={{ background: dark ? '#1a1a1a' : '#f6f6f7' }}>
             <p className="text-[13px] text-black/45 dark:text-white/45">{strings.videoSoon}</p>
           </div>
         )}
 
-        {/* Current step (navigated with the arrows below) */}
-        <div className="mt-4">
+        {/* Current step — fills the space left under the video. Keyed by step so
+            it re-animates (slide + fade) each time you move between steps. */}
+        <div key={current} className={`mt-3 flex-1 flex flex-col min-h-0 ${dir >= 0 ? 'gd-next' : 'gd-prev'}`}>
           <GuideStepCard
             step={steps[current]}
             label={strings.stepLabel.replace('{n}', String(current + 1))}
             dark={dark}
           />
         </div>
+        <style jsx>{`
+          @keyframes gdNext { from { opacity: 0; transform: translateX(26px); } to { opacity: 1; transform: none; } }
+          @keyframes gdPrev { from { opacity: 0; transform: translateX(-26px); } to { opacity: 1; transform: none; } }
+          .gd-next { animation: gdNext 0.26s cubic-bezier(0.22, 0.61, 0.36, 1); }
+          .gd-prev { animation: gdPrev 0.26s cubic-bezier(0.22, 0.61, 0.36, 1); }
+        `}</style>
       </div>
 
       {/* Pinned navigation: ← prev · progress dots · next → */}
@@ -137,7 +173,7 @@ export default function ClosetGuide({ open, onClose }: Props) {
             {steps.map((_, i) => (
               <button
                 key={i}
-                onClick={() => setCurrent(i)}
+                onClick={() => goTo(i)}
                 aria-label={strings.stepLabel.replace('{n}', String(i + 1))}
                 className="rounded-full transition-all duration-300"
                 style={{
@@ -177,8 +213,8 @@ export default function ClosetGuide({ open, onClose }: Props) {
 function GuideStepCard({ step, label, dark }: { step: GuideStep; label: string; dark: boolean }) {
   const multi = step.images.length > 1;
   return (
-    <div className="rounded-2xl overflow-hidden" style={{ background: dark ? '#1a1a1a' : '#f6f6f7' }}>
-      <div className="p-4">
+    <div className="rounded-2xl overflow-hidden flex flex-col flex-1 min-h-0" style={{ background: dark ? '#1a1a1a' : '#f6f6f7' }}>
+      <div className="p-4 shrink-0">
         <span
           className="inline-block text-[10px] font-extrabold tracking-wider px-2.5 py-1 rounded-full"
           style={{ background: 'rgba(243,112,167,0.12)', color: '#F370A7' }}
@@ -196,9 +232,11 @@ function GuideStepCard({ step, label, dark }: { step: GuideStep; label: string; 
         </ul>
       </div>
       {step.images.length > 0 && (
-        <div className={`px-4 pb-4 grid gap-2 justify-items-center ${multi ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        // Fills the remaining height; images are contained so they never get
+        // clipped by the footer, on any screen size.
+        <div className="px-4 pb-4 flex-1 min-h-0 flex gap-2 justify-center items-center" style={{ minHeight: 150 }}>
           {step.images.map((src, k) => (
-            <GuideShot key={k} src={src} alt={step.title} maxHeight={multi ? '34vh' : '42vh'} />
+            <GuideShot key={k} src={src} alt={step.title} maxWidth={multi ? '50%' : '100%'} />
           ))}
         </div>
       )}
@@ -207,7 +245,7 @@ function GuideStepCard({ step, label, dark }: { step: GuideStep; label: string; 
 }
 
 /** A single screenshot that hides itself if the file can't be loaded. */
-function GuideShot({ src, alt, maxHeight }: { src: string; alt: string; maxHeight: string }) {
+function GuideShot({ src, alt, maxWidth }: { src: string; alt: string; maxWidth: string }) {
   const [ok, setOk] = useState(true);
   if (!ok) return null;
   return (
@@ -218,7 +256,7 @@ function GuideShot({ src, alt, maxHeight }: { src: string; alt: string; maxHeigh
       onError={() => setOk(false)}
       loading="lazy"
       className="rounded-xl"
-      style={{ width: '100%', height: 'auto', maxHeight, objectFit: 'contain' }}
+      style={{ maxWidth, maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain' }}
     />
   );
 }
