@@ -60,10 +60,12 @@ export default function ContactsStep({ form, patch, authed, onNeedAuth, onPublis
   const fullPhone = `+998${clean}`;
   const telegramOn = methods.includes('telegram');
   const callOn = methods.includes('phone');
+  const chatOn = methods.includes('chat');
   // Telegram can't be reached via a phone number, so an explicit username is
   // required whenever the Telegram option is enabled.
   const telegramOk = !telegramOn || telegramUsername.trim().length > 0;
-  const valid = clean.length === 9 && name.trim().length > 0 && telegramOk;
+  // At least one way to reach the seller must stay enabled.
+  const valid = clean.length === 9 && name.trim().length > 0 && telegramOk && methods.length > 0;
 
   function setSeller(p: Partial<NonNullable<MarketDraft['seller']>>) {
     patch({ seller: { ...(form.seller ?? { id: '', name: '' }), ...p } });
@@ -101,7 +103,6 @@ export default function ContactsStep({ form, patch, authed, onNeedAuth, onPublis
   function setMethod(m: MarketContactMethod, on: boolean) {
     const set = new Set(methods);
     if (on) set.add(m); else set.delete(m);
-    set.add('chat'); // chat is always available
     patch({ contactMethods: Array.from(set) });
   }
 
@@ -193,13 +194,13 @@ export default function ContactsStep({ form, patch, authed, onNeedAuth, onPublis
           <Toggle on={callOn} onChange={(v) => setMethod('phone', v)} />
         </div>
 
-        {/* In-app chat — always on (last option) */}
+        {/* In-app chat — toggleable (last option) */}
         <div className="flex items-center gap-3 p-3.5 rounded-2xl" style={{ background: 'rgba(128,128,128,0.08)' }}>
           <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#3BA55D' }}>
             <MessageCircle size={20} color="white" />
           </span>
           <span className="flex-1 text-[15px] font-semibold text-black dark:text-white">{t.mk_contact_chat}</span>
-          <Toggle on disabled onChange={() => {}} />
+          <Toggle on={chatOn} onChange={(v) => setMethod('chat', v)} />
         </div>
       </div>
     </StepScaffold>
