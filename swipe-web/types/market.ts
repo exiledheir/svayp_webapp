@@ -42,8 +42,8 @@ export interface MarketListing {
   category: string; // MARKET_CATEGORIES key
   condition: MarketCondition;
   brand?: string;
-  size?: string; // e.g. '46 (M)'
-  color?: string; // MARKET_COLORS key
+  sizes?: string[]; // e.g. ['S', 'M', 'XL']
+  colors?: string[]; // MARKET_COLORS keys
   season?: MarketSeason;
   length?: MarketLength;
   hijabFriendly?: boolean; // «Подходит для покрытых» (Да/Нет)
