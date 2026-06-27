@@ -167,6 +167,7 @@ export interface Translations {
   mk_contacts_name: string;
   mk_contacts_name_ph: string;
   mk_contacts_methods: string;
+  mk_contacts_need_one: string;
   mk_contact_chat: string;
   mk_contact_chat_note: string;
   mk_contact_telegram: string;
@@ -657,6 +658,7 @@ const en: Translations = {
   mk_contacts_name: 'Name',
   mk_contacts_name_ph: 'Your name',
   mk_contacts_methods: 'Preferred ways to contact you',
+  mk_contacts_need_one: 'Choose at least one way for buyers to reach you.',
   mk_contact_chat: 'In-app chat',
   mk_contact_chat_note: 'Enabled by default',
   mk_contact_telegram: 'Telegram',
@@ -1220,6 +1222,7 @@ const ru: Translations = {
   mk_contacts_name: 'Имя',
   mk_contacts_name_ph: 'Ваше имя',
   mk_contacts_methods: 'Предпочтительные способы связи с вами',
+  mk_contacts_need_one: 'Выберите хотя бы один способ связи с вами.',
   mk_contact_chat: 'Чат в приложении',
   mk_contact_chat_note: 'Включён по умолчанию',
   mk_contact_telegram: 'Telegram',
@@ -1784,6 +1787,7 @@ const uz: Translations = {
   mk_contacts_name: 'Ism',
   mk_contacts_name_ph: 'Ismingiz',
   mk_contacts_methods: 'Siz bilan bogʻlanishning afzal usullari',
+  mk_contacts_need_one: 'Xaridorlar bogʻlanishi uchun kamida bitta usulni tanlang.',
   mk_contact_chat: 'Ilovadagi chat',
   mk_contact_chat_note: 'Sukut boʻyicha yoqilgan',
   mk_contact_telegram: 'Telegram',
