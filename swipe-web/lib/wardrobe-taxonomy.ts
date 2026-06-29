@@ -216,6 +216,9 @@ const LABELS_EN: LabelMap = {
   FLARED: 'Flared', SKINNY: 'Skinny', TEA_LENGTH: 'Tea length',
   // fits
   REGULAR: 'Regular', LOOSE: 'Loose', SLIM: 'Slim',
+  // legacy subcategories (pre-migration items still carry these enum values)
+  TSHIRTS: 'T-Shirts', BLOUSES: 'Blouses', JUMPSUITS: 'Jumpsuits', JACKETS: 'Jackets',
+  JEANS: 'Jeans', PANTS: 'Pants', SHOES: 'Shoes', BOOTS: 'Boots', SHAWL: 'Shawl',
 };
 
 const LABELS_RU: LabelMap = {
@@ -236,6 +239,9 @@ const LABELS_RU: LabelMap = {
   ANKLE: 'Укороченные', FLOOR_LENGTH: 'В пол', BERMUDA: 'Бермуды', STRAIGHT: 'Прямые',
   FLARED: 'Клёш', SKINNY: 'Скинни', TEA_LENGTH: 'По середину икр',
   REGULAR: 'Обычный', LOOSE: 'Свободный', SLIM: 'Облегающий',
+  // legacy subcategories (pre-migration items still carry these enum values)
+  TSHIRTS: 'Футболки', BLOUSES: 'Блузки', JUMPSUITS: 'Комбинезоны', JACKETS: 'Куртки',
+  JEANS: 'Джинсы', PANTS: 'Брюки', SHOES: 'Обувь', BOOTS: 'Ботинки', SHAWL: 'Хиджаб',
 };
 
 const LABELS_UZ: LabelMap = {
@@ -256,6 +262,9 @@ const LABELS_UZ: LabelMap = {
   ANKLE: 'Kalta', FLOOR_LENGTH: 'Polgacha', BERMUDA: 'Bermuda', STRAIGHT: 'Toʻgʻri',
   FLARED: 'Klesh', SKINNY: 'Skinni', TEA_LENGTH: 'Boldirgacha',
   REGULAR: 'Oddiy', LOOSE: 'Erkin', SLIM: 'Tor',
+  // legacy subcategories (pre-migration items still carry these enum values)
+  TSHIRTS: 'Futbolkalar', BLOUSES: 'Bluzkalar', JUMPSUITS: 'Kombinezonlar', JACKETS: 'Kurtkalar',
+  JEANS: 'Jinsilar', PANTS: 'Shimlar', SHOES: 'Poyabzal', BOOTS: 'Etiklar', SHAWL: 'Roʻmol',
 };
 
 const LABELS: Record<Locale, LabelMap> = { en: LABELS_EN, ru: LABELS_RU, uz: LABELS_UZ };

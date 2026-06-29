@@ -11,7 +11,7 @@ import type { ClosetItem, ClosetCategory } from '@/lib/closet-storage';
 import type { WardrobeUploadStatus, PlanTier, PlanLimits, PlanUsage, TryOnJobResponse, WardrobeSection, WardrobeSubcategory } from '@/types';
 import ItemOptionsPicker, { defaultSelectionForSection, isSelectionComplete, type ItemOptionsSelection } from '@/components/closet/ItemOptionsPicker';
 import { subcategoryToLocal, sectionForSubcategory, subcategoriesForSection, SECTION_ORDER, localToSubcategory, taxLabel } from '@/lib/wardrobe-taxonomy';
-import { getUserPlan, generateOutfitSuggestions, fetchAiCanvasSuggest, createTryOnJob, watchTryOnUntilDone, getOutfitCalendar, createOutfitCanvas, updateOutfitCanvas, deleteOutfitCanvas, getOutfitCanvases, getOutfitCanvas, listUploads, watchUploadUntilDone, getTryOnJob, getTryOnJobHistory, getUserProfile } from '@/lib/wardrobe-api';
+import { getUserPlan, generateOutfitSuggestions, fetchAiCanvasSuggest, createTryOnJob, watchTryOnUntilDone, getOutfitCalendar, createOutfitCanvas, updateOutfitCanvas, deleteOutfitCanvas, getOutfitCanvases, getOutfitCanvas, listUploads, watchUploadUntilDone, getTryOnJob, getTryOnJobHistory, deleteTryOnJob, getUserProfile } from '@/lib/wardrobe-api';
 import type { SseHandle } from '@/types';
 import { useI18n } from '@/lib/i18n';
 import type { Locale } from '@/lib/translations';
@@ -391,6 +391,7 @@ export default function ClosetPage() {
   const [tryOnState, setTryOnState] = useState<{ status: 'loading' | 'processing' | 'completed' | 'failed'; resultUrl?: string; failureReason?: string; previewImages?: string[] } | null>(null);
   const [showTryOnConfirm, setShowTryOnConfirm] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
+  const [tryOnDeleteFailed, setTryOnDeleteFailed] = useState(false);
   const [outfitToastMsg, setOutfitToastMsg] = useState<string | null>(null);
   const [outfitBlockedModal, setOutfitBlockedModal] = useState<{ title: string; body: string } | null>(null);
   const tryOnCancelRef = useRef(false);
@@ -1243,6 +1244,22 @@ export default function ClosetPage() {
     setCanvases((prev) => prev.filter((_, i) => i !== canvasIdx));
   }
 
+  async function handleDeleteTryOn(id: string) {
+    logAnalyticsEvent(Events.TRYON_RESULT_DISMISSED);
+    const removed = tryOnJobs.find((j) => j.id === id);
+    // Optimistically remove from the gallery; the backend is the source of truth.
+    setTryOnJobs((prev) => prev.filter((j) => j.id !== id));
+    try {
+      await deleteTryOnJob(id);
+    } catch {
+      // Delete failed on the backend — restore the look and surface a toast so
+      // the user knows it wasn't removed.
+      if (removed) setTryOnJobs((prev) => (prev.some((j) => j.id === id) ? prev : [removed, ...prev]));
+      setTryOnDeleteFailed(true);
+      setTimeout(() => setTryOnDeleteFailed(false), 4000);
+    }
+  }
+
   function handleCancelTryOn() {
     tryOnCancelRef.current = true;
     activeTryOnHandleRef.current?.close();
@@ -1257,6 +1274,12 @@ export default function ClosetPage() {
       {saveFailed && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[999] px-4 py-2.5 rounded-full bg-red-500 text-white text-[13px] font-semibold shadow-lg">
           {t.saveFailed}
+        </div>
+      )}
+      {/* Try-on delete-failed toast */}
+      {tryOnDeleteFailed && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[999] px-4 py-2.5 rounded-full bg-red-500 text-white text-[13px] font-semibold shadow-lg">
+          {t.tryOnDeleteFailed}
         </div>
       )}
       {/* Outfit generation toast */}
@@ -1426,6 +1449,7 @@ export default function ClosetPage() {
           tryOnHasMore={tryOnHasMore}
           onRetryTryOns={() => loadTryOns(0)}
           onLoadMoreTryOns={() => loadTryOns(tryOnPageRef.current + 1)}
+          onDeleteTryOn={handleDeleteTryOn}
           calendarDays={calendarDays}
           canTryOn={canTryOn}
           onTryItOnItems={handleTryItOnFromItems}
@@ -1896,7 +1920,7 @@ export default function ClosetPage() {
 }
 
 // ─── My Outfits ─────────────────────────────────────────────────────────────────
-function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnError, tryOnHasMore, onRetryTryOns, onLoadMoreTryOns, calendarDays, canTryOn, onTryItOnItems, allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onShowCanvasPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem, allowAutoGenerate, plansEnabled }: {
+function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnError, tryOnHasMore, onRetryTryOns, onLoadMoreTryOns, onDeleteTryOn, calendarDays, canTryOn, onTryItOnItems, allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onShowCanvasPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem, allowAutoGenerate, plansEnabled }: {
   activeTab: 'boards' | 'outfits' | 'dressme' | 'calendar';
   onTabChange: (tab: 'boards' | 'outfits' | 'dressme' | 'calendar') => void;
   tryOnJobs: TryOnJobResponse[];
@@ -1905,6 +1929,7 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
   tryOnHasMore: boolean;
   onRetryTryOns: () => void;
   onLoadMoreTryOns: () => void;
+  onDeleteTryOn: (id: string) => void;
   calendarDays: number;
   canTryOn: boolean;
   onTryItOnItems: (items: ClosetItem[]) => void;
@@ -2067,6 +2092,7 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
           hasMore={tryOnHasMore}
           onRetry={onRetryTryOns}
           onLoadMore={onLoadMoreTryOns}
+          onDelete={onDeleteTryOn}
         />
       )}
 
@@ -2089,18 +2115,28 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
 }
 
 // ── Outfits tab: gallery of completed virtual try-on results ────────────────────
-function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore }: {
+function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDelete }: {
   jobs: TryOnJobResponse[];
   loading: boolean;
   error: boolean;
   hasMore: boolean;
   onRetry: () => void;
   onLoadMore: () => void;
+  onDelete: (id: string) => void;
 }) {
   const { t } = useI18n();
   const { theme } = useTheme();
   const [viewingJob, setViewingJob] = useState<TryOnJobResponse | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+
+  function confirmDelete() {
+    if (!confirmDeleteId) return;
+    onDelete(confirmDeleteId);
+    // Close the full-screen viewer if the deleted look was the one being viewed.
+    setViewingJob((cur) => (cur?.id === confirmDeleteId ? null : cur));
+    setConfirmDeleteId(null);
+  }
   // Newest generated first (createdAt desc). ISO strings compare lexically.
   const sortedJobs = [...jobs].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
 
@@ -2158,10 +2194,11 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore }: {
     <>
       <div className="flex gap-3 hide-scrollbar py-2 overflow-x-auto pl-4">
         {sortedJobs.map((job) => (
-          <button
+          <div
             key={job.id}
+            role="button"
             onClick={() => setViewingJob(job)}
-            className="relative shrink-0 overflow-hidden rounded-[28px] active:scale-[0.98] transition-transform"
+            className="relative shrink-0 overflow-hidden rounded-[28px] active:scale-[0.98] transition-transform cursor-pointer"
             style={{
               width: 'min(82vw, 340px)',
               height: 440,
@@ -2172,7 +2209,16 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore }: {
             {job.resultImageUrl && (
               <Image src={job.resultImageUrl} alt="Try-on result" fill className="object-cover" unoptimized />
             )}
-          </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(job.id); }}
+              className="absolute top-3.5 left-3.5 z-10 w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
+              style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}
+              title={t.delete}
+              aria-label={t.delete}
+            >
+              <Trash2 size={15} strokeWidth={2.2} className="text-white" />
+            </button>
+          </div>
         ))}
         {hasMore && (
           <button
@@ -2196,7 +2242,15 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore }: {
       {/* Full-screen viewer with download */}
       {viewingJob?.resultImageUrl && (
         <div className="fixed inset-0 z-[100] bg-black flex flex-col">
-          <div className="shrink-0 flex items-center justify-end px-4 h-14">
+          <div className="shrink-0 flex items-center justify-between px-4 h-14">
+            <button
+              onClick={() => setConfirmDeleteId(viewingJob.id)}
+              className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center"
+              title={t.delete}
+              aria-label={t.delete}
+            >
+              <Trash2 size={16} color="white" />
+            </button>
             <button
               onClick={() => setViewingJob(null)}
               className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center"
@@ -2232,6 +2286,42 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore }: {
               )}
               {t.myLooksSaveLook}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation */}
+      {confirmDeleteId && (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center px-8"
+          style={{ background: 'rgba(0,0,0,0.5)' }}
+          onClick={() => setConfirmDeleteId(null)}
+        >
+          <div
+            className="w-full max-w-[320px] rounded-3xl bg-white dark:bg-[#1c1c1e] p-6 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-14 h-14 rounded-full mx-auto flex items-center justify-center mb-4" style={{ background: 'rgba(239,68,68,0.12)' }}>
+              <Trash2 size={26} className="text-[#EF4444]" />
+            </div>
+            <h2 className="text-[18px] font-bold text-black dark:text-white">{t.tryOnDeleteTitle}</h2>
+            <p className="text-[14px] leading-relaxed text-black/55 dark:text-white/55 mt-1.5">{t.tryOnDeleteBody}</p>
+            <div className="flex gap-2.5 mt-5">
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                className="flex-1 py-3 rounded-2xl font-semibold text-[15px] text-black dark:text-white active:opacity-80"
+                style={{ background: 'rgba(128,128,128,0.14)' }}
+              >
+                {t.tryOnCancel}
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 py-3 rounded-2xl font-semibold text-[15px] text-white active:opacity-90"
+                style={{ background: '#EF4444' }}
+              >
+                {t.delete}
+              </button>
+            </div>
           </div>
         </div>
       )}

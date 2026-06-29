@@ -92,7 +92,7 @@ export default function OptionSheet(props: Props) {
                   {opt.label}
                 </span>
                 <span
-                  className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
+                  className={`w-6 h-6 flex items-center justify-center shrink-0 ${isMulti ? 'rounded-md' : 'rounded-full'}`}
                   style={{
                     border: active ? 'none' : '1.5px solid rgba(128,128,128,0.4)',
                     background: active ? '#F370A7' : 'transparent',

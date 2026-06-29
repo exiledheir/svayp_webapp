@@ -19,6 +19,11 @@ function processQueue(newToken: string) {
 function redirectToLogin() {
   clearTokens();
   if (typeof window !== 'undefined') {
+    // Already in the auth flow → don't redirect. `window.location.href` is a full
+    // page reload, so redirecting to /auth/phone while already on an /auth/* page
+    // reloads it in an infinite loop (e.g. a background 401 from the feature-flags
+    // provider's /me call on the logged-out login page).
+    if (window.location.pathname.startsWith('/auth/')) return;
     window.location.href = '/auth/phone';
   }
 }

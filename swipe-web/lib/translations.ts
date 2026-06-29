@@ -387,6 +387,9 @@ export interface Translations {
   tryOnConfirmBody: string;
   tryOnCancel: string;
   tryOnConfirm: string;
+  tryOnDeleteTitle: string;
+  tryOnDeleteBody: string;
+  tryOnDeleteFailed: string;
   tryOnStarting: string;
   tryOnGenerating: string;
   tryOnPhase2: string;
@@ -877,6 +880,9 @@ const en: Translations = {
   tryOnConfirmBody: 'See how this outfit looks on you',
   tryOnCancel: 'Cancel',
   tryOnConfirm: 'Try It On',
+  tryOnDeleteTitle: 'Delete this look?',
+  tryOnDeleteBody: "This can't be undone.",
+  tryOnDeleteFailed: 'Failed to delete. Please try again.',
   tryOnStarting: 'Starting try-on...',
   tryOnGenerating: 'Generating your look...',
   tryOnPhase2: 'Analyzing your outfit...',
@@ -1441,6 +1447,9 @@ const ru: Translations = {
   tryOnConfirmBody: 'Посмотрите, как наряд смотрится на вас',
   tryOnCancel: 'Отмена',
   tryOnConfirm: 'Примерить',
+  tryOnDeleteTitle: 'Удалить этот образ?',
+  tryOnDeleteBody: 'Это действие нельзя отменить.',
+  tryOnDeleteFailed: 'Не удалось удалить. Попробуйте снова.',
   tryOnStarting: 'Запуск примерки...',
   tryOnGenerating: 'Создаём ваш образ...',
   tryOnPhase2: 'Анализируем ваш наряд...',
@@ -2004,6 +2013,9 @@ const uz: Translations = {
   tryOnConfirmBody: "Bu obraz sizga qanday yarashishini ko'ring",
   tryOnCancel: 'Bekor',
   tryOnConfirm: "Kiyib ko'rish",
+  tryOnDeleteTitle: "Bu obrazni o'chirilsinmi?",
+  tryOnDeleteBody: "Buni qaytarib bo'lmaydi.",
+  tryOnDeleteFailed: "O'chirib bo'lmadi. Qaytadan urinib ko'ring.",
   tryOnStarting: "Kiyib ko'rish boshlanmoqda...",
   tryOnGenerating: "Ko'rinishingiz yaratilmoqda...",
   tryOnPhase2: "Obrazingiz tahlil qilinmoqda...",
