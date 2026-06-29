@@ -498,7 +498,7 @@ const en: Translations = {
   today: 'Today',
   weekend: 'Weekend',
   nextSevenDays: 'Next 7 Days',
-  marketTitle: 'Market',
+  marketTitle: 'LIBAS Market',
   marketComingSoonTitle: 'Coming soon',
   marketComingSoonText: 'Soon, the place where you can sell your things',
   // ── Market (C2C) ──
@@ -1065,7 +1065,7 @@ const ru: Translations = {
   today: 'Сегодня',
   weekend: 'Выходные',
   nextSevenDays: 'Ближайшие 7 дней',
-  marketTitle: 'Маркет',
+  marketTitle: 'LIBAS Market',
   marketComingSoonTitle: 'Скоро',
   marketComingSoonText: 'Скоро здесь вы сможете продавать свои вещи',
   // ── Market (C2C) ──
@@ -1633,7 +1633,7 @@ const uz: Translations = {
   today: 'Bugun',
   weekend: 'Dam olish',
   nextSevenDays: 'Keyingi 7 kun',
-  marketTitle: 'Bozor',
+  marketTitle: 'LIBAS Market',
   marketComingSoonTitle: 'Tez orada',
   marketComingSoonText: "Tez orada, bu yerda siz o'z buyumlaringizni sotishingiz mumkin",
   // ── Market (C2C) ──
