@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { getSubscriptionBadgeEnabled, getMarketEnabled } from '@/lib/api';
 import { getUserProfile } from '@/lib/wardrobe-api';
-import { getUser } from '@/lib/auth';
+import { getUser, isAuthenticated } from '@/lib/auth';
 
 interface FeatureFlagsState {
   /** Both flags are driven by the FRONTEND-only `feature.subscription_badge.enabled`
@@ -54,9 +54,14 @@ export function FeatureFlagsProvider({ children }: { children: React.ReactNode }
     Promise.all([
       getSubscriptionBadgeEnabled(),
       getMarketEnabled(),
-      getUserProfile()
-        .then((profile) => profile.phoneNumber)
-        .catch(() => undefined),
+      // Only fetch the profile when signed in. A logged-out /me returns 401, which
+      // trips the axios interceptor into a login redirect — pointless here since a
+      // guest has no phone for the allowlist anyway.
+      isAuthenticated()
+        ? getUserProfile()
+            .then((profile) => profile.phoneNumber)
+            .catch(() => undefined)
+        : Promise.resolve(undefined),
     ])
       .then(([badgeEnabled, marketFlag, profilePhone]) => {
         // Phone from the backend profile, falling back to the locally stored

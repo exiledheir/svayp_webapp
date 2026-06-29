@@ -537,6 +537,10 @@ export async function getTryOnJob(id: string): Promise<TryOnJobResponse> {
   return unwrapData<TryOnJobResponse>(res);
 }
 
+export async function deleteTryOnJob(id: string): Promise<void> {
+  await api.delete(`/outfits/try-on/${id}`);
+}
+
 /**
  * Try-on history for the current user (newest first), paginated.
  * Pass status (e.g. 'COMPLETED') to only get finished jobs that have a resultImageUrl.
