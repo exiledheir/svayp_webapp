@@ -20,7 +20,7 @@ import 'react-image-crop/dist/ReactCrop.css';
 // Pages that do not require authentication
 // Market browsing + posting funnel are public; posting enforces auth in-page
 // at the wizard's phone step (so the browse→post funnel stays open).
-const PUBLIC_PATHS = new Set(['/auth/phone', '/auth/otp', '/auth/verify-method', '/auth/basic-info', '/auth/telegram/callback', '/auth/partner', '/market', '/market/[id]', '/market/onboarding', '/market/create', '/market/mine', '/market/liked', '/market/chat/[id]']);
+const PUBLIC_PATHS = new Set(['/auth/phone', '/auth/otp', '/auth/verify-method', '/auth/basic-info', '/auth/telegram/callback', '/auth/partner', '/market', '/market/[id]', '/market/onboarding', '/market/create', '/market/mine', '/market/liked', '/market/chat/[id]', '/feed', '/feed/[username]', '/feed/p/[id]']);
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
@@ -116,7 +116,7 @@ export default function App({ Component, pageProps }: AppProps) {
   // keeps normal selection; form fields opt back in (see globals.css).
   useEffect(() => {
     const path = router.pathname;
-    const nativeFeel = path.startsWith('/closet') || path.startsWith('/market');
+    const nativeFeel = path.startsWith('/closet') || path.startsWith('/market') || path.startsWith('/feed');
     document.body.classList.toggle('app-no-select', nativeFeel);
     return () => document.body.classList.remove('app-no-select');
   }, [router.pathname]);

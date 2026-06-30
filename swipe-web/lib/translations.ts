@@ -487,6 +487,62 @@ export interface Translations {
     underwear: string;
   };
   categoryLabels: Record<string, string>;
+  // ── Лента (Feed) ──
+  feed_tab: string;
+  feed_title: string;
+  feed_empty: string;
+  feed_publish_cta: string;
+  feed_publish_short: string;
+  feed_pick_sources_title: string;
+  feed_select_hint: string;
+  feed_no_sources: string;
+  feed_next: string;
+  feed_add_more: string;
+  feed_refresh: string;
+  feed_add_tryon_title: string;
+  feed_add_tryon_body: string;
+  feed_add_tryon_cta: string;
+  feed_add_tryon_skip: string;
+  feed_caption_placeholder: string;
+  feed_compose_title: string;
+  feed_compose_subtitle: string;
+  feed_privacy_notice_flatlay: string;
+  feed_privacy_notice_realphoto: string;
+  feed_publishing: string;
+  feed_publish_error: string;
+  feed_nsfw_blocked: string;
+  feed_published_title: string;
+  feed_published_body: string;
+  feed_go_to_feed: string;
+  feed_go_to_profile: string;
+  feed_report: string;
+  feed_report_title: string;
+  feed_reason_inappropriate: string;
+  feed_reason_spam: string;
+  feed_reason_not_fashion: string;
+  feed_reason_copyright: string;
+  feed_reason_other: string;
+  feed_report_message_placeholder: string;
+  feed_report_submit: string;
+  feed_report_done: string;
+  feed_hide_user: string;
+  feed_hidden_done: string;
+  feed_delete: string;
+  feed_delete_confirm_title: string;
+  feed_delete_confirm_body: string;
+  feed_cancel: string;
+  feed_profile_posts: string;
+  feed_profile_likes: string;
+  feed_edit_profile: string;
+  feed_profile_empty: string;
+  feed_display_name: string;
+  feed_username: string;
+  feed_username_taken: string;
+  feed_username_available: string;
+  feed_username_required: string;
+  feed_bio: string;
+  feed_save: string;
+  feed_avatar: string;
 }
 
 const en: Translations = {
@@ -663,6 +719,62 @@ const en: Translations = {
   mk_contact_chat_libas: 'Chat in LIBΛS',
   mk_contact_via_telegram: 'Contact via Telegram',
   mk_publish_cta: 'Post listing',
+  // ── Лента (Feed) ──
+  feed_tab: 'Feed',
+  feed_title: 'Feed',
+  feed_empty: 'No posts yet. Be the first to share an outfit!',
+  feed_publish_cta: 'Post to feed',
+  feed_publish_short: 'Post',
+  feed_pick_sources_title: 'Choose an outfit',
+  feed_select_hint: 'Pick one or more to post together',
+  feed_add_more: 'Add more',
+  feed_refresh: 'Refresh',
+  feed_add_tryon_title: 'Add your try-on?',
+  feed_add_tryon_body: 'Add a try-on result so people can see the outfit on you, not just the flat lay. It’s optional, but posts with a try-on get more engagement.',
+  feed_add_tryon_cta: 'Add a try-on',
+  feed_add_tryon_skip: 'Post without it',
+  feed_no_sources: 'Nothing to post yet — create an outfit first.',
+  feed_next: 'Next',
+  feed_caption_placeholder: 'Add a caption… e.g. "office look for summer"',
+  feed_compose_title: 'Post outfit',
+  feed_compose_subtitle: 'Other members will see it in the feed',
+  feed_privacy_notice_flatlay: 'A mannequin flat-lay is posted — without your personal photo.',
+  feed_privacy_notice_realphoto: 'This post includes your real try-on photo — everyone will see it.',
+  feed_publishing: 'Posting…',
+  feed_publish_error: 'Could not post. Please try again.',
+  feed_nsfw_blocked: 'This image did not pass moderation.',
+  feed_published_title: 'Posted!',
+  feed_published_body: 'Your outfit is now in the feed.',
+  feed_go_to_feed: 'To feed',
+  feed_go_to_profile: 'My profile',
+  feed_report: 'Report',
+  feed_report_title: 'Report post',
+  feed_reason_inappropriate: 'Inappropriate content',
+  feed_reason_spam: 'Spam',
+  feed_reason_not_fashion: 'Not fashion-related',
+  feed_reason_copyright: 'Copyright violation',
+  feed_reason_other: 'Other',
+  feed_report_message_placeholder: 'Describe the issue (optional)',
+  feed_report_submit: 'Submit',
+  feed_report_done: 'Thanks, your report was sent.',
+  feed_hide_user: "Hide this user's posts",
+  feed_hidden_done: "This user's posts are hidden.",
+  feed_delete: 'Delete',
+  feed_delete_confirm_title: 'Delete post?',
+  feed_delete_confirm_body: 'This cannot be undone.',
+  feed_cancel: 'Cancel',
+  feed_profile_posts: 'Outfits',
+  feed_profile_likes: 'Likes',
+  feed_edit_profile: 'Edit profile',
+  feed_profile_empty: 'No posts yet',
+  feed_display_name: 'Name',
+  feed_username: 'Username',
+  feed_username_taken: 'Taken',
+  feed_username_available: 'Available',
+  feed_username_required: 'Pick a username to start posting',
+  feed_bio: 'Bio',
+  feed_save: 'Save',
+  feed_avatar: 'Profile photo',
   mk_publish_error: "Couldn't publish. Please try again.",
   mk_published_title: 'Listing under review',
   mk_published_body: "We'll review it and publish it soon. You can find it in My listings.",
@@ -1225,6 +1337,62 @@ const ru: Translations = {
   mk_contact_chat_libas: 'Чат внутри LIBΛS',
   mk_contact_via_telegram: 'Связаться по Telegram',
   mk_publish_cta: 'Поставить объявление',
+  // ── Лента (Feed) ──
+  feed_tab: 'Лента',
+  feed_title: 'Лента',
+  feed_empty: 'Пока нет публикаций. Поделитесь образом первым!',
+  feed_publish_cta: 'Опубликовать в ленту',
+  feed_publish_short: 'Опубликовать',
+  feed_pick_sources_title: 'Выберите образ',
+  feed_select_hint: 'Выберите один или несколько, чтобы опубликовать вместе',
+  feed_add_more: 'Добавить ещё',
+  feed_refresh: 'Обновить',
+  feed_add_tryon_title: 'Добавить примерку?',
+  feed_add_tryon_body: 'Добавьте результат примерки, чтобы было видно образ на вас, а не только раскладку. Это необязательно, но посты с примеркой набирают больше откликов.',
+  feed_add_tryon_cta: 'Добавить примерку',
+  feed_add_tryon_skip: 'Опубликовать без неё',
+  feed_no_sources: 'Пока нечего публиковать — сначала создайте образ.',
+  feed_next: 'Далее',
+  feed_caption_placeholder: 'Добавьте подпись… напр. «деловой образ на лето»',
+  feed_compose_title: 'Опубликовать образ',
+  feed_compose_subtitle: 'Его увидят другие участники ленты',
+  feed_privacy_notice_flatlay: 'Публикуется образ на манекене — без вашего личного фото.',
+  feed_privacy_notice_realphoto: 'В посте есть ваше реальное фото из примерки — его увидят все.',
+  feed_publishing: 'Публикуем…',
+  feed_publish_error: 'Не удалось опубликовать. Попробуйте ещё раз.',
+  feed_nsfw_blocked: 'Изображение не прошло модерацию.',
+  feed_published_title: 'Опубликовано!',
+  feed_published_body: 'Ваш образ теперь в ленте.',
+  feed_go_to_feed: 'В ленту',
+  feed_go_to_profile: 'Мой профиль',
+  feed_report: 'Пожаловаться',
+  feed_report_title: 'Пожаловаться на пост',
+  feed_reason_inappropriate: 'Непристойный контент',
+  feed_reason_spam: 'Спам',
+  feed_reason_not_fashion: 'Не относится к моде',
+  feed_reason_copyright: 'Нарушение авторских прав',
+  feed_reason_other: 'Другое',
+  feed_report_message_placeholder: 'Опишите проблему (необязательно)',
+  feed_report_submit: 'Отправить',
+  feed_report_done: 'Спасибо, жалоба отправлена.',
+  feed_hide_user: 'Скрыть посты пользователя',
+  feed_hidden_done: 'Посты пользователя скрыты.',
+  feed_delete: 'Удалить',
+  feed_delete_confirm_title: 'Удалить публикацию?',
+  feed_delete_confirm_body: 'Это действие нельзя отменить.',
+  feed_cancel: 'Отмена',
+  feed_profile_posts: 'Образов',
+  feed_profile_likes: 'Лайков',
+  feed_edit_profile: 'Редактировать профиль',
+  feed_profile_empty: 'Пока нет публикаций',
+  feed_display_name: 'Имя',
+  feed_username: 'Имя пользователя',
+  feed_username_taken: 'Занято',
+  feed_username_available: 'Свободно',
+  feed_username_required: 'Придумайте имя пользователя, чтобы публиковать',
+  feed_bio: 'О себе',
+  feed_save: 'Сохранить',
+  feed_avatar: 'Фото профиля',
   mk_publish_error: 'Не удалось опубликовать. Попробуйте ещё раз.',
   mk_published_title: 'Объявление на проверке',
   mk_published_body: 'Мы проверим его и скоро опубликуем. Объявление доступно в разделе «Мои объявления».',
@@ -1788,6 +1956,62 @@ const uz: Translations = {
   mk_contact_chat_libas: 'LIBΛS ichidagi chat',
   mk_contact_via_telegram: "Telegram orqali bogʻlanish",
   mk_publish_cta: "E'lon joylash",
+  // ── Лента (Feed) ──
+  feed_tab: 'Lenta',
+  feed_title: 'Lenta',
+  feed_empty: "Hozircha post yo'q. Birinchi bo'lib obraz ulashing!",
+  feed_publish_cta: 'Lentaga joylash',
+  feed_publish_short: 'Joylash',
+  feed_pick_sources_title: 'Obrazni tanlang',
+  feed_select_hint: "Birga joylash uchun bittadan ko'pini tanlang",
+  feed_add_more: "Yana qo'shish",
+  feed_refresh: 'Yangilash',
+  feed_add_tryon_title: "Primerkani qo'shasizmi?",
+  feed_add_tryon_body: "Primerka natijasini qo'shing — shunda obraz nafaqat raskladkada, balki sizda qanday turishini ko'rishadi. Ixtiyoriy, lekin primerkali postlar ko'proq e'tibor oladi.",
+  feed_add_tryon_cta: "Primerka qo'shish",
+  feed_add_tryon_skip: 'Usiz joylash',
+  feed_no_sources: "Hozircha joylashga narsa yo'q — avval obraz yarating.",
+  feed_next: 'Keyingi',
+  feed_caption_placeholder: 'Izoh qoʻshing… masalan, «yoz uchun ish obrazi»',
+  feed_compose_title: 'Obrazni joylash',
+  feed_compose_subtitle: "Uni lentadagi boshqalar ko'radi",
+  feed_privacy_notice_flatlay: 'Manekendagi obraz joylanadi — shaxsiy suratingizsiz.',
+  feed_privacy_notice_realphoto: "Bu postda primerkadagi haqiqiy suratingiz bor — uni hamma ko'radi.",
+  feed_publishing: 'Joylanmoqda…',
+  feed_publish_error: "Joylab bo'lmadi. Qayta urinib ko'ring.",
+  feed_nsfw_blocked: "Rasm moderatsiyadan o'tmadi.",
+  feed_published_title: 'Joylandi!',
+  feed_published_body: 'Obrazingiz endi lentada.',
+  feed_go_to_feed: 'Lentaga',
+  feed_go_to_profile: 'Mening profilim',
+  feed_report: 'Shikoyat',
+  feed_report_title: 'Postga shikoyat',
+  feed_reason_inappropriate: 'Nomaqbul kontent',
+  feed_reason_spam: 'Spam',
+  feed_reason_not_fashion: "Modaga aloqasi yo'q",
+  feed_reason_copyright: 'Mualliflik huquqi buzilishi',
+  feed_reason_other: 'Boshqa',
+  feed_report_message_placeholder: 'Muammoni tasvirlang (ixtiyoriy)',
+  feed_report_submit: 'Yuborish',
+  feed_report_done: 'Rahmat, shikoyat yuborildi.',
+  feed_hide_user: 'Foydalanuvchi postlarini yashirish',
+  feed_hidden_done: 'Foydalanuvchi postlari yashirildi.',
+  feed_delete: "O'chirish",
+  feed_delete_confirm_title: "Post o'chirilsinmi?",
+  feed_delete_confirm_body: "Buni qaytarib bo'lmaydi.",
+  feed_cancel: 'Bekor qilish',
+  feed_profile_posts: 'Obraz',
+  feed_profile_likes: 'Layk',
+  feed_edit_profile: 'Profilni tahrirlash',
+  feed_profile_empty: "Hozircha post yo'q",
+  feed_display_name: 'Ism',
+  feed_username: 'Foydalanuvchi nomi',
+  feed_username_taken: 'Band',
+  feed_username_available: "Bo'sh",
+  feed_username_required: 'Joylash uchun foydalanuvchi nomi tanlang',
+  feed_bio: "O'zingiz haqingizda",
+  feed_save: 'Saqlash',
+  feed_avatar: 'Profil surati',
   mk_publish_error: "Joylab boʻlmadi. Qaytadan urinib koʻring.",
   mk_published_title: "E'lon tekshiruvda",
   mk_published_body: "Biz uni tekshirib, tez orada e'lon qilamiz. Uni «Mening e'lonlarim» bo'limida topishingiz mumkin.",

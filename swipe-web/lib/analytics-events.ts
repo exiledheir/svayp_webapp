@@ -67,6 +67,22 @@ export const Events = {
   MARKET_CONTACT_TELEGRAM_TAPPED: 'market_contact_telegram_tapped',
   MARKET_FAVORITE_TOGGLED: 'market_favorite_toggled',
   MARKET_SUPPORT_BANNER_TAPPED: 'market_support_banner_tapped',
+
+  // ── Лента (Feed) Funnel ────────────────────────────────────────────────────
+  FEED_VIEWED: 'feed_viewed',
+  FEED_POST_VIEWED: 'feed_post_viewed',
+  FEED_POST_CREATE_STARTED: 'feed_post_create_started',
+  FEED_SOURCE_SELECTED: 'feed_source_selected',
+  FEED_COMPOSE_VIEWED: 'feed_compose_viewed',
+  FEED_POST_PUBLISHED: 'feed_post_published',
+  FEED_POST_PUBLISH_FAILED: 'feed_post_publish_failed',
+  FEED_POST_DELETED: 'feed_post_deleted',
+  FEED_LIKE_TOGGLED: 'feed_like_toggled',
+  FEED_PROFILE_VIEWED: 'feed_profile_viewed',
+  FEED_PROFILE_EDITED: 'feed_profile_edited',
+  FEED_POST_REPORTED: 'feed_post_reported',
+  FEED_USER_HIDDEN: 'feed_user_hidden',
+  FEED_PUBLISH_FROM_CLOSET: 'feed_publish_from_closet',
 } as const;
 
 export const Params = {
@@ -94,4 +110,8 @@ export const Params = {
   MK_DEAL_TYPE: 'mk_deal_type',
   MK_CONTACT_METHOD: 'mk_contact_method',
   MK_HAS_TELEGRAM_USERNAME: 'mk_has_telegram_username',
+  FEED_SOURCE_TYPE: 'feed_source_type',
+  FEED_IMAGE_COUNT: 'feed_image_count',
+  FEED_HAS_REAL_PHOTO: 'feed_has_real_photo',
+  FEED_REPORT_REASON: 'feed_report_reason',
 } as const;
