@@ -1,20 +1,20 @@
 import React from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { ChevronLeft, RefreshCw } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { isAuthenticated } from '@/lib/auth';
 import { fetchClosetItems, type ClosetItem } from '@/lib/closet-storage';
-import { getOutfitCanvases, getTryOnJobHistory, getOutfitCalendar } from '@/lib/wardrobe-api';
-import { buildLayoutFromIds, type CanvasGroup, type SavedCanvasLayout } from '@/lib/closet-types';
+import { getOutfitCanvases, getTryOnJobHistory } from '@/lib/wardrobe-api';
+import { type CanvasGroup, type SavedCanvasLayout } from '@/lib/closet-types';
 import { publishPost, FeedPublishError, type SelectedSource } from '@/lib/feed-publish';
-import { getMyProfile as getFeedProfile } from '@/lib/feed-api';
+import { getMyProfile as getFeedProfile, fileToCompressedDataUrl } from '@/lib/feed-api';
 import { loadCached, clearCache } from '@/lib/feed-cache';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
-import type { FeedPost, FeedSourceType } from '@/types/feed';
+import type { FeedPost } from '@/types/feed';
 import FeedGuard from '@/components/feed/FeedGuard';
-import SourcePicker from '@/components/feed/SourcePicker';
+import SourcePicker, { type SourcePickerHandle } from '@/components/feed/SourcePicker';
 import ComposeSheet from '@/components/feed/ComposeSheet';
 
 const PICK = 0, COMPOSE = 1, PUBLISHED = 2;
@@ -23,16 +23,49 @@ const PICK = 0, COMPOSE = 1, PUBLISHED = 2;
 const K_ITEMS = 'feed_src_items_v1';
 const K_BOARDS = 'feed_src_boards_v1';
 const K_TRYONS = 'feed_src_tryons_v1';
-const K_CALENDAR = 'feed_src_calendar_v1';
+// User-uploaded library photos (persisted as data URLs, newest first, capped).
+const LIB_KEY = 'feed_library_photos_v1';
+const LIB_CAP = 12;
 
 type BoardContent = Awaited<ReturnType<typeof getOutfitCanvases>>['content'];
 type TryonContent = Awaited<ReturnType<typeof getTryOnJobHistory>>['content'];
-type CalendarDays = Awaited<ReturnType<typeof getOutfitCalendar>>['days'];
 
-function isoDay(offset = 0): string {
-  const d = new Date();
-  d.setDate(d.getDate() + offset);
-  return d.toISOString().slice(0, 10);
+// Blob image URLs come back from the backend with encoded slashes (%2F) in the
+// path, which the origin 404s. Restore real slashes — but ONLY in the path, so a
+// SAS token's signature (which legitimately contains %2F) is left untouched.
+const normalizeBlobUrl = (u?: string | null): string => {
+  if (!u) return '';
+  const q = u.indexOf('?');
+  return q === -1 ? u.replace(/%2F/gi, '/') : u.slice(0, q).replace(/%2F/gi, '/') + u.slice(q);
+};
+
+interface LibPhoto {
+  id: string;
+  dataUrl: string;
+}
+function readLibrary(): LibPhoto[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    return JSON.parse(localStorage.getItem(LIB_KEY) || '[]') as LibPhoto[];
+  } catch {
+    return [];
+  }
+}
+function writeLibrary(arr: LibPhoto[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(LIB_KEY, JSON.stringify(arr.slice(0, LIB_CAP)));
+  } catch {
+    /* quota — best effort */
+  }
+}
+function libToSources(arr: LibPhoto[]): SelectedSource[] {
+  return arr.map((p) => ({
+    key: `library:${p.id}`,
+    sourceType: 'library',
+    sourceRefId: `library:${p.id}`,
+    previewUrl: p.dataUrl,
+  }));
 }
 
 function CreateFeedPost() {
@@ -41,11 +74,10 @@ function CreateFeedPost() {
 
   const [step, setStep] = React.useState(PICK);
   const [loading, setLoading] = React.useState(true);
-  const [tab, setTab] = React.useState<FeedSourceType>('tryon'); // Outfits first
-  const [sources, setSources] = React.useState<Record<FeedSourceType, SelectedSource[]>>({
+  const [sources, setSources] = React.useState<{ board: SelectedSource[]; tryon: SelectedSource[]; library: SelectedSource[] }>({
     board: [],
     tryon: [],
-    calendar: [],
+    library: [],
   });
   const [allItems, setAllItems] = React.useState<ClosetItem[]>([]);
   const [selected, setSelected] = React.useState<SelectedSource[]>([]);
@@ -57,27 +89,34 @@ function CreateFeedPost() {
   const [showTryonPrompt, setShowTryonPrompt] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [published, setPublished] = React.useState<FeedPost | null>(null);
+  const pickerRef = React.useRef<SourcePickerHandle>(null);
 
   // Auth gate (FeedGuard handles the feature flag; this handles sign-in).
   React.useEffect(() => {
     if (!isAuthenticated()) router.replace('/closet');
   }, [router]);
 
-  // Load all three sources + wardrobe items (cached 7 days; `force` re-fetches).
+  // Load boards + outfits + wardrobe items (cached 7 days; `force` re-fetches).
+  // Library photos come from localStorage (user-uploaded).
   const reqIdRef = React.useRef(0);
   const buildAndSet = React.useCallback(
     async (opts: { force?: boolean; applySeed?: boolean } = {}) => {
       const myReq = ++reqIdRef.current;
       setLoading(true);
       try {
-        const items = await loadCached<ClosetItem[]>(K_ITEMS, () => fetchClosetItems(), [], opts.force);
-        const [boardsC, tryonsC, calDays] = await Promise.all([
+        // Wardrobe items are fetched FRESH every open (not cached): board images
+        // resolve only against this list via signed URLs, and a stale/empty
+        // cache would silently leave every board blank. `.catch` keeps a failed
+        // wardrobe load from blocking the rest of the picker. Boards/try-ons are
+        // cached (they change rarely). All three run in parallel.
+        const [items, boardsC, tryonsC] = await Promise.all([
+          fetchClosetItems().catch(() => [] as ClosetItem[]),
           loadCached<BoardContent>(K_BOARDS, () => getOutfitCanvases({ size: 50 }).then((r) => r.content), [], opts.force),
           loadCached<TryonContent>(K_TRYONS, () => getTryOnJobHistory({ size: 50, status: 'COMPLETED' }).then((r) => r.content), [], opts.force),
-          loadCached<CalendarDays>(K_CALENDAR, () => getOutfitCalendar(isoDay(0), isoDay(7)).then((r) => r.days), [], opts.force),
         ]);
         if (reqIdRef.current !== myReq) return; // superseded by a newer load
 
+        const wardrobeById = new Map(items.map((i) => [i.id, i]));
         const boardSources: SelectedSource[] = boardsC.map((c) => {
           const layout: SavedCanvasLayout = c.items.map((it) => ({
             id: it.wardrobeItemId,
@@ -87,19 +126,26 @@ function CreateFeedPost() {
             zIndex: it.zIndex,
             group: (it.itemGroup as CanvasGroup) ?? 'acc',
           }));
-          // Snapshot resolves images from this list — derive it from the canvas
-          // so it never depends on the wardrobe page containing every item.
-          const canvasItems: ClosetItem[] = c.items.map((it) => ({
-            id: it.wardrobeItemId,
-            category: 'tops',
-            imageData: it.imageUrl,
-            createdAt: c.createdAt,
-          }));
+          // Snapshot resolves images from this list. Prefer the wardrobe item's
+          // clean URL (same one the closet renders); fall back to the canvas URL
+          // (normalized) so boards referencing deleted items still show.
+          const canvasItems: ClosetItem[] = c.items.map((it) => {
+            const wardrobe = it.wardrobeItemId ? wardrobeById.get(it.wardrobeItemId) : undefined;
+            return {
+              id: it.wardrobeItemId,
+              category: 'tops',
+              // Matched wardrobe item → use its URL verbatim (byte-identical to
+              // how the closet canvas renders it). Only the unmatched fallback
+              // (a deleted item's canvas URL) gets slash-normalized.
+              imageData: wardrobe?.imageData || normalizeBlobUrl(it.imageUrl),
+              createdAt: c.createdAt,
+            };
+          });
           return {
             key: `board:${c.id}`,
             sourceType: 'board',
             sourceRefId: c.id,
-            previewUrl: c.thumbnailUrl,
+            previewUrl: normalizeBlobUrl(c.thumbnailUrl),
             layout,
             items: canvasItems,
           };
@@ -115,30 +161,16 @@ function CreateFeedPost() {
             resultImageUrl: j.resultImageUrl as string,
           }));
 
-        const calendarSources: SelectedSource[] = [];
-        for (const day of calDays ?? []) {
-          for (const sug of day.outfits ?? []) {
-            const layout = buildLayoutFromIds([...sug.coreItemIds, ...sug.optionalItemIds], items);
-            if (!layout.length) continue;
-            calendarSources.push({
-              key: `calendar:${sug.id}`,
-              sourceType: 'calendar',
-              sourceRefId: sug.id,
-              previewUrl: sug.collagePreviewUrl,
-              layout,
-              items,
-            });
-          }
-        }
+        const librarySources = libToSources(readLibrary());
 
         setAllItems(items);
-        setSources({ board: boardSources, tryon: tryonSources, calendar: calendarSources });
+        setSources({ board: boardSources, tryon: tryonSources, library: librarySources });
 
         // Seed from a closet deep-link (?seed=board:<id> etc.) → pre-select + COMPOSE.
         if (opts.applySeed) {
           const seed = typeof router.query.seed === 'string' ? router.query.seed : null;
           if (seed) {
-            const all = [...boardSources, ...tryonSources, ...calendarSources];
+            const all = [...boardSources, ...tryonSources, ...librarySources];
             const match = all.find((s) => s.key === seed);
             if (match) {
               setSelected([match]);
@@ -160,8 +192,25 @@ function CreateFeedPost() {
 
   function refresh() {
     if (loading) return;
-    clearCache(K_ITEMS, K_BOARDS, K_TRYONS, K_CALENDAR);
+    clearCache(K_ITEMS, K_BOARDS, K_TRYONS);
     buildAndSet({ force: true });
+  }
+
+  async function handleAddLibraryPhoto(file: File) {
+    try {
+      const dataUrl = await fileToCompressedDataUrl(file);
+      const photo: LibPhoto = { id: `${Date.now()}_${Math.round(Math.random() * 1e6)}`, dataUrl };
+      const arr = [photo, ...readLibrary()].slice(0, LIB_CAP);
+      writeLibrary(arr);
+      const libSources = libToSources(arr);
+      setSources((prev) => ({ ...prev, library: libSources }));
+      // Auto-select the just-added photo so it lands in the post.
+      const added = libSources[0];
+      setSelected((prev) => (prev.some((p) => p.key === added.key) ? prev : [...prev, added]));
+      logAnalyticsEvent(Events.FEED_SOURCE_SELECTED, { [Params.FEED_SOURCE_TYPE]: 'library' });
+    } catch {
+      /* ignore unreadable image */
+    }
   }
 
   function toggle(s: SelectedSource) {
@@ -248,7 +297,7 @@ function CreateFeedPost() {
         <title>{t.feed_publish_short} · LIBΛS</title>
       </Head>
       <div className="phone-container relative flex flex-col bg-white dark:bg-[#111111]" style={{ height: '100dvh' }}>
-        {/* Header — Next sits at the top-right on the PICK step */}
+        {/* Header */}
         <div className="flex items-center gap-2 px-3 py-3 shrink-0 border-b border-black/5 dark:border-white/10">
           <button
             onClick={() => (step === COMPOSE ? setStep(PICK) : router.back())}
@@ -260,26 +309,6 @@ function CreateFeedPost() {
           <h1 className="text-[16px] font-bold text-black dark:text-white">
             {step === COMPOSE ? t.feed_compose_title : t.feed_pick_sources_title}
           </h1>
-          {step === PICK && (
-            <div className="ml-auto flex items-center gap-1">
-              <button
-                onClick={refresh}
-                disabled={loading}
-                aria-label={t.feed_refresh}
-                className="p-2 text-black/55 dark:text-white/55 disabled:opacity-40"
-              >
-                <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-              </button>
-              <button
-                onClick={handleNext}
-                disabled={selected.length === 0}
-                className="px-3 py-1.5 rounded-full text-[15px] font-bold active:opacity-80 disabled:opacity-35"
-                style={{ color: selected.length > 0 ? '#F370A7' : undefined }}
-              >
-                {t.feed_next}{selected.length > 0 ? ` · ${selected.length}` : ''}
-              </button>
-            </div>
-          )}
         </div>
 
         {error && (
@@ -290,17 +319,30 @@ function CreateFeedPost() {
 
         {step === PICK && (
           <>
-            <p className="px-4 pt-2 text-[13px] text-black/50 dark:text-white/50">{t.feed_select_hint}</p>
             <div className="flex-1 min-h-0">
               <SourcePicker
-                sources={sources}
+                ref={pickerRef}
+                boards={sources.board}
+                outfits={sources.tryon}
+                library={sources.library}
                 selectedKeys={selected.map((s) => s.key)}
                 onToggle={toggle}
+                onAddLibraryPhoto={handleAddLibraryPhoto}
+                onRefresh={refresh}
                 items={allItems}
                 loading={loading}
-                tab={tab}
-                onTabChange={setTab}
               />
+            </div>
+            <div className="px-4 pt-2 pb-6 shrink-0 border-t border-black/5 dark:border-white/10" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}>
+              <p className="text-center text-[12.5px] text-black/45 dark:text-white/45 mt-2 mb-2">{t.feed_select_hint}</p>
+              <button
+                onClick={handleNext}
+                disabled={selected.length === 0}
+                className="w-full py-3.5 rounded-2xl text-white font-semibold text-[15px] active:opacity-90 disabled:opacity-40"
+                style={{ background: '#F370A7' }}
+              >
+                {t.feed_next}{selected.length > 0 ? ` · ${selected.length}` : ''}
+              </button>
             </div>
           </>
         )}
@@ -360,7 +402,7 @@ function CreateFeedPost() {
               <button
                 onClick={() => {
                   setShowTryonPrompt(false);
-                  setTab('tryon');
+                  pickerRef.current?.focusOutfits();
                 }}
                 className="w-full mt-5 py-3.5 rounded-2xl text-white font-semibold text-[15px]"
                 style={{ background: '#F370A7' }}

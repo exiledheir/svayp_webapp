@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, ChevronLeft, ChevronRight, Info, Plus, LayoutGrid, Camera, CalendarDays, type LucideIcon } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Info, Plus, LayoutGrid, Camera, CalendarDays, Images, type LucideIcon } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import type { ClosetItem } from '@/lib/closet-storage';
 import { containsRealPhoto, type SelectedSource } from '@/lib/feed-publish';
@@ -10,6 +10,7 @@ const TYPE_ICON: Record<FeedSourceType, LucideIcon> = {
   board: LayoutGrid,
   tryon: Camera,
   calendar: CalendarDays,
+  library: Images,
 };
 
 interface Props {
@@ -45,6 +46,7 @@ export default function ComposeSheet({
     board: t.tabBoards,
     tryon: t.tabOutfits,
     calendar: t.tabCalendar,
+    library: t.feed_src_library,
   };
 
   return (

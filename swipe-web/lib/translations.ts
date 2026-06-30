@@ -499,6 +499,9 @@ export interface Translations {
   feed_next: string;
   feed_add_more: string;
   feed_refresh: string;
+  feed_src_library: string;
+  feed_lib_add: string;
+  feed_section_empty: string;
   feed_add_tryon_title: string;
   feed_add_tryon_body: string;
   feed_add_tryon_cta: string;
@@ -729,6 +732,9 @@ const en: Translations = {
   feed_select_hint: 'Pick one or more to post together',
   feed_add_more: 'Add more',
   feed_refresh: 'Refresh',
+  feed_src_library: 'Library',
+  feed_lib_add: 'Add photo',
+  feed_section_empty: 'Nothing here yet',
   feed_add_tryon_title: 'Add your try-on?',
   feed_add_tryon_body: 'Add a try-on result so people can see the outfit on you, not just the flat lay. It’s optional, but posts with a try-on get more engagement.',
   feed_add_tryon_cta: 'Add a try-on',
@@ -1347,6 +1353,9 @@ const ru: Translations = {
   feed_select_hint: 'Выберите один или несколько, чтобы опубликовать вместе',
   feed_add_more: 'Добавить ещё',
   feed_refresh: 'Обновить',
+  feed_src_library: 'Галерея',
+  feed_lib_add: 'Добавить фото',
+  feed_section_empty: 'Здесь пока пусто',
   feed_add_tryon_title: 'Добавить примерку?',
   feed_add_tryon_body: 'Добавьте результат примерки, чтобы было видно образ на вас, а не только раскладку. Это необязательно, но посты с примеркой набирают больше откликов.',
   feed_add_tryon_cta: 'Добавить примерку',
@@ -1966,6 +1975,9 @@ const uz: Translations = {
   feed_select_hint: "Birga joylash uchun bittadan ko'pini tanlang",
   feed_add_more: "Yana qo'shish",
   feed_refresh: 'Yangilash',
+  feed_src_library: 'Galereya',
+  feed_lib_add: "Foto qo'shish",
+  feed_section_empty: "Hozircha bo'sh",
   feed_add_tryon_title: "Primerkani qo'shasizmi?",
   feed_add_tryon_body: "Primerka natijasini qo'shing — shunda obraz nafaqat raskladkada, balki sizda qanday turishini ko'rishadi. Ixtiyoriy, lekin primerkali postlar ko'proq e'tibor oladi.",
   feed_add_tryon_cta: "Primerka qo'shish",

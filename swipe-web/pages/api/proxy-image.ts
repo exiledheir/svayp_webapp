@@ -13,30 +13,38 @@ const PRIVATE_HOSTNAME_PATTERNS = [
   /^fe80:/i,
 ];
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse): Promise<void> {
   if (req.method !== 'GET') {
-    return res.status(405).end();
+    res.status(405).end();
+    return;
   }
 
   const { url } = req.query;
   if (!url || typeof url !== 'string') {
-    return res.status(400).json({ error: 'Missing url parameter' });
+    res.status(400).json({ error: 'Missing url parameter' });
+    return;
   }
 
+  // NOTE: do not rewrite %2F here — SAS-signed URLs carry encoded slashes in
+  // their signature, and "fixing" those would corrupt the signature. Encoded
+  // slashes in a blob path are normalized at the source (see feed/create.tsx).
   let parsed: URL;
   try {
     parsed = new URL(url);
   } catch {
-    return res.status(400).json({ error: 'Invalid URL' });
+    res.status(400).json({ error: 'Invalid URL' });
+    return;
   }
 
   if (parsed.protocol !== 'https:') {
-    return res.status(400).json({ error: 'Only HTTPS URLs are allowed' });
+    res.status(400).json({ error: 'Only HTTPS URLs are allowed' });
+    return;
   }
 
   const hostname = parsed.hostname;
   if (PRIVATE_HOSTNAME_PATTERNS.some((p) => p.test(hostname))) {
-    return res.status(403).json({ error: 'Private addresses are not allowed' });
+    res.status(403).json({ error: 'Private addresses are not allowed' });
+    return;
   }
 
   const controller = new AbortController();
@@ -51,12 +59,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     clearTimeout(timeout);
 
     if (!response.ok) {
-      return res.status(response.status).end();
+      res.status(response.status).end();
+      return;
     }
 
     const contentType = response.headers.get('content-type') || 'image/jpeg';
     if (!contentType.startsWith('image/')) {
-      return res.status(400).json({ error: 'URL does not point to an image' });
+      res.status(400).json({ error: 'URL does not point to an image' });
+      return;
     }
 
     const buffer = await response.arrayBuffer();

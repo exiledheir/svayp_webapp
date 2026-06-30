@@ -3,8 +3,9 @@
 // sources. Mirrors types/market.ts conventions: UUID ids, ISO-8601 timestamps,
 // camelCase. Backend contract lives under /api/v1/feed/* (see the Feed plan).
 
-/** Which closet surface an image was published from. */
-export type FeedSourceType = 'board' | 'calendar' | 'tryon';
+/** Which surface an image was published from. `calendar` is legacy (kept so old
+ *  posts still render); the composer now offers board / tryon / library. */
+export type FeedSourceType = 'board' | 'calendar' | 'tryon' | 'library';
 
 /** Post-moderation lifecycle. Posts are born `active` (instant publish). */
 export type FeedPostStatus = 'active' | 'hidden' | 'removed';

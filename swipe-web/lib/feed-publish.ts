@@ -65,6 +65,17 @@ export async function publishPost(
         imageUrl: s.resultImageUrl,
         sourceRefId: s.sourceRefId,
       });
+    } else if (s.sourceType === 'library') {
+      // Library photos are compressed to a data URL at pick time, so we reference
+      // it directly (no canvas render). In local mode the data URL is stored
+      // inline; backend mode should upload it so the NSFW scan still runs.
+      if (!s.previewUrl) throw new FeedPublishError('Library photo missing', 'unknown');
+      images.push({
+        sourceType: 'library',
+        position: i,
+        imageUrl: s.previewUrl,
+        sourceRefId: s.sourceRefId,
+      });
     } else {
       // board | calendar → flat-lay PNG snapshot, uploaded through the pipeline
       // (always re-uploaded — even when a board thumbnail exists — so every
