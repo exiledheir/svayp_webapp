@@ -57,7 +57,7 @@ export default function OnboardingPage() {
       clearOnboarding();
       clearOnboardingStep();
     } else if (isOnboardingComplete()) {
-      router.replace('/closet');
+      router.replace('/feed');
       return;
     }
     (async () => {
@@ -122,7 +122,7 @@ export default function OnboardingPage() {
     // Interactive onboarding already taught the core actions — suppress the
     // closet's passive coach-mark tour (still replayable from the profile).
     setClosetTourDone();
-    router.replace('/closet');
+    router.replace('/feed');
   }
 
   function skip() {
@@ -130,7 +130,7 @@ export default function OnboardingPage() {
     setOnboardingComplete();
     clearOnboardingStep();
     setClosetTourDone();
-    router.replace('/closet');
+    router.replace('/feed');
   }
 
   // ── Step transitions ───────────────────────────────────────────────────────

@@ -10,9 +10,7 @@ import { MARKET_CATEGORIES, categoryLabel } from '@/lib/market-attributes';
 import type { MarketListing } from '@/types/market';
 import { useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
-import { useMarketAccess } from '@/lib/feature-flags-context';
 import { useRootBackGuard } from '@/lib/use-root-back-guard';
-import MarketComingSoon from '@/components/market/MarketComingSoon';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events } from '@/lib/analytics-events';
 import { openSupportChat } from '@/lib/support-chat';
@@ -28,7 +26,6 @@ export default function MarketFeedPage() {
   const { t, locale } = useI18n();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const access = useMarketAccess();
   const [listings, setListings] = useState<MarketListing[]>([]);
   const [category, setCategory] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -38,11 +35,10 @@ export default function MarketFeedPage() {
   useRootBackGuard();
 
   useEffect(() => {
-    if (access === 'enabled') logAnalyticsEvent(Events.MARKET_FEED_VIEWED);
-  }, [access]);
+    logAnalyticsEvent(Events.MARKET_FEED_VIEWED);
+  }, []);
 
   const loadFeed = useCallback(async () => {
-    if (access !== 'enabled') return;
     // Live backend feed (GET /marketplace/listings).
     try {
       const page = await apiGetFeed({
@@ -53,7 +49,7 @@ export default function MarketFeedPage() {
     } catch {
       setListings([]);
     }
-  }, [access, category, search]);
+  }, [category, search]);
 
   useEffect(() => { loadFeed(); }, [loadFeed]);
 
@@ -113,14 +109,6 @@ export default function MarketFeedPage() {
   function handlePost() {
     if (isMarketOnboardingComplete()) router.push('/market/create');
     else router.push('/market/onboarding');
-  }
-
-  // ── Feature gate: non-allowlisted users (flag off) see "coming soon" ──
-  if (access === 'loading') {
-    return <div className="phone-container bg-white dark:bg-[#111111]" style={{ height: '100dvh' }} />;
-  }
-  if (access === 'blocked') {
-    return <MarketComingSoon />;
   }
 
   // ── Support banner tap → open the Libas support chat ────────────────────────
