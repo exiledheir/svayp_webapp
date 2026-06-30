@@ -483,6 +483,17 @@ export async function createChat(opts: {
   return { id: d.id as string };
 }
 
+/**
+ * Open (or reuse) the user's support chat with the Libas team.
+ * Backend: POST /chats/support → ApiResponse.of({ id, ... }); unwrapSingle peels
+ * the wrapper so we read the chat id directly.
+ */
+export async function createSupportChat(): Promise<{ id: string }> {
+  const res = await api.post('/chats/support');
+  const d = unwrapSingle(res.data) as Record<string, unknown>;
+  return { id: d.id as string };
+}
+
 export async function placeOrder(opts: {
   deliveryMethod: 'PICKUP' | 'DELIVERY';
   paymentMethod: 'CASH' | 'CARD';

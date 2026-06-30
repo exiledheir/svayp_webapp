@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2, ArrowUpRight, BookOpen } from 'lucide-react';
+import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2, ArrowUpRight, BookOpen, MessageCircle } from 'lucide-react';
 import { getUser, clearTokens } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags-context';
 import { useRootBackGuard } from '@/lib/use-root-back-guard';
@@ -21,6 +21,7 @@ import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
 import { useTheme } from '@/lib/theme';
 import { isInFlutterWebView } from '@/lib/flutter-bridge';
+import { openSupportChat } from '@/lib/support-chat';
 import { saveUploadPreview, getUploadPreview, clearUploadPreview } from '@/lib/upload-previews';
 import { compressImageForUpload } from '@/lib/image-utils';
 import {
@@ -284,33 +285,21 @@ export default function ClosetPage() {
   const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | 'tryOn' | 'canvas' | null>(null);
   const { plan, limits, usage, fetchPlan, canGenerate, canTryOn, calendarDays } = usePlan();
 
-  // ── 24h promo countdown timer ─────────────────────────────────────────────────
-  const PROMO_DURATION_MS = 24 * 60 * 60 * 1000;
-  const [promoSecondsLeft, setPromoSecondsLeft] = useState<number>(PROMO_DURATION_MS / 1000);
+  // ── Feedback contact (Libas support) ───────────────────────────────────────────
+  // Opens the user's support chat with the Libas team — native chat inside the
+  // app, web chat in a browser, Telegram as a fallback (see openSupportChat).
+  const [contactingAdmin, setContactingAdmin] = useState(false);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const userKey = userInfo?.phoneNumber ?? 'guest';
-    const PROMO_TIMER_KEY = `promoTimerStart_${userKey}`;
-    let stored = localStorage.getItem(PROMO_TIMER_KEY);
-    if (!stored) {
-      stored = String(Date.now());
-      localStorage.setItem(PROMO_TIMER_KEY, stored);
+  async function handleFeedbackTap() {
+    if (contactingAdmin) return;
+    setContactingAdmin(true);
+    logAnalyticsEvent(Events.CLOSET_FEEDBACK_CTA_TAPPED);
+    try {
+      await openSupportChat(router);
+    } finally {
+      setContactingAdmin(false);
     }
-    const startMs = parseInt(stored, 10);
-    const calc = () => {
-      const remaining = Math.max(0, PROMO_DURATION_MS - (Date.now() - startMs));
-      setPromoSecondsLeft(Math.floor(remaining / 1000));
-    };
-    calc();
-    const interval = setInterval(calc, 1000);
-    return () => clearInterval(interval);
-  }, [userInfo?.phoneNumber]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const promoHH = String(Math.floor(promoSecondsLeft / 3600)).padStart(2, '0');
-  const promoMM = String(Math.floor((promoSecondsLeft % 3600) / 60)).padStart(2, '0');
-  const promoSS = String(promoSecondsLeft % 60).padStart(2, '0');
-  const promoTimeStr = `${promoHH}:${promoMM}:${promoSS}`;
+  }
 
   // Single overall wardrobe item limit (across all categories), not per category.
   // Demo items don't count toward the limit.
@@ -1352,52 +1341,39 @@ export default function ClosetPage() {
           </div>
       </header>
 
-      {/* ── Promo Banner: 20% sale ────────────────────────────────── */}
-      {/* Temporarily disabled — banner hidden for now. Re-enable when needed.
-      {plansEnabled && plan === 'free' && promoSecondsLeft > 0 && (
-      <div
-        onClick={() => setShowPremiumGate('generation')}
-        className="shrink-0 mx-3 mb-2 rounded-2xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform select-none"
+      {/* ── Feedback Banner: chat directly with the Libas team ─────────────── */}
+      <button
+        onClick={handleFeedbackTap}
+        disabled={contactingAdmin}
+        className="shrink-0 mx-3 mb-2 w-[calc(100%-1.5rem)] rounded-2xl overflow-hidden text-left active:scale-[0.98] transition-transform select-none disabled:opacity-70"
         style={{
-          background: 'linear-gradient(135deg, #7b2ff7 0%, #f107a3 100%)',
-          boxShadow: '0 4px 18px rgba(123,47,247,0.4)',
+          background: 'linear-gradient(135deg, #2AABEE 0%, #229ED9 100%)',
+          boxShadow: '0 4px 18px rgba(34,158,217,0.32)',
         }}
+        aria-label={t.feedbackBannerCta}
       >
         <div className="relative px-4 py-3 flex items-center gap-3">
+          <div className="shrink-0 w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+            <MessageCircle size={18} strokeWidth={2.2} color="#fff" />
+          </div>
           <div className="flex-1 min-w-0">
             <p className="text-white font-extrabold text-[13px] leading-snug">
-              {t.promoBannerTitle}
+              {t.feedbackBannerTitle}
             </p>
             <p className="text-white/90 text-[10.5px] font-medium leading-snug mt-0.5 line-clamp-2">
-              {t.promoBannerBody}
-            </p>
-            <p className="text-white/70 text-[9.5px] font-medium leading-snug mt-1">
-              {t.promoBannerNote}
+              {t.feedbackBannerBody}
             </p>
           </div>
-          <div className="shrink-0 flex flex-col items-center gap-1.5">
-            <span className="text-white font-black text-[13px] tabular-nums leading-none tracking-tight">{promoTimeStr}</span>
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowPremiumGate('generation'); }}
-              className="px-3 py-1.5 rounded-full bg-white text-[11px] font-bold active:scale-[0.95] transition-transform whitespace-nowrap"
-              style={{ color: '#7b2ff7' }}
-            >
-              {t.promoBannerCta}
-            </button>
-          </div>
+          <span
+            className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-white text-[11px] font-bold whitespace-nowrap"
+            style={{ color: '#1d93d1' }}
+          >
+            {contactingAdmin && <Loader2 size={12} className="animate-spin" />}
+            {t.feedbackBannerCta}
+          </span>
         </div>
-        <div
-          className="h-[3px] w-full"
-          style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%)', backgroundSize: '200% 100%', animation: 'shimmer 2s infinite linear' }}
-        />
-      </div>
-      )}
-      */}
+      </button>
       <style jsx>{`
-        @keyframes shimmer {
-          0%   { background-position: -200% 0; }
-          100% { background-position:  200% 0; }
-        }
         @keyframes hintSlideIn {
           from { opacity: 0; transform: translate(-50%, 12px); }
           to   { opacity: 1; transform: translate(-50%, 0); }

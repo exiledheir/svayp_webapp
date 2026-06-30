@@ -16,13 +16,10 @@ export interface Translations {
   mk_all_categories: string;
   mk_search_placeholder: string;
   mk_visual_search: string;
-  mk_ad_label: string;
   mk_banner_sell_title: string;
   mk_banner_sell_sub: string;
-  mk_banner_new_title: string;
-  mk_banner_new_sub: string;
-  mk_banner_local_title: string;
-  mk_banner_local_sub: string;
+  mk_banner_contact_title: string;
+  mk_banner_contact_sub: string;
   mk_free: string;
   mk_negotiable: string;
   mk_courier_available: string;
@@ -415,11 +412,9 @@ export interface Translations {
   justNow: string;
   minutesAgo: string;
   yesterday: string;
-  promoBannerTitle: string;
-  promoBannerBody: string;
-  promoBannerCta: string;
-  promoBannerTimerLabel: string;
-  promoBannerNote: string;
+  feedbackBannerTitle: string;
+  feedbackBannerBody: string;
+  feedbackBannerCta: string;
   // ── Coach marks ────────────────────────────────────────────────
   coachAddTitle: string;
   coachAddBody: string;
@@ -510,13 +505,10 @@ const en: Translations = {
   mk_all_categories: 'All categories',
   mk_search_placeholder: 'Search listings',
   mk_visual_search: 'Visual search',
-  mk_ad_label: 'Ad',
   mk_banner_sell_title: 'Sell faster',
   mk_banner_sell_sub: 'List your items in minutes',
-  mk_banner_new_title: 'Fresh finds daily',
-  mk_banner_new_sub: 'New listings every day',
-  mk_banner_local_title: 'Deals near you',
-  mk_banner_local_sub: 'Meet and trade nearby',
+  mk_banner_contact_title: 'Contact us',
+  mk_banner_contact_sub: 'Questions or feedback? Chat with our team',
   mk_free: 'Free',
   mk_negotiable: 'Negotiable',
   mk_courier_available: 'Courier delivery',
@@ -960,11 +952,9 @@ const en: Translations = {
   justNow: 'Just now',
   minutesAgo: '{n}m ago',
   yesterday: 'Yesterday',
-  promoBannerTitle: '20% off Plus & Premium 🔥',
-  promoBannerBody: 'Subscribe today and unlock all AI stylist features.',
-  promoBannerCta: 'Subscribe',
-  promoBannerTimerLabel: 'Offer expires in',
-  promoBannerNote: 'Offer valid for a limited time only.',
+  feedbackBannerTitle: 'Help us improve LIBΛS 💬',
+  feedbackBannerBody: 'Share your feedback or report an issue — chat directly with our team.',
+  feedbackBannerCta: 'Send feedback',
   // ── Coach marks ────────────────────────────────────────────────
   coachAddTitle: 'Add your clothes',
   coachAddBody: 'Tap + to upload a photo of any clothing item. AI removes the background automatically.',
@@ -1077,13 +1067,10 @@ const ru: Translations = {
   mk_all_categories: 'Все категории',
   mk_search_placeholder: 'Поиск объявлений',
   mk_visual_search: 'Визуальный поиск',
-  mk_ad_label: 'Реклама',
   mk_banner_sell_title: 'Продавайте быстрее',
   mk_banner_sell_sub: 'Разместите объявление за пару минут',
-  mk_banner_new_title: 'Новинки каждый день',
-  mk_banner_new_sub: 'Свежие объявления ежедневно',
-  mk_banner_local_title: 'Сделки рядом с вами',
-  mk_banner_local_sub: 'Встречайтесь и договаривайтесь рядом',
+  mk_banner_contact_title: 'Свяжитесь с нами',
+  mk_banner_contact_sub: 'Вопросы или отзывы? Напишите нашей команде',
   mk_free:'Даром',
   mk_negotiable: 'Торг уместен',
   mk_courier_available: 'Доставка курьером',
@@ -1528,11 +1515,9 @@ const ru: Translations = {
   justNow: 'Только что',
   minutesAgo: '{n} мин назад',
   yesterday: 'Вчера',
-  promoBannerTitle: 'Скидка 20% на Plus и Premium 🔥',
-  promoBannerBody: 'Подпишитесь сегодня и откройте все возможности AI-стилиста.',
-  promoBannerCta: 'Подписаться',
-  promoBannerTimerLabel: 'Предложение истекает через',
-  promoBannerNote: 'Акция действует ограниченное время.',
+  feedbackBannerTitle: 'Помогите улучшить LIBΛS 💬',
+  feedbackBannerBody: 'Поделитесь отзывом или сообщите о проблеме — напишите нашей команде напрямую.',
+  feedbackBannerCta: 'Оставить отзыв',
   // ── Coach marks ────────────────────────────────────────────────
   coachAddTitle: 'Добавьте одежду',
   coachAddBody: 'Нажмите + чтобы загрузить фото любой вещи. AI удалит фон автоматически.',
@@ -1645,13 +1630,10 @@ const uz: Translations = {
   mk_all_categories: 'Barcha kategoriyalar',
   mk_search_placeholder: "E'lonlarni qidirish",
   mk_visual_search: 'Vizual qidiruv',
-  mk_ad_label: 'Reklama',
   mk_banner_sell_title: 'Tezroq soting',
   mk_banner_sell_sub: "E'loningizni bir necha daqiqada joylang",
-  mk_banner_new_title: 'Har kuni yangi tovarlar',
-  mk_banner_new_sub: "Har kuni yangi e'lonlar",
-  mk_banner_local_title: 'Yaqin atrofdagi bitimlar',
-  mk_banner_local_sub: 'Yaqin atrofda uchrashing va kelishing',
+  mk_banner_contact_title: "Biz bilan bog'laning",
+  mk_banner_contact_sub: 'Savol yoki fikr bormi? Jamoamizga yozing',
   mk_free: 'Tekin',
   mk_negotiable: 'Savdolashish mumkin',
   mk_courier_available: 'Kuryer yetkazib berish',
@@ -2094,11 +2076,9 @@ const uz: Translations = {
   justNow: 'Hozirgina',
   minutesAgo: '{n} daqiqa oldin',
   yesterday: 'Kecha',
-  promoBannerTitle: 'Premium va Plus obunalariga 20% chegirma 🔥',
-  promoBannerBody: 'Bugunoq obuna bo\'ling va AI stilistning barcha imkoniyatlarini oching.',
-  promoBannerCta: 'Obuna bo\'lish',
-  promoBannerTimerLabel: 'Taklif tugashiga',
-  promoBannerNote: 'Taklif cheklangan vaqt davomida amal qiladi.',
+  feedbackBannerTitle: 'LIBΛS’ni yaxshilashga yordam bering 💬',
+  feedbackBannerBody: 'Fikr-mulohaza qoldiring yoki muammo haqida xabar bering — jamoamizga to‘g‘ridan-to‘g‘ri yozing.',
+  feedbackBannerCta: 'Fikr bildirish',
   // ── Coach marks ────────────────────────────────────────────────
   coachAddTitle: "Kiyimlaringizni qo'shing",
   coachAddBody: "Istalgan kiyim rasmini yuklash uchun + bosing. AI fonni avtomatik olib tashlaydi.",
