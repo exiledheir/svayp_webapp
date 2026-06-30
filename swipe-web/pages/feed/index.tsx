@@ -1,7 +1,7 @@
 import React from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { Plus, User } from 'lucide-react';
+import { User } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { getFeed } from '@/lib/feed-api';
 import { logAnalyticsEvent } from '@/lib/analytics';
@@ -117,16 +117,6 @@ function FeedHome() {
             </div>
           )}
         </div>
-
-        {/* Publish FAB — sits above the native Flutter navbar */}
-        <button
-          onClick={() => router.push('/feed/create')}
-          className="absolute right-4 flex items-center justify-center rounded-full text-white shadow-lg active:opacity-90"
-          style={{ width: 52, height: 52, background: '#F370A7', bottom: NAV_INSET }}
-          aria-label={t.feed_publish_short}
-        >
-          <Plus size={24} strokeWidth={2.6} />
-        </button>
       </div>
     </>
   );

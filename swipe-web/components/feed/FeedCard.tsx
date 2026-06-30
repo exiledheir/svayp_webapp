@@ -24,7 +24,6 @@ export default function FeedCard({ post, onLikeChange, onHidden, onDeleted }: Pr
   const [expanded, setExpanded] = React.useState(false);
 
   const openProfile = () => router.push(`/feed/${post.author.username}`);
-  const openPost = () => router.push(`/feed/p/${post.id}`);
 
   return (
     <div className="bg-white dark:bg-[#1c1c1e]">
@@ -48,7 +47,7 @@ export default function FeedCard({ post, onLikeChange, onHidden, onDeleted }: Pr
       </div>
 
       {/* Images */}
-      <ImageCarousel images={post.images} alt={post.caption ?? 'outfit'} onClick={openPost} />
+      <ImageCarousel images={post.images} alt={post.caption ?? 'outfit'} />
 
       {/* Actions + caption */}
       <div className="px-3.5 pt-2.5 pb-3.5">

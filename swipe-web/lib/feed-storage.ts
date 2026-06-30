@@ -53,12 +53,19 @@ function writePosts(posts: FeedPost[]): void {
 }
 
 // ── current user ──────────────────────────────────────────────────────────────
-function me(): { id: string; username: string; displayName: string } {
+function me(): { id: string; username: string; displayName: string; phoneNumber: string | null } {
   const u = getUser();
   const rawUsername = (u?.username as string) || '';
   const id = (u?.id as string) || 'local-user';
   const username = /^[a-z0-9_.]{3,20}$/i.test(rawUsername) ? rawUsername.toLowerCase() : 'me';
-  return { id, username, displayName: 'You' };
+  // Real name + phone from the signed-in user — the same fields the closet
+  // profile reads from localStorage (Flutter writes these on login).
+  const name = (
+    u?.name ?? u?.fullName ?? u?.full_name ?? u?.firstName ?? u?.first_name ??
+    u?.displayName ?? u?.display_name ?? u?.username
+  ) as string | undefined;
+  const phoneNumber = (u?.phoneNumber ?? u?.phone_number ?? u?.phone) as string | undefined;
+  return { id, username, displayName: name || 'You', phoneNumber: phoneNumber || null };
 }
 
 function defaultProfile(): FeedProfile {
@@ -69,6 +76,7 @@ function defaultProfile(): FeedProfile {
     displayName: m.displayName,
     avatarUrl: null,
     bio: null,
+    phoneNumber: m.phoneNumber,
     postsCount: 0,
     likesTotal: 0,
     isOwn: true,
@@ -132,9 +140,15 @@ function paginate<T>(items: T[], pageNum: number, size: number): Page<T> {
 function loadMyProfile(): FeedProfile {
   const stored = readJSON<FeedProfile | null>(PROFILE_KEY, null);
   const base = stored ?? defaultProfile();
+  const m = me();
   const mine = readPosts().filter((p) => p.author.id === base.userId && p.status === 'active');
   return {
     ...base,
+    // Name + phone come from the authenticated user. Phone always reflects auth
+    // (it isn't editable in the feed); displayName falls back to the real name
+    // when the user hasn't set a custom one in the profile editor.
+    displayName: base.displayName || m.displayName,
+    phoneNumber: m.phoneNumber,
     isOwn: true,
     postsCount: mine.length,
     likesTotal: mine.reduce((s, p) => s + p.likesCount, 0),
@@ -152,6 +166,7 @@ function profileFromPosts(match: (p: FeedPost) => boolean, fallback: Partial<Fee
       displayName: a.displayName,
       avatarUrl: a.avatarUrl,
       bio: null,
+      phoneNumber: null,
       postsCount: posts.length,
       likesTotal: posts.reduce((s, p) => s + p.likesCount, 0),
       isOwn: a.id === m.userId,
@@ -163,6 +178,7 @@ function profileFromPosts(match: (p: FeedPost) => boolean, fallback: Partial<Fee
     displayName: fallback.displayName ?? fallback.username ?? 'unknown',
     avatarUrl: null,
     bio: null,
+    phoneNumber: null,
     postsCount: 0,
     likesTotal: 0,
     isOwn: false,

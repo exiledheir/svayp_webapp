@@ -51,6 +51,7 @@ export interface FeedProfile {
   displayName: string;
   avatarUrl: string | null;
   bio: string | null;
+  phoneNumber: string | null; // from the authenticated user; shown on own profile only
   postsCount: number; // «Образов»
   likesTotal: number; // «Лайков» — sum across the user's posts (server-computed)
   isOwn: boolean;
