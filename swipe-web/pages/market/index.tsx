@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
+import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { Plus, User, Search, Camera, Heart } from 'lucide-react';
+import { Plus, User, Search, Camera, Heart, MessageCircle } from 'lucide-react';
 import MarketFeedCard from '@/components/market/MarketFeedCard';
 import { isMarketOnboardingComplete } from '@/lib/market-storage';
 import { getFeed as apiGetFeed, type ListingCard } from '@/lib/market-api';
@@ -14,6 +15,7 @@ import { useRootBackGuard } from '@/lib/use-root-back-guard';
 import MarketComingSoon from '@/components/market/MarketComingSoon';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events } from '@/lib/analytics-events';
+import { openSupportChat } from '@/lib/support-chat';
 
 /**
  * Market feed — the C2C marketplace hub. Layout (top → bottom):
@@ -30,6 +32,7 @@ export default function MarketFeedPage() {
   const [listings, setListings] = useState<MarketListing[]>([]);
   const [category, setCategory] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [supportLoading, setSupportLoading] = useState(false);
 
   // Root tab page — trap Back so it doesn't exit to a blank WebView screen.
   useRootBackGuard();
@@ -120,11 +123,37 @@ export default function MarketFeedPage() {
     return <MarketComingSoon />;
   }
 
-  // Ad banner slots — gradient promo cards (placeholder ad inventory).
+  // ── Support banner tap → open the Libas support chat ────────────────────────
+  // Native chat inside the app, web chat in a browser, Telegram on failure.
+  async function handleSupportBannerClick() {
+    if (supportLoading) return;
+    setSupportLoading(true);
+    logAnalyticsEvent(Events.MARKET_SUPPORT_BANNER_TAPPED);
+    try {
+      await openSupportChat(router);
+    } finally {
+      setSupportLoading(false);
+    }
+  }
+
+  // Banner CTAs — sell entry + support contact (each routes somewhere).
   const banners = [
-    { title: t.mk_banner_sell_title, sub: t.mk_banner_sell_sub, grad: 'linear-gradient(135deg,#F370A7,#F2994A)' },
-    { title: t.mk_banner_new_title, sub: t.mk_banner_new_sub, grad: 'linear-gradient(135deg,#5B8CFF,#8E5BD6)' },
-    { title: t.mk_banner_local_title, sub: t.mk_banner_local_sub, grad: 'linear-gradient(135deg,#3BA55D,#7FB8E8)' },
+    {
+      title: t.mk_banner_sell_title,
+      sub: t.mk_banner_sell_sub,
+      grad: 'linear-gradient(135deg,#F370A7,#F2994A)',
+      img: '/images/market/sell_faster.webp' as string | undefined,
+      icon: null as React.ReactNode,
+      onClick: handlePost, // → /market/create (via the onboarding gate)
+    },
+    {
+      title: t.mk_banner_contact_title,
+      sub: t.mk_banner_contact_sub,
+      grad: 'linear-gradient(135deg,#2AABEE,#229ED9)',
+      img: undefined as string | undefined,
+      icon: <MessageCircle size={30} strokeWidth={2} className="text-white" />,
+      onClick: handleSupportBannerClick, // → Libas support chat
+    },
   ];
 
   return (
@@ -216,12 +245,21 @@ export default function MarketFeedPage() {
             />
           </div>
 
-          {/* Advertisement banners */}
+          {/* CTA banners — sell entry + contact support */}
           <div className="hide-scrollbar flex gap-3 overflow-x-auto px-4 pt-1 pb-3" style={{ scrollSnapType: 'x mandatory' }}>
             {banners.map((b, i) => (
               <div
                 key={i}
-                className="relative shrink-0 flex flex-col justify-end overflow-hidden"
+                role="button"
+                tabIndex={0}
+                onClick={b.onClick}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    b.onClick();
+                  }
+                }}
+                className="relative shrink-0 flex items-stretch gap-2 overflow-hidden cursor-pointer active:scale-[0.98] transition-transform select-none"
                 style={{
                   width: 280,
                   height: 124,
@@ -231,14 +269,37 @@ export default function MarketFeedPage() {
                   padding: 16,
                 }}
               >
-                <span
-                  className="absolute top-2.5 right-3 text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(255,255,255,0.22)', color: '#fff' }}
-                >
-                  {t.mk_ad_label}
-                </span>
-                <span className="text-white text-[18px] font-bold leading-tight">{b.title}</span>
-                <span className="text-white/85 text-[12px] mt-0.5">{b.sub}</span>
+                {/* Text column — flexes to fill the space the image leaves, so it
+                    never sits under the image no matter how long the translation. */}
+                <div className="relative z-10 flex-1 min-w-0 flex flex-col justify-end">
+                  <p className="text-white text-[18px] font-bold leading-tight line-clamp-2">{b.title}</p>
+                  <p className="text-white/85 text-[12px] leading-snug mt-0.5 line-clamp-2">{b.sub}</p>
+                </div>
+                {/* Right column — bleed image (sell) or icon badge (contact). */}
+                {b.img ? (
+                  <div
+                    className="relative shrink-0 w-[108px] -my-4 -mr-4 pointer-events-none select-none"
+                    aria-hidden
+                  >
+                    <Image
+                      src={b.img}
+                      alt=""
+                      fill
+                      sizes="108px"
+                      unoptimized
+                      className="object-contain object-bottom"
+                    />
+                  </div>
+                ) : b.icon ? (
+                  <div
+                    className="relative shrink-0 flex items-center justify-center pointer-events-none select-none"
+                    aria-hidden
+                  >
+                    <div className="w-[60px] h-[60px] rounded-2xl bg-white/15 flex items-center justify-center">
+                      {b.icon}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>

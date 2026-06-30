@@ -7,6 +7,7 @@ export const Events = {
   CLOSET_ITEM_DELETED: 'closet_item_deleted',
   CLOSET_GUIDE_OPENED: 'closet_guide_opened',
   CLOSET_GUIDE_VIDEO_PLAYED: 'closet_guide_video_played',
+  CLOSET_FEEDBACK_CTA_TAPPED: 'closet_feedback_cta_tapped',
 
   // ── Add Item Funnel ────────────────────────────────────────────────────────
   ADD_ITEM_STARTED: 'add_item_started',
@@ -65,6 +66,7 @@ export const Events = {
   MARKET_CONTACT_CALL_TAPPED: 'market_contact_call_tapped',
   MARKET_CONTACT_TELEGRAM_TAPPED: 'market_contact_telegram_tapped',
   MARKET_FAVORITE_TOGGLED: 'market_favorite_toggled',
+  MARKET_SUPPORT_BANNER_TAPPED: 'market_support_banner_tapped',
 } as const;
 
 export const Params = {
