@@ -17,6 +17,9 @@ export default function ProfileHeader({ profile, onEdit }: Props) {
       <Avatar url={profile.avatarUrl} name={profile.displayName || profile.username} size={84} />
       <h2 className="text-[18px] font-bold text-black dark:text-white mt-3">{profile.displayName || profile.username}</h2>
       <p className="text-[13px] text-black/45 dark:text-white/45">@{profile.username}</p>
+      {profile.isOwn && profile.phoneNumber && (
+        <p className="text-[13px] text-black/45 dark:text-white/45 mt-0.5">{profile.phoneNumber}</p>
+      )}
       {profile.bio && <p className="text-[13.5px] text-black/70 dark:text-white/70 mt-2 max-w-[280px]">{profile.bio}</p>}
 
       <div className="flex items-center gap-10 mt-4">
