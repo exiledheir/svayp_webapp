@@ -45,7 +45,10 @@ function FeedPostDetail() {
       </Head>
       <div className="phone-container flex flex-col bg-white dark:bg-[#111111]" style={{ height: '100dvh' }}>
         <div className="flex items-center gap-2 px-3 py-3 shrink-0 border-b border-black/5 dark:border-white/10">
-          <button onClick={() => router.back()} className="text-black dark:text-white p-1" aria-label="Back">
+          {/* Return to the feed directly — NOT router.back(): inside the native
+              WebView the about:blank→url load inflates history.length, so back()
+              steps to a blank entry and the button appears dead (see /feed/create). */}
+          <button onClick={() => router.push('/feed')} className="text-black dark:text-white p-1" aria-label="Back">
             <ChevronLeft size={22} />
           </button>
           <h1 className="text-[16px] font-bold text-black dark:text-white">{t.feed_title}</h1>

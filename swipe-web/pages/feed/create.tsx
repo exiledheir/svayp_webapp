@@ -256,6 +256,19 @@ function CreateFeedPost() {
     goCompose();
   }
 
+  // Back navigation. From COMPOSE this just rewinds to the picker (keeping the
+  // current selection). Otherwise leave the flow for the feed — NOT router.back():
+  // inside the native app's WebView the initial about:blank→url load inflates
+  // window.history.length, so router.back() steps to a blank entry instead of the
+  // feed and the button appears dead (same fix as /market/[id] & /market/chat/[id]).
+  function handleBack() {
+    if (step === COMPOSE) {
+      setStep(PICK);
+      return;
+    }
+    router.push('/feed');
+  }
+
   async function handlePublish() {
     if (publishingRef.current || publishing || selected.length === 0) return;
     publishingRef.current = true;
@@ -300,7 +313,7 @@ function CreateFeedPost() {
         {/* Header */}
         <div className="flex items-center gap-2 px-3 py-3 shrink-0 border-b border-black/5 dark:border-white/10">
           <button
-            onClick={() => (step === COMPOSE ? setStep(PICK) : router.back())}
+            onClick={handleBack}
             className="text-black dark:text-white p-1"
             aria-label="Back"
           >
