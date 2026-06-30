@@ -1,6 +1,6 @@
 import React from 'react';
 import Image from 'next/image';
-import { LayoutGrid, Camera, CalendarDays, type LucideIcon } from 'lucide-react';
+import { LayoutGrid, Camera, CalendarDays, Images, type LucideIcon } from 'lucide-react';
 import CarouselDots from '@/components/market/CarouselDots';
 import { useI18n } from '@/lib/i18n';
 import type { FeedPostImage, FeedSourceType } from '@/types/feed';
@@ -17,6 +17,7 @@ const TYPE_ICON: Record<FeedSourceType, LucideIcon> = {
   board: LayoutGrid,
   tryon: Camera,
   calendar: CalendarDays,
+  library: Images,
 };
 
 /**
@@ -35,6 +36,7 @@ export default function ImageCarousel({ images, alt, aspectRatio = '4/5', onClic
     board: t.tabBoards,
     tryon: t.tabOutfits,
     calendar: t.tabCalendar,
+    library: t.feed_src_library,
   };
 
   function handleScroll(e: React.UIEvent<HTMLDivElement>) {

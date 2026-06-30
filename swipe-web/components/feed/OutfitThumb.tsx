@@ -12,16 +12,15 @@ interface Props {
  * Lightweight DOM preview of a flat-lay outfit. Mirrors the canvas-snapshot
  * geometry (3:4 frame, item width 35%, % positions, scale) so the picker /
  * compose preview matches what captureCanvasSnapshot will render on publish.
- * Uses the image proxy for remote URLs (CORS-safe), same as the snapshot.
+ *
+ * Images load DIRECTLY (no image proxy). This is a plain DOM <img>, not a
+ * canvas, so there's no cross-origin taint to avoid — and the wardrobe blob
+ * host only serves browser requests, not the proxy's server-side fetch (which
+ * 404s). This matches how the closet canvas and try-on thumbnails load.
  */
 export default function OutfitThumb({ layout, items, className = '' }: Props) {
   const byId = React.useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const sorted = React.useMemo(() => [...layout].sort((a, b) => a.zIndex - b.zIndex), [layout]);
-
-  function resolveSrc(raw: string): string {
-    if (raw.startsWith('blob:') || raw.startsWith('data:')) return raw;
-    return `/api/proxy-image?url=${encodeURIComponent(raw)}`;
-  }
 
   return (
     <div className={`relative overflow-hidden ${className}`} style={{ aspectRatio: '3/4', background: '#ffffff' }}>
@@ -32,7 +31,7 @@ export default function OutfitThumb({ layout, items, className = '' }: Props) {
           // eslint-disable-next-line @next/next/no-img-element
           <img
             key={entry.id}
-            src={resolveSrc(item.imageData)}
+            src={item.imageData}
             alt=""
             style={{
               position: 'absolute',

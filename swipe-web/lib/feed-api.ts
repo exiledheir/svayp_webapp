@@ -194,7 +194,7 @@ function watchUpload(
 // Local mode: compress the image to a JPEG data URL (no network). Keeps
 // localStorage small enough to hold several posts. Used for both outfit
 // snapshots and profile avatars.
-function fileToCompressedDataUrl(file: File | Blob, maxW = 600, quality = 0.72): Promise<string> {
+export function fileToCompressedDataUrl(file: File | Blob, maxW = 600, quality = 0.72): Promise<string> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const image = new window.Image();
