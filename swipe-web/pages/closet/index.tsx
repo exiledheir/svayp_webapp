@@ -1931,14 +1931,7 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
 }) {
   const { t } = useI18n();
   const { theme } = useTheme();
-  const router = useRouter();
   const isEmpty = allItems.length === 0;
-
-  // Deep-link a closet board/try-on into the Feed publish flow (pre-seeded).
-  const publishSeed = (seed: string) => {
-    logAnalyticsEvent(Events.FEED_PUBLISH_FROM_CLOSET, { [Params.SOURCE]: seed.split(':')[0] });
-    router.push(`/feed/create?seed=${seed}`);
-  };
 
   return (
     <div className="mt-4">
@@ -1988,7 +1981,6 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
             allowAutoGenerate={allowAutoGenerate}
             isLocked={plansEnabled && idx >= limits.outfitCanvases}
             onShowPlans={plansEnabled && idx >= limits.outfitCanvases ? onShowCanvasPlans : onShowPlans}
-            onPublish={canvas.id ? () => publishSeed(`board:${canvas.id}`) : undefined}
           />
         )) : (
           <OutfitCard
@@ -2110,7 +2102,6 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
 }) {
   const { t } = useI18n();
   const { theme } = useTheme();
-  const router = useRouter();
   const [viewingJob, setViewingJob] = useState<TryOnJobResponse | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -2271,17 +2262,6 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
               )}
               {t.myLooksSaveLook}
             </button>
-            <button
-              onClick={() => {
-                logAnalyticsEvent(Events.FEED_PUBLISH_FROM_CLOSET, { [Params.SOURCE]: 'tryon' });
-                router.push(`/feed/create?seed=tryon:${viewingJob.id}`);
-              }}
-              className="flex-1 h-12 rounded-full text-white text-[13px] font-semibold flex items-center justify-center gap-2"
-              style={{ background: '#F370A7' }}
-            >
-              <ArrowUpRight size={16} strokeWidth={2.2} />
-              {t.feed_publish_short}
-            </button>
           </div>
         </div>
       )}
@@ -2421,7 +2401,6 @@ function OutfitCard({
   allowAutoGenerate,
   isLocked,
   onShowPlans,
-  onPublish,
 }: {
   allItems: ClosetItem[];
   isEmpty: boolean;
@@ -2440,8 +2419,6 @@ function OutfitCard({
   allowAutoGenerate: boolean;
   isLocked?: boolean;
   onShowPlans?: () => void;
-  /** Publish this board to the Лента (Feed). Shown only when a real layout exists. */
-  onPublish?: () => void;
 }) {
   const { t } = useI18n();
   const { theme } = useTheme();
@@ -2692,19 +2669,6 @@ function OutfitCard({
           <span>{t.tryItOn}</span>
           <span className="opacity-70 text-[10px] font-medium">{tryOnCount}/{tryOnLimit}</span>
         </button>
-        )}
-        {onPublish && displayEntries.length > 0 && (
-          <button
-            onClick={onPublish}
-            aria-label={t.feed_publish_short}
-            className="shrink-0 w-[44px] h-[44px] rounded-full flex items-center justify-center active:scale-[0.97] transition-transform"
-            style={{
-              background: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
-              color: '#F370A7',
-            }}
-          >
-            <ArrowUpRight size={20} strokeWidth={2.2} />
-          </button>
         )}
       </div>
       )}

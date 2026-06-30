@@ -76,45 +76,41 @@ function defaultProfile(): FeedProfile {
 }
 
 // ── seed demo content (first run only) ────────────────────────────────────────
-function img(seed: string): string {
-  return `https://picsum.photos/seed/${seed}/400/500`;
+// A single showcase post assembled from two local images in
+// public/images/feed/ (the mannequin board + the mirror try-on of the same
+// look). Bump SEED_VERSION whenever this demo content changes so existing local
+// testers pick it up — earlier demo posts (ids prefixed `seed_`) are replaced
+// while any real user-created posts are preserved.
+const SEED_VERSION = 'libas-look-v1';
+
+function seedPosts(): FeedPost[] {
+  const createdAt = new Date(Date.now() - 20 * 60000).toISOString();
+  return [
+    {
+      id: 'seed_libas_look',
+      author: { id: 'u_libas_looks', username: 'libas_looks', displayName: 'LIBΛS Looks', avatarUrl: null },
+      images: [
+        { id: 'seed_libas_look_0', sourceType: 'board', imageUrl: '/images/feed/look-1.jpg', position: 0, sourceRefId: null },
+        { id: 'seed_libas_look_1', sourceType: 'tryon', imageUrl: '/images/feed/look-2.jpg', position: 1, sourceRefId: null },
+      ],
+      caption: 'Джинсовая рубашка + широкие брюки 🤍',
+      likesCount: 0,
+      isLiked: false,
+      containsRealPhoto: true,
+      status: 'active',
+      isOwner: false,
+      createdAt,
+    },
+  ];
 }
 
 function ensureSeed(): void {
   if (typeof window === 'undefined') return;
-  if (localStorage.getItem(SEEDED_KEY)) return;
-  localStorage.setItem(SEEDED_KEY, '1');
-  if (localStorage.getItem(POSTS_KEY)) return; // never clobber real posts
-
-  const t = (minsAgo: number) => new Date(Date.now() - minsAgo * 60000).toISOString();
-  const mk = (
-    id: string,
-    username: string,
-    display: string,
-    avatarSeed: string,
-    imgs: { sourceType: FeedPostImage['sourceType']; seed: string }[],
-    caption: string,
-    likes: number,
-    minsAgo: number,
-  ): FeedPost => ({
-    id,
-    author: { id: `u_${username}`, username, displayName: display, avatarUrl: img(avatarSeed) },
-    images: imgs.map((x, i) => ({ id: `${id}_${i}`, sourceType: x.sourceType, imageUrl: img(x.seed), position: i, sourceRefId: null })),
-    caption,
-    likesCount: likes,
-    isLiked: false,
-    containsRealPhoto: imgs.some((x) => x.sourceType === 'tryon'),
-    status: 'active',
-    isOwner: false,
-    createdAt: t(minsAgo),
-  });
-
-  const seed: FeedPost[] = [
-    mk('seed_1', 'zarina.style', 'Zarina', 'av-zar', [{ sourceType: 'board', seed: 'libas-a1' }], 'Серые брюки + платок, на работу', 128, 35),
-    mk('seed_2', 'dildora_k', 'Dildora', 'av-dil', [{ sourceType: 'board', seed: 'libas-b1' }, { sourceType: 'tryon', seed: 'libas-b2' }], 'Лён и чёрные брюки на лето', 86, 120),
-    mk('seed_3', 'malika_a', 'Malika', 'av-mal', [{ sourceType: 'calendar', seed: 'libas-c1' }], 'Образ дня ✨', 212, 300),
-  ];
-  writePosts(seed);
+  if (localStorage.getItem(SEEDED_KEY) === SEED_VERSION) return;
+  localStorage.setItem(SEEDED_KEY, SEED_VERSION);
+  // Drop any previously-seeded demo posts but keep real (user-created) ones.
+  const kept = readJSON<FeedPost[]>(POSTS_KEY, []).filter((p) => !p.id.startsWith('seed_'));
+  writePosts([...kept, ...seedPosts()]);
 }
 
 function readPosts(): FeedPost[] {
