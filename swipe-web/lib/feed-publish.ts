@@ -28,6 +28,8 @@ export interface SelectedSource {
   items?: ClosetItem[];
   /** Present for try-on — the real-photo result, referenced directly. */
   resultImageUrl?: string;
+  /** Present for library — the original picked file, uploaded at full quality. */
+  file?: File;
 }
 
 export class FeedPublishError extends Error {
@@ -66,14 +68,28 @@ export async function publishPost(
         sourceRefId: s.sourceRefId,
       });
     } else if (s.sourceType === 'library') {
-      // Library photos are compressed to a data URL at pick time, so we reference
-      // it directly (no canvas render). In local mode the data URL is stored
-      // inline; backend mode should upload it so the NSFW scan still runs.
-      if (!s.previewUrl) throw new FeedPublishError('Library photo missing', 'unknown');
+      // Own photo: upload the ORIGINAL file through the same pipeline as boards
+      // (NSFW scan + thumbnail + CDN url) and reference it by feedImageId — never
+      // ship the raw data URL. Falls back to the compressed preview only if the
+      // original file was lost (e.g. restored from an older cached selection).
+      const file =
+        s.file ??
+        (s.previewUrl ? await dataUrlToFile(s.previewUrl, `feed-library-${i}.jpg`) : null);
+      if (!file) throw new FeedPublishError('Library photo missing', 'unknown');
+      let up;
+      try {
+        up = await uploadFeedImage(file, i);
+      } catch (e) {
+        throw new FeedPublishError((e as Error).message || 'Upload failed', 'upload_failed');
+      }
+      if (up.safetyFlag === 'BLOCKED') throw new FeedPublishError('Image blocked by moderation', 'nsfw_blocked');
+      if (up.status !== 'COMPLETED' || !up.feedImageId) {
+        throw new FeedPublishError(up.failureReason ?? 'Upload failed', 'upload_failed');
+      }
       images.push({
         sourceType: 'library',
         position: i,
-        imageUrl: s.previewUrl,
+        imageId: up.feedImageId,
         sourceRefId: s.sourceRefId,
       });
     } else {
@@ -117,4 +133,11 @@ export async function publishPost(
 /** Whether any selected source is a real-photo try-on (drives the privacy notice). */
 export function containsRealPhoto(sources: SelectedSource[]): boolean {
   return sources.some((s) => s.sourceType === 'tryon');
+}
+
+/** Fallback: turn a cached data-URL preview back into a File for upload. */
+async function dataUrlToFile(dataUrl: string, filename: string): Promise<File> {
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+  return new File([blob], filename, { type: blob.type || 'image/jpeg' });
 }
