@@ -7,11 +7,17 @@ import { saveImageToGallery } from '@/lib/flutter-bridge';
  * Mirrors the on-screen 3:4 canvas geometry (35% item width, % positions, scale).
  */
 export async function captureCanvasSnapshot(layout: SavedCanvasLayout, allItems: ClosetItem[]): Promise<Blob> {
-  const W = 400, H = 533;
+  // Render at 3× the on-screen 3:4 geometry so the flat-lay stays crisp when the
+  // feed shows it as a full-bleed poster (400×533 upscaled looked blurry). PNG is
+  // lossless, so the only quality limit is the source item images themselves.
+  const SCALE = 3;
+  const W = 400 * SCALE, H = 533 * SCALE;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d')!;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, H);
 

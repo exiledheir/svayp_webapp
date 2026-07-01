@@ -182,7 +182,8 @@ function CreateFeedPost() {
         key: `library:${id}`,
         sourceType: 'library',
         sourceRefId: `library:${id}`,
-        previewUrl: dataUrl,
+        previewUrl: dataUrl,   // compressed — thumbnail for the picker only
+        file,                  // original — uploaded at full quality on publish
       };
       setSources((prev) => ({ ...prev, library: [source, ...prev.library] }));
       // Auto-select the just-added photo so it lands in the post.
