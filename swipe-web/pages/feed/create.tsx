@@ -23,9 +23,9 @@ const PICK = 0, COMPOSE = 1, PUBLISHED = 2;
 const K_ITEMS = 'feed_src_items_v1';
 const K_BOARDS = 'feed_src_boards_v1';
 const K_TRYONS = 'feed_src_tryons_v1';
-// User-uploaded library photos (persisted as data URLs, newest first, capped).
-const LIB_KEY = 'feed_library_photos_v1';
-const LIB_CAP = 12;
+// Legacy key for previously-cached library photos — purged on mount; we no
+// longer persist device-picked photos (they're kept in memory per compose).
+const LEGACY_LIB_KEY = 'feed_library_photos_v1';
 
 type BoardContent = Awaited<ReturnType<typeof getOutfitCanvases>>['content'];
 type TryonContent = Awaited<ReturnType<typeof getTryOnJobHistory>>['content'];
@@ -38,35 +38,6 @@ const normalizeBlobUrl = (u?: string | null): string => {
   const q = u.indexOf('?');
   return q === -1 ? u.replace(/%2F/gi, '/') : u.slice(0, q).replace(/%2F/gi, '/') + u.slice(q);
 };
-
-interface LibPhoto {
-  id: string;
-  dataUrl: string;
-}
-function readLibrary(): LibPhoto[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    return JSON.parse(localStorage.getItem(LIB_KEY) || '[]') as LibPhoto[];
-  } catch {
-    return [];
-  }
-}
-function writeLibrary(arr: LibPhoto[]): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(LIB_KEY, JSON.stringify(arr.slice(0, LIB_CAP)));
-  } catch {
-    /* quota — best effort */
-  }
-}
-function libToSources(arr: LibPhoto[]): SelectedSource[] {
-  return arr.map((p) => ({
-    key: `library:${p.id}`,
-    sourceType: 'library',
-    sourceRefId: `library:${p.id}`,
-    previewUrl: p.dataUrl,
-  }));
-}
 
 function CreateFeedPost() {
   const router = useRouter();
@@ -161,16 +132,16 @@ function CreateFeedPost() {
             resultImageUrl: j.resultImageUrl as string,
           }));
 
-        const librarySources = libToSources(readLibrary());
-
         setAllItems(items);
-        setSources({ board: boardSources, tryon: tryonSources, library: librarySources });
+        // Library photos live only in component state (never cached) — keep any
+        // added this session; only boards/outfits are (re)loaded here.
+        setSources((prev) => ({ board: boardSources, tryon: tryonSources, library: prev.library }));
 
         // Seed from a closet deep-link (?seed=board:<id> etc.) → pre-select + COMPOSE.
         if (opts.applySeed) {
           const seed = typeof router.query.seed === 'string' ? router.query.seed : null;
           if (seed) {
-            const all = [...boardSources, ...tryonSources, ...librarySources];
+            const all = [...boardSources, ...tryonSources];
             const match = all.find((s) => s.key === seed);
             if (match) {
               setSelected([match]);
@@ -187,6 +158,12 @@ function CreateFeedPost() {
 
   React.useEffect(() => {
     logAnalyticsEvent(Events.FEED_POST_CREATE_STARTED);
+    // Drop any library photos cached by older builds — we don't persist them now.
+    try {
+      localStorage.removeItem(LEGACY_LIB_KEY);
+    } catch {
+      /* ignore */
+    }
     buildAndSet({ applySeed: true });
   }, [buildAndSet]);
 
@@ -199,14 +176,17 @@ function CreateFeedPost() {
   async function handleAddLibraryPhoto(file: File) {
     try {
       const dataUrl = await fileToCompressedDataUrl(file);
-      const photo: LibPhoto = { id: `${Date.now()}_${Math.round(Math.random() * 1e6)}`, dataUrl };
-      const arr = [photo, ...readLibrary()].slice(0, LIB_CAP);
-      writeLibrary(arr);
-      const libSources = libToSources(arr);
-      setSources((prev) => ({ ...prev, library: libSources }));
+      const id = `${Date.now()}_${Math.round(Math.random() * 1e6)}`;
+      // Kept in component state only for this composing session — NOT persisted.
+      const source: SelectedSource = {
+        key: `library:${id}`,
+        sourceType: 'library',
+        sourceRefId: `library:${id}`,
+        previewUrl: dataUrl,
+      };
+      setSources((prev) => ({ ...prev, library: [source, ...prev.library] }));
       // Auto-select the just-added photo so it lands in the post.
-      const added = libSources[0];
-      setSelected((prev) => (prev.some((p) => p.key === added.key) ? prev : [...prev, added]));
+      setSelected((prev) => [...prev, source]);
       logAnalyticsEvent(Events.FEED_SOURCE_SELECTED, { [Params.FEED_SOURCE_TYPE]: 'library' });
     } catch {
       /* ignore unreadable image */

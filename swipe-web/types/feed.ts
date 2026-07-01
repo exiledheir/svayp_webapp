@@ -39,10 +39,20 @@ export interface FeedPost {
   caption: string | null; // ≤150 chars
   likesCount: number;
   isLiked: boolean; // resolved for the current user
+  commentsCount: number; // number of comments on the post
   containsRealPhoto: boolean; // true if any image is a try-on (real photo)
   status: FeedPostStatus;
   isOwner: boolean; // resolved server-side
   createdAt: string; // ISO; feed sorted by this desc
+}
+
+/** A comment on a feed post. */
+export interface FeedComment {
+  id: string;
+  postId: string;
+  author: FeedAuthor;
+  text: string;
+  createdAt: string; // ISO
 }
 
 export interface FeedProfile {
@@ -54,7 +64,20 @@ export interface FeedProfile {
   phoneNumber: string | null; // from the authenticated user; shown on own profile only
   postsCount: number; // «Образов»
   likesTotal: number; // «Лайков» — sum across the user's posts (server-computed)
+  followersCount: number; // «Подписчиков» — users following this profile
+  followingCount: number; // «Подписок» — users this profile follows
+  isFollowing: boolean; // does the current user follow this profile? (false for own)
   isOwn: boolean;
+}
+
+/** A row in a followers list. */
+export interface FeedFollowUser {
+  userId: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+  isFollowing: boolean; // does the current (logged-in) user follow this person?
+  isOwn: boolean; // is this row the current user?
 }
 
 // ── Create-post request ──────────────────────────────────────────────────────

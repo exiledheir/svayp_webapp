@@ -1,8 +1,8 @@
 import React from 'react';
-import { X, ChevronLeft, ChevronRight, Info, Plus, LayoutGrid, Camera, CalendarDays, Images, type LucideIcon } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Plus, LayoutGrid, Camera, CalendarDays, Images, type LucideIcon } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import type { ClosetItem } from '@/lib/closet-storage';
-import { containsRealPhoto, type SelectedSource } from '@/lib/feed-publish';
+import { type SelectedSource } from '@/lib/feed-publish';
 import OutfitThumb from '@/components/feed/OutfitThumb';
 import type { FeedSourceType } from '@/types/feed';
 
@@ -27,7 +27,7 @@ interface Props {
 
 const MAX_CAPTION = 150;
 
-/** Final compose step: ordered image carousel, caption, privacy notice, CTA. */
+/** Final compose step: ordered image carousel, caption + description, CTA. */
 export default function ComposeSheet({
   sources,
   items,
@@ -40,7 +40,6 @@ export default function ComposeSheet({
   publishing,
 }: Props) {
   const { t } = useI18n();
-  const hasRealPhoto = containsRealPhoto(sources);
 
   const typeLabel: Record<FeedSourceType, string> = {
     board: t.tabBoards,
@@ -131,7 +130,11 @@ export default function ComposeSheet({
 
         {/* Caption */}
         <div className="mt-4">
+          <label htmlFor="feed-caption" className="block text-[13px] font-semibold text-black/70 dark:text-white/70 mb-1.5">
+            {t.feed_caption_label}
+          </label>
           <textarea
+            id="feed-caption"
             value={caption}
             onChange={(e) => onCaptionChange(e.target.value.slice(0, MAX_CAPTION))}
             placeholder={t.feed_caption_placeholder}
@@ -141,18 +144,6 @@ export default function ComposeSheet({
           <div className="text-right text-[12px] text-black/40 dark:text-white/40 mt-1">
             {caption.length}/{MAX_CAPTION}
           </div>
-        </div>
-
-        {/* Privacy notice */}
-        <div
-          className="flex items-start gap-2 mt-2 p-3 rounded-xl text-[12.5px] leading-snug"
-          style={{
-            background: hasRealPhoto ? 'rgba(243,112,167,0.10)' : 'rgba(0,0,0,0.04)',
-            color: hasRealPhoto ? '#C13B7F' : 'rgba(0,0,0,0.55)',
-          }}
-        >
-          <Info size={15} className="shrink-0 mt-0.5" />
-          <span>{hasRealPhoto ? t.feed_privacy_notice_realphoto : t.feed_privacy_notice_flatlay}</span>
         </div>
       </div>
 
