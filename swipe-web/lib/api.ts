@@ -472,6 +472,21 @@ export async function createSupportChat(): Promise<{ id: string }> {
   return { id: d.id as string };
 }
 
+/**
+ * Open (or reuse) a direct 1:1 chat with another user — e.g. the "Message"
+ * action on a feed profile. Backend: POST /chats/direct { recipientUserId,
+ * initialMessage? } → ApiResponse.of({ id, ... }). The caller hands the thread
+ * off to the native chat module (see lib/direct-chat.ts), mirroring support and
+ * marketplace chats.
+ */
+export async function createDirectChat(recipientUserId: string, initialMessage?: string): Promise<{ id: string }> {
+  const body: Record<string, unknown> = { recipientUserId };
+  if (initialMessage) body.initialMessage = initialMessage;
+  const res = await api.post('/chats/direct', body);
+  const d = unwrapSingle(res.data) as Record<string, unknown>;
+  return { id: d.id as string };
+}
+
 export async function placeOrder(opts: {
   deliveryMethod: 'PICKUP' | 'DELIVERY';
   paymentMethod: 'CASH' | 'CARD';

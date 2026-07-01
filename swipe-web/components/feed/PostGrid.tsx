@@ -24,7 +24,7 @@ export default function PostGrid({ posts, emptyHint }: Props) {
         return (
           <button
             key={post.id}
-            onClick={() => router.push(`/feed/p/${post.id}`)}
+            onClick={() => router.push(`/feed/p/${post.id}?from=${encodeURIComponent(router.asPath)}`)}
             className="relative"
             style={{ aspectRatio: '3/4', background: '#F7F7F8' }}
           >

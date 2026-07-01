@@ -507,6 +507,7 @@ export interface Translations {
   feed_add_tryon_cta: string;
   feed_add_tryon_skip: string;
   feed_caption_placeholder: string;
+  feed_caption_label: string;
   feed_compose_title: string;
   feed_compose_subtitle: string;
   feed_privacy_notice_flatlay: string;
@@ -536,6 +537,25 @@ export interface Translations {
   feed_cancel: string;
   feed_profile_posts: string;
   feed_profile_likes: string;
+  feed_profile_followers: string;
+  feed_follow: string;
+  feed_following: string;
+  feed_message: string;
+  feed_followers_title: string;
+  feed_followers_empty: string;
+  feed_profile_following: string;
+  feed_following_title: string;
+  feed_following_empty: string;
+  feed_activity_title: string;
+  feed_tab_liked: string;
+  feed_tab_commented: string;
+  feed_liked_empty: string;
+  feed_commented_empty: string;
+  feed_comments_title: string;
+  feed_comments_empty: string;
+  feed_view_comments: string;
+  feed_add_comment_ph: string;
+  feed_comment_send: string;
   feed_edit_profile: string;
   feed_profile_empty: string;
   feed_display_name: string;
@@ -742,6 +762,7 @@ const en: Translations = {
   feed_no_sources: 'Nothing to post yet — create an outfit first.',
   feed_next: 'Next',
   feed_caption_placeholder: 'Add a caption… e.g. "office look for summer"',
+  feed_caption_label: 'Description',
   feed_compose_title: 'Post outfit',
   feed_compose_subtitle: 'Other members will see it in the feed',
   feed_privacy_notice_flatlay: 'A mannequin flat-lay is posted — without your personal photo.',
@@ -771,6 +792,25 @@ const en: Translations = {
   feed_cancel: 'Cancel',
   feed_profile_posts: 'Outfits',
   feed_profile_likes: 'Likes',
+  feed_profile_followers: 'Followers',
+  feed_follow: 'Follow',
+  feed_following: 'Following',
+  feed_message: 'Message',
+  feed_followers_title: 'Followers',
+  feed_followers_empty: 'No followers yet',
+  feed_profile_following: 'Following',
+  feed_following_title: 'Following',
+  feed_following_empty: 'Not following anyone yet',
+  feed_activity_title: 'Activity',
+  feed_tab_liked: 'Liked',
+  feed_tab_commented: 'Commented',
+  feed_liked_empty: 'No liked posts yet',
+  feed_commented_empty: 'No commented posts yet',
+  feed_comments_title: 'Comments',
+  feed_comments_empty: 'No comments yet',
+  feed_view_comments: 'View all {n} comments',
+  feed_add_comment_ph: 'Add a comment…',
+  feed_comment_send: 'Post',
   feed_edit_profile: 'Edit profile',
   feed_profile_empty: 'No posts yet',
   feed_display_name: 'Name',
@@ -1363,6 +1403,7 @@ const ru: Translations = {
   feed_no_sources: 'Пока нечего публиковать — сначала создайте образ.',
   feed_next: 'Далее',
   feed_caption_placeholder: 'Добавьте подпись… напр. «деловой образ на лето»',
+  feed_caption_label: 'Описание',
   feed_compose_title: 'Опубликовать образ',
   feed_compose_subtitle: 'Его увидят другие участники ленты',
   feed_privacy_notice_flatlay: 'Публикуется образ на манекене — без вашего личного фото.',
@@ -1392,6 +1433,25 @@ const ru: Translations = {
   feed_cancel: 'Отмена',
   feed_profile_posts: 'Образов',
   feed_profile_likes: 'Лайков',
+  feed_profile_followers: 'Подписчиков',
+  feed_follow: 'Подписаться',
+  feed_following: 'Вы подписаны',
+  feed_message: 'Написать',
+  feed_followers_title: 'Подписчики',
+  feed_followers_empty: 'Пока нет подписчиков',
+  feed_profile_following: 'Подписки',
+  feed_following_title: 'Подписки',
+  feed_following_empty: 'Пока ни на кого не подписаны',
+  feed_activity_title: 'Активность',
+  feed_tab_liked: 'Лайки',
+  feed_tab_commented: 'Комментарии',
+  feed_liked_empty: 'Пока нет лайков',
+  feed_commented_empty: 'Пока нет комментариев',
+  feed_comments_title: 'Комментарии',
+  feed_comments_empty: 'Пока нет комментариев',
+  feed_view_comments: 'Смотреть все комментарии ({n})',
+  feed_add_comment_ph: 'Добавьте комментарий…',
+  feed_comment_send: 'Отпр.',
   feed_edit_profile: 'Редактировать профиль',
   feed_profile_empty: 'Пока нет публикаций',
   feed_display_name: 'Имя',
@@ -1985,6 +2045,7 @@ const uz: Translations = {
   feed_no_sources: "Hozircha joylashga narsa yo'q — avval obraz yarating.",
   feed_next: 'Keyingi',
   feed_caption_placeholder: 'Izoh qoʻshing… masalan, «yoz uchun ish obrazi»',
+  feed_caption_label: 'Tavsif',
   feed_compose_title: 'Obrazni joylash',
   feed_compose_subtitle: "Uni lentadagi boshqalar ko'radi",
   feed_privacy_notice_flatlay: 'Manekendagi obraz joylanadi — shaxsiy suratingizsiz.',
@@ -2014,6 +2075,25 @@ const uz: Translations = {
   feed_cancel: 'Bekor qilish',
   feed_profile_posts: 'Obraz',
   feed_profile_likes: 'Layk',
+  feed_profile_followers: 'Obunachi',
+  feed_follow: 'Obuna bo‘lish',
+  feed_following: 'Obuna bo‘lingan',
+  feed_message: 'Yozish',
+  feed_followers_title: 'Obunachilar',
+  feed_followers_empty: 'Hozircha obunachi yo‘q',
+  feed_profile_following: 'Obunalar',
+  feed_following_title: 'Obunalar',
+  feed_following_empty: 'Hozircha hech kimga obuna bo‘lmagan',
+  feed_activity_title: 'Faoliyat',
+  feed_tab_liked: 'Yoqtirilgan',
+  feed_tab_commented: 'Izohlangan',
+  feed_liked_empty: 'Hozircha yoqtirilgan post yo‘q',
+  feed_commented_empty: 'Hozircha izoh qoldirilgan post yo‘q',
+  feed_comments_title: 'Izohlar',
+  feed_comments_empty: 'Hozircha izohlar yo‘q',
+  feed_view_comments: 'Barcha {n} izohni ko‘rish',
+  feed_add_comment_ph: 'Izoh qo‘shing…',
+  feed_comment_send: 'Joylash',
   feed_edit_profile: 'Profilni tahrirlash',
   feed_profile_empty: "Hozircha post yo'q",
   feed_display_name: 'Ism',

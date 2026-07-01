@@ -11,6 +11,9 @@ import type {
   FeedPost,
   FeedPostImage,
   FeedProfile,
+  FeedFollowUser,
+  FeedComment,
+  FeedAuthor,
   CreatePostPayload,
   UpdateProfilePayload,
 } from '@/types/feed';
@@ -20,6 +23,10 @@ const POSTS_KEY = 'svayp_feed_posts';
 const PROFILE_KEY = 'svayp_feed_profile';
 const HIDDEN_KEY = 'svayp_feed_hidden';
 const SEEDED_KEY = 'svayp_feed_seeded';
+const FOLLOWERS_KEY = 'svayp_feed_followers'; // { [userId]: StoredFollower[] }
+const FOLLOW_SEEDED_KEY = 'svayp_feed_follow_seeded';
+const COMMENTED_KEY = 'svayp_feed_commented'; // string[] of post ids the user commented on
+const COMMENTS_KEY = 'svayp_feed_comments'; // { [postId]: FeedComment[] }
 
 /** Local-storage mode until the backend /feed/* endpoints exist. */
 export function isFeedLocalMode(): boolean {
@@ -79,6 +86,9 @@ function defaultProfile(): FeedProfile {
     phoneNumber: m.phoneNumber,
     postsCount: 0,
     likesTotal: 0,
+    followersCount: followersOf(m.id).length,
+    followingCount: followingCountOf(m.id),
+    isFollowing: false,
     isOwn: true,
   };
 }
@@ -104,6 +114,7 @@ function seedPosts(): FeedPost[] {
       caption: 'Джинсовая рубашка + широкие брюки 🤍',
       likesCount: 0,
       isLiked: false,
+      commentsCount: 0,
       containsRealPhoto: true,
       status: 'active',
       isOwner: false,
@@ -137,6 +148,104 @@ function paginate<T>(items: T[], pageNum: number, size: number): Page<T> {
   };
 }
 
+// ── follow model (local demo) ─────────────────────────────────────────────────
+// Followers are stored per user: { [userId]: StoredFollower[] }. In local mode
+// the only real actor is the signed-in user, so we seed a few demo followers for
+// the showcase author and the current user, and model follow/unfollow by adding
+// or removing the current user from a target's follower list.
+interface StoredFollower {
+  userId: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+type FollowersMap = Record<string, StoredFollower[]>;
+
+const DEMO_FOLLOWERS: StoredFollower[] = [
+  { userId: 'u_aisha', username: 'aisha.mode', displayName: 'Aisha', avatarUrl: null },
+  { userId: 'u_nigora', username: 'nigora_style', displayName: 'Nigora', avatarUrl: null },
+  { userId: 'u_kamila', username: 'kamila.k', displayName: 'Kamila', avatarUrl: null },
+  { userId: 'u_madina', username: 'madina_looks', displayName: 'Madina', avatarUrl: null },
+  { userId: 'u_sabina', username: 'sabina.fashion', displayName: 'Sabina', avatarUrl: null },
+];
+
+function writeFollowers(map: FollowersMap): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(FOLLOWERS_KEY, JSON.stringify(map));
+  } catch {
+    /* ignore quota */
+  }
+}
+
+const FOLLOW_SEED_VERSION = 'v2';
+
+function ensureFollowSeed(): void {
+  if (typeof window === 'undefined') return;
+  if (localStorage.getItem(FOLLOW_SEEDED_KEY) === FOLLOW_SEED_VERSION) return;
+  localStorage.setItem(FOLLOW_SEEDED_KEY, FOLLOW_SEED_VERSION);
+  const map = readJSON<FollowersMap>(FOLLOWERS_KEY, {});
+  // Demo followers for the showcase author + current user (only if unset).
+  if (!map.u_libas_looks) map.u_libas_looks = DEMO_FOLLOWERS.slice(0, 4);
+  if (!map[me().id]) map[me().id] = DEMO_FOLLOWERS.slice(0, 2);
+  // Seed a few "following" for the current user (idempotent) so the Following
+  // list isn't empty: follow the showcase author + two demo accounts.
+  const meFollower = meAsFollower();
+  for (const followeeId of ['u_libas_looks', 'u_aisha', 'u_nigora']) {
+    const list = map[followeeId] ?? [];
+    if (!list.some((f) => f.userId === meFollower.userId)) list.unshift(meFollower);
+    map[followeeId] = list;
+  }
+  writeFollowers(map);
+}
+
+function readFollowers(): FollowersMap {
+  ensureFollowSeed();
+  return readJSON<FollowersMap>(FOLLOWERS_KEY, {});
+}
+
+function followersOf(userId: string): StoredFollower[] {
+  return readFollowers()[userId] ?? [];
+}
+function amFollowing(userId: string): boolean {
+  const meId = me().id;
+  return followersOf(userId).some((f) => f.userId === meId);
+}
+function meAsFollower(): StoredFollower {
+  const p = loadMyProfile();
+  return { userId: p.userId, username: p.username, displayName: p.displayName, avatarUrl: p.avatarUrl };
+}
+
+/** User ids the given user follows (i.e. follower lists that contain them). */
+function followeesOf(userId: string): string[] {
+  const map = readFollowers();
+  return Object.keys(map).filter((fid) => (map[fid] ?? []).some((f) => f.userId === userId));
+}
+function followingCountOf(userId: string): number {
+  return followeesOf(userId).length;
+}
+
+/** Best-effort resolve a userId → display info (current user, demo pool, a post
+ *  author, or any stored follower entry). */
+function resolveUser(userId: string): StoredFollower {
+  const meId = me().id;
+  if (userId === meId) {
+    const p = loadMyProfile();
+    return { userId: p.userId, username: p.username, displayName: p.displayName, avatarUrl: p.avatarUrl };
+  }
+  const demo = DEMO_FOLLOWERS.find((d) => d.userId === userId);
+  if (demo) return demo;
+  const post = readPosts().find((p) => p.author.id === userId);
+  if (post) {
+    return { userId, username: post.author.username, displayName: post.author.displayName, avatarUrl: post.author.avatarUrl };
+  }
+  for (const list of Object.values(readFollowers())) {
+    const hit = list.find((f) => f.userId === userId);
+    if (hit) return hit;
+  }
+  return { userId, username: userId, displayName: userId, avatarUrl: null };
+}
+
 function loadMyProfile(): FeedProfile {
   const stored = readJSON<FeedProfile | null>(PROFILE_KEY, null);
   const base = stored ?? defaultProfile();
@@ -152,6 +261,9 @@ function loadMyProfile(): FeedProfile {
     isOwn: true,
     postsCount: mine.length,
     likesTotal: mine.reduce((s, p) => s + p.likesCount, 0),
+    followersCount: followersOf(base.userId).length,
+    followingCount: followingCountOf(base.userId),
+    isFollowing: false,
   };
 }
 
@@ -169,6 +281,9 @@ function profileFromPosts(match: (p: FeedPost) => boolean, fallback: Partial<Fee
       phoneNumber: null,
       postsCount: posts.length,
       likesTotal: posts.reduce((s, p) => s + p.likesCount, 0),
+      followersCount: followersOf(a.id).length,
+      followingCount: followingCountOf(a.id),
+      isFollowing: amFollowing(a.id),
       isOwn: a.id === m.userId,
     };
   }
@@ -181,6 +296,9 @@ function profileFromPosts(match: (p: FeedPost) => boolean, fallback: Partial<Fee
     phoneNumber: null,
     postsCount: 0,
     likesTotal: 0,
+    followersCount: fallback.userId ? followersOf(fallback.userId).length : 0,
+    followingCount: fallback.userId ? followingCountOf(fallback.userId) : 0,
+    isFollowing: fallback.userId ? amFollowing(fallback.userId) : false,
     isOwn: false,
   };
 }
@@ -221,6 +339,7 @@ export async function createPost(body: CreatePostPayload): Promise<FeedPost> {
     caption: body.caption ?? null,
     likesCount: 0,
     isLiked: false,
+    commentsCount: 0,
     containsRealPhoto: images.some((im) => im.sourceType === 'tryon'),
     status: 'active',
     isOwner: true,
@@ -248,6 +367,82 @@ export async function getUserPosts(userId: string, page = 0, size = 21): Promise
     .filter((p) => p.author.id === userId && p.status === 'active')
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   return paginate(posts, page, size);
+}
+
+/** Posts the current user has liked (newest first). */
+export async function getLikedPosts(page = 0, size = 21): Promise<Page<FeedPost>> {
+  const posts = readPosts()
+    .filter((p) => p.isLiked && p.status === 'active')
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  return paginate(posts, page, size);
+}
+
+/** Posts the current user has commented on. Comments aren't implemented yet, so
+ *  this reads a (currently empty) set of commented post ids — the tab is wired
+ *  and will populate as soon as a comment feature writes to COMMENTED_KEY. */
+export async function getCommentedPosts(page = 0, size = 21): Promise<Page<FeedPost>> {
+  const ids = new Set(readJSON<string[]>(COMMENTED_KEY, []));
+  const posts = readPosts()
+    .filter((p) => ids.has(p.id) && p.status === 'active')
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  return paginate(posts, page, size);
+}
+
+// ── Comments ────────────────────────────────────────────────────────────────
+type CommentsMap = Record<string, FeedComment[]>;
+
+/** Comments on a post, oldest first (newest lands at the bottom near the input). */
+export async function getComments(postId: string, page = 0, size = 50): Promise<Page<FeedComment>> {
+  const map = readJSON<CommentsMap>(COMMENTS_KEY, {});
+  const list = (map[postId] ?? []).slice().sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+  return paginate(list, page, size);
+}
+
+export async function addComment(postId: string, text: string): Promise<FeedComment> {
+  const prof = loadMyProfile();
+  const author: FeedAuthor = {
+    id: prof.userId,
+    username: prof.username,
+    displayName: prof.displayName,
+    avatarUrl: prof.avatarUrl,
+  };
+  const comment: FeedComment = {
+    id: `c_${Date.now()}_${Math.round(Math.random() * 1e6)}`,
+    postId,
+    author,
+    text: text.trim(),
+    createdAt: new Date().toISOString(),
+  };
+
+  const map = readJSON<CommentsMap>(COMMENTS_KEY, {});
+  map[postId] = [...(map[postId] ?? []), comment];
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(COMMENTS_KEY, JSON.stringify(map));
+    } catch {
+      /* ignore quota */
+    }
+  }
+
+  // Keep the post's commentsCount in sync and mark it commented so it shows in
+  // the profile-activity "Commented" tab.
+  const posts = readPosts();
+  const post = posts.find((p) => p.id === postId);
+  if (post) {
+    post.commentsCount = (post.commentsCount ?? 0) + 1;
+    writePosts(posts);
+  }
+  const commented = new Set(readJSON<string[]>(COMMENTED_KEY, []));
+  commented.add(postId);
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(COMMENTED_KEY, JSON.stringify([...commented]));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return comment;
 }
 
 export async function getProfile(userId: string): Promise<FeedProfile> {
@@ -320,4 +515,48 @@ export async function hideUserPosts(userId: string): Promise<void> {
 export async function unhideUserPosts(userId: string): Promise<void> {
   const hidden = readJSON<string[]>(HIDDEN_KEY, []).filter((id) => id !== userId);
   localStorage.setItem(HIDDEN_KEY, JSON.stringify(hidden));
+}
+
+// ── Follow ─────────────────────────────────────────────────────────────────────
+export async function toggleFollow(userId: string): Promise<{ isFollowing: boolean; followersCount: number }> {
+  const map = readFollowers();
+  const meId = me().id;
+  const list = map[userId] ?? [];
+  const idx = list.findIndex((f) => f.userId === meId);
+  if (idx >= 0) list.splice(idx, 1);
+  else list.unshift(meAsFollower());
+  map[userId] = list;
+  writeFollowers(map);
+  return { isFollowing: idx < 0, followersCount: list.length };
+}
+
+export async function getFollowers(userId: string, page = 0, size = 30): Promise<Page<FeedFollowUser>> {
+  const map = readFollowers();
+  const meId = me().id;
+  const rows: FeedFollowUser[] = (map[userId] ?? []).map((f) => ({
+    userId: f.userId,
+    username: f.username,
+    displayName: f.displayName,
+    avatarUrl: f.avatarUrl ?? null,
+    isOwn: f.userId === meId,
+    isFollowing: (map[f.userId] ?? []).some((x) => x.userId === meId),
+  }));
+  return paginate(rows, page, size);
+}
+
+export async function getFollowing(userId: string, page = 0, size = 30): Promise<Page<FeedFollowUser>> {
+  const map = readFollowers();
+  const meId = me().id;
+  const rows: FeedFollowUser[] = followeesOf(userId).map((fid) => {
+    const u = resolveUser(fid);
+    return {
+      userId: u.userId,
+      username: u.username,
+      displayName: u.displayName,
+      avatarUrl: u.avatarUrl ?? null,
+      isOwn: u.userId === meId,
+      isFollowing: (map[fid] ?? []).some((f) => f.userId === meId),
+    };
+  });
+  return paginate(rows, page, size);
 }

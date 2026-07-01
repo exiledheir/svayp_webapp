@@ -240,3 +240,14 @@ body.app-no-select [contenteditable]:not([contenteditable='false']) {
 }
 .ReactCrop__drag-handle.ord-e::after { right: -1px; }
 .ReactCrop__drag-handle.ord-w::after { left: -1px; }
+
+/* Instagram-style double-tap heart burst (feed posts). */
+@keyframes feed-heart-burst {
+  0%   { opacity: 0;    transform: scale(0.3); }
+  15%  { opacity: 0.95; transform: scale(1.15); }
+  30%  { opacity: 0.95; transform: scale(0.92); }
+  45%  { opacity: 0.95; transform: scale(1); }
+  75%  { opacity: 0.9;  transform: scale(1); }
+  100% { opacity: 0;    transform: scale(1); }
+}
+.feed-heart-burst { animation: feed-heart-burst 0.85s ease-in-out forwards; }

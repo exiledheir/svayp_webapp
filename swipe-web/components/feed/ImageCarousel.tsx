@@ -1,6 +1,6 @@
 import React from 'react';
 import Image from 'next/image';
-import { LayoutGrid, Camera, CalendarDays, Images, type LucideIcon } from 'lucide-react';
+import { LayoutGrid, Camera, CalendarDays, Images, Heart, type LucideIcon } from 'lucide-react';
 import CarouselDots from '@/components/market/CarouselDots';
 import { useI18n } from '@/lib/i18n';
 import type { FeedPostImage, FeedSourceType } from '@/types/feed';
@@ -10,7 +10,9 @@ interface Props {
   alt: string;
   /** CSS aspect-ratio for the frame. Default 4/5 (matches boards/try-ons). */
   aspectRatio?: string;
-  onClick?: () => void;
+  /** Instagram-style double-tap to like. Fires on every double-tap; the parent
+   *  decides whether to actually like. A heart animation plays regardless. */
+  onDoubleTapLike?: () => void;
 }
 
 const TYPE_ICON: Record<FeedSourceType, LucideIcon> = {
@@ -26,11 +28,33 @@ const TYPE_ICON: Record<FeedSourceType, LucideIcon> = {
  * source type (Board / Outfit / Calendar); multi-image posts get a chip row
  * below so viewers can see the mix and jump straight to an image.
  */
-export default function ImageCarousel({ images, alt, aspectRatio = '4/5', onClick }: Props) {
+export default function ImageCarousel({ images, alt, aspectRatio = '4/5', onDoubleTapLike }: Props) {
   const { t } = useI18n();
   const [idx, setIdx] = React.useState(0);
   const scrollerRef = React.useRef<HTMLDivElement>(null);
   const list = images.length ? images : [];
+
+  // Double-tap → like (Instagram). A quick second tap within 300ms fires the
+  // like and plays a heart burst; a single tap does nothing.
+  const lastTap = React.useRef(0);
+  const [burstKey, setBurstKey] = React.useState(0);
+  const [burst, setBurst] = React.useState(false);
+  const burstTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  React.useEffect(() => () => { if (burstTimer.current) clearTimeout(burstTimer.current); }, []);
+
+  function handleTap() {
+    const now = Date.now();
+    if (now - lastTap.current < 300) {
+      lastTap.current = 0;
+      onDoubleTapLike?.();
+      setBurstKey((k) => k + 1);
+      setBurst(true);
+      if (burstTimer.current) clearTimeout(burstTimer.current);
+      burstTimer.current = setTimeout(() => setBurst(false), 850);
+    } else {
+      lastTap.current = now;
+    }
+  }
 
   const typeLabel: Record<FeedSourceType, string> = {
     board: t.tabBoards,
@@ -48,12 +72,9 @@ export default function ImageCarousel({ images, alt, aspectRatio = '4/5', onClic
     if (el) el.scrollTo({ left: i * el.clientWidth, behavior: 'smooth' });
   }
 
-  const current = list[idx];
-  const CurrentIcon = current ? TYPE_ICON[current.sourceType] : null;
-
   return (
     <div>
-      <div className="relative" style={{ aspectRatio, background: '#F7F7F8' }} onClick={onClick}>
+      <div className="relative" style={{ aspectRatio, background: '#F7F7F8' }} onClick={handleTap}>
         <div
           ref={scrollerRef}
           className="absolute inset-0 flex overflow-x-auto hide-scrollbar"
@@ -74,18 +95,15 @@ export default function ImageCarousel({ images, alt, aspectRatio = '4/5', onClic
           ))}
         </div>
 
-        {/* Source-type pill for the currently visible image */}
-        {current && CurrentIcon && (
+        {burst && (
           <div
-            className="absolute top-2.5 left-2.5 flex items-center gap-1 px-2 py-1 rounded-full text-white text-[11px] font-semibold pointer-events-none"
-            style={{ background: 'rgba(0,0,0,0.55)' }}
+            key={burstKey}
+            className="feed-heart-burst pointer-events-none absolute inset-0 flex items-center justify-center z-20"
           >
-            <CurrentIcon size={12} />
-            <span>{typeLabel[current.sourceType]}</span>
+            <Heart size={92} strokeWidth={1.5} style={{ color: '#F370A7', fill: '#F370A7', filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.25))' }} />
           </div>
         )}
-
-        <CarouselDots count={images.length} active={idx} />
+        <CarouselDots count={images.length} active={idx} variant="dark" />
       </div>
 
       {/* Per-image navigation chips (only when there's more than one) */}

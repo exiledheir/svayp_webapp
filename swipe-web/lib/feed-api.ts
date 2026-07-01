@@ -13,6 +13,8 @@ import type { SseHandle } from '@/types';
 import type {
   FeedPost,
   FeedProfile,
+  FeedFollowUser,
+  FeedComment,
   FeedReportReason,
   CreatePostPayload,
   UpdateProfilePayload,
@@ -87,6 +89,29 @@ export async function getUserPosts(userId: string, page = 0, size = 21): Promise
   return asPage<FeedPost>(await api.get(`/feed/users/${userId}/posts`, { params: { page, size } }));
 }
 
+/** Posts the current user has liked (the ♥ tab on the activity screen). */
+export async function getLikedPosts(page = 0, size = 21): Promise<Page<FeedPost>> {
+  if (isFeedLocalMode()) return local.getLikedPosts(page, size);
+  return asPage<FeedPost>(await api.get('/feed/posts/liked', { params: { page, size } }));
+}
+
+/** Posts the current user has commented on (the comment tab on activity). */
+export async function getCommentedPosts(page = 0, size = 21): Promise<Page<FeedPost>> {
+  if (isFeedLocalMode()) return local.getCommentedPosts(page, size);
+  return asPage<FeedPost>(await api.get('/feed/posts/commented', { params: { page, size } }));
+}
+
+// ── Comments ─────────────────────────────────────────────────────────────────
+export async function getComments(postId: string, page = 0, size = 50): Promise<Page<FeedComment>> {
+  if (isFeedLocalMode()) return local.getComments(postId, page, size);
+  return asPage<FeedComment>(await api.get(`/feed/posts/${postId}/comments`, { params: { page, size } }));
+}
+
+export async function addComment(postId: string, text: string): Promise<FeedComment> {
+  if (isFeedLocalMode()) return local.addComment(postId, text);
+  return unwrap<FeedComment>(await api.post(`/feed/posts/${postId}/comments`, { text }));
+}
+
 // ── Profiles ─────────────────────────────────────────────────────────────────
 export async function getProfile(userId: string): Promise<FeedProfile> {
   if (isFeedLocalMode()) return local.getProfile(userId);
@@ -136,6 +161,26 @@ export async function hideUserPosts(userId: string): Promise<void> {
 export async function unhideUserPosts(userId: string): Promise<void> {
   if (isFeedLocalMode()) return local.unhideUserPosts(userId);
   await api.delete(`/feed/users/${userId}/hide`);
+}
+
+// ── Follow ─────────────────────────────────────────────────────────────────────
+// Toggle returns the authoritative relationship + count so the UI can reconcile
+// an optimistic flip.
+export async function toggleFollow(userId: string): Promise<{ isFollowing: boolean; followersCount: number }> {
+  if (isFeedLocalMode()) return local.toggleFollow(userId);
+  return unwrap<{ isFollowing: boolean; followersCount: number }>(
+    await api.post(`/feed/users/${userId}/toggle-follow`),
+  );
+}
+
+export async function getFollowers(userId: string, page = 0, size = 30): Promise<Page<FeedFollowUser>> {
+  if (isFeedLocalMode()) return local.getFollowers(userId, page, size);
+  return asPage<FeedFollowUser>(await api.get(`/feed/users/${userId}/followers`, { params: { page, size } }));
+}
+
+export async function getFollowing(userId: string, page = 0, size = 30): Promise<Page<FeedFollowUser>> {
+  if (isFeedLocalMode()) return local.getFollowing(userId, page, size);
+  return asPage<FeedFollowUser>(await api.get(`/feed/users/${userId}/following`, { params: { page, size } }));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
