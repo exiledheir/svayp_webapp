@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { X, Sparkles, Loader2, RefreshCw, User, Camera } from 'lucide-react';
+import { X, Sparkles, Loader2, RefreshCw, User, Camera, Check } from 'lucide-react';
 import type { ClosetItem } from '@/lib/closet-storage';
 import type { SavedCanvasLayout } from '@/lib/closet-types';
 import { useI18n } from '@/lib/i18n';
@@ -109,7 +109,7 @@ export function TryOnConfirmModal({
       onClick={handleCancel}
     >
       <div
-        className="w-full max-w-[430px] rounded-t-3xl bg-white shadow-2xl"
+        className="w-full max-w-[430px] rounded-t-3xl bg-white shadow-2xl max-h-[94vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Drag handle */}
@@ -120,7 +120,7 @@ export function TryOnConfirmModal({
         {/* Outfit preview */}
         <div
           className="mx-5 rounded-2xl overflow-hidden bg-white flex items-center justify-center"
-          style={{ height: 260, border: '1px solid #f3f4f6' }}
+          style={{ height: 220, border: '1px solid #f3f4f6' }}
         >
           <div className="relative h-full" style={{ aspectRatio: '3 / 4', maxWidth: '100%' }}>
             {displayEntries.map((entry, idx) => (
@@ -150,83 +150,96 @@ export function TryOnConfirmModal({
           <p className="text-[13px] text-gray-400 mt-1">{t.tryOnConfirmBody}</p>
         </div>
 
-        {/* Target selector — mannequin vs your own photo */}
-        <div className="px-5 pt-1 pb-1 flex flex-col gap-2">
+        {/* Target selector — two option cards: mannequin vs your own photo */}
+        <div className="px-5 pt-1 pb-1 grid grid-cols-2 gap-3 items-stretch">
+          {/* Card: on a mannequin */}
           <button
             onClick={() => setTarget('mannequin')}
-            className="w-full flex items-center gap-3 p-3 rounded-2xl border text-left transition-colors"
+            className="relative flex flex-col items-center text-center gap-2 rounded-2xl border p-3.5 transition-all"
             style={{
               borderColor: target === 'mannequin' ? '#F370A7' : '#eee',
+              borderWidth: target === 'mannequin' ? 2 : 1,
               background: target === 'mannequin' ? 'rgba(243,112,167,0.06)' : '#fff',
+              boxShadow: target === 'mannequin' ? '0 4px 16px rgba(243,112,167,0.14)' : 'none',
             }}
           >
-            <span className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(243,112,167,0.10)' }}>
-              <User size={18} className="text-[#F370A7]" />
+            <SelectBadge active={target === 'mannequin'} />
+            <span className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'rgba(243,112,167,0.10)' }}>
+              <User size={22} className="text-[#F370A7]" />
             </span>
-            <span className="flex-1">
-              <span className="block text-[13px] font-semibold text-gray-900">{t.tryOnTargetMannequin}</span>
-              <span className="block text-[11px] text-gray-400">{t.tryOnTargetMannequinHint}</span>
-            </span>
-            <span
-              className="w-4 h-4 rounded-full border-2 shrink-0"
-              style={{ borderColor: target === 'mannequin' ? '#F370A7' : '#d1d5db', background: target === 'mannequin' ? '#F370A7' : 'transparent' }}
-            />
+            <span className="block text-[13px] font-semibold text-gray-900 leading-tight">{t.tryOnTargetMannequin}</span>
+            <span className="block text-[11px] text-gray-400 leading-snug">{t.tryOnTargetMannequinHint}</span>
           </button>
 
+          {/* Card: on my photo */}
           <button
             onClick={() => setTarget('self')}
-            className="w-full flex items-center gap-3 p-3 rounded-2xl border text-left transition-colors"
+            className="relative flex flex-col items-center text-center gap-2 rounded-2xl border p-3.5 transition-all"
             style={{
               borderColor: target === 'self' ? '#F370A7' : '#eee',
+              borderWidth: target === 'self' ? 2 : 1,
               background: target === 'self' ? 'rgba(243,112,167,0.06)' : '#fff',
+              boxShadow: target === 'self' ? '0 4px 16px rgba(243,112,167,0.14)' : 'none',
             }}
           >
-            <span className="w-9 h-9 rounded-full overflow-hidden flex items-center justify-center shrink-0" style={{ background: 'rgba(243,112,167,0.10)' }}>
+            <SelectBadge active={target === 'self'} />
+            <span className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center" style={{ background: 'rgba(243,112,167,0.10)' }}>
               {photoPreview ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={photoPreview} alt="" className="w-full h-full object-cover" />
               ) : (
-                <Camera size={18} className="text-[#F370A7]" />
+                <Camera size={22} className="text-[#F370A7]" />
               )}
             </span>
-            <span className="flex-1">
-              <span className="block text-[13px] font-semibold text-gray-900">{t.tryOnTargetSelf}</span>
-              <span className="block text-[11px] text-gray-400">{t.tryOnTargetSelfHint}</span>
-            </span>
-            <span
-              className="w-4 h-4 rounded-full border-2 shrink-0"
-              style={{ borderColor: target === 'self' ? '#F370A7' : '#d1d5db', background: target === 'self' ? '#F370A7' : 'transparent' }}
-            />
+            <span className="block text-[13px] font-semibold text-gray-900 leading-tight">{t.tryOnTargetSelf}</span>
+            <span className="block text-[11px] text-gray-400 leading-snug">{t.tryOnTargetSelfHint}</span>
           </button>
-
-          {/* Photo upload area — only in "self" mode */}
-          {target === 'self' && (
-            <div className="mt-0.5">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handlePhotoPick}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="w-full h-11 rounded-2xl border border-dashed flex items-center justify-center gap-2 text-[13px] font-semibold text-gray-700 disabled:opacity-60"
-                style={{ borderColor: '#F370A7' }}
-              >
-                {uploading ? (
-                  <><Loader2 size={15} className="animate-spin" /> {t.tryOnUploading}</>
-                ) : (
-                  <><Camera size={15} className="text-[#F370A7]" /> {personKey ? t.tryOnChangePhoto : t.tryOnUploadPhoto}</>
-                )}
-              </button>
-              <p className="text-[11px] text-center mt-1.5" style={{ color: photoError ? '#ef4444' : '#9ca3af' }}>
-                {photoError ? t.tryOnPhotoFailed : t.tryOnPhotoHint}
-              </p>
-            </div>
-          )}
         </div>
+
+        {/* Photo upload area + example photos — only in "self" mode */}
+        {target === 'self' && (
+          <div className="px-5 pt-3">
+            {/* Example photos so users know how to shoot for a great result */}
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 mb-2">
+              <Sparkles size={12} className="text-[#F370A7]" />
+              {t.tryOnPhotoExamplesTitle}
+            </p>
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              {[
+                { src: '/images/closet/tryon/example-1.png', cap: t.tryOnPhotoTip1 },
+                { src: '/images/closet/tryon/example-2.png', cap: t.tryOnPhotoTip2 },
+                { src: '/images/closet/tryon/example-3.png', cap: t.tryOnPhotoTip3 },
+              ].map((ex) => (
+                <ExamplePhoto key={ex.src} src={ex.src} caption={ex.cap} />
+              ))}
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePhotoPick}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="w-full h-11 rounded-2xl border border-dashed flex items-center justify-center gap-2 text-[13px] font-semibold text-gray-700 disabled:opacity-60"
+              style={{ borderColor: '#F370A7', background: 'rgba(243,112,167,0.03)' }}
+            >
+              {uploading ? (
+                <><Loader2 size={15} className="animate-spin" /> {t.tryOnUploading}</>
+              ) : personKey ? (
+                <><Check size={15} className="text-[#16a34a]" /> {t.tryOnChangePhoto}</>
+              ) : (
+                <><Camera size={15} className="text-[#F370A7]" /> {t.tryOnUploadPhoto}</>
+              )}
+            </button>
+            <p className="text-[11px] text-center mt-1.5" style={{ color: photoError ? '#ef4444' : '#9ca3af' }}>
+              {photoError ? t.tryOnPhotoFailed : t.tryOnPhotoHint}
+            </p>
+          </div>
+        )}
 
         {/* Buttons */}
         <div className="flex gap-3 px-5 pt-3 pb-8">
@@ -251,6 +264,52 @@ export function TryOnConfirmModal({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Top-right selection indicator for an option card — filled check when active. */
+function SelectBadge({ active }: { active: boolean }) {
+  return (
+    <span
+      className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full flex items-center justify-center border-2 transition-colors"
+      style={{
+        borderColor: active ? '#F370A7' : '#d1d5db',
+        background: active ? '#F370A7' : 'transparent',
+      }}
+    >
+      {active && <Check size={12} className="text-white" strokeWidth={3} />}
+    </span>
+  );
+}
+
+/**
+ * One example photo showing how to shoot for a good try-on result. Falls back to
+ * a neutral silhouette placeholder if the image file is missing, so the captions
+ * still teach and the layout stays stable.
+ */
+function ExamplePhoto({ src, caption }: { src: string; caption: string }) {
+  const [ok, setOk] = useState(true);
+  return (
+    <div>
+      <div className="relative rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center" style={{ aspectRatio: '2 / 3' }}>
+        {ok ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={src}
+            alt={caption}
+            onError={() => setOk(false)}
+            loading="lazy"
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <User size={26} className="text-gray-300" />
+        )}
+      </div>
+      <p className="flex items-center justify-center gap-0.5 text-[10px] text-gray-500 mt-1 leading-tight">
+        <Check size={10} className="text-[#16a34a] shrink-0" strokeWidth={3} />
+        {caption}
+      </p>
     </div>
   );
 }

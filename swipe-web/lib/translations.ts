@@ -393,6 +393,10 @@ export interface Translations {
   tryOnPhotoHint: string;
   tryOnUploading: string;
   tryOnPhotoFailed: string;
+  tryOnPhotoExamplesTitle: string;
+  tryOnPhotoTip1: string;
+  tryOnPhotoTip2: string;
+  tryOnPhotoTip3: string;
   tryOnDeleteTitle: string;
   tryOnDeleteBody: string;
   tryOnDeleteFailed: string;
@@ -1048,6 +1052,10 @@ const en: Translations = {
   tryOnPhotoHint: 'Full-length photo, good lighting, facing the camera',
   tryOnUploading: 'Uploading…',
   tryOnPhotoFailed: 'Upload failed. Try another photo.',
+  tryOnPhotoExamplesTitle: 'Good example photos',
+  tryOnPhotoTip1: 'Full length',
+  tryOnPhotoTip2: 'Good lighting',
+  tryOnPhotoTip3: 'Plain background',
   tryOnDeleteTitle: 'Delete this look?',
   tryOnDeleteBody: "This can't be undone.",
   tryOnDeleteFailed: 'Failed to delete. Please try again.',
@@ -1698,6 +1706,10 @@ const ru: Translations = {
   tryOnPhotoHint: 'Фото в полный рост, хорошее освещение, лицом к камере',
   tryOnUploading: 'Загрузка…',
   tryOnPhotoFailed: 'Не удалось загрузить. Попробуйте другое фото.',
+  tryOnPhotoExamplesTitle: 'Хорошие примеры фото',
+  tryOnPhotoTip1: 'В полный рост',
+  tryOnPhotoTip2: 'Хорошее освещение',
+  tryOnPhotoTip3: 'Простой фон',
   tryOnDeleteTitle: 'Удалить этот образ?',
   tryOnDeleteBody: 'Это действие нельзя отменить.',
   tryOnDeleteFailed: 'Не удалось удалить. Попробуйте снова.',
@@ -2347,6 +2359,10 @@ const uz: Translations = {
   tryOnPhotoHint: "To'liq bo'yli surat, yaxshi yorug'lik, kameraga qarab",
   tryOnUploading: 'Yuklanmoqda…',
   tryOnPhotoFailed: "Yuklab bo'lmadi. Boshqa surat tanlang.",
+  tryOnPhotoExamplesTitle: 'Yaxshi surat namunalari',
+  tryOnPhotoTip1: "To'liq bo'y",
+  tryOnPhotoTip2: "Yaxshi yorug'lik",
+  tryOnPhotoTip3: 'Sodda fon',
   tryOnDeleteTitle: "Bu obrazni o'chirilsinmi?",
   tryOnDeleteBody: "Buni qaytarib bo'lmaydi.",
   tryOnDeleteFailed: "O'chirib bo'lmadi. Qaytadan urinib ko'ring.",
