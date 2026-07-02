@@ -516,10 +516,29 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(binary);
 }
 
+/**
+ * Upload the user's OWN photo for "try on myself" mode.
+ * Gets a presigned PUT URL from the backend, uploads the file (proxied through the
+ * Next.js blob-upload route to dodge Azure CORS), and returns the blob key to pass
+ * as `personImageKey` when creating the try-on job.
+ */
+export async function uploadModelPhoto(file: File): Promise<string> {
+  const contentType = file.type || 'image/jpeg';
+  const res = await api.post('/outfits/try-on/model-image-url', null, { params: { contentType } });
+  const raw = unwrapData<Record<string, unknown>>(res);
+  const putUrl = (raw.putUrl ?? raw.put_url ?? '') as string;
+  const blobKey = (raw.blobKey ?? raw.blob_key ?? '') as string;
+  if (!putUrl || !blobKey) throw new Error('Backend did not return a valid model-image upload URL');
+  await uploadFileToBlob(putUrl, file, contentType);
+  return blobKey;
+}
+
 export async function createTryOnJob(data: {
   canvasId?: string;
   wardrobeItemIds: string[];
   modelImageUrl?: string;
+  /** Blob key of the user's own uploaded photo — switches ML into "dress this person" mode. */
+  personImageKey?: string;
   snapshotBlob?: Blob;
 }): Promise<TryOnJobResponse> {
   const snapshotBase64 = data.snapshotBlob ? await blobToBase64(data.snapshotBlob) : undefined;
@@ -527,6 +546,7 @@ export async function createTryOnJob(data: {
     canvasId: data.canvasId,
     wardrobeItemIds: data.wardrobeItemIds,
     modelImageUrl: data.modelImageUrl,
+    personImageKey: data.personImageKey,
     snapshotBase64,
   });
   return unwrapData<TryOnJobResponse>(res);

@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { X, Sparkles, Loader2, RefreshCw } from 'lucide-react';
+import { X, Sparkles, Loader2, RefreshCw, User, Camera } from 'lucide-react';
 import type { ClosetItem } from '@/lib/closet-storage';
 import type { SavedCanvasLayout } from '@/lib/closet-types';
 import { useI18n } from '@/lib/i18n';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
 import { downloadWithWatermark } from '@/lib/canvas-snapshot';
+import { uploadModelPhoto } from '@/lib/wardrobe-api';
 
 /**
  * Maps a raw backend try-on failure reason to a friendly, localized message.
@@ -46,10 +47,44 @@ export function TryOnConfirmModal({
 }: {
   savedLayout: SavedCanvasLayout | null;
   items: ClosetItem[];
-  onConfirm: () => void;
+  onConfirm: (opts: { personImageKey?: string }) => void;
   onCancel: () => void;
 }) {
   const { t } = useI18n();
+
+  // Куда примеряем: на манекен (по умолчанию) или на своё загруженное фото.
+  const [target, setTarget] = useState<'mannequin' | 'self'>('mannequin');
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [personKey, setPersonKey] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [photoError, setPhotoError] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  async function handlePhotoPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file
+    if (!file) return;
+    setPhotoError(false);
+    setPersonKey(null);
+    setPhotoPreview(URL.createObjectURL(file));
+    setUploading(true);
+    try {
+      const key = await uploadModelPhoto(file);
+      setPersonKey(key);
+    } catch {
+      setPhotoError(true);
+      setPhotoPreview(null);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  // "На своё фото" готово к запуску только когда фото загружено на сервер.
+  const confirmDisabled = target === 'self' && (!personKey || uploading);
+
+  function handleConfirm() {
+    onConfirm({ personImageKey: target === 'self' ? personKey ?? undefined : undefined });
+  }
 
   // Отказ на экране подтверждения — примерка брошена после tryon_initiated.
   function handleCancel() {
@@ -115,6 +150,84 @@ export function TryOnConfirmModal({
           <p className="text-[13px] text-gray-400 mt-1">{t.tryOnConfirmBody}</p>
         </div>
 
+        {/* Target selector — mannequin vs your own photo */}
+        <div className="px-5 pt-1 pb-1 flex flex-col gap-2">
+          <button
+            onClick={() => setTarget('mannequin')}
+            className="w-full flex items-center gap-3 p-3 rounded-2xl border text-left transition-colors"
+            style={{
+              borderColor: target === 'mannequin' ? '#F370A7' : '#eee',
+              background: target === 'mannequin' ? 'rgba(243,112,167,0.06)' : '#fff',
+            }}
+          >
+            <span className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: 'rgba(243,112,167,0.10)' }}>
+              <User size={18} className="text-[#F370A7]" />
+            </span>
+            <span className="flex-1">
+              <span className="block text-[13px] font-semibold text-gray-900">{t.tryOnTargetMannequin}</span>
+              <span className="block text-[11px] text-gray-400">{t.tryOnTargetMannequinHint}</span>
+            </span>
+            <span
+              className="w-4 h-4 rounded-full border-2 shrink-0"
+              style={{ borderColor: target === 'mannequin' ? '#F370A7' : '#d1d5db', background: target === 'mannequin' ? '#F370A7' : 'transparent' }}
+            />
+          </button>
+
+          <button
+            onClick={() => setTarget('self')}
+            className="w-full flex items-center gap-3 p-3 rounded-2xl border text-left transition-colors"
+            style={{
+              borderColor: target === 'self' ? '#F370A7' : '#eee',
+              background: target === 'self' ? 'rgba(243,112,167,0.06)' : '#fff',
+            }}
+          >
+            <span className="w-9 h-9 rounded-full overflow-hidden flex items-center justify-center shrink-0" style={{ background: 'rgba(243,112,167,0.10)' }}>
+              {photoPreview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={photoPreview} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <Camera size={18} className="text-[#F370A7]" />
+              )}
+            </span>
+            <span className="flex-1">
+              <span className="block text-[13px] font-semibold text-gray-900">{t.tryOnTargetSelf}</span>
+              <span className="block text-[11px] text-gray-400">{t.tryOnTargetSelfHint}</span>
+            </span>
+            <span
+              className="w-4 h-4 rounded-full border-2 shrink-0"
+              style={{ borderColor: target === 'self' ? '#F370A7' : '#d1d5db', background: target === 'self' ? '#F370A7' : 'transparent' }}
+            />
+          </button>
+
+          {/* Photo upload area — only in "self" mode */}
+          {target === 'self' && (
+            <div className="mt-0.5">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handlePhotoPick}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="w-full h-11 rounded-2xl border border-dashed flex items-center justify-center gap-2 text-[13px] font-semibold text-gray-700 disabled:opacity-60"
+                style={{ borderColor: '#F370A7' }}
+              >
+                {uploading ? (
+                  <><Loader2 size={15} className="animate-spin" /> {t.tryOnUploading}</>
+                ) : (
+                  <><Camera size={15} className="text-[#F370A7]" /> {personKey ? t.tryOnChangePhoto : t.tryOnUploadPhoto}</>
+                )}
+              </button>
+              <p className="text-[11px] text-center mt-1.5" style={{ color: photoError ? '#ef4444' : '#9ca3af' }}>
+                {photoError ? t.tryOnPhotoFailed : t.tryOnPhotoHint}
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Buttons */}
         <div className="flex gap-3 px-5 pt-3 pb-8">
           <button
@@ -124,15 +237,16 @@ export function TryOnConfirmModal({
             {t.tryOnCancel}
           </button>
           <button
-            onClick={onConfirm}
-            className="flex-1 h-12 rounded-full text-white text-[13px] font-semibold flex items-center justify-center gap-1.5"
+            onClick={handleConfirm}
+            disabled={confirmDisabled}
+            className="flex-1 h-12 rounded-full text-white text-[13px] font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50"
             style={{
               background: 'linear-gradient(135deg, #F370A7 0%, #e0409a 50%, #F370A7 100%)',
               backgroundSize: '200% auto',
               boxShadow: '0 4px 18px rgba(243,112,167,0.45)',
             }}
           >
-            <Sparkles size={12} />
+            {uploading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
             {t.tryOnConfirm}
           </button>
         </div>
