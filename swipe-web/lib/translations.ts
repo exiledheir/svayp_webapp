@@ -384,6 +384,15 @@ export interface Translations {
   tryOnConfirmBody: string;
   tryOnCancel: string;
   tryOnConfirm: string;
+  tryOnTargetMannequin: string;
+  tryOnTargetMannequinHint: string;
+  tryOnTargetSelf: string;
+  tryOnTargetSelfHint: string;
+  tryOnUploadPhoto: string;
+  tryOnChangePhoto: string;
+  tryOnPhotoHint: string;
+  tryOnUploading: string;
+  tryOnPhotoFailed: string;
   tryOnDeleteTitle: string;
   tryOnDeleteBody: string;
   tryOnDeleteFailed: string;
@@ -1030,6 +1039,15 @@ const en: Translations = {
   tryOnConfirmBody: 'See how this outfit looks on you',
   tryOnCancel: 'Cancel',
   tryOnConfirm: 'Try It On',
+  tryOnTargetMannequin: 'On a mannequin',
+  tryOnTargetMannequinHint: 'Classic studio look on a model',
+  tryOnTargetSelf: 'On my photo',
+  tryOnTargetSelfHint: 'Upload a photo — we dress it in this outfit',
+  tryOnUploadPhoto: 'Upload photo',
+  tryOnChangePhoto: 'Change photo',
+  tryOnPhotoHint: 'Full-length photo, good lighting, facing the camera',
+  tryOnUploading: 'Uploading…',
+  tryOnPhotoFailed: 'Upload failed. Try another photo.',
   tryOnDeleteTitle: 'Delete this look?',
   tryOnDeleteBody: "This can't be undone.",
   tryOnDeleteFailed: 'Failed to delete. Please try again.',
@@ -1671,6 +1689,15 @@ const ru: Translations = {
   tryOnConfirmBody: 'Посмотрите, как наряд смотрится на вас',
   tryOnCancel: 'Отмена',
   tryOnConfirm: 'Примерить',
+  tryOnTargetMannequin: 'На манекен',
+  tryOnTargetMannequinHint: 'Классический показ на модели',
+  tryOnTargetSelf: 'На своё фото',
+  tryOnTargetSelfHint: 'Загрузите фото — оденем наряд на вас',
+  tryOnUploadPhoto: 'Загрузить фото',
+  tryOnChangePhoto: 'Изменить фото',
+  tryOnPhotoHint: 'Фото в полный рост, хорошее освещение, лицом к камере',
+  tryOnUploading: 'Загрузка…',
+  tryOnPhotoFailed: 'Не удалось загрузить. Попробуйте другое фото.',
   tryOnDeleteTitle: 'Удалить этот образ?',
   tryOnDeleteBody: 'Это действие нельзя отменить.',
   tryOnDeleteFailed: 'Не удалось удалить. Попробуйте снова.',
@@ -2311,6 +2338,15 @@ const uz: Translations = {
   tryOnConfirmBody: "Bu obraz sizga qanday yarashishini ko'ring",
   tryOnCancel: 'Bekor',
   tryOnConfirm: "Kiyib ko'rish",
+  tryOnTargetMannequin: 'Manekenga',
+  tryOnTargetMannequinHint: "Model ustida klassik ko'rinish",
+  tryOnTargetSelf: "O'z suratimga",
+  tryOnTargetSelfHint: "Surat yuklang — obrazni sizga kiydiramiz",
+  tryOnUploadPhoto: 'Surat yuklash',
+  tryOnChangePhoto: "Suratni o'zgartirish",
+  tryOnPhotoHint: "To'liq bo'yli surat, yaxshi yorug'lik, kameraga qarab",
+  tryOnUploading: 'Yuklanmoqda…',
+  tryOnPhotoFailed: "Yuklab bo'lmadi. Boshqa surat tanlang.",
   tryOnDeleteTitle: "Bu obrazni o'chirilsinmi?",
   tryOnDeleteBody: "Buni qaytarib bo'lmaydi.",
   tryOnDeleteFailed: "O'chirib bo'lmadi. Qaytadan urinib ko'ring.",

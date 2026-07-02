@@ -1086,6 +1086,9 @@ export default function ClosetPage() {
 
   const tryOnCanvasIdxRef = useRef(0);
   const tryOnOverrideRef = useRef<{ itemIds: string[]; layout: SavedCanvasLayout } | null>(null);
+  // Blob key of the user's own uploaded photo when примерка идёт "на своё фото".
+  // Persisted in a ref so a Retry re-runs the same mode.
+  const tryOnPersonKeyRef = useRef<string | undefined>(undefined);
 
   function handleTryItOnFromItems(calItems: ClosetItem[]) {
     if (plansEnabled && !canTryOn) { setShowPremiumGate('tryOn'); return; }
@@ -1119,8 +1122,9 @@ export default function ClosetPage() {
   function startTryOn() {
     tryOnCancelRef.current = false;
 
-    // Demo shortcut — show the pre-built result instantly, no API call needed
-    if (hasDemoItems) {
+    // Demo shortcut — show the pre-built result instantly, no API call needed.
+    // Skipped for "на своё фото": a real person photo must go through the ML pipeline.
+    if (hasDemoItems && !tryOnPersonKeyRef.current) {
       tryOnOverrideRef.current = null;
       const DEMO_TRYON_URL = 'https://svaypimages2.blob.core.windows.net/product-images/try-on%2F07bbfdf7-504d-44f4-9880-6003831845cf%2F1e088b17-ed7d-4e79-8daf-6cae0a3f979b.png';
       setTryOnState({ status: 'completed', resultUrl: DEMO_TRYON_URL });
@@ -1160,7 +1164,7 @@ export default function ClosetPage() {
           // snapshot capture failed — fall back to classic mode
         }
       }
-      return createTryOnJob({ wardrobeItemIds: itemIds, canvasId, snapshotBlob });
+      return createTryOnJob({ wardrobeItemIds: itemIds, canvasId, snapshotBlob, personImageKey: tryOnPersonKeyRef.current });
     };
 
     buildJob()
@@ -1640,7 +1644,7 @@ export default function ClosetPage() {
         <TryOnConfirmModal
           savedLayout={tryOnOverrideRef.current?.layout ?? displayCanvases[tryOnCanvasIdxRef.current]?.layout ?? null}
           items={items}
-          onConfirm={() => { setShowTryOnConfirm(false); startTryOn(); }}
+          onConfirm={(opts) => { setShowTryOnConfirm(false); tryOnPersonKeyRef.current = opts.personImageKey; startTryOn(); }}
           onCancel={() => setShowTryOnConfirm(false)}
         />
       )}
