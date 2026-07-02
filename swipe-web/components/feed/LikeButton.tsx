@@ -2,7 +2,7 @@ import React from 'react';
 import { Heart } from 'lucide-react';
 import { toggleLike } from '@/lib/feed-api';
 import { logAnalyticsEvent } from '@/lib/analytics';
-import { Events } from '@/lib/analytics-events';
+import { Events, Params } from '@/lib/analytics-events';
 import { formatCount } from '@/lib/feed-format';
 
 interface Props {
@@ -39,7 +39,7 @@ export default function LikeButton({ postId, liked, count, onChange, size = 24 }
       const res = await toggleLike(postId);
       setState({ liked: res.isLiked, count: res.likesCount });
       onChange?.(res);
-      logAnalyticsEvent(Events.FEED_LIKE_TOGGLED, { liked: res.isLiked });
+      logAnalyticsEvent(Events.FEED_LIKE_TOGGLED, { [Params.POST_ID]: postId, liked: res.isLiked });
     } catch {
       setState({ liked, count }); // revert to the props snapshot
       onChange?.({ isLiked: liked, likesCount: count });

@@ -36,6 +36,20 @@ export const Events = {
   TRYON_RESULT_DISMISSED: 'tryon_result_dismissed',
   TRYON_HISTORY_VIEWED: 'tryon_history_viewed',
 
+  // ── Wardrobe milestones & abandonment ──────────────────────────────────────
+  WARDROBE_MILESTONE: 'wardrobe_milestone',
+  ADD_ITEM_ABANDONED: 'add_item_abandoned',
+  TRYON_ABANDONED: 'tryon_abandoned',
+
+  // ── Discover (веб-свайп) — имена совпадают с мобилкой для кросс-платформы ──
+  DISCOVER_VIEWED: 'discover_viewed',
+  PRODUCT_IMPRESSION: 'product_impression',
+  PRODUCT_SWIPED: 'product_swiped',
+  PRODUCT_DETAIL_OPENED: 'product_detail_opened',
+  PRODUCT_ADDED_TO_CART: 'product_added_to_cart',
+  SWIPE_UNDO: 'swipe_undo',
+  FEED_EXHAUSTED: 'feed_exhausted',
+
   // ── Upgrade / Plans Funnel ─────────────────────────────────────────────────
   UPGRADE_MODAL_SHOWN: 'upgrade_modal_shown',
   UPGRADE_MODAL_DISMISSED: 'upgrade_modal_dismissed',
@@ -83,6 +97,8 @@ export const Events = {
   FEED_POST_REPORTED: 'feed_post_reported',
   FEED_USER_HIDDEN: 'feed_user_hidden',
   FEED_PUBLISH_FROM_CLOSET: 'feed_publish_from_closet',
+  FEED_POST_IMPRESSION: 'feed_post_impression',
+  FEED_SCROLL_DEPTH: 'feed_scroll_depth',
 } as const;
 
 export const Params = {
@@ -114,4 +130,18 @@ export const Params = {
   FEED_IMAGE_COUNT: 'feed_image_count',
   FEED_HAS_REAL_PHOTO: 'feed_has_real_photo',
   FEED_REPORT_REASON: 'feed_report_reason',
+  // Общие идентификаторы контекста
+  FLOW: 'flow',
+  LISTING_ID: 'listing_id',
+  POST_ID: 'post_id',
+  PRODUCT_ID: 'product_id',
+  DIRECTION: 'direction',
+  POSITION: 'position',
+  VIEW_DURATION_MS: 'view_duration_ms',
+  STEP: 'step',
+  DEPTH: 'depth',
+  SIZE: 'size',
+  COLOR: 'color',
+  BRAND: 'brand',
+  PRICE: 'price',
 } as const;

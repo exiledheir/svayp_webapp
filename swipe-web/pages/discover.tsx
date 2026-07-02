@@ -6,6 +6,8 @@ import { getRecommendedProducts } from '@/lib/api';
 import { toggleLiked } from '@/lib/liked-storage';
 import { addToCart } from '@/lib/cart-storage';
 import BottomNav, { TopBar } from '@/components/BottomNav';
+import { logAnalyticsEvent } from '@/lib/analytics';
+import { Events, Params } from '@/lib/analytics-events';
 import type { Product } from '@/types';
 
 // ─── Price formatter matching Flutter formattedPrice ────────────────────────
@@ -276,12 +278,61 @@ export default function DiscoverPage() {
   // Trigger ref — top card sets this so action buttons can fire a swipe
   const triggerTopSwipe = useRef<((dir: SwipeDir) => void) | null>(null);
 
+  // Аналитика: показы карточек (дедуп в рамках визита), время просмотра верхней
+  // карточки и однократное feed_exhausted. Имена событий совпадают с мобилкой.
+  const seenImpressionsRef = useRef<Set<string>>(new Set());
+  const impressionStartRef = useRef<number>(Date.now());
+  const exhaustedLoggedRef = useRef(false);
+
   useEffect(() => {
+    logAnalyticsEvent(Events.DISCOVER_VIEWED);
     getRecommendedProducts(0, 20)
       .then((res) => { setProducts(res); setHasMore(res.length === 20); })
       .catch(() => setError('Failed to load products'))
       .finally(() => setLoading(false));
   }, []);
+
+  // Верхняя карточка стека = показ товара.
+  useEffect(() => {
+    const p = products[currentIndex];
+    if (!p) return;
+    impressionStartRef.current = Date.now();
+    if (seenImpressionsRef.current.has(p.id)) return;
+    seenImpressionsRef.current.add(p.id);
+    logAnalyticsEvent(Events.PRODUCT_IMPRESSION, {
+      [Params.PRODUCT_ID]: p.id,
+      [Params.POSITION]: currentIndex,
+    });
+  }, [currentIndex, products]);
+
+  // Лента закончилась (и подгружать больше нечего) — один раз за визит.
+  useEffect(() => {
+    if (loading || products.length === 0) return;
+    if (currentIndex >= products.length && !hasMore && !exhaustedLoggedRef.current) {
+      exhaustedLoggedRef.current = true;
+      logAnalyticsEvent(Events.FEED_EXHAUSTED, { [Params.POSITION]: products.length });
+    }
+  }, [currentIndex, products.length, hasMore, loading]);
+
+  function logSwipe(p: Product, direction: 'like' | 'dislike') {
+    logAnalyticsEvent(Events.PRODUCT_SWIPED, {
+      [Params.PRODUCT_ID]: p.id,
+      [Params.DIRECTION]: direction,
+      [Params.BRAND]: p.brand,
+      [Params.PRICE]: p.price,
+      [Params.VIEW_DURATION_MS]: Date.now() - impressionStartRef.current,
+    });
+  }
+
+  function logAddToCart(p: Product, size?: string, color?: string) {
+    logAnalyticsEvent(Events.PRODUCT_ADDED_TO_CART, {
+      [Params.PRODUCT_ID]: p.id,
+      [Params.BRAND]: p.brand,
+      [Params.PRICE]: p.price,
+      ...(size ? { [Params.SIZE]: size } : {}),
+      ...(color ? { [Params.COLOR]: color } : {}),
+    });
+  }
 
   const checkLoadMore = useCallback((idx: number, current: Product[], has: boolean) => {
     if (current.length - idx <= 5 && has && !fetchingMore) {
@@ -298,6 +349,7 @@ export default function DiscoverPage() {
   }, [fetchPage, fetchingMore]);
 
   function handleSwipeLeft() {
+    logSwipe(products[currentIndex], 'dislike');
     setHistory((h) => [...h, { product: products[currentIndex], action: 'dislike' }]);
     const next = currentIndex + 1;
     setCurrentIndex(next);
@@ -307,6 +359,7 @@ export default function DiscoverPage() {
 
   function handleSwipeRight() {
     const p = products[currentIndex];
+    logSwipe(p, 'like');
     toggleLiked({ productId: p.id, title: p.title, brand: p.brand, price: p.price, currency: p.currency, imageUrl: p.images[0] ?? '' });
     setHistory((h) => [...h, { product: p, action: 'like' }]);
     const next = currentIndex + 1;
@@ -327,6 +380,7 @@ export default function DiscoverPage() {
         price: p.price, currency: p.currency, imageUrl: p.images[0] ?? '',
         selectedSize: p.sizes?.[0], quantity: 1,
       });
+      logAddToCart(p, p.sizes?.[0]);
       setHistory((h) => [...h, { product: p, action: 'cart' }]);
       const next = currentIndex + 1;
       setCurrentIndex(next);
@@ -342,6 +396,7 @@ export default function DiscoverPage() {
       price: cartProduct.price, currency: cartProduct.currency, imageUrl: cartProduct.images[0] ?? '',
       selectedSize: selectedSize || undefined, selectedColor: selectedColor || undefined, quantity: 1,
     });
+    logAddToCart(cartProduct, selectedSize || undefined, selectedColor || undefined);
     setHistory((h) => [...h, { product: cartProduct, action: 'cart' }]);
     const next = currentIndex + 1;
     setCurrentIndex(next);
@@ -352,6 +407,11 @@ export default function DiscoverPage() {
 
   function handleUndo() {
     if (history.length === 0) return;
+    const last = history[history.length - 1];
+    logAnalyticsEvent(Events.SWIPE_UNDO, {
+      [Params.PRODUCT_ID]: last.product.id,
+      [Params.DIRECTION]: last.action,
+    });
     setCurrentIndex((i) => Math.max(0, i - 1));
     setHistory((h) => h.slice(0, -1));
     setDragProgress(0);
@@ -405,7 +465,13 @@ export default function DiscoverPage() {
                     onSwipeLeft={offset === 0 ? handleSwipeLeft : () => {}}
                     onSwipeRight={offset === 0 ? handleSwipeRight : () => {}}
                     onSwipeUp={offset === 0 ? handleSwipeUp : () => {}}
-                    onTap={offset === 0 ? () => router.push(`/product/${products[idx].id}`) : () => {}}
+                    onTap={offset === 0 ? () => {
+                      logAnalyticsEvent(Events.PRODUCT_DETAIL_OPENED, {
+                        [Params.PRODUCT_ID]: products[idx].id,
+                        [Params.SOURCE]: 'discover',
+                      });
+                      router.push(`/product/${products[idx].id}`);
+                    } : () => {}}
                     registerTrigger={offset === 0 ? (fn) => { triggerTopSwipe.current = fn; } : undefined}
                   />
                 );

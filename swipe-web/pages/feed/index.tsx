@@ -5,7 +5,7 @@ import { Plus, User, Heart, RefreshCw } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { getFeed } from '@/lib/feed-api';
 import { logAnalyticsEvent } from '@/lib/analytics';
-import { Events } from '@/lib/analytics-events';
+import { Events, Params } from '@/lib/analytics-events';
 import type { FeedPost } from '@/types/feed';
 import FeedGuard from '@/components/feed/FeedGuard';
 import FeedCard from '@/components/feed/FeedCard';
@@ -67,10 +67,24 @@ function FeedHome() {
       .finally(() => setFetchingMore(false));
   }, [page, hasMore, fetchingMore]);
 
+  // Глубина скролла ленты (25/50/75/100%), каждый порог — один раз за визит.
+  const scrollDepthRef = React.useRef<Set<number>>(new Set());
+
   function handleScroll() {
     const el = scrollRef.current;
     if (!el) return;
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 800) loadMore();
+
+    const scrollable = el.scrollHeight - el.clientHeight;
+    if (scrollable > 0) {
+      const pct = ((el.scrollTop + el.clientHeight) / el.scrollHeight) * 100;
+      for (const threshold of [25, 50, 75, 100]) {
+        if (pct >= threshold && !scrollDepthRef.current.has(threshold)) {
+          scrollDepthRef.current.add(threshold);
+          logAnalyticsEvent(Events.FEED_SCROLL_DEPTH, { [Params.DEPTH]: threshold });
+        }
+      }
+    }
   }
 
   // ── Pull-to-refresh: drag down from the very top to reload the feed. ──

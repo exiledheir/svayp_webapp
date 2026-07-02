@@ -8,12 +8,8 @@ import { restoreOnboardingFromCloud } from '@/lib/onboarding-storage';
 import { I18nProvider } from '@/lib/i18n';
 import { ThemeProvider } from '@/lib/theme';
 import { FeatureFlagsProvider } from '@/lib/feature-flags-context';
-import {
-  initAnalytics,
-  logAnalyticsEvent,
-  setAnalyticsUser,
-  setAnalyticsUserProperties,
-} from '@/lib/analytics';
+import { initAnalytics, logPageViewEvent } from '@/lib/analytics';
+import { initAppEvents, setAppEventsScreen } from '@/lib/app-events';
 import '@/styles/globals.css';
 import 'react-image-crop/dist/ReactCrop.css';
 
@@ -32,35 +28,45 @@ export default function App({ Component, pageProps }: AppProps) {
   // Set user identity in Analytics once the auth state is known
   useEffect(() => {
     if (!ready) return;
-    // After Firebase is initialized, set the user identity
-    initAnalytics().then(() => {
-      const user = getUser();
-      if (user) {
-        const userId = (user.id ?? user.userId ?? user.user_id) as string | undefined;
-        if (userId) setAnalyticsUser(String(userId));
-      }
+    // Start the backend app_events sink first: events fired during Firebase
+    // init are queued there immediately and buffered for Firebase.
+    initAppEvents();
+    setAppEventsScreen(router.pathname);
 
-      // Detect which surface this session is running on
-      const context = (() => {
-        if (/flutter/i.test(navigator.userAgent)) return 'webview_flutter';
-        if (
-          typeof window !== 'undefined' &&
-          (window as unknown as { Telegram?: { WebApp?: { initData?: string } } })
-            .Telegram?.WebApp?.initData
-        ) return 'telegram_miniapp';
-        return 'browser';
-      })();
-      setAnalyticsUserProperties({ client_context: context });
+    const user = getUser();
+    const userId = user
+      ? ((user.id ?? user.userId ?? user.user_id) as string | undefined)
+      : undefined;
 
-      // Track the initial page view (subsequent ones are handled by route events)
-      logAnalyticsEvent('page_view', { page_path: router.asPath });
+    // Detect which surface this session is running on
+    const context = (() => {
+      if (/flutter/i.test(navigator.userAgent)) return 'webview_flutter';
+      if (
+        typeof window !== 'undefined' &&
+        (window as unknown as { Telegram?: { WebApp?: { initData?: string } } })
+          .Telegram?.WebApp?.initData
+      ) return 'telegram_miniapp';
+      return 'browser';
+    })();
+
+    // Identity is passed into init so buffered startup events keep attribution.
+    initAnalytics({
+      userId: userId ? String(userId) : undefined,
+      userProperties: { client_context: context },
     });
 
-    const handleRouteChange = (url: string) => {
-      logAnalyticsEvent('page_view', { page_path: url });
+    // Track page views, deduping the initial route (routeChangeComplete can
+    // re-fire for the path we already logged manually).
+    let lastLoggedPath: string | null = null;
+    const logPageView = (url: string) => {
+      if (url === lastLoggedPath) return;
+      lastLoggedPath = url;
+      setAppEventsScreen(url);
+      logPageViewEvent(url);
     };
-    router.events.on('routeChangeComplete', handleRouteChange);
-    return () => router.events.off('routeChangeComplete', handleRouteChange);
+    logPageView(router.asPath);
+    router.events.on('routeChangeComplete', logPageView);
+    return () => router.events.off('routeChangeComplete', logPageView);
   }, [ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
