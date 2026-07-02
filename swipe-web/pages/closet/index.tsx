@@ -17,7 +17,7 @@ import { useI18n } from '@/lib/i18n';
 import type { Locale } from '@/lib/translations';
 import { isOnboardingComplete, isCanvasHintSeen, setCanvasHintSeen } from '@/lib/onboarding-storage';
 import { saveTryOnResult, saveActiveTryOnJob, getActiveTryOnJobWithCloud, clearActiveTryOnJob } from '@/lib/tryon-history';
-import { logAnalyticsEvent } from '@/lib/analytics';
+import { logAnalyticsEvent, clearAnalyticsUser } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
 import { useTheme } from '@/lib/theme';
 import { isInFlutterWebView } from '@/lib/flutter-bridge';
@@ -501,6 +501,13 @@ export default function ClosetPage() {
 
 
 
+  // Майлстоун гардероба: шлём текущее число реальных вещей (без демо) после
+  // каждого сохранения — воронка на бэке матчит item_count >= N.
+  function logWardrobeMilestone() {
+    const realCount = items.filter((i) => !DEMO_ITEM_IDS.has(i.id)).length + 1;
+    logAnalyticsEvent(Events.WARDROBE_MILESTONE, { [Params.ITEM_COUNT]: realCount });
+  }
+
   function handleAddFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -511,7 +518,7 @@ export default function ClosetPage() {
       // Pre-select full image so corner handles are visible immediately (crop is optional)
       setAddCrop({ unit: '%', x: 0, y: 0, width: 100, height: 100 });
       setAddCompletedCrop(undefined);
-      logAnalyticsEvent(Events.ADD_ITEM_PHOTO_SELECTED);
+      logAnalyticsEvent(Events.ADD_ITEM_PHOTO_SELECTED, { [Params.FLOW]: 'closet' });
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -593,11 +600,13 @@ export default function ClosetPage() {
         });
         // Upload complete — remove pending, reload items
         if (activeJobId) clearUploadPreview(activeJobId);
+        logAnalyticsEvent(Events.ADD_ITEM_BG_REMOVAL_COMPLETED);
         logAnalyticsEvent(Events.ADD_ITEM_SAVED, {
           [Params.CATEGORY]: category,
           [Params.HAS_BG_REMOVED]: true,
+          [Params.FLOW]: 'closet',
         });
-        logAnalyticsEvent(Events.ADD_ITEM_BG_REMOVAL_COMPLETED);
+        logWardrobeMilestone();
         setPendingUploads((prev) => { const next = new Map(prev); next.delete(pendingId); return next; });
         await load();
         fetchPlan();
@@ -620,7 +629,9 @@ export default function ClosetPage() {
           logAnalyticsEvent(Events.ADD_ITEM_SAVED, {
             [Params.CATEGORY]: category,
             [Params.HAS_BG_REMOVED]: false,
+            [Params.FLOW]: 'closet',
           });
+          logWardrobeMilestone();
           setPendingUploads((prev) => { const next = new Map(prev); next.delete(pendingId); return next; });
           await load();
         }
@@ -631,7 +642,9 @@ export default function ClosetPage() {
       logAnalyticsEvent(Events.ADD_ITEM_SAVED, {
         [Params.CATEGORY]: category,
         [Params.HAS_BG_REMOVED]: false,
+        [Params.FLOW]: 'closet',
       });
+      logWardrobeMilestone();
       setPendingUploads((prev) => { const next = new Map(prev); next.delete(pendingId); return next; });
       await load();
     }
@@ -1672,8 +1685,8 @@ export default function ClosetPage() {
         <PhotoSourceSheet
           position="fixed"
           onClose={() => setShowAddPicker(false)}
-          onGallery={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'gallery' }); fileInputRef.current?.click(); setShowAddPicker(false); }}
-          onCamera={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'camera' }); cameraInputRef.current?.click(); setShowAddPicker(false); }}
+          onGallery={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'gallery', [Params.FLOW]: 'closet' }); fileInputRef.current?.click(); setShowAddPicker(false); }}
+          onCamera={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'camera', [Params.FLOW]: 'closet' }); cameraInputRef.current?.click(); setShowAddPicker(false); }}
         />
       )}
 
@@ -1836,6 +1849,9 @@ export default function ClosetPage() {
               {/* Logout */}
               <button
                 onClick={() => {
+                  // Отвязываем аналитику от юзера, иначе события после логаута
+                  // продолжают писаться под старым userId.
+                  clearAnalyticsUser();
                   clearTokens();
                   router.replace('/');
                 }}

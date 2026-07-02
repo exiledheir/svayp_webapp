@@ -5,7 +5,7 @@ import type { ClosetItem } from '@/lib/closet-storage';
 import type { SavedCanvasLayout } from '@/lib/closet-types';
 import { useI18n } from '@/lib/i18n';
 import { logAnalyticsEvent } from '@/lib/analytics';
-import { Events } from '@/lib/analytics-events';
+import { Events, Params } from '@/lib/analytics-events';
 import { downloadWithWatermark } from '@/lib/canvas-snapshot';
 
 /**
@@ -50,6 +50,13 @@ export function TryOnConfirmModal({
   onCancel: () => void;
 }) {
   const { t } = useI18n();
+
+  // Отказ на экране подтверждения — примерка брошена после tryon_initiated.
+  function handleCancel() {
+    logAnalyticsEvent(Events.TRYON_ABANDONED, { [Params.STEP]: 'confirm' });
+    onCancel();
+  }
+
   const displayEntries = React.useMemo(() => {
     if (!savedLayout || savedLayout.length === 0) return [];
     return savedLayout
@@ -64,7 +71,7 @@ export function TryOnConfirmModal({
   return (
     <div
       className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 backdrop-blur-sm"
-      onClick={onCancel}
+      onClick={handleCancel}
     >
       <div
         className="w-full max-w-[430px] rounded-t-3xl bg-white shadow-2xl"
@@ -111,7 +118,7 @@ export function TryOnConfirmModal({
         {/* Buttons */}
         <div className="flex gap-3 px-5 pt-3 pb-8">
           <button
-            onClick={onCancel}
+            onClick={handleCancel}
             className="flex-1 h-12 rounded-full bg-gray-100 text-gray-700 text-[13px] font-semibold"
           >
             {t.tryOnCancel}
@@ -219,6 +226,15 @@ export function TryOnModal({
   const secondsLeft = Math.max(0, 60 - elapsed);
   const timeLabel = status === 'completed' ? null : elapsed < 5 ? t.tryOnTimeEstimate : `~${secondsLeft}s`;
 
+  // Закрытие модалки во время обработки = брошенная примерка — фиксируем шаг,
+  // иначе воронка не видит, где юзер вышел.
+  function handleClose() {
+    if (isProcessing) {
+      logAnalyticsEvent(Events.TRYON_ABANDONED, { [Params.STEP]: 'processing' });
+    }
+    onClose();
+  }
+
   async function downloadWithLogo() {
     if (!resultUrl || isDownloading) return;
     setIsDownloading(true);
@@ -234,7 +250,7 @@ export function TryOnModal({
   return (
     <div
       className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div
         className="w-[90%] max-w-[380px] rounded-3xl bg-white overflow-hidden shadow-2xl"

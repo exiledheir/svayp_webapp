@@ -62,6 +62,21 @@ export default function ClosetAddPage() {
   const [saving, setSaving] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
 
+  // Отслеживание брошенного флоу: на unmount без сохранения шлём abandonment
+  // с последним пройденным шагом — иначе воронка не видит, где именно ушли.
+  const lastStepRef = useRef<'source_picker' | 'photo' | 'category'>('source_picker');
+  const savedRef = useRef(false);
+  useEffect(() => {
+    return () => {
+      if (!savedRef.current) {
+        logAnalyticsEvent(Events.ADD_ITEM_ABANDONED, {
+          [Params.STEP]: lastStepRef.current,
+          [Params.FLOW]: 'add_page',
+        });
+      }
+    };
+  }, []);
+
   // Determine which subcategories to show based on group query param
   const group = (router.query.group as string) ?? 'upper';
   const allowedCats = GROUPS[group] ?? CLOSET_CATEGORIES.map((c) => c.value);
@@ -92,7 +107,8 @@ export default function ClosetAddPage() {
       // Pre-select full image so corner handles are visible immediately (crop is optional)
       setCrop({ unit: '%', x: 0, y: 0, width: 100, height: 100 });
       setCompletedCrop(undefined);
-      logAnalyticsEvent(Events.ADD_ITEM_PHOTO_SELECTED);
+      lastStepRef.current = 'photo';
+      logAnalyticsEvent(Events.ADD_ITEM_PHOTO_SELECTED, { [Params.FLOW]: 'add_page' });
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -110,9 +126,11 @@ export default function ClosetAddPage() {
     }
 
     addClosetItem({ category, imageData: imageToSave });
+    savedRef.current = true;
     logAnalyticsEvent(Events.ADD_ITEM_SAVED, {
       [Params.CATEGORY]: category,
       [Params.HAS_BG_REMOVED]: false,
+      [Params.FLOW]: 'add_page',
     });
     router.replace('/closet');
   }
@@ -184,8 +202,10 @@ export default function ClosetAddPage() {
                       key={cat}
                       onClick={() => {
                         setCategory(cat);
+                        lastStepRef.current = 'category';
                         logAnalyticsEvent(Events.ADD_ITEM_CATEGORY_SELECTED, {
                           [Params.CATEGORY]: cat,
+                          [Params.FLOW]: 'add_page',
                         });
                       }}
                       className="px-3.5 py-[6px] rounded-full text-[12px] transition-colors font-medium"
@@ -256,7 +276,7 @@ export default function ClosetAddPage() {
               <div className="flex flex-col gap-2.5">
                 {/* Photo Library — primary action, opens native photo grid on mobile */}
                 <button
-                  onClick={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'gallery' }); fileInputRef.current?.click(); setShowPicker(false); }}
+                  onClick={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'gallery', [Params.FLOW]: 'add_page' }); fileInputRef.current?.click(); setShowPicker(false); }}
                   className="w-full h-14 rounded-2xl flex items-center gap-3.5 px-4 active:scale-[0.98] transition-transform"
                   style={{
                     backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f3f4f6',
@@ -272,7 +292,7 @@ export default function ClosetAddPage() {
                 </button>
                 {/* Camera */}
                 <button
-                  onClick={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'camera' }); cameraInputRef.current?.click(); setShowPicker(false); }}
+                  onClick={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'camera', [Params.FLOW]: 'add_page' }); cameraInputRef.current?.click(); setShowPicker(false); }}
                   className="w-full h-14 rounded-2xl flex items-center gap-3.5 px-4 active:scale-[0.98] transition-transform"
                   style={{
                     backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f3f4f6',

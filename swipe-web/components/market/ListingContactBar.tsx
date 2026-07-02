@@ -41,7 +41,7 @@ export default function ListingContactBar({ listing }: { listing: MarketListing 
   async function sendMessage() {
     if (sending) return;
     setSending(true);
-    logAnalyticsEvent(Events.MARKET_CONTACT_CHAT_TAPPED, { listing_id: listing.id });
+    logAnalyticsEvent(Events.MARKET_CONTACT_CHAT_TAPPED, { [Params.LISTING_ID]: listing.id });
     try {
       // Upsert the C2C thread (listingId, buyer, seller) + initial message.
       const { id } = await startListingChat(listing.id, listing.seller.id, message);
@@ -60,7 +60,7 @@ export default function ListingContactBar({ listing }: { listing: MarketListing 
     setShowOptions(false);
     const phone = listing.seller.phone;
     if (!phone) return;
-    logAnalyticsEvent(Events.MARKET_CONTACT_CALL_TAPPED, { listing_id: listing.id });
+    logAnalyticsEvent(Events.MARKET_CONTACT_CALL_TAPPED, { [Params.LISTING_ID]: listing.id });
     // Open the native phone app (iOS/Android) with the number prefilled. A
     // synthesised anchor click is handled by the WebView's navigation delegate
     // — and by the browser elsewhere — more reliably than assigning
@@ -76,7 +76,7 @@ export default function ListingContactBar({ listing }: { listing: MarketListing 
   function openTelegram() {
     setShowOptions(false);
     logAnalyticsEvent(Events.MARKET_CONTACT_TELEGRAM_TAPPED, {
-      listing_id: listing.id,
+      [Params.LISTING_ID]: listing.id,
       [Params.MK_HAS_TELEGRAM_USERNAME]: !!listing.seller.telegramUsername,
     });
     const url =

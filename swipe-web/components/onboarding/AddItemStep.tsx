@@ -69,7 +69,7 @@ export default function AddItemStep({
       setRawImage(ev.target?.result as string);
       setCrop({ unit: '%', x: 0, y: 0, width: 100, height: 100 });
       setCompletedCrop(undefined);
-      logAnalyticsEvent(Events.ADD_ITEM_PHOTO_SELECTED);
+      logAnalyticsEvent(Events.ADD_ITEM_PHOTO_SELECTED, { [Params.FLOW]: 'onboarding' });
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -107,9 +107,10 @@ export default function AddItemStep({
       }
       f = await compressImageForUpload(f);
       await addClosetItemFromFile(f, cat, extras, () => {});
-      logAnalyticsEvent(Events.ADD_ITEM_SAVED, { [Params.CATEGORY]: cat, [Params.HAS_BG_REMOVED]: true });
+      logAnalyticsEvent(Events.ADD_ITEM_BG_REMOVAL_COMPLETED, { [Params.FLOW]: 'onboarding' });
+      logAnalyticsEvent(Events.ADD_ITEM_SAVED, { [Params.CATEGORY]: cat, [Params.HAS_BG_REMOVED]: true, [Params.FLOW]: 'onboarding' });
     })().catch(() => {
-      logAnalyticsEvent(Events.ADD_ITEM_BG_REMOVAL_FAILED);
+      logAnalyticsEvent(Events.ADD_ITEM_BG_REMOVAL_FAILED, { [Params.FLOW]: 'onboarding' });
     });
 
     // Advance immediately — upload runs in the background.
@@ -214,7 +215,7 @@ export default function AddItemStep({
               <div className="flex flex-col gap-2.5">
                 <button
                   onClick={() => {
-                    logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'gallery' });
+                    logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'gallery', [Params.FLOW]: 'onboarding' });
                     fileInputRef.current?.click();
                     setShowPicker(false);
                   }}
@@ -233,7 +234,7 @@ export default function AddItemStep({
                 </button>
                 <button
                   onClick={() => {
-                    logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'camera' });
+                    logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'camera', [Params.FLOW]: 'onboarding' });
                     cameraInputRef.current?.click();
                     setShowPicker(false);
                   }}

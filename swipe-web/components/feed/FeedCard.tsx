@@ -7,7 +7,12 @@ import { timeAgo, formatCount } from '@/lib/feed-format';
 import Avatar from '@/components/feed/Avatar';
 import ImageCarousel from '@/components/feed/ImageCarousel';
 import LikeButton from '@/components/feed/LikeButton';
+import { logAnalyticsEvent } from '@/lib/analytics';
+import { Events, Params } from '@/lib/analytics-events';
 import type { FeedPost } from '@/types/feed';
+
+// Дедуп показов постов в рамках визита страницы (общий для всех карточек).
+const seenPostImpressions = new Set<string>();
 
 interface Props {
   post: FeedPost;
@@ -24,6 +29,37 @@ export default function FeedCard({ post, onLikeChange, onOpenComments }: Props) 
   const [expanded, setExpanded] = React.useState(false);
 
   const openProfile = () => router.push(`/feed/${post.author.username}?from=${encodeURIComponent(router.asPath)}`);
+
+  // Показ поста: карточка видна >=50% площади не меньше 1 секунды, один раз
+  // за визит — иначе воронка ленты не отличает «открыл ленту» от «реально видел посты».
+  const cardRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const el = cardRef.current;
+    if (!el || seenPostImpressions.has(post.id) || typeof IntersectionObserver === 'undefined') return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          timer = setTimeout(() => {
+            if (!seenPostImpressions.has(post.id)) {
+              seenPostImpressions.add(post.id);
+              logAnalyticsEvent(Events.FEED_POST_IMPRESSION, { [Params.POST_ID]: post.id });
+            }
+            observer.disconnect();
+          }, 1000);
+        } else if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+      },
+      { threshold: 0.5 },
+    );
+    observer.observe(el);
+    return () => {
+      if (timer) clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, [post.id]);
 
   // Double-tap to like (Instagram): likes only when not already liked; the heart
   // burst animation plays either way (handled inside ImageCarousel).
@@ -43,7 +79,7 @@ export default function FeedCard({ post, onLikeChange, onOpenComments }: Props) 
   }
 
   return (
-    <div className="bg-white dark:bg-[#1c1c1e]">
+    <div ref={cardRef} className="bg-white dark:bg-[#1c1c1e]">
       {/* Author row */}
       <div className="flex items-center gap-2.5 px-3.5 py-2.5">
         <button className="flex items-center gap-2.5 min-w-0" onClick={openProfile}>

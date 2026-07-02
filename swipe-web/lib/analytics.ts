@@ -1,5 +1,11 @@
 // Firebase Analytics singleton — SSR-safe (Next.js pages router).
 // Call initAnalytics() once in _app.tsx on mount.
+//
+// Every event is dual-written: to Firebase AND to our own backend app_events
+// pipeline (lib/app-events.ts), so funnels can be built in the admin dashboard.
+// Events fired before Firebase finishes initialising are buffered in a pre-init
+// queue and flushed (with the user identity already set) once init completes —
+// nothing is silently dropped on startup.
 
 import { initializeApp, getApps } from 'firebase/app';
 import {
@@ -10,6 +16,7 @@ import {
   isSupported,
   type Analytics,
 } from 'firebase/analytics';
+import { trackAppEvent } from './app-events';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -22,11 +29,34 @@ const firebaseConfig = {
 };
 
 let instance: Analytics | null = null;
+// Firebase init resolved (successfully or not) — pre-init queue may be drained.
+let initSettled = false;
+
+type PendingEvent = {
+  eventName: string;
+  params?: Record<string, string | number | boolean>;
+};
+const preInitQueue: PendingEvent[] = [];
+const PRE_INIT_QUEUE_CAP = 100;
+
+function debugEnabled(): boolean {
+  if (process.env.NODE_ENV !== 'production') return true;
+  try {
+    return new URLSearchParams(window.location.search).has('debug_mode');
+  } catch {
+    return false;
+  }
+}
+
+function debugLog(...args: unknown[]): void {
+  if (debugEnabled()) console.log('[Analytics]', ...args);
+}
 
 // Expose instance globally for debugging (optional)
 if (typeof window !== 'undefined') {
   (window as any).__firebaseAnalyticsDebug = () => ({
     instance: instance ? 'INITIALIZED' : 'NULL',
+    queued: preInitQueue.length,
     config: {
       projectId: firebaseConfig.projectId,
       measurementId: firebaseConfig.measurementId,
@@ -34,37 +64,62 @@ if (typeof window !== 'undefined') {
   });
 }
 
-export async function initAnalytics(): Promise<void> {
+export interface AnalyticsIdentity {
+  userId?: string;
+  userProperties?: Record<string, string>;
+}
+
+/**
+ * Initialise Firebase. Pass the known identity so it is applied BEFORE the
+ * pre-init event buffer is drained — otherwise startup events lose attribution.
+ */
+export async function initAnalytics(identity?: AnalyticsIdentity): Promise<void> {
   if (typeof window === 'undefined') return;
   try {
     const supported = await isSupported();
-    console.log('[Analytics] isSupported check:', supported);
     if (!supported) {
-      console.warn('[Analytics] Firebase Analytics is not supported in this environment');
+      debugLog('Firebase Analytics is not supported in this environment');
       return;
     }
-    console.log('[Analytics] Initializing Firebase...');
     const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-    console.log('[Analytics] Firebase app initialized, getting analytics instance...');
     instance = getAnalytics(app);
-    console.log('[Analytics] Firebase Analytics instance created successfully');
-    
-    // Log debug info if debug_mode parameter is present
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('debug_mode')) {
-      console.log('[Analytics] Debug mode: events will be visible in Firebase DebugView');
-      console.log('[Analytics] DebugView URL: https://console.firebase.google.com/project/svayp-ai/analytics/debugview');
-      // Log a test event to confirm setup
-      logEvent(instance, 'debug_mode_enabled', {
-        timestamp: new Date().toISOString(),
-      });
+
+    if (identity?.userId) setAnalyticsUser(identity.userId);
+    if (identity?.userProperties) setAnalyticsUserProperties(identity.userProperties);
+
+    if (new URLSearchParams(window.location.search).has('debug_mode')) {
+      debugLog('Debug mode: events visible in Firebase DebugView');
+      logEvent(instance, 'debug_mode_enabled', { timestamp: new Date().toISOString() });
     }
-    
-    console.log('[Analytics] Firebase Analytics initialized successfully');
+    debugLog('Firebase Analytics initialized');
   } catch (err) {
     console.error('[Analytics] Failed to initialize Firebase Analytics:', err);
-    console.error('[Analytics] Stack:', err instanceof Error ? err.stack : 'N/A');
     // Analytics is optional — never crash the app
+  } finally {
+    // Even if Firebase failed, drain the buffer so app_events still got these
+    // via trackAppEvent at fire time and Firebase gets whatever is possible.
+    initSettled = true;
+    drainPreInitQueue();
+  }
+}
+
+function drainPreInitQueue(): void {
+  while (preInitQueue.length > 0) {
+    const { eventName, params } = preInitQueue.shift()!;
+    fireFirebaseEvent(eventName, params);
+  }
+}
+
+function fireFirebaseEvent(
+  eventName: string,
+  params?: Record<string, string | number | boolean>,
+): void {
+  if (!instance) return; // Firebase unavailable — app_events already has it
+  try {
+    logEvent(instance, eventName, params);
+    debugLog(`Event: ${eventName}`, params);
+  } catch (err) {
+    console.error(`[Analytics] Failed to log event ${eventName}:`, err);
   }
 }
 
@@ -72,56 +127,62 @@ export function logAnalyticsEvent(
   eventName: string,
   params?: Record<string, string | number | boolean>,
 ): void {
-  if (!instance) {
-    console.warn(`[Analytics] Event logged but analytics not initialized: ${eventName}`, params);
+  // Our own pipeline first — independent of Firebase init state.
+  trackAppEvent(eventName, params);
+
+  if (!initSettled) {
+    // Buffer until initAnalytics() settles so startup events reach Firebase
+    // with the user identity already set.
+    if (preInitQueue.length < PRE_INIT_QUEUE_CAP) preInitQueue.push({ eventName, params });
     return;
   }
-  try {
-    logEvent(instance, eventName, params);
-    console.log(`[Analytics] Event: ${eventName}`, params);
-  } catch (err) {
-    console.error(`[Analytics] Failed to log event ${eventName}:`, err);
+  fireFirebaseEvent(eventName, params);
+}
+
+/**
+ * Page view: Firebase keeps its conventional `page_view`, while app_events
+ * gets `screen_view` — the same name the mobile app sends, so cross-platform
+ * screen analytics aggregate in one place.
+ */
+export function logPageViewEvent(path: string): void {
+  trackAppEvent('screen_view', { page_path: path });
+
+  if (!initSettled) {
+    if (preInitQueue.length < PRE_INIT_QUEUE_CAP) {
+      preInitQueue.push({ eventName: 'page_view', params: { page_path: path } });
+    }
+    return;
   }
+  fireFirebaseEvent('page_view', { page_path: path });
 }
 
 export function setAnalyticsUser(userId: string): void {
-  if (!instance) {
-    console.warn(`[Analytics] User ID set but analytics not initialized: ${userId}`);
-    return;
-  }
+  if (!instance) return;
   try {
     setUserId(instance, userId);
-    console.log(`[Analytics] User ID set: ${userId}`);
+    debugLog(`User ID set: ${userId}`);
   } catch (err) {
-    console.error(`[Analytics] Failed to set user ID:`, err);
+    console.error('[Analytics] Failed to set user ID:', err);
   }
 }
 
 export function clearAnalyticsUser(): void {
-  if (!instance) {
-    console.warn('[Analytics] Clear user but analytics not initialized');
-    return;
-  }
+  if (!instance) return;
   try {
     // Firebase typing requires a string, but null clears the user
     setUserId(instance, null as unknown as string);
-    console.log('[Analytics] User ID cleared');
+    debugLog('User ID cleared');
   } catch (err) {
-    console.error(`[Analytics] Failed to clear user ID:`, err);
+    console.error('[Analytics] Failed to clear user ID:', err);
   }
 }
 
-export function setAnalyticsUserProperties(
-  props: Record<string, string>,
-): void {
-  if (!instance) {
-    console.warn('[Analytics] User properties set but analytics not initialized', props);
-    return;
-  }
+export function setAnalyticsUserProperties(props: Record<string, string>): void {
+  if (!instance) return;
   try {
     setUserProperties(instance, props);
-    console.log('[Analytics] User properties set:', props);
+    debugLog('User properties set:', props);
   } catch (err) {
-    console.error(`[Analytics] Failed to set user properties:`, err);
+    console.error('[Analytics] Failed to set user properties:', err);
   }
 }
