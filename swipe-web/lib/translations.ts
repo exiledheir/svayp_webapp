@@ -393,10 +393,8 @@ export interface Translations {
   tryOnPhotoHint: string;
   tryOnUploading: string;
   tryOnPhotoFailed: string;
-  tryOnPhotoExamplesTitle: string;
-  tryOnPhotoTip1: string;
-  tryOnPhotoTip2: string;
-  tryOnPhotoTip3: string;
+  tryOnPhotoWhatTitle: string;
+  tryOnPhotoWhatBody: string;
   tryOnDeleteTitle: string;
   tryOnDeleteBody: string;
   tryOnDeleteFailed: string;
@@ -1052,10 +1050,8 @@ const en: Translations = {
   tryOnPhotoHint: 'Full-length photo, good lighting, facing the camera',
   tryOnUploading: 'Uploading…',
   tryOnPhotoFailed: 'Upload failed. Try another photo.',
-  tryOnPhotoExamplesTitle: 'Good example photos',
-  tryOnPhotoTip1: 'Full length',
-  tryOnPhotoTip2: 'Good lighting',
-  tryOnPhotoTip3: 'Plain background',
+  tryOnPhotoWhatTitle: 'What photo should you upload?',
+  tryOnPhotoWhatBody: 'For the best results, upload a full-body photo of only yourself standing against a plain (preferably white) or clean background. Make sure your full body is visible and your outfit is not covered.',
   tryOnDeleteTitle: 'Delete this look?',
   tryOnDeleteBody: "This can't be undone.",
   tryOnDeleteFailed: 'Failed to delete. Please try again.',
@@ -1706,10 +1702,8 @@ const ru: Translations = {
   tryOnPhotoHint: 'Фото в полный рост, хорошее освещение, лицом к камере',
   tryOnUploading: 'Загрузка…',
   tryOnPhotoFailed: 'Не удалось загрузить. Попробуйте другое фото.',
-  tryOnPhotoExamplesTitle: 'Хорошие примеры фото',
-  tryOnPhotoTip1: 'В полный рост',
-  tryOnPhotoTip2: 'Хорошее освещение',
-  tryOnPhotoTip3: 'Простой фон',
+  tryOnPhotoWhatTitle: 'Какое фото загрузить?',
+  tryOnPhotoWhatBody: 'Для лучшего результата загрузите фото в полный рост, где вы стоите одна на однотонном (желательно белом) или чистом фоне. Не обрезайте ноги и не закрывайте одежду или фигуру.',
   tryOnDeleteTitle: 'Удалить этот образ?',
   tryOnDeleteBody: 'Это действие нельзя отменить.',
   tryOnDeleteFailed: 'Не удалось удалить. Попробуйте снова.',
@@ -2359,10 +2353,8 @@ const uz: Translations = {
   tryOnPhotoHint: "To'liq bo'yli surat, yaxshi yorug'lik, kameraga qarab",
   tryOnUploading: 'Yuklanmoqda…',
   tryOnPhotoFailed: "Yuklab bo'lmadi. Boshqa surat tanlang.",
-  tryOnPhotoExamplesTitle: 'Yaxshi surat namunalari',
-  tryOnPhotoTip1: "To'liq bo'y",
-  tryOnPhotoTip2: "Yaxshi yorug'lik",
-  tryOnPhotoTip3: 'Sodda fon',
+  tryOnPhotoWhatTitle: 'Qanday surat yuklash kerak?',
+  tryOnPhotoWhatBody: "Yaxshi natija uchun to'liq bo'yda, faqat o'zingiz tushgan, oddiy (yaxshisi oq) yoki toza fonli suratni yuklang. Oyoqlaringiz to'liq ko'rinsin va kiyimingiz yopilib qolmasin.",
   tryOnDeleteTitle: "Bu obrazni o'chirilsinmi?",
   tryOnDeleteBody: "Buni qaytarib bo'lmaydi.",
   tryOnDeleteFailed: "O'chirib bo'lmadi. Qaytadan urinib ko'ring.",
