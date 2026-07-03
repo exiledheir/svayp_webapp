@@ -15,6 +15,11 @@ body {
   overscroll-behavior-y: none;
   /* Hide all scrollbars globally */
   scrollbar-width: none;
+  /* No pinch-zoom anywhere (accidental magnification breaks the layout).
+     pan-x/pan-y keep normal scrolling; elements that need their own gestures
+     (outfit canvas) override touch-action locally. Belt-and-suspenders with the
+     viewport meta (user-scalable=no) and the native WebView zoom lock. */
+  touch-action: pan-x pan-y;
 }
 
 /* ── Dark theme base ──────────────────────────────────────────────────────── */
