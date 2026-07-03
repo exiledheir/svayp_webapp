@@ -23,10 +23,17 @@ import { useEffect } from 'react';
 export function useRootBackGuard(): void {
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    // Marker read by the native shell's Back handler: while a tab-root page is
+    // mounted (and no overlay is open — see use-overlay-back-close), Back should
+    // fall through to native tab-switch / app-exit instead of history.back().
+    (window as unknown as { __svaypTabRoot?: boolean }).__svaypTabRoot = true;
     const seed = () => window.history.pushState(window.history.state, '', window.location.href);
     seed();
     const onPopState = () => seed();
     window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
+    return () => {
+      (window as unknown as { __svaypTabRoot?: boolean }).__svaypTabRoot = false;
+      window.removeEventListener('popstate', onPopState);
+    };
   }, []);
 }
