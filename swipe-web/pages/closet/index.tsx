@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2, ArrowUpRight, BookOpen, MessageCircle } from 'lucide-react';
+import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2, ArrowUpRight, BookOpen, MessageCircle, Share2 } from 'lucide-react';
 import { getUser, clearTokens } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags-context';
 import { useRootBackGuard } from '@/lib/use-root-back-guard';
@@ -21,6 +21,7 @@ import { logAnalyticsEvent, clearAnalyticsUser } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
 import { useTheme } from '@/lib/theme';
 import { isInFlutterWebView } from '@/lib/flutter-bridge';
+import { shareImageBlob, fetchImageBlob } from '@/lib/share-image';
 import { openSupportChat } from '@/lib/support-chat';
 import { saveUploadPreview, getUploadPreview, clearUploadPreview } from '@/lib/upload-previews';
 import { compressImageForUpload } from '@/lib/image-utils';
@@ -2531,6 +2532,11 @@ function OutfitCard({
                   <Sparkles size={18} style={{ color: 'rgb(243, 112, 167)' }} />
                 )}
               </button>
+              {!isAiSuggesting && (
+                <span className="text-[9px] font-semibold leading-none whitespace-nowrap" style={{ color: 'rgb(243, 112, 167)' }}>
+                  {t.generateOutfitLabel}
+                </span>
+              )}
               <span className="text-[9px] font-semibold leading-none" style={{ color: isAiSuggesting ? '#6366f1' : '#9ca3af' }}>
                 {isAiSuggesting ? 'AI…' : `${genCount}/${regenLimit}`}
               </span>
@@ -3177,9 +3183,23 @@ function ItemEditSheet({
   onSave: (id: string, selection: ItemOptionsSelection) => void;
 }) {
   const [selection, setSelection] = useState<ItemOptionsSelection>(() => selectionFromItem(item));
+  const [isSharing, setIsSharing] = useState(false);
   const { t, locale } = useI18n();
   const { theme } = useTheme();
   const dark = theme === 'dark';
+
+  async function handleShare() {
+    if (!item.imageData || isSharing) return;
+    setIsSharing(true);
+    try {
+      const blob = await fetchImageBlob(item.imageData);
+      await shareImageBlob(blob, `libas-item-${item.id}.png`);
+    } catch {
+      /* share cancelled or fetch failed — no-op */
+    } finally {
+      setIsSharing(false);
+    }
+  }
 
   return (
     <div
@@ -3218,7 +3238,7 @@ function ItemEditSheet({
           </div>
         </div>
 
-        {/* Delete + Save buttons */}
+        {/* Delete + Share + Save buttons */}
         <div className="flex gap-2.5 px-5 pt-3 pb-8 shrink-0">
           <button
             onClick={() => onDelete(item.id)}
@@ -3226,6 +3246,15 @@ function ItemEditSheet({
             style={{ background: 'rgba(239,68,68,0.1)' }}
           >
             {t.delete}
+          </button>
+          <button
+            onClick={handleShare}
+            disabled={isSharing}
+            aria-label={t.share}
+            title={t.share}
+            className="shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-[#2a2a2a] disabled:opacity-50"
+          >
+            {isSharing ? <Loader2 size={16} className="animate-spin" /> : <Share2 size={16} />}
           </button>
           <button
             onClick={() => onSave(item.id, selection)}

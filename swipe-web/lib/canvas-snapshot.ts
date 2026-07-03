@@ -1,6 +1,7 @@
 import type { ClosetItem } from '@/lib/closet-storage';
 import type { SavedCanvasLayout } from '@/lib/closet-types';
 import { saveImageToGallery } from '@/lib/flutter-bridge';
+import { shareImageBlob } from '@/lib/share-image';
 
 /**
  * Render a flat-lay canvas layout to a PNG blob (used as the try-on snapshot input).
@@ -50,8 +51,8 @@ export async function captureCanvasSnapshot(layout: SavedCanvasLayout, allItems:
   );
 }
 
-/** Download a try-on result image with the LIBΛS watermark burned in. */
-export async function downloadWithWatermark(resultUrl: string): Promise<void> {
+/** Render a try-on result image with the LIBΛS watermark burned in, as a JPEG blob. */
+export async function renderWatermarkedBlob(resultUrl: string): Promise<Blob> {
   const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(resultUrl)}`;
   const img = new window.Image();
   img.crossOrigin = 'anonymous';
@@ -91,31 +92,35 @@ export async function downloadWithWatermark(resultUrl: string): Promise<void> {
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur = 0;
 
-  return new Promise<void>((resolve, reject) => {
-    canvas.toBlob(async (blob) => {
-      if (!blob) {
-        resolve();
-        return;
-      }
-      const filename = `libas-tryon-${Date.now()}.jpg`;
-      try {
-        // Inside the Flutter WebView, `<a download>` is a no-op — hand the
-        // image to the native app so it lands in the device photo gallery.
-        const savedNatively = await saveImageToGallery(blob, filename);
-        if (!savedNatively) {
-          const blobUrl = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = blobUrl;
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-        }
-        resolve();
-      } catch (err) {
-        reject(err);
-      }
-    }, 'image/jpeg', 0.95);
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('toBlob failed'))),
+      'image/jpeg',
+      0.95,
+    );
   });
+}
+
+/** Download a try-on result image with the LIBΛS watermark burned in. */
+export async function downloadWithWatermark(resultUrl: string): Promise<void> {
+  const blob = await renderWatermarkedBlob(resultUrl);
+  const filename = `libas-tryon-${Date.now()}.jpg`;
+  // Inside the Flutter WebView, `<a download>` is a no-op — hand the image to the
+  // native app so it lands in the device photo gallery.
+  const savedNatively = await saveImageToGallery(blob, filename);
+  if (savedNatively) return;
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+}
+
+/** Share a try-on result image with the LIBΛS watermark burned in. */
+export async function shareWatermarked(resultUrl: string): Promise<void> {
+  const blob = await renderWatermarkedBlob(resultUrl);
+  await shareImageBlob(blob, `libas-tryon-${Date.now()}.jpg`);
 }
