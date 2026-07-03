@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { X, Sparkles, Loader2, RefreshCw, User, Camera, Check } from 'lucide-react';
+import { X, Sparkles, Loader2, RefreshCw, User, Camera, Check, ZoomIn } from 'lucide-react';
 import type { ClosetItem } from '@/lib/closet-storage';
 import type { SavedCanvasLayout } from '@/lib/closet-types';
 import { useI18n } from '@/lib/i18n';
@@ -52,12 +52,22 @@ export function TryOnConfirmModal({
 }) {
   const { t } = useI18n();
 
-  // Куда примеряем: на манекен (по умолчанию) или на своё загруженное фото.
-  const [target, setTarget] = useState<'mannequin' | 'self'>('mannequin');
+  // Куда примеряем: на своё загруженное фото (по умолчанию) или на манекен.
+  const [target, setTarget] = useState<'mannequin' | 'self'>('self');
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [personKey, setPersonKey] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState(false);
+  // Увеличенный просмотр примера-фото (лайтбокс).
+  const [zoomSrc, setZoomSrc] = useState<string | null>(null);
+  // Свайп вниз закрывает шторку (за «ручку» мышью, или потянув контент вниз,
+  // когда он прокручен до самого верха).
+  const [dragY, setDragY] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [entered, setEntered] = useState(false); // анимация появления
+  const [closing, setClosing] = useState(false); // анимация закрытия
+  const sheetRef = useRef<HTMLDivElement | null>(null);
+  const closeTimerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   async function handlePhotoPick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -86,11 +96,127 @@ export function TryOnConfirmModal({
     onConfirm({ personImageKey: target === 'self' ? personKey ?? undefined : undefined });
   }
 
-  // Отказ на экране подтверждения — примерка брошена после tryon_initiated.
-  function handleCancel() {
+  // Закрытие с анимацией: доводим шторку вниз и гасим фон, затем размонтируем.
+  // (примерка брошена после tryon_initiated — логируем один раз в начале ухода).
+  const CLOSE_MS = 260;
+  function requestClose() {
+    if (closing) return;
+    setClosing(true);
+    setDragging(false);
     logAnalyticsEvent(Events.TRYON_ABANDONED, { [Params.STEP]: 'confirm' });
-    onCancel();
+    closeTimerRef.current = window.setTimeout(onCancel, CLOSE_MS);
   }
+
+  // Порог закрытия свайпом.
+  const DISMISS_THRESHOLD = 110;
+
+  // Мышь/стилус: тянем вниз от «ручки» или от контента, прокрученного до самого
+  // верха (тач обрабатывается отдельным эффектом, чтобы не ломать нативный скролл).
+  function handleSheetPointerDown(e: React.PointerEvent) {
+    if (e.pointerType === 'touch' || closing) return;
+    if ((sheetRef.current?.scrollTop ?? 0) > 0) return; // тянем только от верха
+    const startY = e.clientY;
+    let curD = 0;
+    const onMove = (ev: PointerEvent) => {
+      const d = ev.clientY - startY;
+      if (d > 4) { curD = d; setDragging(true); setDragY(d); }
+      else if (curD !== 0) { curD = 0; setDragging(false); setDragY(0); }
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      if (curD > DISMISS_THRESHOLD) requestClose();
+      else { setDragging(false); setDragY(0); }
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }
+
+  // Всегда актуальная ссылка на закрытие — чтобы тач-эффект можно было завесить один раз.
+  const cancelRef = useRef(requestClose);
+  cancelRef.current = requestClose;
+
+  // Плавное появление шторки + очистка таймера закрытия при размонтировании.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setEntered(true));
+    return () => {
+      cancelAnimationFrame(id);
+      if (closeTimerRef.current != null) clearTimeout(closeTimerRef.current);
+    };
+  }, []);
+
+  // На открытии прокручиваем шторку вниз, чтобы сразу была видна кнопка загрузки.
+  useEffect(() => {
+    const el = sheetRef.current;
+    if (!el) return;
+    const id = requestAnimationFrame(() => {
+      el.scrollTo({ top: el.scrollHeight });
+    });
+    return () => cancelAnimationFrame(id);
+    // Пересчитываем при переключении режима (в «self» контент выше).
+  }, [target]);
+
+  // Тач-жест: скроллим контент как обычно, но у самого верха «оттягивание» вниз
+  // тянет всю шторку и за порогом закрывает её.
+  useEffect(() => {
+    const el = sheetRef.current;
+    if (!el) return;
+    let startY = 0;
+    let active = false; // жест перешёл в перетаскивание шторки
+    let dy = 0;
+
+    function onStart(e: TouchEvent) {
+      if (e.touches.length !== 1) return;
+      startY = e.touches[0].clientY;
+      active = false;
+      dy = 0;
+    }
+    function onMove(e: TouchEvent) {
+      const y = e.touches[0].clientY;
+      if (!active) {
+        // Перехватываем только когда прокручены до верха и тянем вниз.
+        if (el!.scrollTop <= 0 && y - startY > 4) {
+          active = true;
+          setDragging(true);
+          startY = y; // сдвиг считаем от точки захвата, чтобы не было рывка
+          return; // перевод применяем со следующего кадра
+        }
+        return; // обычный скролл
+      }
+      const delta = y - startY;
+      if (delta <= 0) {
+        // Вернулись выше точки захвата — отпускаем, отдаём скроллу.
+        active = false;
+        dy = 0;
+        setDragging(false);
+        setDragY(0);
+        startY = y;
+        return;
+      }
+      e.preventDefault(); // гасим нативный скролл/оверскролл, пока тянем
+      dy = delta;
+      setDragY(delta);
+    }
+    function onEnd() {
+      if (!active) return;
+      const shouldClose = dy > DISMISS_THRESHOLD;
+      active = false;
+      setDragging(false);
+      if (shouldClose) cancelRef.current();
+      else setDragY(0);
+    }
+
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchend', onEnd);
+    el.addEventListener('touchcancel', onEnd);
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+      el.removeEventListener('touchcancel', onEnd);
+    };
+  }, []);
 
   const displayEntries = React.useMemo(() => {
     if (!savedLayout || savedLayout.length === 0) return [];
@@ -103,18 +229,38 @@ export function TryOnConfirmModal({
       .filter(Boolean) as { item: ClosetItem; x: number; y: number; scale: number; zIndex: number }[];
   }, [savedLayout, items]);
 
+  // Позиция шторки: закрытие/до-появления — уводим вниз; иначе следуем за пальцем.
+  const sheetTransform =
+    closing || !entered
+      ? 'translateY(100%)'
+      : dragY
+      ? `translateY(${dragY}px)`
+      : 'translateY(0)';
+
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 backdrop-blur-sm"
-      onClick={handleCancel}
+      className="fixed inset-0 z-[80] flex items-end justify-center"
+      onClick={requestClose}
     >
+      {/* Затемнение — отдельным слоем, чтобы гаснуть независимо от съезжающей шторки */}
       <div
-        className="w-full max-w-[430px] rounded-t-3xl bg-white shadow-2xl max-h-[94vh] overflow-y-auto"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        style={{ opacity: closing || !entered ? 0 : 1, transition: `opacity ${CLOSE_MS}ms ease` }}
+      />
+      <div
+        ref={sheetRef}
+        className="relative w-full max-w-[430px] rounded-t-3xl bg-white shadow-2xl max-h-[94vh] overflow-y-auto overscroll-contain"
         onClick={(e) => e.stopPropagation()}
+        onPointerDown={handleSheetPointerDown}
+        style={{
+          transform: sheetTransform,
+          transition: dragging && !closing ? 'none' : `transform ${CLOSE_MS}ms ease`,
+          userSelect: dragging ? 'none' : undefined,
+        }}
       >
-        {/* Drag handle */}
-        <div className="flex justify-center pt-3 pb-2">
-          <div className="w-9 h-1 rounded-full bg-gray-200" />
+        {/* Drag handle — drag down (from here or the top of the content) to dismiss */}
+        <div className="flex justify-center pt-3 pb-2.5 cursor-grab active:cursor-grabbing touch-none">
+          <div className="w-9 h-1 rounded-full bg-gray-300" />
         </div>
 
         {/* Outfit preview */}
@@ -199,18 +345,20 @@ export function TryOnConfirmModal({
         {/* Photo upload area + example photos — only in "self" mode */}
         {target === 'self' && (
           <div className="px-5 pt-3">
-            {/* Example photos so users know how to shoot for a great result */}
-            <p className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 mb-2">
-              <Sparkles size={12} className="text-[#F370A7]" />
-              {t.tryOnPhotoExamplesTitle}
-            </p>
+            {/* Guidance: what photo to upload */}
+            <div className="rounded-2xl p-3.5 mb-3" style={{ background: 'rgba(243,112,167,0.05)' }}>
+              <p className="text-[13px] font-bold text-gray-900">{t.tryOnPhotoWhatTitle}</p>
+              <p className="text-[12px] text-gray-500 leading-relaxed mt-1">{t.tryOnPhotoWhatBody}</p>
+            </div>
+
+            {/* Example photos — tap to view larger */}
             <div className="grid grid-cols-3 gap-2 mb-3">
               {[
-                { src: '/images/closet/tryon/example-1.png', cap: t.tryOnPhotoTip1 },
-                { src: '/images/closet/tryon/example-2.png', cap: t.tryOnPhotoTip2 },
-                { src: '/images/closet/tryon/example-3.png', cap: t.tryOnPhotoTip3 },
-              ].map((ex) => (
-                <ExamplePhoto key={ex.src} src={ex.src} caption={ex.cap} />
+                '/images/closet/tryon/example-1.webp',
+                '/images/closet/tryon/example-2.webp',
+                '/images/closet/tryon/example-3.webp',
+              ].map((src, i) => (
+                <ExamplePhoto key={src} src={src} alt={`${t.tryOnPhotoWhatTitle} ${i + 1}`} onZoom={() => setZoomSrc(src)} />
               ))}
             </div>
 
@@ -221,30 +369,46 @@ export function TryOnConfirmModal({
               className="hidden"
               onChange={handlePhotoPick}
             />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="w-full h-11 rounded-2xl border border-dashed flex items-center justify-center gap-2 text-[13px] font-semibold text-gray-700 disabled:opacity-60"
-              style={{ borderColor: '#F370A7', background: 'rgba(243,112,167,0.03)' }}
-            >
-              {uploading ? (
-                <><Loader2 size={15} className="animate-spin" /> {t.tryOnUploading}</>
-              ) : personKey ? (
-                <><Check size={15} className="text-[#16a34a]" /> {t.tryOnChangePhoto}</>
-              ) : (
-                <><Camera size={15} className="text-[#F370A7]" /> {t.tryOnUploadPhoto}</>
-              )}
-            </button>
-            <p className="text-[11px] text-center mt-1.5" style={{ color: photoError ? '#ef4444' : '#9ca3af' }}>
-              {photoError ? t.tryOnPhotoFailed : t.tryOnPhotoHint}
-            </p>
+            {personKey && !uploading ? (
+              // Фото уже выбрано — кнопка становится тихой второстепенной.
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full h-11 rounded-2xl border flex items-center justify-center gap-2 text-[13px] font-semibold text-gray-700"
+                style={{ borderColor: '#e5e7eb', background: '#fff' }}
+              >
+                <Check size={15} className="text-[#16a34a]" /> {t.tryOnChangePhoto}
+              </button>
+            ) : (
+              // Ещё нет фото — это главный следующий шаг, выделяем его.
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="w-full h-12 rounded-2xl flex items-center justify-center gap-2 text-[14px] font-bold text-white disabled:opacity-80"
+                style={{
+                  background: 'linear-gradient(135deg, #F370A7 0%, #e0409a 50%, #F370A7 100%)',
+                  backgroundSize: '200% auto',
+                  boxShadow: '0 6px 22px rgba(243,112,167,0.5)',
+                }}
+              >
+                {uploading ? (
+                  <><Loader2 size={16} className="animate-spin" /> {t.tryOnUploading}</>
+                ) : (
+                  <><Camera size={17} /> {t.tryOnUploadPhoto}</>
+                )}
+              </button>
+            )}
+            {photoError && (
+              <p className="text-[11px] text-center mt-1.5" style={{ color: '#ef4444' }}>
+                {t.tryOnPhotoFailed}
+              </p>
+            )}
           </div>
         )}
 
         {/* Buttons */}
         <div className="flex gap-3 px-5 pt-3 pb-8">
           <button
-            onClick={handleCancel}
+            onClick={requestClose}
             className="flex-1 h-12 rounded-full bg-gray-100 text-gray-700 text-[13px] font-semibold"
           >
             {t.tryOnCancel}
@@ -264,6 +428,30 @@ export function TryOnConfirmModal({
           </button>
         </div>
       </div>
+
+      {/* Enlarged example-photo viewer (lightbox) */}
+      {zoomSrc && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/85 p-6"
+          onClick={(e) => { e.stopPropagation(); setZoomSrc(null); }}
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); setZoomSrc(null); }}
+            aria-label={t.close}
+            className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/15 backdrop-blur flex items-center justify-center"
+          >
+            <X size={20} className="text-white" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={zoomSrc}
+            alt=""
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-full rounded-2xl shadow-2xl"
+            style={{ maxHeight: '85vh', objectFit: 'contain' }}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -284,33 +472,37 @@ function SelectBadge({ active }: { active: boolean }) {
 }
 
 /**
- * One example photo showing how to shoot for a good try-on result. Falls back to
- * a neutral silhouette placeholder if the image file is missing, so the captions
- * still teach and the layout stays stable.
+ * One example photo showing how to shoot for a good try-on result. Tapping it
+ * opens the enlarged viewer. Falls back to a neutral silhouette placeholder if
+ * the image file is missing, so the layout stays stable.
  */
-function ExamplePhoto({ src, caption }: { src: string; caption: string }) {
+function ExamplePhoto({ src, alt, onZoom }: { src: string; alt: string; onZoom: () => void }) {
   const [ok, setOk] = useState(true);
   return (
-    <div>
-      <div className="relative rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center" style={{ aspectRatio: '2 / 3' }}>
-        {ok ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={src}
-            alt={caption}
-            onError={() => setOk(false)}
-            loading="lazy"
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <User size={26} className="text-gray-300" />
-        )}
-      </div>
-      <p className="flex items-center justify-center gap-0.5 text-[10px] text-gray-500 mt-1 leading-tight">
-        <Check size={10} className="text-[#16a34a] shrink-0" strokeWidth={3} />
-        {caption}
-      </p>
-    </div>
+    <button
+      type="button"
+      onClick={ok ? onZoom : undefined}
+      className="group relative rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center"
+      style={{ aspectRatio: '2 / 3', cursor: ok ? 'zoom-in' : 'default' }}
+    >
+      {ok ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt={alt}
+          onError={() => setOk(false)}
+          loading="lazy"
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <User size={26} className="text-gray-300" />
+      )}
+      {ok && (
+        <span className="absolute bottom-1.5 right-1.5 w-6 h-6 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center">
+          <ZoomIn size={13} className="text-white" />
+        </span>
+      )}
+    </button>
   );
 }
 
