@@ -5,6 +5,7 @@ import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Loader2, 
 import { getUser, clearTokens } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags-context';
 import { useRootBackGuard } from '@/lib/use-root-back-guard';
+import { useOverlayBackClose } from '@/lib/use-overlay-back-close';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import { fetchClosetItems, addClosetItemFromFile, removeClosetItem, updateClosetItemApi, getClosetItems, addClosetItem, deleteClosetItem, updateClosetItem } from '@/lib/closet-storage';
 import type { ClosetItem, ClosetCategory } from '@/lib/closet-storage';
@@ -22,6 +23,7 @@ import { Events, Params } from '@/lib/analytics-events';
 import { useTheme } from '@/lib/theme';
 import { isInFlutterWebView } from '@/lib/flutter-bridge';
 import { shareImageBlob, fetchImageBlob } from '@/lib/share-image';
+import ShareSheet from '@/components/ShareSheet';
 import { openSupportChat } from '@/lib/support-chat';
 import { saveUploadPreview, getUploadPreview, clearUploadPreview } from '@/lib/upload-previews';
 import { compressImageForUpload } from '@/lib/image-utils';
@@ -89,10 +91,10 @@ const DEMO_ITEM_IDS = new Set([
 ]);
 
 const DEMO_ITEMS: ClosetItem[] = [
-  { id: '0d1b6b18-bd57-4a3e-a4c4-5aac9ca5fa5e', category: 'tops',   imageData: 'https://svaypimages2.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2F4f7dbf50-c725-418c-b9ca-4a7f14eef80a.thumb.png',  createdAt: '2024-01-01T00:00:00Z' },
-  { id: 'd101c8a6-35fa-4cba-9a7c-e7288947f3b2', category: 'skirts', imageData: 'https://svaypimages2.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2Fd44bec44-ad12-41ad-a08c-ce90b863d0f3.thumb.png', createdAt: '2024-01-01T00:00:00Z' },
-  { id: 'da66eb48-1cd7-4087-8a1f-16a011bcae3e', category: 'shoes',  imageData: 'https://svaypimages2.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2F8d912326-ee36-41bf-988f-0cde9bbedce3.thumb.png',  createdAt: '2024-01-01T00:00:00Z' },
-  { id: 'fb18130c-1192-4d32-aa84-0d5a837a3bcd', category: 'bags',   imageData: 'https://svaypimages2.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2F32150c11-a5f4-4b32-98b1-49c8ed2a952a.thumb.png',  createdAt: '2024-01-01T00:00:00Z' },
+  { id: '0d1b6b18-bd57-4a3e-a4c4-5aac9ca5fa5e', category: 'tops',   imageData: 'https://libasimages.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2F4f7dbf50-c725-418c-b9ca-4a7f14eef80a.thumb.png',  createdAt: '2024-01-01T00:00:00Z' },
+  { id: 'd101c8a6-35fa-4cba-9a7c-e7288947f3b2', category: 'skirts', imageData: 'https://libasimages.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2Fd44bec44-ad12-41ad-a08c-ce90b863d0f3.thumb.png', createdAt: '2024-01-01T00:00:00Z' },
+  { id: 'da66eb48-1cd7-4087-8a1f-16a011bcae3e', category: 'shoes',  imageData: 'https://libasimages.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2F8d912326-ee36-41bf-988f-0cde9bbedce3.thumb.png',  createdAt: '2024-01-01T00:00:00Z' },
+  { id: 'fb18130c-1192-4d32-aa84-0d5a837a3bcd', category: 'bags',   imageData: 'https://libasimages.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2F32150c11-a5f4-4b32-98b1-49c8ed2a952a.thumb.png',  createdAt: '2024-01-01T00:00:00Z' },
 ];
 
 const DEMO_CANVAS_LAYOUT: SavedCanvasLayout = [
@@ -379,6 +381,26 @@ export default function ClosetPage() {
 
   const [editItem, setEditItem] = useState<ClosetItem | null>(null);
   const [tryOnState, setTryOnState] = useState<{ status: 'loading' | 'processing' | 'completed' | 'failed'; resultUrl?: string; failureReason?: string; previewImages?: string[] } | null>(null);
+
+  // Close the canvas overlay (X button AND hardware Back). Removes a brand-new
+  // empty canvas entry so cancelling creation doesn't leave a blank board.
+  const closeCanvas = () => {
+    if (editingCanvasIdx !== null) {
+      const c = canvases[editingCanvasIdx];
+      if (c && !c.id && c.layout.length === 0) {
+        setCanvases((prev) => prev.filter((_, i) => i !== editingCanvasIdx));
+      }
+    }
+    setEditingCanvasIdx(null);
+    setCanvasData(null);
+  };
+
+  // Hardware/gesture Back closes full-screen overlays (canvas, try-on, item
+  // editor, view-all) instead of navigating the WebView away to another tab.
+  useOverlayBackClose(canvasData !== null, closeCanvas);
+  useOverlayBackClose(tryOnState !== null, () => setTryOnState(null));
+  useOverlayBackClose(editItem !== null, () => setEditItem(null));
+  useOverlayBackClose(viewAll !== null, () => setViewAll(null));
   const [showTryOnConfirm, setShowTryOnConfirm] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const [tryOnDeleteFailed, setTryOnDeleteFailed] = useState(false);
@@ -1127,7 +1149,7 @@ export default function ClosetPage() {
     // Skipped for "на своё фото": a real person photo must go through the ML pipeline.
     if (hasDemoItems && !tryOnPersonKeyRef.current) {
       tryOnOverrideRef.current = null;
-      const DEMO_TRYON_URL = 'https://svaypimages2.blob.core.windows.net/product-images/try-on%2F07bbfdf7-504d-44f4-9880-6003831845cf%2F1e088b17-ed7d-4e79-8daf-6cae0a3f979b.png';
+      const DEMO_TRYON_URL = 'https://libasimages.blob.core.windows.net/product-images/try-on%2F07bbfdf7-504d-44f4-9880-6003831845cf%2F1e088b17-ed7d-4e79-8daf-6cae0a3f979b.png';
       setTryOnState({ status: 'completed', resultUrl: DEMO_TRYON_URL });
       saveTryOnResult(DEMO_TRYON_URL);
       return;
@@ -1543,17 +1565,7 @@ export default function ClosetPage() {
           acc={canvasData.acc}
           initialLayout={canvasInitialLayout}
           allItems={items}
-          onClose={() => {
-            // If this was a brand-new canvas with no items saved yet, remove the empty entry
-            if (editingCanvasIdx !== null) {
-              const c = canvases[editingCanvasIdx];
-              if (c && !c.id && c.layout.length === 0) {
-                setCanvases((prev) => prev.filter((_, i) => i !== editingCanvasIdx));
-              }
-            }
-            setEditingCanvasIdx(null);
-            setCanvasData(null);
-          }}
+          onClose={closeCanvas}
           onSave={(layout) => {
             if (editingCanvasIdx !== null) {
               setCanvases((prev) => {
@@ -1980,7 +1992,10 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
       </div>
 
       {activeTab === 'boards' && (
-      <div className={`flex gap-3 hide-scrollbar py-2 ${isEmpty ? 'justify-center px-4' : 'overflow-x-auto pl-4'}`}>
+      <div
+        className={`flex gap-3 hide-scrollbar py-2 ${isEmpty ? 'justify-center px-4' : 'overflow-x-auto pl-4'}`}
+        style={{ overscrollBehaviorX: 'contain', contain: 'layout paint' }}
+      >
         {/* Render all canvas cards */}
         {canvases.length > 0 ? canvases.map((canvas, idx) => (
           <OutfitCard
@@ -2189,7 +2204,10 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
 
   return (
     <>
-      <div className="flex gap-3 hide-scrollbar py-2 overflow-x-auto pl-4">
+      <div
+        className="flex gap-3 hide-scrollbar py-2 overflow-x-auto pl-4"
+        style={{ overscrollBehaviorX: 'contain', contain: 'layout paint' }}
+      >
         {sortedJobs.map((job) => (
           <div
             key={job.id}
@@ -2391,7 +2409,7 @@ function DressMeReel({ items, height }: {
     <div
       ref={scrollRef}
       className="flex items-center overflow-x-auto hide-scrollbar snap-x snap-mandatory"
-      style={{ height }}
+      style={{ height, overscrollBehaviorX: 'contain', contain: 'layout paint' }}
     >
       <div className="shrink-0" style={{ width: '20%' }} />
       {items.map((item) => (
@@ -3184,6 +3202,7 @@ function ItemEditSheet({
 }) {
   const [selection, setSelection] = useState<ItemOptionsSelection>(() => selectionFromItem(item));
   const [isSharing, setIsSharing] = useState(false);
+  const [showShareSheet, setShowShareSheet] = useState(false);
   const { t, locale } = useI18n();
   const { theme } = useTheme();
   const dark = theme === 'dark';
@@ -3248,7 +3267,7 @@ function ItemEditSheet({
             {t.delete}
           </button>
           <button
-            onClick={handleShare}
+            onClick={() => setShowShareSheet(true)}
             disabled={isSharing}
             aria-label={t.share}
             title={t.share}
@@ -3256,6 +3275,9 @@ function ItemEditSheet({
           >
             {isSharing ? <Loader2 size={16} className="animate-spin" /> : <Share2 size={16} />}
           </button>
+          {showShareSheet && (
+            <ShareSheet onClose={() => setShowShareSheet(false)} onExternal={handleShare} />
+          )}
           <button
             onClick={() => onSave(item.id, selection)}
             disabled={!isSelectionComplete(selection)}

@@ -7,6 +7,7 @@ import { useI18n } from '@/lib/i18n';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
 import { downloadWithWatermark, shareWatermarked } from '@/lib/canvas-snapshot';
+import ShareSheet from '@/components/ShareSheet';
 import { uploadModelPhoto } from '@/lib/wardrobe-api';
 
 /**
@@ -527,6 +528,7 @@ export function TryOnModal({
   const { t } = useI18n();
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [showShareSheet, setShowShareSheet] = useState(false);
   const [tipIndex, setTipIndex] = useState(() => Math.floor(Math.random() * 49));
   const [tipFading, setTipFading] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -799,7 +801,7 @@ export function TryOnModal({
                 {t.close}
               </button>
               <button
-                onClick={shareResult}
+                onClick={() => setShowShareSheet(true)}
                 disabled={isSharing}
                 aria-label={t.share}
                 title={t.share}
@@ -811,6 +813,9 @@ export function TryOnModal({
                   <Share2 size={16} />
                 )}
               </button>
+              {showShareSheet && (
+                <ShareSheet onClose={() => setShowShareSheet(false)} onExternal={shareResult} />
+              )}
               <button
                 onClick={() => {
                   logAnalyticsEvent(Events.TRYON_RESULT_SAVED);

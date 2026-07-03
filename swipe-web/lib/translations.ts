@@ -250,6 +250,8 @@ export interface Translations {
   delete: string;
   save: string;
   share: string;
+  shareToFeed: string;
+  shareExternal: string;
   noItemsYet: string;
   language: string;
   upgradeToGetMore: string;
@@ -908,6 +910,8 @@ const en: Translations = {
   delete: 'Delete',
   save: 'Save',
   share: 'Share',
+  shareToFeed: 'Post to feed',
+  shareExternal: 'Share to other apps',
   noItemsYet: 'No items yet',
   language: 'Language',
   upgradeToGetMore: 'Upgrade to unlock',
@@ -1562,6 +1566,8 @@ const ru: Translations = {
   delete: 'Удалить',
   save: 'Сохранить',
   share: 'Поделиться',
+  shareToFeed: 'Опубликовать в ленту',
+  shareExternal: 'Поделиться в другие приложения',
   noItemsYet: 'Пока нет вещей',
   language: 'Язык',
   upgradeToGetMore: 'Нужен план',
@@ -2217,6 +2223,8 @@ const uz: Translations = {
   delete: "O'chirish",
   save: 'Saqlash',
   share: 'Ulashish',
+  shareToFeed: 'Lentaga joylash',
+  shareExternal: "Boshqa ilovalarga ulashish",
   noItemsYet: "Hali narsalar yo'q",
   language: 'Til',
   upgradeToGetMore: "Ko'rish uchun yangilang",
