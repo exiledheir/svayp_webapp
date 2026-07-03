@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { X } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { getFollowers, getFollowing, toggleFollow } from '@/lib/feed-api';
+import { useOverlayBackClose } from '@/lib/use-overlay-back-close';
 import Avatar from '@/components/feed/Avatar';
 import type { FeedFollowUser } from '@/types/feed';
 
@@ -19,6 +20,8 @@ interface Props {
 export default function FollowersSheet({ userId, mode, title, onClose }: Props) {
   const router = useRouter();
   const { t } = useI18n();
+  // Hardware Back closes the sheet instead of navigating the page away.
+  useOverlayBackClose(true, onClose);
   const [rows, setRows] = React.useState<FeedFollowUser[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState<string | null>(null);

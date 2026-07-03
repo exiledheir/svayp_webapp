@@ -2,6 +2,7 @@ import React from 'react';
 import { useRouter } from 'next/router';
 import { Share2, Send } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
+import { useOverlayBackClose } from '@/lib/use-overlay-back-close';
 
 interface Props {
   /** Called when the user picks "share to other apps" (system share sheet). */
@@ -17,6 +18,8 @@ interface Props {
 export default function ShareSheet({ onExternal, onClose }: Props) {
   const router = useRouter();
   const { t } = useI18n();
+  // Hardware Back closes the chooser instead of navigating the page away.
+  useOverlayBackClose(true, onClose);
   return (
     <div
       className="fixed inset-0 z-[95] flex items-end justify-center bg-black/40"
