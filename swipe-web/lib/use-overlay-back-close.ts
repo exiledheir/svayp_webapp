@@ -19,10 +19,18 @@ export function useOverlayBackClose(open: boolean, onClose: () => void): void {
 
   useEffect(() => {
     if (!open || typeof window === 'undefined') return;
+    // Overlay counter read by the native shell's Back handler: while any overlay
+    // is open, Back must go through history.back() (which closes it) even on a
+    // tab-root page.
+    const w = window as unknown as { __svaypOverlays?: number };
+    w.__svaypOverlays = (w.__svaypOverlays ?? 0) + 1;
     // Same-url entry: Back now pops this instead of leaving the page.
     window.history.pushState(window.history.state, '', window.location.href);
     const onPop = () => closeRef.current();
     window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
+    return () => {
+      w.__svaypOverlays = Math.max(0, (w.__svaypOverlays ?? 1) - 1);
+      window.removeEventListener('popstate', onPop);
+    };
   }, [open]);
 }
