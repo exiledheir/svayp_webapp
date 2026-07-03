@@ -249,6 +249,7 @@ export interface Translations {
   stepProcessing: string;
   delete: string;
   save: string;
+  share: string;
   noItemsYet: string;
   language: string;
   upgradeToGetMore: string;
@@ -473,6 +474,7 @@ export interface Translations {
   readyLabel: string;
   moreNeeded: string;
   regenerateWithAI: string;
+  generateOutfitLabel: string;
   aiThinking: string;
   cats: {
     tops: string;
@@ -905,6 +907,7 @@ const en: Translations = {
   stepProcessing: 'Processing…',
   delete: 'Delete',
   save: 'Save',
+  share: 'Share',
   noItemsYet: 'No items yet',
   language: 'Language',
   upgradeToGetMore: 'Upgrade to unlock',
@@ -1181,6 +1184,7 @@ const en: Translations = {
   readyLabel: '✓ Ready!',
   moreNeeded: '{n} more needed',
   regenerateWithAI: 'Regenerate with AI',
+  generateOutfitLabel: 'Generate outfit',
   aiThinking: 'AI is thinking…',
 
   cats: {
@@ -1557,6 +1561,7 @@ const ru: Translations = {
   stepProcessing: 'Обработка…',
   delete: 'Удалить',
   save: 'Сохранить',
+  share: 'Поделиться',
   noItemsYet: 'Пока нет вещей',
   language: 'Язык',
   upgradeToGetMore: 'Нужен план',
@@ -1834,6 +1839,7 @@ const ru: Translations = {
   readyLabel: '✓ Готово!',
   moreNeeded: 'ещё {n}',
   regenerateWithAI: 'Обновить с AI',
+  generateOutfitLabel: 'Генерировать образ',
   aiThinking: 'AI думает…',
 
   cats: {
@@ -2210,6 +2216,7 @@ const uz: Translations = {
   stepProcessing: 'Ishlov berilmoqda…',
   delete: "O'chirish",
   save: 'Saqlash',
+  share: 'Ulashish',
   noItemsYet: "Hali narsalar yo'q",
   language: 'Til',
   upgradeToGetMore: "Ko'rish uchun yangilang",
@@ -2485,6 +2492,7 @@ const uz: Translations = {
   readyLabel: '✓ Tayyor!',
   moreNeeded: 'yana {n} ta',
   regenerateWithAI: 'AI bilan yangilash',
+  generateOutfitLabel: 'Kombinatsiya yaratish',
   aiThinking: "AI o'ylayapti…",
 
   cats: {

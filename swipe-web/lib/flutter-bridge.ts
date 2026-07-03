@@ -17,6 +17,7 @@ export type BridgeMessageType =
   | 'set_language'
   | 'set_theme'
   | 'save_image'
+  | 'share_image'
   | 'open_chat';
 
 export interface AuthCompletePayload {
@@ -120,6 +121,21 @@ export interface SaveImagePayload {
 }
 
 /**
+ * Sent when the user taps "Share" inside the WebView. The Web Share API isn't
+ * available in a WebView, so the web page hands the rendered image to the native
+ * app, which opens the system share sheet (via share_plus).
+ */
+export interface ShareImagePayload {
+  type: 'share_image';
+  /** Base64-encoded image bytes (no `data:` URI prefix). */
+  base64: string;
+  /** Suggested file name, e.g. `libas-look-1700000000000.png`. */
+  filename: string;
+  /** MIME type of the bytes, e.g. `image/png`. */
+  mimeType: string;
+}
+
+/**
  * Sent when the user opens a chat from inside the WebView (e.g. tapping "Чат" on a
  * marketplace listing). The native app navigates to its own chat detail screen for
  * {@link chatId}, so C2C listing chats live in the native chat module alongside C2B.
@@ -140,6 +156,7 @@ export type BridgePayload =
   | SetLanguagePayload
   | SetThemePayload
   | SaveImagePayload
+  | ShareImagePayload
   | OpenChatPayload;
 
 type FlutterBridgeChannel = {
@@ -219,6 +236,28 @@ export async function saveImageToGallery(
     base64,
     filename,
     mimeType: blob.type || 'image/jpeg',
+  });
+  return true;
+}
+
+/**
+ * Hand an image blob to the native app to open the system share sheet. Returns
+ * true when running inside the Flutter WebView (and the message was sent), false
+ * otherwise — callers should fall back to the Web Share API / a browser download.
+ */
+export async function shareImageToNative(
+  blob: Blob,
+  filename: string,
+): Promise<boolean> {
+  // Requires a real messaging channel to post the image to — fall back otherwise
+  // (e.g. iOS, where the channel isn't a plain window property).
+  if (getChannel() === null) return false;
+  const base64 = await blobToBase64(blob);
+  sendToFlutter({
+    type: 'share_image',
+    base64,
+    filename,
+    mimeType: blob.type || 'image/png',
   });
   return true;
 }

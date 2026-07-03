@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Plus, X, Crown, RefreshCw } from 'lucide-react';
+import { Plus, X, Crown, RefreshCw, Share2, Loader2 } from 'lucide-react';
 import type { ClosetItem } from '@/lib/closet-storage';
 import { UPPER_CATS, LOWER_CATS, SHOES_CATS, ACC_CATS, type SavedCanvasLayout, type CanvasGroup } from '@/lib/closet-types';
 import { useI18n } from '@/lib/i18n';
 import { isCanvasHintSeen, setCanvasHintSeen } from '@/lib/onboarding-storage';
+import { captureCanvasSnapshot } from '@/lib/canvas-snapshot';
+import { shareImageBlob } from '@/lib/share-image';
 
 interface CanvasItem {
   item: ClosetItem;
@@ -48,6 +50,7 @@ export default function InteractiveCanvas({
   const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const nextZ = useRef(10);
+  const [isSharing, setIsSharing] = useState(false);
 
   // Build initial canvas items
   const buildInitialItems = useCallback((): CanvasItem[] => {
@@ -89,6 +92,10 @@ export default function InteractiveCanvas({
   }, [alwaysShowHint]);
   // Pinch zoom state — stores the target item index so handleTouchMove doesn't rely on selectedIdx closure
   const pinchRef = useRef<{ initialDist: number; initialScale: number; itemIdx: number } | null>(null);
+  // Container rect captured once at drag start — the canvas doesn't resize mid-drag,
+  // so reading getBoundingClientRect() on every pointermove is a needless reflow
+  // that makes dragging feel uneven. Cache it here for handlePointerMove.
+  const dragRectRef = useRef<{ width: number; height: number }>({ width: 1, height: 1 });
 
   // ── Item-nudge animation — runs once, shows items are draggable ──
   const [showDragHint, setShowDragHint] = useState<boolean>(() => {
@@ -253,13 +260,17 @@ export default function InteractiveCanvas({
     const ci = canvasItems[idx];
     setIsDragging(true);
     setDragStart({ x: e.clientX, y: e.clientY, itemX: ci.x, itemY: ci.y });
+    if (containerRef.current) {
+      const r = containerRef.current.getBoundingClientRect();
+      dragRectRef.current = { width: r.width || 1, height: r.height || 1 };
+    }
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
   }
 
   function handlePointerMove(e: React.PointerEvent) {
     if (!isDragging || pinchRef.current || selectedIdx === null || !containerRef.current) return;
     e.preventDefault();
-    const rect = containerRef.current.getBoundingClientRect();
+    const rect = dragRectRef.current;
     const dx = ((e.clientX - dragStart.x) / rect.width) * 100;
     const dy = ((e.clientY - dragStart.y) / rect.height) * 100;
     setCanvasItems((prev) =>
@@ -412,6 +423,33 @@ export default function InteractiveCanvas({
     }
     if (demo.active) cancelDemo();
     onSave(deduped);
+  }
+
+  // Build a deduped SavedCanvasLayout from the current canvas (same rule as save:
+  // last/top occurrence of each item wins), for rendering a shareable snapshot.
+  function buildCurrentLayout(): SavedCanvasLayout {
+    const seen = new Set<string>();
+    const layout: SavedCanvasLayout = [];
+    for (let i = canvasItems.length - 1; i >= 0; i--) {
+      const ci = canvasItems[i];
+      if (seen.has(ci.item.id)) continue;
+      seen.add(ci.item.id);
+      layout.unshift({ id: ci.item.id, x: ci.x, y: ci.y, scale: ci.scale, zIndex: ci.zIndex, group: ci.group });
+    }
+    return layout;
+  }
+
+  async function handleShare() {
+    if (canvasItems.length === 0 || isSharing) return;
+    setIsSharing(true);
+    try {
+      const blob = await captureCanvasSnapshot(buildCurrentLayout(), allItems);
+      await shareImageBlob(blob, `libas-outfit-${Date.now()}.png`);
+    } catch {
+      /* share cancelled or render failed — no-op */
+    } finally {
+      setIsSharing(false);
+    }
   }
 
   // Deselect when tapping empty canvas
@@ -612,15 +650,24 @@ export default function InteractiveCanvas({
         </div>
       )}
 
-      {/* Save button — bottom of screen */}
+      {/* Save + Share buttons — bottom of screen */}
       <div
-        className="shrink-0 px-5 py-3 bg-white border-t border-gray-100"
+        className="shrink-0 px-5 py-3 bg-white border-t border-gray-100 flex gap-3"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0.75rem))' }}
       >
         <button
+          onClick={handleShare}
+          disabled={canvasItems.length === 0 || isSharing}
+          aria-label={t.share}
+          title={t.share}
+          className="shrink-0 w-14 py-3.5 rounded-2xl bg-gray-100 text-gray-700 disabled:opacity-40 transition-opacity flex items-center justify-center"
+        >
+          {isSharing ? <Loader2 size={18} className="animate-spin" /> : <Share2 size={18} />}
+        </button>
+        <button
           onClick={handleSave}
           disabled={canvasItems.length === 0 || !continueReady}
-          className="w-full py-3.5 rounded-2xl text-white text-[15px] font-semibold disabled:opacity-40 transition-opacity flex items-center justify-center"
+          className="flex-1 py-3.5 rounded-2xl text-white text-[15px] font-semibold disabled:opacity-40 transition-opacity flex items-center justify-center"
           style={{ backgroundColor: '#F370A7' }}
         >
           {t.save}

@@ -6,6 +6,7 @@ import { useI18n } from '@/lib/i18n';
 import { getFeed } from '@/lib/feed-api';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
+import { useRootBackGuard } from '@/lib/use-root-back-guard';
 import type { FeedPost } from '@/types/feed';
 import FeedGuard from '@/components/feed/FeedGuard';
 import FeedCard from '@/components/feed/FeedCard';
@@ -28,6 +29,10 @@ function FeedHome() {
   const router = useRouter();
   const { t } = useI18n();
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  // Keep a history sentinel on this tab root so the Android system back is
+  // handled as an in-page popstate instead of exiting the WebView (matches
+  // Closet/Market). Prevents the black-screen-on-back at the feed root.
+  useRootBackGuard();
 
   const [posts, setPosts] = React.useState<FeedPost[]>([]);
   const [page, setPage] = React.useState(0);
@@ -69,22 +74,32 @@ function FeedHome() {
 
   // Глубина скролла ленты (25/50/75/100%), каждый порог — один раз за визит.
   const scrollDepthRef = React.useRef<Set<number>>(new Set());
+  // Coalesce scroll work into one rAF per frame: reading scroll geometry on every
+  // native scroll event forces a synchronous reflow that stutters the momentum
+  // scroll ("то быстро, то медленно"). Batching in rAF reads layout once/frame.
+  const scrollTickingRef = React.useRef(false);
 
   function handleScroll() {
-    const el = scrollRef.current;
-    if (!el) return;
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 800) loadMore();
+    if (scrollTickingRef.current) return;
+    scrollTickingRef.current = true;
+    requestAnimationFrame(() => {
+      scrollTickingRef.current = false;
+      const el = scrollRef.current;
+      if (!el) return;
+      const { scrollHeight, scrollTop, clientHeight } = el;
+      if (scrollHeight - scrollTop - clientHeight < 800) loadMore();
 
-    const scrollable = el.scrollHeight - el.clientHeight;
-    if (scrollable > 0) {
-      const pct = ((el.scrollTop + el.clientHeight) / el.scrollHeight) * 100;
-      for (const threshold of [25, 50, 75, 100]) {
-        if (pct >= threshold && !scrollDepthRef.current.has(threshold)) {
-          scrollDepthRef.current.add(threshold);
-          logAnalyticsEvent(Events.FEED_SCROLL_DEPTH, { [Params.DEPTH]: threshold });
+      const scrollable = scrollHeight - clientHeight;
+      if (scrollable > 0) {
+        const pct = ((scrollTop + clientHeight) / scrollHeight) * 100;
+        for (const threshold of [25, 50, 75, 100]) {
+          if (pct >= threshold && !scrollDepthRef.current.has(threshold)) {
+            scrollDepthRef.current.add(threshold);
+            logAnalyticsEvent(Events.FEED_SCROLL_DEPTH, { [Params.DEPTH]: threshold });
+          }
         }
       }
-    }
+    });
   }
 
   // ── Pull-to-refresh: drag down from the very top to reload the feed. ──

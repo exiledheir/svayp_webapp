@@ -12,10 +12,11 @@ import { getMyProfile as getFeedProfile, fileToCompressedDataUrl } from '@/lib/f
 import { loadCached, clearCache } from '@/lib/feed-cache';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
-import type { FeedPost } from '@/types/feed';
+import type { FeedPost, FeedProfile } from '@/types/feed';
 import FeedGuard from '@/components/feed/FeedGuard';
 import SourcePicker, { type SourcePickerHandle } from '@/components/feed/SourcePicker';
 import ComposeSheet from '@/components/feed/ComposeSheet';
+import ProfileEditSheet from '@/components/feed/ProfileEditSheet';
 
 const PICK = 0, COMPOSE = 1, PUBLISHED = 2;
 
@@ -58,6 +59,9 @@ function CreateFeedPost() {
   // re-enter handlePublish before `publishing` re-renders and creates two posts.
   const publishingRef = React.useRef(false);
   const [showTryonPrompt, setShowTryonPrompt] = React.useState(false);
+  // When publishing without a username, we open the username editor as an
+  // overlay (not a page navigation) so the composed draft stays in state.
+  const [usernameGate, setUsernameGate] = React.useState<FeedProfile | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [published, setPublished] = React.useState<FeedPost | null>(null);
   const pickerRef = React.useRef<SourcePickerHandle>(null);
@@ -252,22 +256,29 @@ function CreateFeedPost() {
 
   async function handlePublish() {
     if (publishingRef.current || publishing || selected.length === 0) return;
+
+    // Username gate: a post needs a public profile. If the feed profile has no
+    // username yet, open the username editor as an OVERLAY (not a page nav) so
+    // the composed draft stays in state, then continue publishing on save.
+    try {
+      const prof = await getFeedProfile();
+      if (!prof.username) {
+        setUsernameGate(prof);
+        return;
+      }
+    } catch {
+      // Profile endpoint unavailable — proceed and let the server validate.
+    }
+
+    await doPublish();
+  }
+
+  async function doPublish() {
+    if (publishingRef.current || publishing || selected.length === 0) return;
     publishingRef.current = true;
     setError(null);
     setPublishing(true);
     try {
-      // Best-effort username gate: a post needs a public profile. If the feed
-      // profile has no username yet, send the user to set one first.
-      try {
-        const prof = await getFeedProfile();
-        if (!prof.username) {
-          router.push('/feed/me?setup=1');
-          return;
-        }
-      } catch {
-        // Profile endpoint unavailable — proceed and let the server validate.
-      }
-
       const post = await publishPost(selected, caption, allItems);
       logAnalyticsEvent(Events.FEED_POST_PUBLISHED, {
         [Params.FEED_IMAGE_COUNT]: selected.length,
@@ -414,6 +425,19 @@ function CreateFeedPost() {
               </button>
             </div>
           </div>
+        )}
+
+        {/* Username gate — overlay editor; on save we continue publishing the
+            in-memory draft (which is never lost, since we don't navigate away). */}
+        {usernameGate && (
+          <ProfileEditSheet
+            profile={usernameGate}
+            onClose={() => setUsernameGate(null)}
+            onSaved={(updated) => {
+              setUsernameGate(null);
+              if (updated.username) void doPublish();
+            }}
+          />
         )}
       </div>
     </>

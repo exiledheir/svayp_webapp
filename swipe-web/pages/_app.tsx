@@ -143,9 +143,11 @@ export default function App({ Component, pageProps }: AppProps) {
         keeps the `env(safe-area-inset-*)` paddings the app already relies on.
       */}
       <Head>
+        {/* maximum-scale=1 + user-scalable=no disable pinch / double-tap zoom, which
+            otherwise fire accidentally mid-scroll and read as inconsistent scroll speed. */}
         <meta
           name="viewport"
-          content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-visual"
+          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-visual"
         />
       </Head>
       <FeatureFlagsProvider>

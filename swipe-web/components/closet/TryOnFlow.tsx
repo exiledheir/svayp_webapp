@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { X, Sparkles, Loader2, RefreshCw, User, Camera, Check, ZoomIn } from 'lucide-react';
+import { X, Sparkles, Loader2, RefreshCw, User, Camera, Check, ZoomIn, Share2 } from 'lucide-react';
 import type { ClosetItem } from '@/lib/closet-storage';
 import type { SavedCanvasLayout } from '@/lib/closet-types';
 import { useI18n } from '@/lib/i18n';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
-import { downloadWithWatermark } from '@/lib/canvas-snapshot';
+import { downloadWithWatermark, shareWatermarked } from '@/lib/canvas-snapshot';
 import { uploadModelPhoto } from '@/lib/wardrobe-api';
 
 /**
@@ -526,6 +526,7 @@ export function TryOnModal({
 }) {
   const { t } = useI18n();
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const [tipIndex, setTipIndex] = useState(() => Math.floor(Math.random() * 49));
   const [tipFading, setTipFading] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -609,6 +610,18 @@ export function TryOnModal({
       window.open(resultUrl, '_blank');
     } finally {
       setIsDownloading(false);
+    }
+  }
+
+  async function shareResult() {
+    if (!resultUrl || isSharing) return;
+    setIsSharing(true);
+    try {
+      await shareWatermarked(resultUrl);
+    } catch {
+      /* share cancelled or unavailable — no-op */
+    } finally {
+      setIsSharing(false);
     }
   }
 
@@ -784,6 +797,19 @@ export function TryOnModal({
                 className="flex-1 h-12 rounded-full bg-gray-100 text-gray-700 text-[13px] font-semibold"
               >
                 {t.close}
+              </button>
+              <button
+                onClick={shareResult}
+                disabled={isSharing}
+                aria-label={t.share}
+                title={t.share}
+                className="shrink-0 w-12 h-12 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center disabled:opacity-50"
+              >
+                {isSharing ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Share2 size={16} />
+                )}
               </button>
               <button
                 onClick={() => {

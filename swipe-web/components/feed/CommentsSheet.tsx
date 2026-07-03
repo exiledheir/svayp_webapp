@@ -2,11 +2,12 @@ import React from 'react';
 import { useRouter } from 'next/router';
 import { X, Send } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
-import { getComments, addComment } from '@/lib/feed-api';
+import { getComments, addComment, getMyProfile } from '@/lib/feed-api';
 import { timeAgo } from '@/lib/feed-format';
 import { useKeyboardInset } from '@/lib/use-keyboard-inset';
 import Avatar from '@/components/feed/Avatar';
-import type { FeedComment } from '@/types/feed';
+import ProfileEditSheet from '@/components/feed/ProfileEditSheet';
+import type { FeedComment, FeedProfile } from '@/types/feed';
 
 interface Props {
   postId: string;
@@ -30,6 +31,9 @@ export default function CommentsSheet({ postId, onClose, onCountChange }: Props)
   const [comments, setComments] = React.useState<FeedComment[] | null>(null);
   const [text, setText] = React.useState('');
   const [sending, setSending] = React.useState(false);
+  // Commenting needs a username. If the user has none, open the username editor
+  // as an overlay (the typed text stays in state) and post the comment on save.
+  const [usernameGate, setUsernameGate] = React.useState<FeedProfile | null>(null);
   const endRef = React.useRef<HTMLDivElement>(null);
 
   // Draggable sheet height.
@@ -77,6 +81,25 @@ export default function CommentsSheet({ postId, onClose, onCountChange }: Props)
   }, [postId]);
 
   async function submit() {
+    const body = text.trim();
+    if (!body || sending) return;
+
+    // Username gate — a comment needs a public profile. If none yet, open the
+    // username editor as an overlay (the typed text stays) and post on save.
+    try {
+      const prof = await getMyProfile();
+      if (!prof.username) {
+        setUsernameGate(prof);
+        return;
+      }
+    } catch {
+      // Profile endpoint unavailable — proceed and let the server validate.
+    }
+
+    await doSubmit();
+  }
+
+  async function doSubmit() {
     const body = text.trim();
     if (!body || sending) return;
     setSending(true);
@@ -196,6 +219,18 @@ export default function CommentsSheet({ postId, onClose, onCountChange }: Props)
           </button>
         </div>
       </div>
+
+      {/* Username gate — overlay editor; on save we post the typed comment. */}
+      {usernameGate && (
+        <ProfileEditSheet
+          profile={usernameGate}
+          onClose={() => setUsernameGate(null)}
+          onSaved={(updated) => {
+            setUsernameGate(null);
+            if (updated.username) void doSubmit();
+          }}
+        />
+      )}
     </div>
   );
 }
