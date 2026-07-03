@@ -63,9 +63,18 @@ export default function ImageCarousel({ images, alt, aspectRatio = '4/5', onDoub
     library: t.feed_src_library,
   };
 
-  function handleScroll(e: React.UIEvent<HTMLDivElement>) {
-    const el = e.currentTarget;
-    if (el.clientWidth) setIdx(Math.round(el.scrollLeft / el.clientWidth));
+  // Coalesce dot-index updates into one rAF per frame: reading scrollLeft /
+  // clientWidth on every native scroll event forces synchronous layout inside
+  // the WebView and makes the horizontal swipe stutter ("то быстро, то медленно").
+  const idxTicking = React.useRef(false);
+  function handleScroll() {
+    if (idxTicking.current) return;
+    idxTicking.current = true;
+    requestAnimationFrame(() => {
+      idxTicking.current = false;
+      const el = scrollerRef.current;
+      if (el && el.clientWidth) setIdx(Math.round(el.scrollLeft / el.clientWidth));
+    });
   }
   function scrollTo(i: number) {
     const el = scrollerRef.current;
@@ -78,7 +87,10 @@ export default function ImageCarousel({ images, alt, aspectRatio = '4/5', onDoub
         <div
           ref={scrollerRef}
           className="absolute inset-0 flex overflow-x-auto hide-scrollbar"
-          style={{ scrollSnapType: 'x mandatory' }}
+          // overscroll-contain stops a horizontal fling from chaining into the
+          // vertical feed scroller; contain isolates the carousel's layout/paint
+          // so per-frame scroll work never reflows the whole feed.
+          style={{ scrollSnapType: 'x mandatory', overscrollBehaviorX: 'contain', contain: 'layout paint' }}
           onScroll={handleScroll}
         >
           {list.map((img, i) => (

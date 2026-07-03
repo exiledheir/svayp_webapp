@@ -220,16 +220,20 @@ export default function CommentsSheet({ postId, onClose, onCountChange }: Props)
         </div>
       </div>
 
-      {/* Username gate — overlay editor; on save we post the typed comment. */}
+      {/* Username gate — overlay editor; on save we post the typed comment.
+          stopPropagation is critical: the root div's onClick={onClose} would
+          otherwise close the whole comments sheet on any tap inside the editor. */}
       {usernameGate && (
-        <ProfileEditSheet
-          profile={usernameGate}
-          onClose={() => setUsernameGate(null)}
-          onSaved={(updated) => {
-            setUsernameGate(null);
-            if (updated.username) void doSubmit();
-          }}
-        />
+        <div onClick={(e) => e.stopPropagation()}>
+          <ProfileEditSheet
+            profile={usernameGate}
+            onClose={() => setUsernameGate(null)}
+            onSaved={(updated) => {
+              setUsernameGate(null);
+              if (updated.username) void doSubmit();
+            }}
+          />
+        </div>
       )}
     </div>
   );

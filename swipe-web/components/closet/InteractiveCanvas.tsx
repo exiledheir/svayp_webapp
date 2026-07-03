@@ -7,6 +7,7 @@ import { useI18n } from '@/lib/i18n';
 import { isCanvasHintSeen, setCanvasHintSeen } from '@/lib/onboarding-storage';
 import { captureCanvasSnapshot } from '@/lib/canvas-snapshot';
 import { shareImageBlob } from '@/lib/share-image';
+import ShareSheet from '@/components/ShareSheet';
 
 interface CanvasItem {
   item: ClosetItem;
@@ -51,6 +52,7 @@ export default function InteractiveCanvas({
   const containerRef = useRef<HTMLDivElement>(null);
   const nextZ = useRef(10);
   const [isSharing, setIsSharing] = useState(false);
+  const [showShareSheet, setShowShareSheet] = useState(false);
 
   // Build initial canvas items
   const buildInitialItems = useCallback((): CanvasItem[] => {
@@ -656,7 +658,7 @@ export default function InteractiveCanvas({
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0.75rem))' }}
       >
         <button
-          onClick={handleShare}
+          onClick={() => setShowShareSheet(true)}
           disabled={canvasItems.length === 0 || isSharing}
           aria-label={t.share}
           title={t.share}
@@ -664,6 +666,9 @@ export default function InteractiveCanvas({
         >
           {isSharing ? <Loader2 size={18} className="animate-spin" /> : <Share2 size={18} />}
         </button>
+        {showShareSheet && (
+          <ShareSheet onClose={() => setShowShareSheet(false)} onExternal={handleShare} />
+        )}
         <button
           onClick={handleSave}
           disabled={canvasItems.length === 0 || !continueReady}
