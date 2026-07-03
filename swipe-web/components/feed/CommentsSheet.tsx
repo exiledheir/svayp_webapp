@@ -5,6 +5,7 @@ import { useI18n } from '@/lib/i18n';
 import { getComments, addComment, getMyProfile } from '@/lib/feed-api';
 import { timeAgo } from '@/lib/feed-format';
 import { useKeyboardInset } from '@/lib/use-keyboard-inset';
+import { useOverlayBackClose } from '@/lib/use-overlay-back-close';
 import Avatar from '@/components/feed/Avatar';
 import ProfileEditSheet from '@/components/feed/ProfileEditSheet';
 import type { FeedComment, FeedProfile } from '@/types/feed';
@@ -28,6 +29,8 @@ export default function CommentsSheet({ postId, onClose, onCountChange }: Props)
   const router = useRouter();
   const { t, locale } = useI18n();
   const kbInset = useKeyboardInset();
+  // Hardware Back closes the sheet instead of navigating the page away.
+  useOverlayBackClose(true, onClose);
   const [comments, setComments] = React.useState<FeedComment[] | null>(null);
   const [text, setText] = React.useState('');
   const [sending, setSending] = React.useState(false);

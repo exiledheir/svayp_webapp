@@ -2,6 +2,7 @@ import React from 'react';
 import { X } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { updateMyProfile, checkUsernameAvailable } from '@/lib/feed-api';
+import { useOverlayBackClose } from '@/lib/use-overlay-back-close';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events } from '@/lib/analytics-events';
 import type { FeedProfile } from '@/types/feed';
@@ -18,6 +19,8 @@ const USERNAME_RE = /^[a-z0-9_.]{3,20}$/;
  *  phone come from the account, and avatar/bio are intentionally left out. */
 export default function ProfileEditSheet({ profile, onSaved, onClose }: Props) {
   const { t } = useI18n();
+  // Hardware Back closes the editor instead of navigating the page away.
+  useOverlayBackClose(true, onClose);
   const [username, setUsername] = React.useState(profile.username ?? '');
   const [usernameState, setUsernameState] = React.useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
   const [saving, setSaving] = React.useState(false);

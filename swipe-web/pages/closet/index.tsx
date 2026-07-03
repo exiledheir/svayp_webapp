@@ -2141,6 +2141,8 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
   const [viewingJob, setViewingJob] = useState<TryOnJobResponse | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  // Hardware Back closes the full-screen look viewer instead of leaving the page.
+  useOverlayBackClose(viewingJob !== null, () => setViewingJob(null));
 
   function confirmDelete() {
     if (!confirmDeleteId) return;
@@ -2413,7 +2415,7 @@ function DressMeReel({ items, height }: {
     >
       <div className="shrink-0" style={{ width: '20%' }} />
       {items.map((item) => (
-        <div key={item.id} className="relative shrink-0 h-full snap-center" style={{ width: '60%' }}>
+        <div key={item.id} className="relative shrink-0 h-full snap-center" style={{ width: '60%', scrollSnapStop: 'always' }}>
           <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized />
         </div>
       ))}

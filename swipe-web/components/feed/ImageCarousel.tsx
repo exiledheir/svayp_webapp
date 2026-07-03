@@ -94,7 +94,9 @@ export default function ImageCarousel({ images, alt, aspectRatio = '4/5', onDoub
           onScroll={handleScroll}
         >
           {list.map((img, i) => (
-            <div key={img.id || i} className="relative shrink-0 w-full h-full" style={{ scrollSnapAlign: 'start' }}>
+            // snap-stop:always caps a fling at ONE image per swipe — without it a
+            // fast swipe skips several photos ("скролл очень быстрый").
+            <div key={img.id || i} className="relative shrink-0 w-full h-full" style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}>
               <Image
                 src={img.imageUrl}
                 alt={`${alt} ${i + 1}`}

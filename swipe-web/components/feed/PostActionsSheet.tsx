@@ -4,6 +4,7 @@ import { useI18n } from '@/lib/i18n';
 import { reportPost, hideUserPosts, deletePost } from '@/lib/feed-api';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
+import { useOverlayBackClose } from '@/lib/use-overlay-back-close';
 import type { FeedPost, FeedReportReason } from '@/types/feed';
 
 interface Props {
@@ -23,6 +24,8 @@ const REASONS: FeedReportReason[] = ['inappropriate', 'spam', 'not_fashion', 'co
  */
 export default function PostActionsSheet({ post, onReported, onHidden, onDeleted, onClose }: Props) {
   const { t } = useI18n();
+  // Hardware Back closes the sheet instead of navigating the page away.
+  useOverlayBackClose(true, onClose);
   const [view, setView] = React.useState<'menu' | 'report' | 'confirmDelete'>('menu');
   const [reason, setReason] = React.useState<FeedReportReason | null>(null);
   const [message, setMessage] = React.useState('');

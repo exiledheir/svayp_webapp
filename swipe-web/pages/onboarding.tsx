@@ -57,7 +57,10 @@ export default function OnboardingPage() {
       clearOnboarding();
       clearOnboardingStep();
     } else if (isOnboardingComplete()) {
-      router.replace('/feed');
+      // Onboarding is only ever entered FROM the closet (closet/index redirects
+      // here). Inside the app shell this page runs in the CLOSET tab's WebView —
+      // returning to /feed would turn the closet tab into the feed page.
+      router.replace('/closet');
       return;
     }
     (async () => {
@@ -122,7 +125,8 @@ export default function OnboardingPage() {
     // Interactive onboarding already taught the core actions — suppress the
     // closet's passive coach-mark tour (still replayable from the profile).
     setClosetTourDone();
-    router.replace('/feed');
+    // Back to the closet — this page lives inside the closet tab's WebView.
+    router.replace('/closet');
   }
 
   function skip() {
@@ -130,7 +134,7 @@ export default function OnboardingPage() {
     setOnboardingComplete();
     clearOnboardingStep();
     setClosetTourDone();
-    router.replace('/feed');
+    router.replace('/closet');
   }
 
   // ── Step transitions ───────────────────────────────────────────────────────
