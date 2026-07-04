@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
@@ -79,7 +80,7 @@ export default function MarketFeedCard({ listing, onToggleFavorite, hideFavorite
                   fill
                   sizes="(max-width: 430px) 50vw, 215px"
                   className="object-cover"
-                  unoptimized
+                  unoptimized={needsUnoptimized(src)}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-[12px]" style={{ color: 'rgba(0,0,0,0.3)' }}>

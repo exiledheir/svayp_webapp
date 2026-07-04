@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
@@ -9,6 +10,18 @@ import BottomNav, { TopBar } from '@/components/BottomNav';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
 import type { Product } from '@/types';
+import { getPageCache, setPageCache } from '@/lib/page-cache';
+
+// Restore the swipe deck (cards + position) on back-navigation instead of
+// refetching page 0 and resetting the user to the top of the stack.
+const DISCOVER_CACHE_KEY = 'discover:deck';
+const DISCOVER_CACHE_TTL_MS = 5 * 60_000;
+type DiscoverSnapshot = {
+  products: Product[];
+  currentIndex: number;
+  fetchPage: number;
+  hasMore: boolean;
+};
 
 // ─── Price formatter matching Flutter formattedPrice ────────────────────────
 function fmtUzs(price: number, currency: string): string {
@@ -191,7 +204,7 @@ function SwipeCard({
               fill
               className="object-cover pointer-events-none"
               sizes="(max-width: 430px) 100vw, 430px"
-              unoptimized
+              unoptimized={needsUnoptimized(currentImg)}
               priority={stackIndex === 0}
             />
           ) : (
@@ -286,11 +299,29 @@ export default function DiscoverPage() {
 
   useEffect(() => {
     logAnalyticsEvent(Events.DISCOVER_VIEWED);
+    const cached = getPageCache<DiscoverSnapshot>(DISCOVER_CACHE_KEY, DISCOVER_CACHE_TTL_MS);
+    if (cached && cached.products.length > 0 && cached.currentIndex < cached.products.length) {
+      setProducts(cached.products);
+      setCurrentIndex(cached.currentIndex);
+      setFetchPage(cached.fetchPage);
+      setHasMore(cached.hasMore);
+      setLoading(false);
+      return;
+    }
     getRecommendedProducts(0, 20)
       .then((res) => { setProducts(res); setHasMore(res.length === 20); })
       .catch(() => setError('Failed to load products'))
       .finally(() => setLoading(false));
   }, []);
+
+  // Snapshot the deck + position so back-navigation resumes where the user was.
+  useEffect(() => {
+    if (!loading && products.length > 0) {
+      setPageCache(DISCOVER_CACHE_KEY, {
+        products, currentIndex, fetchPage, hasMore,
+      } satisfies DiscoverSnapshot);
+    }
+  }, [products, currentIndex, fetchPage, hasMore, loading]);
 
   // Верхняя карточка стека = показ товара.
   useEffect(() => {

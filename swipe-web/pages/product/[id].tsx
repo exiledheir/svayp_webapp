@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
@@ -263,7 +264,7 @@ export default function ProductDetailPage() {
                 {(product.images.length > 0 ? product.images : ['']).map((img, i) => (
                   <div key={i} className="relative shrink-0 w-full" style={{ aspectRatio: '4/5', scrollSnapAlign: 'start', background: '#F7F7F8' }}>
                     {img ? (
-                      <Image src={img} alt={product.title} fill className="object-cover" unoptimized priority={i === 0} />
+                      <Image src={img} alt={product.title} fill className="object-cover" unoptimized={needsUnoptimized(img)} priority={i === 0} />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-[13px]" style={{ color: 'rgba(0,0,0,0.3)' }}>No image</div>
                     )}
@@ -466,7 +467,7 @@ export default function ProductDetailPage() {
                     >
                       {sellerInfo?.logoImg ? (
                         <div className="w-10 h-10 rounded-full overflow-hidden relative shrink-0" style={{ border: '1px solid rgba(0,0,0,0.08)' }}>
-                          <Image src={sellerInfo.logoImg} alt={sellerInfo.name} fill sizes="40px" className="object-cover" unoptimized />
+                          <Image src={sellerInfo.logoImg} alt={sellerInfo.name} fill sizes="40px" className="object-cover" unoptimized={needsUnoptimized(sellerInfo.logoImg)} />
                         </div>
                       ) : (
                         <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-[15px] font-bold" style={{ background: 'rgba(0,0,0,0.07)', color: 'rgba(0,0,0,0.5)' }}>
@@ -558,7 +559,7 @@ function ChatComposeSheet({
           <div className="flex items-center gap-3">
             {sellerInfo?.logoImg ? (
               <div className="w-9 h-9 rounded-full overflow-hidden relative shrink-0" style={{ border: '1px solid rgba(0,0,0,0.08)' }}>
-                <Image src={sellerInfo.logoImg} alt={sellerInfo.name} fill sizes="36px" className="object-cover" unoptimized />
+                <Image src={sellerInfo.logoImg} alt={sellerInfo.name} fill sizes="36px" className="object-cover" unoptimized={needsUnoptimized(sellerInfo.logoImg)} />
               </div>
             ) : (
               <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-[14px] font-bold" style={{ background: '#000', color: 'white' }}>
@@ -579,7 +580,7 @@ function ChatComposeSheet({
           <div className="mx-4 mt-4 p-3 flex gap-3" style={{ borderRadius: 12, border: '1px solid rgba(0,0,0,0.09)' }}>
             {product.images[0] && (
               <div className="relative shrink-0 rounded-lg overflow-hidden" style={{ width: 64, height: 85, background: '#F7F7F8' }}>
-                <Image src={product.images[0]} alt={product.title} fill className="object-cover" unoptimized />
+                <Image src={product.images[0]} alt={product.title} fill className="object-cover" unoptimized={needsUnoptimized(product.images[0])} />
               </div>
             )}
             <div className="flex-1 min-w-0">

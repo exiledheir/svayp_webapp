@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
@@ -139,7 +140,10 @@ function usePlan() {
   const [limits, setLimits] = useState<PlanLimits>(PLAN_LIMITS_FALLBACK.free);
   const [usage, setUsage] = useState<PlanUsage>({ wardrobeItemsUsed: 0, regenerationsUsed: 0, tryItOnsUsed: 0, itemCountByCategory: {} });
 
+  const lastPlanFetchRef = useRef(0);
+
   const fetchPlan = useCallback(async () => {
+    lastPlanFetchRef.current = Date.now();
     try {
       const data = await getUserPlan();
       // mapPlanResponse in wardrobe-api guarantees all fields are present,
@@ -155,11 +159,15 @@ function usePlan() {
 
   useEffect(() => { fetchPlan(); }, [fetchPlan]);
 
-  // Re-fetch plan whenever the user returns to this tab so that backend-side
-  // resets (e.g. subscription or usage reset by admin) are reflected immediately.
+  // Re-fetch plan when the user returns to this tab so that backend-side
+  // resets (e.g. subscription or usage reset by admin) are reflected.
+  // Throttled to once per minute: every app switch fired a fresh GET /me/plan,
+  // while mutation paths (upload/try-on) still refresh it immediately.
   useEffect(() => {
     function handleVisibility() {
-      if (!document.hidden) fetchPlan();
+      if (!document.hidden && Date.now() - lastPlanFetchRef.current > 60_000) {
+        fetchPlan();
+      }
     }
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
@@ -2224,7 +2232,7 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
             }}
           >
             {job.resultImageUrl && (
-              <Image src={job.resultImageUrl} alt="Try-on result" fill className="object-cover" unoptimized />
+              <Image src={job.resultImageUrl} alt="Try-on result" fill className="object-cover" unoptimized={needsUnoptimized(job.resultImageUrl)} />
             )}
             <button
               onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(job.id); }}
@@ -2416,7 +2424,7 @@ function DressMeReel({ items, height }: {
       <div className="shrink-0" style={{ width: '20%' }} />
       {items.map((item) => (
         <div key={item.id} className="relative shrink-0 h-full snap-center" style={{ width: '60%', scrollSnapStop: 'always' }}>
-          <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized />
+          <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized={needsUnoptimized(item.imageData)} />
         </div>
       ))}
       <div className="shrink-0" style={{ width: '20%' }} />
@@ -2678,7 +2686,7 @@ function OutfitCard({
                   }}
                 >
                   <div className="relative w-full h-full">
-                    <Image src={entry.item.imageData} alt={entry.item.category} fill className="object-contain" unoptimized />
+                    <Image src={entry.item.imageData} alt={entry.item.category} fill className="object-contain" unoptimized={needsUnoptimized(entry.item.imageData)} />
                   </div>
                 </div>
               ))}
@@ -2886,7 +2894,7 @@ function ClothingItemCard({ item, onTap, isProcessing, startedAt, onRemove }: { 
     >
       <div className="relative w-full h-full">
         {item.imageData ? (
-          <Image src={item.imageData} alt={item.category} fill className={`object-contain ${isProcessing ? 'opacity-50' : ''}`} unoptimized />
+          <Image src={item.imageData} alt={item.category} fill className={`object-contain ${isProcessing ? 'opacity-50' : ''}`} unoptimized={needsUnoptimized(item.imageData)} />
         ) : (
           <div className="w-full h-full bg-gray-200 animate-pulse" />
         )}
@@ -2968,7 +2976,7 @@ function ViewAllModal({
             <div className="grid grid-cols-3 gap-2.5">
               {items.map((item) => (
                 <div key={item.id} className="relative aspect-[3/4] rounded-xl overflow-hidden">
-                  <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized />
+                  <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized={needsUnoptimized(item.imageData)} />
                   {showDelete && (
                     <button
                       onClick={() => onDelete(item.id)}
@@ -3170,7 +3178,7 @@ function MiniOutfitSlot({ item, flex }: { item: ClosetItem | null; flex?: boolea
   if (!item) return flex ? <div className="flex-1 bg-gray-50" /> : null;
   return (
     <div className={`relative w-full overflow-hidden bg-gray-50 ${flex ? 'flex-1' : 'h-10 shrink-0'}`}>
-      <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized />
+      <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized={needsUnoptimized(item.imageData)} />
     </div>
   );
 }
@@ -3241,7 +3249,7 @@ function ItemEditSheet({
           {/* Image preview */}
           <div className="pt-1 pb-2">
             <div className="w-full rounded-2xl overflow-hidden relative bg-gray-50 dark:bg-[#222]" style={{ aspectRatio: '1/1' }}>
-              <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized />
+              <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized={needsUnoptimized(item.imageData)} />
             </div>
           </div>
 

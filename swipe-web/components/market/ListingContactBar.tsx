@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
@@ -166,7 +167,7 @@ export default function ListingContactBar({ listing }: { listing: MarketListing 
             <div className="flex items-center gap-3 mb-4 p-2.5 rounded-2xl" style={{ background: 'rgba(128,128,128,0.08)' }}>
               <div className="relative w-12 h-12 rounded-xl overflow-hidden shrink-0" style={{ background: '#F7F7F8' }}>
                 {listing.images[0] && (
-                  <Image src={listing.images[0]} alt={listing.title} fill sizes="48px" className="object-cover" unoptimized />
+                  <Image src={listing.images[0]} alt={listing.title} fill sizes="48px" className="object-cover" unoptimized={needsUnoptimized(listing.images[0])} />
                 )}
               </div>
               <div className="flex-1 min-w-0">

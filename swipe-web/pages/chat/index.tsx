@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
@@ -56,7 +57,7 @@ function Avatar({ name, logo }: { name: string; logo?: string }) {
             width={54}
             height={54}
             className="object-cover w-full h-full"
-            unoptimized
+            unoptimized={needsUnoptimized(logo)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-white text-lg font-bold">

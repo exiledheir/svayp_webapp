@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React from 'react';
 import Image from 'next/image';
 import { LayoutGrid, Camera, CalendarDays, Images, Heart, type LucideIcon } from 'lucide-react';
@@ -103,7 +104,7 @@ export default function ImageCarousel({ images, alt, aspectRatio = '4/5', onDoub
                 fill
                 sizes="(max-width: 480px) 100vw, 480px"
                 className="object-cover"
-                unoptimized
+                unoptimized={needsUnoptimized(img.imageUrl)}
               />
             </div>
           ))}

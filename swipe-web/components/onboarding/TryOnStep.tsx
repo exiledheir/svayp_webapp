@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { Sparkles } from 'lucide-react';
@@ -150,7 +151,7 @@ export default function TryOnStep({
           {phase !== 'processing' && (
             <>
               {phase === 'completed' && resultUrl ? (
-                <Image src={resultUrl} alt="Try-on result" fill className="object-cover" unoptimized />
+                <Image src={resultUrl} alt="Try-on result" fill className="object-cover" unoptimized={needsUnoptimized(resultUrl)} />
               ) : (
                 <>
                   {previewEntries.length > 0 ? (
@@ -161,7 +162,7 @@ export default function TryOnStep({
                         style={{ left: `${entry.x}%`, top: `${entry.y}%`, width: '35%', aspectRatio: '1', transform: `scale(${entry.scale})`, zIndex: entry.zIndex }}
                       >
                         <div className="relative w-full h-full">
-                          <Image src={entry.item.imageData} alt={entry.item.category} fill className="object-contain" unoptimized />
+                          <Image src={entry.item.imageData} alt={entry.item.category} fill className="object-contain" unoptimized={needsUnoptimized(entry.item.imageData)} />
                         </div>
                       </div>
                     ))
@@ -210,7 +211,7 @@ export default function TryOnStep({
                             background: '#f9fafb',
                           }}
                         >
-                          <Image src={item.imageData} alt="outfit item" fill className="object-contain" unoptimized />
+                          <Image src={item.imageData} alt="outfit item" fill className="object-contain" unoptimized={needsUnoptimized(item.imageData)} />
                           {isActive && (
                             <div
                               className="absolute inset-0 rounded-xl pointer-events-none"

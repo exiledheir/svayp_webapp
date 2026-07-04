@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { X, Sparkles, Loader2, RefreshCw, User, Camera, Check, ZoomIn, Share2 } from 'lucide-react';
@@ -284,7 +285,7 @@ export function TryOnConfirmModal({
                 }}
               >
                 <div className="relative w-full h-full">
-                  <Image src={entry.item.imageData} alt={entry.item.category} fill className="object-contain" unoptimized />
+                  <Image src={entry.item.imageData} alt={entry.item.category} fill className="object-contain" unoptimized={needsUnoptimized(entry.item.imageData)} />
                 </div>
               </div>
             ))}
@@ -673,7 +674,7 @@ export function TryOnModal({
                             background: '#f9fafb',
                           }}
                         >
-                          <Image src={src} alt="outfit item" fill className="object-contain" unoptimized />
+                          <Image src={src} alt="outfit item" fill className="object-contain" unoptimized={needsUnoptimized(src)} />
                           {/* Shimmer overlay on active item */}
                           {isActive && (
                             <div
@@ -758,7 +759,7 @@ export function TryOnModal({
 
           {status === 'completed' && resultUrl && (
             <div className="relative w-full h-[420px]">
-              <Image src={resultUrl} alt="Try-on result" fill className="object-contain" unoptimized />
+              <Image src={resultUrl} alt="Try-on result" fill className="object-contain" unoptimized={needsUnoptimized(resultUrl)} />
               {/* Logo watermark — visible on screenshots */}
               <div className="absolute top-7 left-3 z-10 pointer-events-none">
                 <p className="text-[13px] font-bold tracking-[0.5px]" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.18)' }}>

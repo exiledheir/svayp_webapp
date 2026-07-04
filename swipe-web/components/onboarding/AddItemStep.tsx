@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useRef, useState } from 'react';
 import Image from 'next/image';
 import { Camera, Image as ImageIcon, Check, Plus } from 'lucide-react';
@@ -175,7 +176,7 @@ export default function AddItemStep({
             alt={group === 'upper' ? 'top garment' : group === 'lower' ? 'bottom garment' : 'shoes'}
             fill
             className="object-contain"
-            unoptimized
+            unoptimized={needsUnoptimized(heroSrc)}
           />
         </div>
       </div>

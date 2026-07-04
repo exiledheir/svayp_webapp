@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React from 'react';
 import Image from 'next/image';
 import { getInitials } from '@/lib/feed-format';
@@ -18,7 +19,7 @@ export default function Avatar({ url, name, size = 36, className = '' }: Props) 
         className={`relative shrink-0 overflow-hidden rounded-full ${className}`}
         style={{ ...dim, background: '#F7F7F8' }}
       >
-        <Image src={url} alt={name ?? ''} fill sizes={`${size}px`} className="object-cover" unoptimized />
+        <Image src={url} alt={name ?? ''} fill sizes={`${size}px`} className="object-cover" unoptimized={needsUnoptimized(url)} />
       </div>
     );
   }

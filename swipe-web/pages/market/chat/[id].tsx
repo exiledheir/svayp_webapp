@@ -1,10 +1,11 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { ArrowLeft, Send } from 'lucide-react';
 import {
-  getChatThread, getChatMessages, sendChatMessage, markChatRead,
+  getChatThread, getChatMessages, getChatMessagesAfter, sendChatMessage, markChatRead,
   type MarketChatThread, type MarketChatMessage,
 } from '@/lib/market-api';
 import MarketGuard from '@/components/market/MarketGuard';
@@ -18,6 +19,9 @@ function MarketChatThreadPageInner() {
   const [messages, setMessages] = useState<MarketChatMessage[]>([]);
   const [text, setText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<MarketChatMessage[]>([]);
+  // createdAt of the newest server message — delta-poll cursor.
+  const lastServerTsRef = useRef<string | null>(null);
 
   async function reload() {
     if (typeof id !== 'string') return;
@@ -25,7 +29,10 @@ function MarketChatThreadPageInner() {
       const [th, msgs] = await Promise.all([getChatThread(id), getChatMessages(id, 0, 100)]);
       setThread(th);
       // Backend returns newest-first; show oldest-first. Skip the LISTING context card (no text).
-      setMessages(msgs.content.filter((m) => m.content).reverse());
+      const list = msgs.content.filter((m) => m.content).reverse();
+      setMessages(list);
+      messagesRef.current = list;
+      if (msgs.content.length > 0) lastServerTsRef.current = msgs.content[0].createdAt;
       markChatRead(id).catch(() => { /* non-blocking */ });
     } catch {
       setThread(null);
@@ -35,9 +42,27 @@ function MarketChatThreadPageInner() {
   useEffect(() => { reload(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Light polling for the counterparty's replies (STOMP can replace this later).
+  // Delta request (?after=) — was a full thread + 100-message refetch every tick.
   useEffect(() => {
     if (typeof id !== 'string') return;
-    const iv = setInterval(() => { reload(); }, 5000);
+    const iv = setInterval(async () => {
+      try {
+        const after = lastServerTsRef.current;
+        if (!after) { reload(); return; }
+        const fresh = await getChatMessagesAfter(id, after, 100);
+        if (fresh.length === 0) return;
+        lastServerTsRef.current = fresh[fresh.length - 1].createdAt;
+        const known = new Set(messagesRef.current.map((m) => m.id));
+        const toAdd = fresh.filter((m) => m.content && !known.has(m.id));
+        if (toAdd.length > 0) {
+          const updated = [...messagesRef.current, ...toAdd];
+          messagesRef.current = updated;
+          setMessages(updated);
+          // Something new arrived — mark the counterparty's messages read.
+          markChatRead(id).catch(() => { /* non-blocking */ });
+        }
+      } catch { /* silent */ }
+    }, 5000);
     return () => clearInterval(iv);
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -50,8 +75,15 @@ function MarketChatThreadPageInner() {
     const body = text;
     setText('');
     try {
-      await sendChatMessage(id, body);
-      await reload();
+      const msg = await sendChatMessage(id, body);
+      // Append the server response locally — a full thread reload per send
+      // cost 2 extra requests; the 5s delta poll picks up anything else.
+      if (msg.createdAt) lastServerTsRef.current = msg.createdAt;
+      if (msg.content) {
+        const updated = [...messagesRef.current, msg];
+        messagesRef.current = updated;
+        setMessages(updated);
+      }
     } catch {
       setText(body); // restore on failure
     }
@@ -82,7 +114,7 @@ function MarketChatThreadPageInner() {
             <>
               <div className="relative w-9 h-9 rounded-lg overflow-hidden shrink-0" style={{ background: '#F7F7F8' }}>
                 {thread.listingImage && (
-                  <Image src={thread.listingImage} alt={thread.listingTitle} fill sizes="36px" className="object-cover" unoptimized />
+                  <Image src={thread.listingImage} alt={thread.listingTitle} fill sizes="36px" className="object-cover" unoptimized={needsUnoptimized(thread.listingImage)} />
                 )}
               </div>
               <div className="flex-1 min-w-0">

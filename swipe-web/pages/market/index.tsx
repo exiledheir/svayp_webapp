@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import Image from 'next/image';
@@ -14,6 +15,10 @@ import { useRootBackGuard } from '@/lib/use-root-back-guard';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events } from '@/lib/analytics-events';
 import { openSupportChat } from '@/lib/support-chat';
+import { getPageCache, setPageCache } from '@/lib/page-cache';
+
+// Feed lists live briefly in the page cache so "listing → back" doesn't refetch.
+const MARKET_FEED_TTL_MS = 2 * 60_000;
 
 /**
  * Market feed — the C2C marketplace hub. Layout (top → bottom):
@@ -29,6 +34,9 @@ export default function MarketFeedPage() {
   const [listings, setListings] = useState<MarketListing[]>([]);
   const [category, setCategory] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  // Debounced mirror of `search` — the feed refetches 350 ms after typing
+  // stops instead of firing GET /marketplace/listings on every keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [supportLoading, setSupportLoading] = useState(false);
 
   // Root tab page — trap Back so it doesn't exit to a blank WebView screen.
@@ -38,18 +46,33 @@ export default function MarketFeedPage() {
     logAnalyticsEvent(Events.MARKET_FEED_VIEWED);
   }, []);
 
-  const loadFeed = useCallback(async () => {
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(id);
+  }, [search]);
+
+  const loadFeed = useCallback(async (force = false) => {
+    const cacheKey = `market:feed:${category ?? 'all'}:${debouncedSearch.trim()}`;
+    if (!force) {
+      const cached = getPageCache<MarketListing[]>(cacheKey, MARKET_FEED_TTL_MS);
+      if (cached) {
+        setListings(cached);
+        return;
+      }
+    }
     // Live backend feed (GET /marketplace/listings).
     try {
       const page = await apiGetFeed({
         category: category ? [category] : undefined,
-        q: search.trim() || undefined,
+        q: debouncedSearch.trim() || undefined,
       });
-      setListings(page.content.map(cardToListing));
+      const list = page.content.map(cardToListing);
+      setListings(list);
+      setPageCache(cacheKey, list);
     } catch {
       setListings([]);
     }
-  }, [category, search]);
+  }, [category, debouncedSearch]);
 
   useEffect(() => { loadFeed(); }, [loadFeed]);
 
@@ -80,9 +103,8 @@ export default function MarketFeedPage() {
     if (pullDistance >= PULL_THRESHOLD && !isPullRefreshing) {
       setIsPullRefreshing(true);
       setPullDistance(0);
-      loadFeed();
-      // Feed reads from localStorage (instant) — hold the spinner briefly so the
-      // refresh is perceptible.
+      loadFeed(true); // explicit refresh — bypass the page cache
+      // Hold the spinner briefly so the refresh is perceptible.
       await new Promise((r) => setTimeout(r, 450));
       setIsPullRefreshing(false);
     } else {
@@ -274,7 +296,7 @@ export default function MarketFeedPage() {
                       alt=""
                       fill
                       sizes="108px"
-                      unoptimized
+                      unoptimized={needsUnoptimized(b.img)}
                       className="object-contain object-bottom"
                     />
                   </div>

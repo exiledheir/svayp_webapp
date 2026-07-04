@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
@@ -29,7 +30,7 @@ function OrderItemRow({ item }: { item: CartItem }) {
     <div className="flex gap-3 px-4 py-3" style={{ borderBottom: '0.5px solid rgba(0,0,0,0.06)' }}>
       <div className="shrink-0 overflow-hidden relative" style={{ width: 72, height: 96, borderRadius: 10, background: '#F7F7F8' }}>
         {item.imageUrl && (
-          <Image src={item.imageUrl} alt={item.title} fill className="object-cover" unoptimized />
+          <Image src={item.imageUrl} alt={item.title} fill className="object-cover" unoptimized={needsUnoptimized(item.imageUrl)} />
         )}
       </div>
       <div className="flex-1 min-w-0 py-0.5">

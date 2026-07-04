@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
@@ -5,7 +6,13 @@ import { Heart, ArrowLeft } from 'lucide-react';
 import BottomNav from '@/components/BottomNav';
 import { getFavoriteProducts, removeFavorite } from '@/lib/api';
 import { formatPrice } from '@/lib/cart-storage';
+import { getPageCache, setPageCache } from '@/lib/page-cache';
 import type { Product } from '@/types';
+
+// Short-lived: likes can be added from other surfaces (native app), so the
+// snapshot only bridges quick back-navigation, not real staleness.
+const LIKED_CACHE_KEY = 'liked:items';
+const LIKED_CACHE_TTL_MS = 60_000;
 
 export default function LikedPage() {
   const router = useRouter();
@@ -13,15 +20,28 @@ export default function LikedPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const cached = getPageCache<Product[]>(LIKED_CACHE_KEY, LIKED_CACHE_TTL_MS);
+    if (cached && cached.length > 0) {
+      setItems(cached);
+      setLoading(false);
+      return;
+    }
     getFavoriteProducts()
-      .then(setItems)
+      .then((list) => {
+        setItems(list);
+        setPageCache(LIKED_CACHE_KEY, list);
+      })
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
   }, []);
 
   async function handleUnlike(e: React.MouseEvent, item: Product) {
     e.stopPropagation();
-    setItems((prev) => prev.filter((p) => p.id !== item.id));
+    setItems((prev) => {
+      const updated = prev.filter((p) => p.id !== item.id);
+      setPageCache(LIKED_CACHE_KEY, updated);
+      return updated;
+    });
     try { await removeFavorite(item.id); } catch { /* best-effort */ }
   }
 
@@ -92,7 +112,7 @@ export default function LikedPage() {
                       alt={item.title}
                       fill
                       className="object-cover"
-                      unoptimized
+                      unoptimized={needsUnoptimized(item.images[0])}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center" style={{ color: 'rgba(0,0,0,0.2)' }}>

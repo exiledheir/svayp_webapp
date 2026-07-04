@@ -1,0 +1,8 @@
+# Keep local dev state out of the production image build context.
+# .env.local in particular points NEXT_PUBLIC_API_ORIGIN at localhost —
+# if it ever appears on the VM it must NOT be baked into the prod build.
+.env.local
+node_modules
+.next
+.git
+*.log

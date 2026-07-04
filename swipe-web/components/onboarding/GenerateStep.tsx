@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { Sparkles } from 'lucide-react';
@@ -23,7 +24,7 @@ function LayoutPreview({ layout, items }: { layout: SavedCanvasLayout; items: Cl
           style={{ left: `${entry.x}%`, top: `${entry.y}%`, width: '35%', aspectRatio: '1', transform: `scale(${entry.scale})`, zIndex: entry.zIndex }}
         >
           <div className="relative w-full h-full">
-            <Image src={entry.item.imageData} alt={entry.item.category} fill className="object-contain" unoptimized />
+            <Image src={entry.item.imageData} alt={entry.item.category} fill className="object-contain" unoptimized={needsUnoptimized(entry.item.imageData)} />
           </div>
         </div>
       ))}

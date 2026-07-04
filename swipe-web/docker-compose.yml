@@ -9,9 +9,16 @@ services:
       - "3010:3000"
     environment:
       NODE_ENV: production
+    # Optimized-image cache survives rebuilds — without it every deploy
+    # re-encodes all product photos on first view.
+    volumes:
+      - image-cache:/app/.next/cache/images
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
       interval: 30s
       timeout: 10s
       start_period: 30s
       retries: 3
+
+volumes:
+  image-cache:
