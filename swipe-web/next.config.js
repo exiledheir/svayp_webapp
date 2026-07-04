@@ -6,6 +6,9 @@ const nextConfig = {
   output: "standalone",
   images: {
     remotePatterns: [{ protocol: "https", hostname: "**" }],
+    // Product photos are immutable blobs — cache optimized variants for 31 days
+    // so the server doesn't re-fetch/re-encode originals on every request.
+    minimumCacheTTL: 2678400,
   },
   async rewrites() {
     return [

@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Image from 'next/image';
@@ -147,7 +148,7 @@ function ListingDetailPageInner() {
             >
               {(listing.images.length ? listing.images : ['']).map((src, i) => (
                 <div key={i} className="relative shrink-0 w-full" style={{ aspectRatio: '4/5', background: '#F7F7F8', scrollSnapAlign: 'start' }}>
-                  {src && <Image src={src} alt={`${listing.title} ${i + 1}`} fill sizes="430px" className="object-cover" unoptimized />}
+                  {src && <Image src={src} alt={`${listing.title} ${i + 1}`} fill sizes="430px" className="object-cover" unoptimized={needsUnoptimized(src)} />}
                 </div>
               ))}
             </div>

@@ -30,6 +30,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # public/ is NOT included in standalone output — must be copied explicitly
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
+# Image-optimizer cache dir: pre-created with the right owner so the named
+# volume mounted here (docker-compose) inherits nextjs ownership — otherwise
+# Docker creates it as root and the optimizer silently re-encodes every image.
+RUN mkdir -p .next/cache/images && chown -R nextjs:nodejs .next/cache
+
 USER nextjs
 
 EXPOSE 3000

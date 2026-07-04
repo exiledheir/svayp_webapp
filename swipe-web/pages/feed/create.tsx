@@ -10,6 +10,7 @@ import { type CanvasGroup, type SavedCanvasLayout } from '@/lib/closet-types';
 import { publishPost, FeedPublishError, type SelectedSource } from '@/lib/feed-publish';
 import { getMyProfile as getFeedProfile, fileToCompressedDataUrl } from '@/lib/feed-api';
 import { loadCached, clearCache } from '@/lib/feed-cache';
+import { clearPageCache } from '@/lib/page-cache';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
 import type { FeedPost, FeedProfile } from '@/types/feed';
@@ -280,6 +281,8 @@ function CreateFeedPost() {
     setPublishing(true);
     try {
       const post = await publishPost(selected, caption, allItems);
+      // The cached feed snapshot doesn't contain the new post — drop it.
+      clearPageCache('feed:posts');
       logAnalyticsEvent(Events.FEED_POST_PUBLISHED, {
         [Params.FEED_IMAGE_COUNT]: selected.length,
         [Params.FEED_HAS_REAL_PHOTO]: selected.some((s) => s.sourceType === 'tryon'),

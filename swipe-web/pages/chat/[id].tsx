@@ -1,10 +1,11 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { ArrowLeft, Send, Smile, Paperclip, X, ImageIcon } from 'lucide-react';
 import { FullPageLoader } from '@/components/LoadingSpinner';
 import ChatEmojiPanel from '@/components/ChatEmojiPanel';
-import { getChatMessages, sendChatMessage, sendMultipartMessage, getChats } from '@/lib/api';
+import { getChatMessages, getChatMessagesAfter, sendChatMessage, sendMultipartMessage, getChat } from '@/lib/api';
 import { getUser } from '@/lib/auth';
 import type { ChatMessage, ChatSummary } from '@/types';
 
@@ -47,6 +48,9 @@ export default function ChatDetailPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<ChatMessage[]>([]);
+  // createdAt of the newest SERVER-sourced message — delta-poll cursor.
+  // Optimistic local messages use the client clock and must not move it.
+  const lastServerTsRef = useRef<string | null>(null);
 
   const user = getUser();
   const userId = (user?.id ?? user?.userId ?? '') as string;
@@ -63,31 +67,49 @@ export default function ChatDetailPage() {
   const qSellerName = router.query.sellerName as string | undefined;
   const qSellerLogo = router.query.sellerLogo as string | undefined;
 
-  // Initial load
+  // Initial load — one summary request instead of the whole chat list
   useEffect(() => {
     if (!chatId) return;
     Promise.all([
       getChatMessages(chatId),
-      getChats(0, 50).then((chats) => chats.find((c) => c.id === chatId) ?? null),
+      getChat(chatId).catch(() => null),
     ])
       .then(([msgs, foundChat]) => {
         setMessages(msgs);
         messagesRef.current = msgs;
+        if (msgs.length > 0) lastServerTsRef.current = msgs[msgs.length - 1].createdAt;
         setChat(foundChat);
       })
       .finally(() => setLoading(false));
   }, [chatId]);
 
-  // Poll for new messages every 5 seconds (picks up seller replies)
+  // Poll for new messages every 5 seconds (picks up seller replies).
+  // Delta request (?after=) — the server returns only messages newer than the
+  // last server-sourced one, instead of the full page each tick.
   useEffect(() => {
     if (!chatId) return;
     const id = setInterval(async () => {
       try {
-        const fresh = await getChatMessages(chatId);
-        // Only update if there are genuinely more messages (avoids flicker)
-        if (fresh.length !== messagesRef.current.length) {
-          messagesRef.current = fresh;
-          setMessages(fresh);
+        const after = lastServerTsRef.current;
+        if (!after) {
+          const fresh = await getChatMessages(chatId);
+          if (fresh.length !== messagesRef.current.length) {
+            messagesRef.current = fresh;
+            setMessages(fresh);
+            if (fresh.length > 0) lastServerTsRef.current = fresh[fresh.length - 1].createdAt;
+          }
+          return;
+        }
+        const fresh = await getChatMessagesAfter(chatId, after);
+        if (fresh.length === 0) return;
+        lastServerTsRef.current = fresh[fresh.length - 1].createdAt;
+        // Own just-sent messages may arrive here before the optimistic swap — dedupe by id.
+        const known = new Set(messagesRef.current.map((m) => m.id));
+        const add = fresh.filter((m) => !known.has(m.id));
+        if (add.length > 0) {
+          const updated = [...messagesRef.current, ...add];
+          messagesRef.current = updated;
+          setMessages(updated);
         }
       } catch { /* silent */ }
     }, 5000);
@@ -188,6 +210,7 @@ export default function ChatDetailPage() {
         msg = await sendChatMessage(chatId, content);
       }
       // Replace optimistic with real message
+      if (msg.createdAt) lastServerTsRef.current = msg.createdAt;
       setMessages((prev) => {
         const updated = prev.map((m) => (m.id === optimisticId ? msg : m));
         messagesRef.current = updated;
@@ -254,7 +277,7 @@ export default function ChatDetailPage() {
               width={36}
               height={36}
               className="object-cover w-full h-full"
-              unoptimized
+              unoptimized={needsUnoptimized(sellerLogo)}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-white text-sm font-bold">
@@ -283,7 +306,7 @@ export default function ChatDetailPage() {
               height={64}
               className="rounded-xl object-cover shrink-0"
               style={{ width: 52, height: 64 }}
-              unoptimized
+              unoptimized={needsUnoptimized(productImage)}
             />
           ) : (
             <div className="rounded-xl bg-gray-200 shrink-0" style={{ width: 52, height: 64 }} />

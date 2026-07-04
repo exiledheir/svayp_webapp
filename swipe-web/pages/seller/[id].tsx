@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
@@ -104,7 +105,7 @@ export default function SellerProfilePage() {
               className="w-[90px] h-[90px] rounded-full overflow-hidden relative"
               style={{ border: '2px solid rgba(0,0,0,0.10)', boxShadow: '0 4px 12px rgba(0,0,0,0.10)' }}
             >
-              <Image src={info.logoImg} alt={info.name} fill sizes="90px" className="object-cover" unoptimized />
+              <Image src={info.logoImg} alt={info.name} fill sizes="90px" className="object-cover" unoptimized={needsUnoptimized(info.logoImg)} />
             </div>
           ) : (
             <div

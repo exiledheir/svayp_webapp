@@ -334,6 +334,15 @@ export async function getChatThread(id: string): Promise<MarketChatThread> {
 export async function getChatMessages(id: string, page = 0, size = 50): Promise<Page<MarketChatMessage>> {
   return asPage<MarketChatMessage>(await api.get(`/marketplace/chats/${id}/messages`, { params: { page, size } }));
 }
+/** Delta poll: only messages created after `afterIso` — oldest first. */
+export async function getChatMessagesAfter(
+  id: string,
+  afterIso: string,
+  size = 100,
+): Promise<MarketChatMessage[]> {
+  const res = await api.get(`/marketplace/chats/${id}/messages`, { params: { after: afterIso, size } });
+  return asPage<MarketChatMessage>(res).content;
+}
 export async function sendChatMessage(id: string, content: string): Promise<MarketChatMessage> {
   return unwrap<MarketChatMessage>(await api.post(`/marketplace/chats/${id}/messages`, { content }));
 }

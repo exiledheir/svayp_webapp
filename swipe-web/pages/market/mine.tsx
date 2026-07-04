@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import Image from 'next/image';
@@ -14,6 +15,7 @@ import {
 } from '@/lib/market-api';
 import type { MarketDraft, MarketListingStatus } from '@/types/market';
 import { statusLabel } from '@/lib/market-attributes';
+import { clearPageCache } from '@/lib/page-cache';
 import { useI18n } from '@/lib/i18n';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events } from '@/lib/analytics-events';
@@ -80,6 +82,8 @@ function MyListingsPageInner() {
       else if (target === 'archived') await archiveListing(listing.id);
       else if (target === 'active') await reactivateListing(listing.id);
       logAnalyticsEvent(Events.MARKET_LISTING_STATUS_CHANGED, { listing_id: listing.id, status: target });
+      // Lifecycle change affects the public feed — drop its cached snapshots.
+      clearPageCache('market:feed:', true);
     } catch { /* ignore — reload reflects server state */ }
     reload();
   }
@@ -198,7 +202,7 @@ function MyListingsPageInner() {
                   <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ border: '1px solid rgba(243,112,167,0.4)' }}>
                     <div className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0" style={{ background: '#F7F7F8' }}>
                       {draft.images?.[0] ? (
-                        <Image src={draft.images[0]} alt="draft" fill sizes="56px" className="object-cover" unoptimized />
+                        <Image src={draft.images[0]} alt="draft" fill sizes="56px" className="object-cover" unoptimized={needsUnoptimized(draft.images[0])} />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center"><FileEdit size={20} className="text-black/30" /></div>
                       )}

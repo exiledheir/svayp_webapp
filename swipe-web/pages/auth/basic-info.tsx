@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { createProfileV2 } from '@/lib/api';
+import { invalidateUserProfileCache } from '@/lib/wardrobe-api';
 import { getToken, getRefreshToken, getUser } from '@/lib/auth';
 import { sendToFlutter } from '@/lib/flutter-bridge';
 import { useI18n } from '@/lib/i18n';
@@ -72,6 +73,7 @@ export default function BasicInfoPage() {
         dateOfBirth: dateStr,
         gender,
       });
+      invalidateUserProfileCache();
 
       const accessToken = getToken() ?? '';
       const refreshToken = getRefreshToken() ?? '';

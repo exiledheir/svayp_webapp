@@ -11,8 +11,13 @@ import type { FeedPost } from '@/types/feed';
 import FeedGuard from '@/components/feed/FeedGuard';
 import FeedCard from '@/components/feed/FeedCard';
 import CommentsSheet from '@/components/feed/CommentsSheet';
+import { getPageCache, setPageCache } from '@/lib/page-cache';
 
 const PAGE_SIZE = 10;
+// Restore the feed list on back-navigation instead of refetching page 0.
+const FEED_CACHE_KEY = 'feed:posts';
+const FEED_CACHE_TTL_MS = 3 * 60_000;
+type FeedSnapshot = { posts: FeedPost[]; page: number; hasMore: boolean };
 // Bottom inset so content / FAB clear the native Flutter navbar (this page is a
 // WebView tab in the shell — like Closet/Market, it does not render the web
 // BottomNav, which would otherwise double up with the native bar).
@@ -49,6 +54,14 @@ function FeedHome() {
 
   React.useEffect(() => {
     logAnalyticsEvent(Events.FEED_VIEWED);
+    const cached = getPageCache<FeedSnapshot>(FEED_CACHE_KEY, FEED_CACHE_TTL_MS);
+    if (cached && cached.posts.length > 0) {
+      setPosts(cached.posts);
+      setPage(cached.page);
+      setHasMore(cached.hasMore);
+      setLoading(false);
+      return;
+    }
     getFeed(0, PAGE_SIZE)
       .then((res) => {
         setPosts(res.content);
@@ -57,6 +70,13 @@ function FeedHome() {
       .catch(() => setHasMore(false)) // backend may not be live yet → empty state
       .finally(() => setLoading(false));
   }, []);
+
+  // Snapshot the list (incl. like toggles) so the next visit restores it as-is.
+  React.useEffect(() => {
+    if (!loading && posts.length > 0) {
+      setPageCache(FEED_CACHE_KEY, { posts, page, hasMore } satisfies FeedSnapshot);
+    }
+  }, [posts, page, hasMore, loading]);
 
   const loadMore = React.useCallback(() => {
     if (fetchingMore || !hasMore) return;

@@ -416,10 +416,26 @@ export async function getChats(page = 0, size = 20): Promise<ChatSummary[]> {
   return unwrapList(res.data).map(mapChat);
 }
 
+/** Single chat summary — cheaper than fetching the whole list to find one. */
+export async function getChat(chatId: string): Promise<ChatSummary> {
+  const res = await api.get(`/chats/${chatId}`);
+  return mapChat(unwrapSingle(res.data));
+}
+
 export async function getChatMessages(chatId: string, page = 0, size = 50): Promise<ChatMessage[]> {
   const res = await api.get(`/chats/${chatId}/messages`, { params: { page, size } });
   // API returns newest-first; reverse so oldest is at top (chat convention)
   return unwrapList(res.data).map(mapMessage).reverse();
+}
+
+/** Delta poll: only messages created after `afterIso` — already oldest-first. */
+export async function getChatMessagesAfter(
+  chatId: string,
+  afterIso: string,
+  size = 50,
+): Promise<ChatMessage[]> {
+  const res = await api.get(`/chats/${chatId}/messages`, { params: { after: afterIso, size } });
+  return unwrapList(res.data).map(mapMessage);
 }
 
 export async function sendChatMessage(chatId: string, content: string): Promise<ChatMessage> {

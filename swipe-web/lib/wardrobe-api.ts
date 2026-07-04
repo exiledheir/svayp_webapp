@@ -67,17 +67,46 @@ export async function getUserPlan(): Promise<UserPlanResponse> {
   return mapPlanResponse(raw);
 }
 
-export async function getUserProfile(): Promise<{ name?: string; phoneNumber?: string }> {
-  const res = await api.get('/me');
-  const raw = unwrapData<Record<string, unknown>>(res);
-  const name = (
-    raw.name ?? raw.firstName ?? raw.first_name ??
-    raw.username ?? raw.fullName ?? raw.full_name ?? raw.displayName ?? raw.display_name
-  ) as string | undefined;
-  const phoneNumber = (
-    raw.phoneNumber ?? raw.phone_number ?? raw.phone
-  ) as string | undefined;
-  return { name: name || undefined, phoneNumber: phoneNumber || undefined };
+// FeatureFlagsProvider (_app), closet and the market contact step all request
+// the same rarely-changing profile — coalesce concurrent calls and reuse the
+// result briefly instead of firing several GET /me per screen. A full page
+// reload (login redirect, token hand-off from Flutter) resets this module
+// state, so a user switch can't serve a stale profile.
+type UserProfileLite = { name?: string; phoneNumber?: string };
+const PROFILE_CACHE_TTL_MS = 60_000;
+let profileCache: { value: UserProfileLite; at: number } | null = null;
+let profileInFlight: Promise<UserProfileLite> | null = null;
+
+/** Drop the cached /me result (call after profile create/update). */
+export function invalidateUserProfileCache(): void {
+  profileCache = null;
+  profileInFlight = null;
+}
+
+export async function getUserProfile(): Promise<UserProfileLite> {
+  if (profileCache && Date.now() - profileCache.at < PROFILE_CACHE_TTL_MS) {
+    return profileCache.value;
+  }
+  if (profileInFlight) return profileInFlight;
+  profileInFlight = (async () => {
+    try {
+      const res = await api.get('/me');
+      const raw = unwrapData<Record<string, unknown>>(res);
+      const name = (
+        raw.name ?? raw.firstName ?? raw.first_name ??
+        raw.username ?? raw.fullName ?? raw.full_name ?? raw.displayName ?? raw.display_name
+      ) as string | undefined;
+      const phoneNumber = (
+        raw.phoneNumber ?? raw.phone_number ?? raw.phone
+      ) as string | undefined;
+      const value: UserProfileLite = { name: name || undefined, phoneNumber: phoneNumber || undefined };
+      profileCache = { value, at: Date.now() };
+      return value;
+    } finally {
+      profileInFlight = null;
+    }
+  })();
+  return profileInFlight;
 }
 
 // ── Upload Flow ───────────────────────────────────────────────────────────────

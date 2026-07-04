@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { Plus, X, Crown, RefreshCw, Share2, Loader2 } from 'lucide-react';
@@ -643,7 +644,7 @@ export default function InteractiveCanvas({
               <div className="grid grid-cols-3 gap-2.5">
                 {getGroupItems(canvasItems[swapTarget].group).map((item) => (
                   <button key={item.id} onClick={() => handleSwap(swapTarget, item)} className={`relative aspect-[3/4] rounded-xl overflow-hidden border-2 transition-colors ${canvasItems[swapTarget].item.id === item.id ? 'border-[#F370A7]' : 'border-transparent'}`}>
-                    <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized />
+                    <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized={needsUnoptimized(item.imageData)} />
                   </button>
                 ))}
               </div>
@@ -691,7 +692,7 @@ export default function InteractiveCanvas({
               <div className="grid grid-cols-3 gap-2.5">
                 {getAllItems().map((item) => (
                   <button key={item.id} onClick={() => addItem(item)} className="relative aspect-[3/4] rounded-xl overflow-hidden border border-gray-100">
-                    <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized />
+                    <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized={needsUnoptimized(item.imageData)} />
                   </button>
                 ))}
               </div>

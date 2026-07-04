@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useRef, useState } from 'react';
 import Image from 'next/image';
 import { Plus, X, Camera, ArrowUpRight } from 'lucide-react';
@@ -101,7 +102,7 @@ export default function PhotosStep({ form, patch, onNext }: StepProps) {
         <div className="grid grid-cols-3 gap-2.5">
           {images.map((src, i) => (
             <div key={i} className="relative rounded-2xl overflow-hidden" style={{ aspectRatio: '1', background: '#F7F7F8' }}>
-              <Image src={src} alt={`photo ${i + 1}`} fill sizes="120px" className="object-cover" unoptimized />
+              <Image src={src} alt={`photo ${i + 1}`} fill sizes="120px" className="object-cover" unoptimized={needsUnoptimized(src)} />
               <button
                 onClick={() => removeAt(i)}
                 className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center"

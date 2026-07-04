@@ -1,3 +1,4 @@
+import { needsUnoptimized } from '@/lib/img';
 import React, { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
@@ -150,7 +151,7 @@ function SellerCard({ seller }: { seller: SellerInfo }) {
       {/* Avatar */}
       {seller.logoImg ? (
         <div className="w-16 h-16 rounded-full overflow-hidden shrink-0 relative">
-          <Image src={seller.logoImg} alt={seller.name} fill sizes="64px" className="object-cover" unoptimized />
+          <Image src={seller.logoImg} alt={seller.name} fill sizes="64px" className="object-cover" unoptimized={needsUnoptimized(seller.logoImg)} />
         </div>
       ) : (
         <div
