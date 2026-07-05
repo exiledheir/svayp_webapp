@@ -10,6 +10,7 @@ import { Events, Params } from '@/lib/analytics-events';
 import { downloadWithWatermark, shareWatermarked } from '@/lib/canvas-snapshot';
 import ShareSheet from '@/components/ShareSheet';
 import { uploadModelPhoto } from '@/lib/wardrobe-api';
+import { compressImageForUpload } from '@/lib/image-utils';
 
 /**
  * Maps a raw backend try-on failure reason to a friendly, localized message.
@@ -81,7 +82,12 @@ export function TryOnConfirmModal({
     setPhotoPreview(URL.createObjectURL(file));
     setUploading(true);
     try {
-      const key = await uploadModelPhoto(file);
+      // Re-encode to JPEG via canvas before upload — same as every other upload
+      // path (closet, market, onboarding). iPhone gallery photos arrive as HEIC
+      // or very large files that the backend rejects; the canvas round-trip
+      // normalizes them to a JPEG the backend accepts.
+      const normalized = await compressImageForUpload(file);
+      const key = await uploadModelPhoto(normalized);
       setPersonKey(key);
     } catch {
       setPhotoError(true);
