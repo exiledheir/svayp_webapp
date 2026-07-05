@@ -20,6 +20,14 @@ import { getPageCache, setPageCache } from '@/lib/page-cache';
 // Feed lists live briefly in the page cache so "listing → back" doesn't refetch.
 const MARKET_FEED_TTL_MS = 2 * 60_000;
 
+// Cached feed state — the loaded listings plus where pagination left off, so a
+// "listing → back" restores the full scrolled-through list, not just page 0.
+interface MarketFeedSnapshot {
+  listings: MarketListing[];
+  nextPage: number;
+  hasMore: boolean;
+}
+
 /**
  * Market feed — the C2C marketplace hub. Layout (top → bottom):
  *   Header (title + My listings) · Search bar · Ad banners · Categories · Grid.
@@ -32,6 +40,11 @@ export default function MarketFeedPage() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [listings, setListings] = useState<MarketListing[]>([]);
+  // Infinite scroll: `nextPage` is the page index to request next, `hasMore`
+  // stops us once the backend runs out, `fetchingMore` guards concurrent loads.
+  const [nextPage, setNextPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [fetchingMore, setFetchingMore] = useState(false);
   const [category, setCategory] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   // Debounced mirror of `search` — the feed refetches 350 ms after typing
@@ -51,30 +64,77 @@ export default function MarketFeedPage() {
     return () => clearTimeout(id);
   }, [search]);
 
+  const cacheKey = `market:feed:${category ?? 'all'}:${debouncedSearch.trim()}`;
+
   const loadFeed = useCallback(async (force = false) => {
-    const cacheKey = `market:feed:${category ?? 'all'}:${debouncedSearch.trim()}`;
     if (!force) {
-      const cached = getPageCache<MarketListing[]>(cacheKey, MARKET_FEED_TTL_MS);
+      const cached = getPageCache<MarketFeedSnapshot>(cacheKey, MARKET_FEED_TTL_MS);
       if (cached) {
-        setListings(cached);
+        setListings(cached.listings);
+        setNextPage(cached.nextPage);
+        setHasMore(cached.hasMore);
         return;
       }
     }
-    // Live backend feed (GET /marketplace/listings).
+    // Live backend feed (GET /marketplace/listings) — first page.
     try {
       const page = await apiGetFeed({
         category: category ? [category] : undefined,
         q: debouncedSearch.trim() || undefined,
       });
       const list = page.content.map(cardToListing);
+      const more = page.number + 1 < page.totalPages;
       setListings(list);
-      setPageCache(cacheKey, list);
+      setNextPage(1);
+      setHasMore(more);
+      setPageCache(cacheKey, { listings: list, nextPage: 1, hasMore: more } satisfies MarketFeedSnapshot);
     } catch {
       setListings([]);
+      setHasMore(false);
     }
-  }, [category, debouncedSearch]);
+  }, [category, debouncedSearch, cacheKey]);
 
   useEffect(() => { loadFeed(); }, [loadFeed]);
+
+  // Fetch the next page and append — triggered as the grid nears the bottom.
+  const loadMore = useCallback(async () => {
+    if (fetchingMore || !hasMore) return;
+    setFetchingMore(true);
+    try {
+      const page = await apiGetFeed({
+        category: category ? [category] : undefined,
+        q: debouncedSearch.trim() || undefined,
+        page: nextPage,
+      });
+      const more = page.number + 1 < page.totalPages;
+      setListings((prev) => {
+        const merged = [...prev, ...page.content.map(cardToListing)];
+        setPageCache(cacheKey, { listings: merged, nextPage: nextPage + 1, hasMore: more } satisfies MarketFeedSnapshot);
+        return merged;
+      });
+      setNextPage(nextPage + 1);
+      setHasMore(more);
+    } catch {
+      setHasMore(false);
+    } finally {
+      setFetchingMore(false);
+    }
+  }, [fetchingMore, hasMore, category, debouncedSearch, nextPage, cacheKey]);
+
+  // Infinite scroll: load the next page as the grid nears the bottom. Batched in
+  // rAF so reading scroll geometry doesn't force a reflow on every scroll event.
+  const scrollTickingRef = useRef(false);
+  function handleScroll() {
+    if (scrollTickingRef.current) return;
+    scrollTickingRef.current = true;
+    requestAnimationFrame(() => {
+      scrollTickingRef.current = false;
+      const el = mainScrollRef.current;
+      if (!el) return;
+      const { scrollHeight, scrollTop, clientHeight } = el;
+      if (scrollHeight - scrollTop - clientHeight < 800) loadMore();
+    });
+  }
 
   // ── Pull-to-refresh ─────────────────────────────────────────────────────────
   const mainScrollRef = useRef<HTMLElement>(null);
@@ -234,6 +294,7 @@ export default function MarketFeedPage() {
           ref={mainScrollRef}
           className="flex-1 overflow-y-auto"
           style={{ paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', overscrollBehaviorY: 'contain' }}
+          onScroll={handleScroll}
           onTouchStart={handlePullTouchStart}
           onTouchMove={handlePullTouchMove}
           onTouchEnd={handlePullTouchEnd}
@@ -339,11 +400,22 @@ export default function MarketFeedPage() {
               {t.mk_empty_feed}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3 px-4 pt-1">
-              {listings.map((l) => (
-                <MarketFeedCard key={l.id} listing={l} />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-2 gap-3 px-4 pt-1">
+                {listings.map((l) => (
+                  <MarketFeedCard key={l.id} listing={l} />
+                ))}
+              </div>
+              {/* Loading-more spinner while the next page fetches */}
+              {fetchingMore && (
+                <div className="flex items-center justify-center py-5">
+                  <div
+                    className="w-6 h-6 rounded-full border-2"
+                    style={{ borderColor: '#F370A7', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }}
+                  />
+                </div>
+              )}
+            </>
           )}
         </main>
 
