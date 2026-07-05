@@ -1,7 +1,7 @@
 import { needsUnoptimized } from '@/lib/img';
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Sparkles, User, Camera, Check, Loader2 } from 'lucide-react';
+import { Sparkles, User, Camera, Check, Loader2, ZoomIn, X } from 'lucide-react';
 import type { ClosetItem } from '@/lib/closet-storage';
 import type { SavedCanvasLayout } from '@/lib/closet-types';
 import { createTryOnJob, watchTryOnUntilDone, uploadModelPhoto } from '@/lib/wardrobe-api';
@@ -41,13 +41,15 @@ export default function TryOnStep({
   const [elapsed, setElapsed] = useState(0);
   const [activeItemIdx, setActiveItemIdx] = useState(0);
 
-  // Куда примеряем: на манекен (по умолчанию — без трения на первом запуске)
-  // или на своё загруженное фото. Совпадает с основным TryOnFlow в гардеробе.
-  const [target, setTarget] = useState<'mannequin' | 'self'>('mannequin');
+  // Куда примеряем: на своё загруженное фото (по умолчанию, как в основном
+  // TryOnFlow в гардеробе) или на манекен.
+  const [target, setTarget] = useState<'mannequin' | 'self'>('self');
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [personKey, setPersonKey] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [photoError, setPhotoError] = useState(false);
+  // Увеличенный просмотр примера-фото (лайтбокс).
+  const [zoomSrc, setZoomSrc] = useState<string | null>(null);
 
   async function handlePhotoPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -174,17 +176,21 @@ export default function TryOnStep({
   }
 
   return (
-    <div className="flex-1 flex flex-col">
-      <div className="px-6 pt-4 pb-2">
+    <div className="flex-1 flex flex-col min-h-0">
+      <div className="px-6 pt-4 pb-2 flex-none">
         <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-2">{title}</h2>
         <p className="text-[16px] font-medium leading-relaxed text-gray-600 dark:text-gray-300 max-w-[34ch]">{body}</p>
       </div>
 
+      {/* Scrollable region: canvas + (idle) target chooser & photo upload. Kept
+          scrollable so the guidance/examples never push the pinned CTA off-screen
+          on short devices. */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 flex flex-col">
       {/* Canvas: white bg, items positioned naturally top→bottom */}
-      <div className="flex-1 flex items-center justify-center px-8 min-h-0">
+      <div className="flex-none flex items-center justify-center py-1">
         <div
           className="relative w-full rounded-3xl overflow-hidden"
-          style={{ aspectRatio: '3/4', maxHeight: '50vh', background: '#ffffff', boxShadow: '0 2px 24px rgba(0,0,0,0.08)' }}
+          style={{ aspectRatio: '3/4', maxHeight: phase === 'idle' ? '34vh' : '46vh', background: '#ffffff', boxShadow: '0 2px 24px rgba(0,0,0,0.08)' }}
         >
           {/* ── Idle / result ── */}
           {phase !== 'processing' && (
@@ -302,10 +308,9 @@ export default function TryOnStep({
         </div>
       </div>
 
-      {/* Bottom actions */}
-      <div className="flex-none px-6 pb-2 pt-3 flex flex-col gap-2">
+        {/* Idle: target chooser + (self) guidance, examples & upload */}
         {phase === 'idle' && (
-          <>
+          <div className="flex-none pt-3 pb-1 flex flex-col gap-2">
             {/* Target selector — two option cards: mannequin vs your own photo */}
             <div className="grid grid-cols-2 gap-3 items-stretch">
               <button
@@ -348,9 +353,26 @@ export default function TryOnStep({
               </button>
             </div>
 
-            {/* Photo upload — only in "self" mode */}
+            {/* Photo guidance + examples + upload — only in "self" mode */}
             {target === 'self' && (
               <>
+                {/* Guidance: what photo to upload */}
+                <div className="rounded-2xl p-3 mt-1" style={{ background: 'rgba(243,112,167,0.05)' }}>
+                  <p className="text-[13px] font-bold text-gray-900">{t.tryOnPhotoWhatTitle}</p>
+                  <p className="text-[12px] text-gray-500 leading-relaxed mt-1">{t.tryOnPhotoWhatBody}</p>
+                </div>
+
+                {/* Example photos — tap to view larger */}
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    '/images/closet/tryon/example-1.webp',
+                    '/images/closet/tryon/example-2.webp',
+                    '/images/closet/tryon/example-3.webp',
+                  ].map((src, i) => (
+                    <ExamplePhoto key={src} src={src} alt={`${t.tryOnPhotoWhatTitle} ${i + 1}`} onZoom={() => setZoomSrc(src)} />
+                  ))}
+                </div>
+
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoPick} />
                 <button
                   onClick={() => fileInputRef.current?.click()}
@@ -375,7 +397,14 @@ export default function TryOnStep({
                 )}
               </>
             )}
+          </div>
+        )}
+      </div>
 
+      {/* Pinned bottom actions */}
+      <div className="flex-none px-6 pb-2 pt-2 flex flex-col gap-2">
+        {phase === 'idle' ? (
+          <>
             <button
               onClick={start}
               disabled={startDisabled}
@@ -387,9 +416,7 @@ export default function TryOnStep({
             </button>
             <p className="text-center text-[11px] text-gray-300 leading-snug">{t.ob_tryon_quota_note}</p>
           </>
-        )}
-
-        {phase !== 'idle' && (
+        ) : (
           <button
             onClick={onFinished}
             disabled={phase === 'processing'}
@@ -400,7 +427,66 @@ export default function TryOnStep({
           </button>
         )}
       </div>
+
+      {/* Enlarged example-photo viewer (lightbox) */}
+      {zoomSrc && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/85 p-6"
+          onClick={() => setZoomSrc(null)}
+        >
+          <button
+            onClick={() => setZoomSrc(null)}
+            aria-label={t.close}
+            className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/15 backdrop-blur flex items-center justify-center"
+          >
+            <X size={20} className="text-white" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={zoomSrc}
+            alt=""
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-full rounded-2xl shadow-2xl"
+            style={{ maxHeight: '85vh', objectFit: 'contain' }}
+          />
+        </div>
+      )}
     </div>
+  );
+}
+
+/**
+ * One example photo showing how to shoot for a good try-on result. Tapping it
+ * opens the enlarged viewer. Falls back to a neutral silhouette placeholder if
+ * the image file is missing, so the layout stays stable.
+ */
+function ExamplePhoto({ src, alt, onZoom }: { src: string; alt: string; onZoom: () => void }) {
+  const [ok, setOk] = useState(true);
+  return (
+    <button
+      type="button"
+      onClick={ok ? onZoom : undefined}
+      className="group relative rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center"
+      style={{ aspectRatio: '2 / 3', cursor: ok ? 'zoom-in' : 'default' }}
+    >
+      {ok ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt={alt}
+          onError={() => setOk(false)}
+          loading="lazy"
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <User size={26} className="text-gray-300" />
+      )}
+      {ok && (
+        <span className="absolute bottom-1.5 right-1.5 w-6 h-6 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center">
+          <ZoomIn size={13} className="text-white" />
+        </span>
+      )}
+    </button>
   );
 }
 
