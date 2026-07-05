@@ -5,6 +5,7 @@ export interface Translations {
   weekend: string;
   nextSevenDays: string;
   marketTitle: string;
+  closetTitle: string;
   marketComingSoonTitle: string;
   marketComingSoonText: string;
   // ── Market (C2C) ──────────────────────────────────────────────────────────
@@ -587,7 +588,8 @@ const en: Translations = {
   today: 'Today',
   weekend: 'Weekend',
   nextSevenDays: 'Next 7 Days',
-  marketTitle: 'LIBAS Market',
+  marketTitle: 'Market',
+  closetTitle: 'Closet',
   marketComingSoonTitle: 'Coming soon',
   marketComingSoonText: 'Soon, the place where you can sell your things',
   // ── Market (C2C) ──
@@ -1243,7 +1245,8 @@ const ru: Translations = {
   today: 'Сегодня',
   weekend: 'Выходные',
   nextSevenDays: 'Ближайшие 7 дней',
-  marketTitle: 'LIBAS Market',
+  marketTitle: 'Маркет',
+  closetTitle: 'Гардероб',
   marketComingSoonTitle: 'Скоро',
   marketComingSoonText: 'Скоро здесь вы сможете продавать свои вещи',
   // ── Market (C2C) ──
@@ -1900,7 +1903,8 @@ const uz: Translations = {
   today: 'Bugun',
   weekend: 'Dam olish',
   nextSevenDays: 'Keyingi 7 kun',
-  marketTitle: 'LIBAS Market',
+  marketTitle: 'Bozor',
+  closetTitle: 'Garderob',
   marketComingSoonTitle: 'Tez orada',
   marketComingSoonText: "Tez orada, bu yerda siz o'z buyumlaringizni sotishingiz mumkin",
   // ── Market (C2C) ──

@@ -1,10 +1,11 @@
 import { needsUnoptimized } from '@/lib/img';
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, User, Camera, Check, Loader2 } from 'lucide-react';
 import type { ClosetItem } from '@/lib/closet-storage';
 import type { SavedCanvasLayout } from '@/lib/closet-types';
-import { createTryOnJob, watchTryOnUntilDone } from '@/lib/wardrobe-api';
+import { createTryOnJob, watchTryOnUntilDone, uploadModelPhoto } from '@/lib/wardrobe-api';
+import { compressImageForUpload } from '@/lib/image-utils';
 import type { SseHandle } from '@/types';
 import { captureCanvasSnapshot } from '@/lib/canvas-snapshot';
 import { saveTryOnResult } from '@/lib/tryon-history';
@@ -33,11 +34,45 @@ export default function TryOnStep({
   const handleRef = useRef<SseHandle | null>(null);
   const cancelRef = useRef(false);
   const startedAt = useRef(0);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [activeItemIdx, setActiveItemIdx] = useState(0);
+
+  // Куда примеряем: на манекен (по умолчанию — без трения на первом запуске)
+  // или на своё загруженное фото. Совпадает с основным TryOnFlow в гардеробе.
+  const [target, setTarget] = useState<'mannequin' | 'self'>('mannequin');
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [personKey, setPersonKey] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [photoError, setPhotoError] = useState(false);
+
+  async function handlePhotoPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file
+    if (!file) return;
+    setPhotoError(false);
+    setPersonKey(null);
+    setPhotoPreview(URL.createObjectURL(file));
+    setUploading(true);
+    try {
+      // Re-encode to JPEG via canvas before upload — iPhone gallery photos
+      // arrive as HEIC/oversized files the backend rejects.
+      const normalized = await compressImageForUpload(file);
+      const key = await uploadModelPhoto(normalized);
+      setPersonKey(key);
+    } catch {
+      setPhotoError(true);
+      setPhotoPreview(null);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  // «На своё фото» готово к запуску только когда фото загружено на сервер.
+  const startDisabled = target === 'self' && (!personKey || uploading);
 
   // Elapsed timer for progress bar
   useEffect(() => {
@@ -87,7 +122,7 @@ export default function TryOnStep({
   const currentPhase = elapsed < 10 ? 0 : elapsed < 25 ? 1 : elapsed < 45 ? 2 : 3;
 
   function start() {
-    if (itemIds.length === 0 || phase !== 'idle') return;
+    if (itemIds.length === 0 || phase !== 'idle' || startDisabled) return;
     cancelRef.current = false;
     logAnalyticsEvent(Events.TRYON_INITIATED, { [Params.OUTFIT_ITEM_COUNT]: itemIds.length, [Params.SOURCE]: 'onboarding' });
     setPhase('processing');
@@ -97,7 +132,11 @@ export default function TryOnStep({
       if (layout && layout.length > 0) {
         try { snapshotBlob = await captureCanvasSnapshot(layout, items); } catch { /* ignore */ }
       }
-      return createTryOnJob({ wardrobeItemIds: itemIds, snapshotBlob });
+      return createTryOnJob({
+        wardrobeItemIds: itemIds,
+        snapshotBlob,
+        personImageKey: target === 'self' ? personKey ?? undefined : undefined,
+      });
     })()
       .then((job) => {
         if (cancelRef.current) return;
@@ -267,9 +306,80 @@ export default function TryOnStep({
       <div className="flex-none px-6 pb-2 pt-3 flex flex-col gap-2">
         {phase === 'idle' && (
           <>
+            {/* Target selector — two option cards: mannequin vs your own photo */}
+            <div className="grid grid-cols-2 gap-3 items-stretch">
+              <button
+                onClick={() => setTarget('mannequin')}
+                className="relative flex flex-col items-center text-center gap-1.5 rounded-2xl border p-3 transition-all"
+                style={{
+                  borderColor: target === 'mannequin' ? '#F370A7' : '#eee',
+                  borderWidth: target === 'mannequin' ? 2 : 1,
+                  background: target === 'mannequin' ? 'rgba(243,112,167,0.06)' : '#fff',
+                }}
+              >
+                <SelectBadge active={target === 'mannequin'} />
+                <span className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(243,112,167,0.10)' }}>
+                  <User size={20} className="text-[#F370A7]" />
+                </span>
+                <span className="block text-[13px] font-semibold text-gray-900 leading-tight">{t.tryOnTargetMannequin}</span>
+                <span className="block text-[11px] text-gray-400 leading-snug">{t.tryOnTargetMannequinHint}</span>
+              </button>
+
+              <button
+                onClick={() => setTarget('self')}
+                className="relative flex flex-col items-center text-center gap-1.5 rounded-2xl border p-3 transition-all"
+                style={{
+                  borderColor: target === 'self' ? '#F370A7' : '#eee',
+                  borderWidth: target === 'self' ? 2 : 1,
+                  background: target === 'self' ? 'rgba(243,112,167,0.06)' : '#fff',
+                }}
+              >
+                <SelectBadge active={target === 'self'} />
+                <span className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center" style={{ background: 'rgba(243,112,167,0.10)' }}>
+                  {photoPreview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={photoPreview} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <Camera size={20} className="text-[#F370A7]" />
+                  )}
+                </span>
+                <span className="block text-[13px] font-semibold text-gray-900 leading-tight">{t.tryOnTargetSelf}</span>
+                <span className="block text-[11px] text-gray-400 leading-snug">{t.tryOnTargetSelfHint}</span>
+              </button>
+            </div>
+
+            {/* Photo upload — only in "self" mode */}
+            {target === 'self' && (
+              <>
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoPick} />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="w-full h-11 rounded-2xl border flex items-center justify-center gap-2 text-[13px] font-semibold disabled:opacity-70"
+                  style={{
+                    borderColor: personKey ? '#e5e7eb' : 'transparent',
+                    background: personKey ? '#fff' : 'rgba(243,112,167,0.10)',
+                    color: personKey ? '#374151' : '#F370A7',
+                  }}
+                >
+                  {uploading ? (
+                    <><Loader2 size={16} className="animate-spin" /> {t.tryOnUploading}</>
+                  ) : personKey ? (
+                    <><Check size={15} className="text-[#16a34a]" /> {t.tryOnChangePhoto}</>
+                  ) : (
+                    <><Camera size={16} /> {t.tryOnUploadPhoto}</>
+                  )}
+                </button>
+                {photoError && (
+                  <p className="text-center text-[11px]" style={{ color: '#ef4444' }}>{t.tryOnPhotoFailed}</p>
+                )}
+              </>
+            )}
+
             <button
               onClick={start}
-              className="w-full py-4 rounded-2xl text-white font-semibold text-[15px] flex items-center justify-center gap-2"
+              disabled={startDisabled}
+              className="w-full py-4 rounded-2xl text-white font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-50"
               style={{ background: 'linear-gradient(135deg, #F370A7, #e0409a)' }}
             >
               <Sparkles size={18} />
@@ -291,5 +401,20 @@ export default function TryOnStep({
         )}
       </div>
     </div>
+  );
+}
+
+/** Checkmark badge in the corner of a selected target card. */
+function SelectBadge({ active }: { active: boolean }) {
+  return (
+    <span
+      className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center border-2 transition-colors"
+      style={{
+        borderColor: active ? '#F370A7' : '#d1d5db',
+        background: active ? '#F370A7' : 'transparent',
+      }}
+    >
+      {active && <Check size={12} className="text-white" strokeWidth={3} />}
+    </span>
   );
 }

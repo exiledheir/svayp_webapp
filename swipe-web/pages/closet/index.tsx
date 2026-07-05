@@ -2,7 +2,7 @@ import { needsUnoptimized } from '@/lib/img';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2, ArrowUpRight, BookOpen, MessageCircle, Share2 } from 'lucide-react';
+import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2, ArrowUpRight, BookOpen, Share2 } from 'lucide-react';
 import { getUser, clearTokens } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags-context';
 import { useRootBackGuard } from '@/lib/use-root-back-guard';
@@ -25,7 +25,6 @@ import { useTheme } from '@/lib/theme';
 import { isInFlutterWebView } from '@/lib/flutter-bridge';
 import { shareImageBlob, fetchImageBlob } from '@/lib/share-image';
 import ShareSheet from '@/components/ShareSheet';
-import { openSupportChat } from '@/lib/support-chat';
 import { saveUploadPreview, getUploadPreview, clearUploadPreview } from '@/lib/upload-previews';
 import { compressImageForUpload } from '@/lib/image-utils';
 import {
@@ -295,22 +294,6 @@ export default function ClosetPage() {
   }, [items]);
   const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | 'tryOn' | 'canvas' | null>(null);
   const { plan, limits, usage, fetchPlan, canGenerate, canTryOn, calendarDays } = usePlan();
-
-  // ── Feedback contact (Libas support) ───────────────────────────────────────────
-  // Opens the user's support chat with the Libas team — native chat inside the
-  // app, web chat in a browser, Telegram as a fallback (see openSupportChat).
-  const [contactingAdmin, setContactingAdmin] = useState(false);
-
-  async function handleFeedbackTap() {
-    if (contactingAdmin) return;
-    setContactingAdmin(true);
-    logAnalyticsEvent(Events.CLOSET_FEEDBACK_CTA_TAPPED);
-    try {
-      await openSupportChat(router);
-    } finally {
-      setContactingAdmin(false);
-    }
-  }
 
   // Single overall wardrobe item limit (across all categories), not per category.
   // Demo items don't count toward the limit.
@@ -1330,8 +1313,8 @@ export default function ClosetPage() {
         className="shrink-0 flex items-center justify-between px-4 pb-2 bg-white dark:bg-[#111111]"
         style={{ paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))' }}
       >
-        {/* Left: LIBΛS logo */}
-        <h1 className="text-[24px] font-bold tracking-[0.12em] text-black dark:text-white shrink-0">LIB<span style={{ color: '#F370A7' }}>Λ</span>S</h1>
+        {/* Left: section name */}
+        <h1 className="text-[26px] font-bold tracking-[-0.5px] text-black dark:text-white shrink-0">{t.closetTitle}</h1>
 
         {/* Right: action buttons + profile + guide */}
         <div className="flex items-center gap-1.5">
@@ -1389,38 +1372,6 @@ export default function ClosetPage() {
           </div>
       </header>
 
-      {/* ── Feedback Banner: chat directly with the Libas team ─────────────── */}
-      <button
-        onClick={handleFeedbackTap}
-        disabled={contactingAdmin}
-        className="shrink-0 mx-3 mb-2 w-[calc(100%-1.5rem)] rounded-2xl overflow-hidden text-left active:scale-[0.98] transition-transform select-none disabled:opacity-70"
-        style={{
-          background: 'linear-gradient(135deg, #2AABEE 0%, #229ED9 100%)',
-          boxShadow: '0 4px 18px rgba(34,158,217,0.32)',
-        }}
-        aria-label={t.feedbackBannerCta}
-      >
-        <div className="relative px-4 py-3 flex items-center gap-3">
-          <div className="shrink-0 w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
-            <MessageCircle size={18} strokeWidth={2.2} color="#fff" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-white font-extrabold text-[13px] leading-snug">
-              {t.feedbackBannerTitle}
-            </p>
-            <p className="text-white/90 text-[10.5px] font-medium leading-snug mt-0.5 line-clamp-2">
-              {t.feedbackBannerBody}
-            </p>
-          </div>
-          <span
-            className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-white text-[11px] font-bold whitespace-nowrap"
-            style={{ color: '#1d93d1' }}
-          >
-            {contactingAdmin && <Loader2 size={12} className="animate-spin" />}
-            {t.feedbackBannerCta}
-          </span>
-        </div>
-      </button>
       <style jsx>{`
         @keyframes hintSlideIn {
           from { opacity: 0; transform: translate(-50%, 12px); }
