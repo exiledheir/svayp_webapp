@@ -30,7 +30,10 @@ export default function ShareSheet({ onExternal, onClose }: Props) {
     >
       <div
         className="w-full max-w-[430px] rounded-t-3xl bg-white dark:bg-[#1c1c1e] px-5 pt-3"
-        style={{ paddingBottom: 'max(1.25rem, env(safe-area-inset-bottom, 1.25rem))' }}
+        // Clear the Flutter app's floating bottom navbar (~60px + safe-area) so
+        // the action rows aren't hidden behind it — matches the 96px nav
+        // clearance used by the scrollable tab pages.
+        style={{ paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="w-10 h-1 rounded-full bg-black/15 dark:bg-white/20 mx-auto mb-2" />
