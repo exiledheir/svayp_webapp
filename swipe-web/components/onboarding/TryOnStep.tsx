@@ -186,11 +186,15 @@ export default function TryOnStep({
           scrollable so the guidance/examples never push the pinned CTA off-screen
           on short devices. */}
       <div className="flex-1 min-h-0 overflow-y-auto px-6 flex flex-col">
-      {/* Canvas: white bg, items positioned naturally top→bottom */}
+      {/* Canvas — only during processing / result. Hidden while idle: the outfit
+          was already previewed on the generate step, and squeezing it into the
+          reduced idle space overlapped the items. Sized by height so the fixed
+          3:4 box can never get squished by a height cap. */}
+      {phase !== 'idle' && (
       <div className="flex-none flex items-center justify-center py-1">
         <div
-          className="relative w-full rounded-3xl overflow-hidden"
-          style={{ aspectRatio: '3/4', maxHeight: phase === 'idle' ? '34vh' : '46vh', background: '#ffffff', boxShadow: '0 2px 24px rgba(0,0,0,0.08)' }}
+          className="relative rounded-3xl overflow-hidden"
+          style={{ aspectRatio: '3/4', height: '46vh', maxWidth: '100%', background: '#ffffff', boxShadow: '0 2px 24px rgba(0,0,0,0.08)' }}
         >
           {/* ── Idle / result ── */}
           {phase !== 'processing' && (
@@ -307,6 +311,7 @@ export default function TryOnStep({
           )}
         </div>
       </div>
+      )}
 
         {/* Idle: target chooser + (self) guidance, examples & upload */}
         {phase === 'idle' && (
