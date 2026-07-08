@@ -1014,7 +1014,14 @@ export default function ClosetPage() {
         if (plansEnabled) { setShowPremiumGate('generation'); return; }
         return;
       } else {
+        // Unknown failure (backend down / 401 / 500 …): still show a local random
+        // outfit so the button isn't dead, but SURFACE the failure — silently
+        // faking success made real outages look like "AI generates randomly and
+        // the counter never grows".
+        console.error('ai-suggest failed', err);
         logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: code ?? 'unknown' });
+        setOutfitToastMsg(`${t.aiSuggestFailed}${code ? ` (${code})` : ''}`);
+        setTimeout(() => setOutfitToastMsg(null), 4000);
         layout = generateRandomOutfit(items);
       }
     } finally {
