@@ -109,7 +109,7 @@ const DEMO_CANVAS_LAYOUT: SavedCanvasLayout = [
 type UserPlan = PlanTier;
 
 const PLAN_LIMITS_FALLBACK: Record<UserPlan, PlanLimits> = {
-  free:    { wardrobeItems: 5,   outfitCanvases: 1, tryItOns: 2,  regenerations: 5,  calendarDays: 2 },
+  free:    { wardrobeItems: 10,  outfitCanvases: 1, tryItOns: 2,  regenerations: 5,  calendarDays: 2 },
   pro:     { wardrobeItems: 40,  outfitCanvases: 3, tryItOns: 10, regenerations: 20, calendarDays: 7 },
   premium: { wardrobeItems: 100, outfitCanvases: 7, tryItOns: 30, regenerations: 50, calendarDays: 7 },
 };
@@ -993,9 +993,17 @@ export default function ClosetPage() {
       const errData = (err as { response?: { data?: { error?: { code?: string; message?: string }; code?: string } } })?.response?.data;
       const code = errData?.error?.code ?? errData?.code;
       if (code === 'NOT_ENOUGH_CLOTHES') {
-        // API requires shoes but client only needs upper + lower — fall back to local random generation
+        // The backend can't build a valid outfit (e.g. bottoms still processing
+        // through the AI pipeline, or genuinely missing). Show the specific
+        // backend message instead of silently faking a random outfit — the
+        // silent fallback hid real problems from users.
         logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: code });
-        layout = generateRandomOutfit(items);
+        const apiMsg = errData?.error?.message;
+        setOutfitBlockedModal({
+          title: t.tooFewItemsTitle,
+          body: apiMsg && apiMsg.trim() ? apiMsg : t.tooFewItemsBody,
+        });
+        return;
       } else if (code === 'OUTFITS_EXHAUSTED') {
         logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: code });
         const apiMsg = errData?.error?.message;
