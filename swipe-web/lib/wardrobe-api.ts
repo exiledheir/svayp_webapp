@@ -44,7 +44,7 @@ function mapPlanResponse(raw: Record<string, unknown>): UserPlanResponse {
     userId: (raw.userId ?? '') as string,
     plan: tierMap[tier] ?? 'free',
     limits: {
-      wardrobeItems:    (limits.wardrobeItems ?? limits.itemsPerCategory ?? 5) as number,
+      wardrobeItems:    (limits.wardrobeItems ?? limits.itemsPerCategory ?? 10) as number,
       outfitCanvases:   (limits.canvases ?? limits.outfitCanvases ?? 1) as number,
       tryItOns:         (limits.tryOnPerMonth ?? limits.tryItOns ?? 2) as number,
       regenerations:    (limits.regenPerMonth ?? limits.regenerations ?? 5) as number,
