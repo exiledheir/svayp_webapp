@@ -478,6 +478,7 @@ export interface Translations {
   moreNeeded: string;
   regenerateWithAI: string;
   generateOutfitLabel: string;
+  aiSuggestFailed: string;
   aiThinking: string;
   cats: {
     tops: string;
@@ -1191,6 +1192,7 @@ const en: Translations = {
   moreNeeded: '{n} more needed',
   regenerateWithAI: 'Regenerate with AI',
   generateOutfitLabel: 'Generate outfit',
+  aiSuggestFailed: 'AI is unavailable — showing a random look',
   aiThinking: 'AI is thinking…',
 
   cats: {
@@ -1849,6 +1851,7 @@ const ru: Translations = {
   moreNeeded: 'ещё {n}',
   regenerateWithAI: 'Обновить с AI',
   generateOutfitLabel: 'Генерировать образ',
+  aiSuggestFailed: 'AI недоступен — показан случайный образ',
   aiThinking: 'AI думает…',
 
   cats: {
@@ -2505,6 +2508,7 @@ const uz: Translations = {
   moreNeeded: 'yana {n} ta',
   regenerateWithAI: 'AI bilan yangilash',
   generateOutfitLabel: 'Kombinatsiya yaratish',
+  aiSuggestFailed: "AI mavjud emas — tasodifiy obraz ko'rsatildi",
   aiThinking: "AI o'ylayapti…",
 
   cats: {
