@@ -17,6 +17,13 @@ import {
   type Analytics,
 } from 'firebase/analytics';
 import { trackAppEvent } from './app-events';
+import {
+  initPostHog,
+  posthogCapture,
+  posthogPageView,
+  posthogIdentify,
+  posthogReset,
+} from './posthog';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -75,6 +82,9 @@ export interface AnalyticsIdentity {
  */
 export async function initAnalytics(identity?: AnalyticsIdentity): Promise<void> {
   if (typeof window === 'undefined') return;
+  // PostHog — no-op без NEXT_PUBLIC_POSTHOG_KEY/HOST
+  initPostHog();
+  if (identity?.userId) posthogIdentify(identity.userId, identity.userProperties);
   try {
     const supported = await isSupported();
     if (!supported) {
@@ -129,6 +139,7 @@ export function logAnalyticsEvent(
 ): void {
   // Our own pipeline first — independent of Firebase init state.
   trackAppEvent(eventName, params);
+  posthogCapture(eventName, params);
 
   if (!initSettled) {
     // Buffer until initAnalytics() settles so startup events reach Firebase
@@ -146,6 +157,7 @@ export function logAnalyticsEvent(
  */
 export function logPageViewEvent(path: string): void {
   trackAppEvent('screen_view', { page_path: path });
+  posthogPageView(path);
 
   if (!initSettled) {
     if (preInitQueue.length < PRE_INIT_QUEUE_CAP) {
@@ -157,6 +169,7 @@ export function logPageViewEvent(path: string): void {
 }
 
 export function setAnalyticsUser(userId: string): void {
+  posthogIdentify(userId);
   if (!instance) return;
   try {
     setUserId(instance, userId);
@@ -167,6 +180,7 @@ export function setAnalyticsUser(userId: string): void {
 }
 
 export function clearAnalyticsUser(): void {
+  posthogReset();
   if (!instance) return;
   try {
     // Firebase typing requires a string, but null clears the user
