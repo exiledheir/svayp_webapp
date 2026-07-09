@@ -7,6 +7,7 @@
 // Never throws into the caller — analytics must not disrupt the app.
 
 import { getHostPlatform } from './flutter-bridge';
+import pkg from '../package.json';
 
 const QUEUE_KEY = 'app_events_queue_v1';
 const SESSION_KEY = 'app_events_session_v1';
@@ -25,6 +26,32 @@ interface QueuedEvent {
   source: 'webapp';
   anon_id: string;
   session_id: string;
+  app_version: string;
+  os_version: string | null;
+  device_model: string | null;
+}
+
+/** "iOS 17.4" / "Android 14" из userAgent — иначе webapp в дашборде «Технологии» виден как unknown. */
+function osVersionFromUa(): string | null {
+  if (typeof navigator === 'undefined') return null;
+  const ua = navigator.userAgent;
+  const ios = ua.match(/(?:iPhone|CPU) OS (\d+[._]\d+)/);
+  if (ios) return `iOS ${ios[1].replace('_', '.')}`.slice(0, 24);
+  const android = ua.match(/Android (\d+(?:\.\d+)?)/);
+  if (android) return `Android ${android[1]}`.slice(0, 24);
+  return null;
+}
+
+/** Модель устройства из userAgent (best-effort). */
+function deviceModelFromUa(): string | null {
+  if (typeof navigator === 'undefined') return null;
+  const ua = navigator.userAgent;
+  if (/iPad/.test(ua)) return 'iPad';
+  if (/iPhone/.test(ua)) return 'iPhone';
+  // "... Android 14; SM-A525F Build/..." → SM-A525F
+  const android = ua.match(/Android [^;]+; ([^;)]+?)(?: Build|\))/);
+  if (android) return android[1].trim().slice(0, 64);
+  return null;
 }
 
 let queue: QueuedEvent[] = [];
@@ -144,6 +171,9 @@ export function trackAppEvent(
       source: 'webapp',
       anon_id: getAnonId(),
       session_id: getSessionId(),
+      app_version: `web-${pkg.version}`,
+      os_version: osVersionFromUa(),
+      device_model: deviceModelFromUa(),
     };
     queue.push(event);
     if (queue.length > MAX_QUEUE) queue = queue.slice(-MAX_QUEUE);
