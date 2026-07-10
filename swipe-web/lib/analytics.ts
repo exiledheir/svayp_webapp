@@ -74,6 +74,8 @@ if (typeof window !== 'undefined') {
 export interface AnalyticsIdentity {
   userId?: string;
   userProperties?: Record<string, string>;
+  /** PostHog-only person properties (username/phone — PII, в Firebase не шлём). */
+  personProperties?: Record<string, string>;
 }
 
 /**
@@ -84,7 +86,12 @@ export async function initAnalytics(identity?: AnalyticsIdentity): Promise<void>
   if (typeof window === 'undefined') return;
   // PostHog — no-op без NEXT_PUBLIC_POSTHOG_KEY/HOST
   initPostHog();
-  if (identity?.userId) posthogIdentify(identity.userId, identity.userProperties);
+  if (identity?.userId) {
+    posthogIdentify(identity.userId, {
+      ...identity.userProperties,
+      ...identity.personProperties,
+    });
+  }
   try {
     const supported = await isSupported();
     if (!supported) {

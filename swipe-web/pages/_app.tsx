@@ -50,9 +50,17 @@ export default function App({ Component, pageProps }: AppProps) {
     })();
 
     // Identity is passed into init so buffered startup events keep attribution.
+    // username/phone уходят как person properties — по ним PostHog подписывает
+    // персону в списках записей/событий вместо анонимного UUID.
+    const username = user?.username as string | undefined;
+    const phone = (user?.phone ?? user?.phoneNumber ?? user?.phone_number) as string | undefined;
     initAnalytics({
       userId: userId ? String(userId) : undefined,
       userProperties: { client_context: context },
+      personProperties: {
+        ...(username ? { username } : {}),
+        ...(phone ? { phone } : {}),
+      },
     });
 
     // Track page views, deduping the initial route (routeChangeComplete can
