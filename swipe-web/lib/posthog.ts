@@ -19,7 +19,9 @@ export function initPostHog(): void {
       // page_view шлём сами из _app (единый путь с Firebase/app_events)
       capture_pageview: false,
       capture_pageleave: true,
-      autocapture: false, // только явные события — единый словарь с app_events
+      // Клики по кнопкам/ссылкам как события $autocapture: питает «топ кнопок»,
+      // heatmaps и поиск по тексту кнопки. Кастомный словарь событий не трогает.
+      autocapture: true,
       persistence: 'localStorage',
       session_recording: {
         maskAllInputs: true, // не записываем содержимое полей ввода
