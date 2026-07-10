@@ -54,6 +54,8 @@ export default function AddItemStep({
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
   const [selection, setSelection] = useState<ItemOptionsSelection>(() => defaultSelectionForSection(allowedSections[0]));
   const [showPicker, setShowPicker] = useState(false);
+  // Дедуп события выбора категории (логируем каждую новую подкатегорию один раз)
+  const loggedSubcategoryRef = useRef<string | null>(null);
 
   const heroSrc = group === 'upper'
     ? '/images/closet/add_top_onboarding.webp'
@@ -132,7 +134,18 @@ export default function AddItemStep({
           <p className="text-[14px] font-semibold text-gray-500 mb-3">{t.ob_add_choose_category}</p>
           <ItemOptionsPicker
             value={selection}
-            onChange={setSelection}
+            onChange={(next) => {
+              setSelection(next);
+              // Шаг воронки «Выбрал категорию» — в онбординге это событие
+              // не отправлялось вовсе и рвало wardrobe_activation на шаге 4.
+              if (next.subcategory && next.subcategory !== loggedSubcategoryRef.current) {
+                loggedSubcategoryRef.current = next.subcategory;
+                logAnalyticsEvent(Events.ADD_ITEM_CATEGORY_SELECTED, {
+                  [Params.CATEGORY]: subcategoryToLocal(next.subcategory),
+                  [Params.FLOW]: 'onboarding',
+                });
+              }
+            }}
             allowedSections={allowedSections}
             hideSection={allowedSections.length <= 1}
           />

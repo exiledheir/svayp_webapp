@@ -20,6 +20,7 @@ import type { Locale } from '@/lib/translations';
 import { isOnboardingComplete, isCanvasHintSeen, setCanvasHintSeen } from '@/lib/onboarding-storage';
 import { saveTryOnResult, saveActiveTryOnJob, getActiveTryOnJobWithCloud, clearActiveTryOnJob } from '@/lib/tryon-history';
 import { logAnalyticsEvent, clearAnalyticsUser } from '@/lib/analytics';
+import { reportPurchaseFunnel } from '@/lib/purchase-funnel';
 import { Events, Params } from '@/lib/analytics-events';
 import { useTheme } from '@/lib/theme';
 import { isInFlutterWebView } from '@/lib/flutter-bridge';
@@ -313,6 +314,7 @@ export default function ClosetPage() {
         [Params.TRIGGER]: showPremiumGate,
         [Params.CURRENT_PLAN]: plan,
       });
+      reportPurchaseFunnel('PAYWALL_SHOWN', showPremiumGate);
     }
     prevPremiumGate.current = showPremiumGate;
   }, [showPremiumGate, plan]);
@@ -1586,6 +1588,7 @@ export default function ClosetPage() {
               [Params.TRIGGER]: showPremiumGate,
               [Params.CURRENT_PLAN]: plan,
             });
+            reportPurchaseFunnel('PAYWALL_DISMISSED', showPremiumGate ?? undefined);
             setShowPremiumGate(null);
           }}
         />
@@ -3324,6 +3327,9 @@ function PremiumGateSheet({
       [Params.CURRENT_PLAN]: currentPlan,
       [Params.DESTINATION]: 'telegram_web',
     });
+    reportPurchaseFunnel('UPGRADE_CLICKED', reason);
+    // CTA сразу открывает Telegram — фиксируем и следующий шаг воронки
+    reportPurchaseFunnel('TELEGRAM_OPENED', reason);
     window.open('https://t.me/libasai_admin', '_blank');
   }
 
