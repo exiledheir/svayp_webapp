@@ -5,6 +5,10 @@
 // Без ключа все функции — no-op, приложение работает как раньше.
 
 import posthog from 'posthog-js';
+// Бандлим рекордер реплеев: иначе он лениво грузится с сервера ПОСЛЕ старта
+// сессии, первый снимок экрана опаздывает и начало записи — чёрный экран
+// («initial snapshot arrived late» в плеере).
+import 'posthog-js/dist/recorder';
 
 const KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 const HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST;
