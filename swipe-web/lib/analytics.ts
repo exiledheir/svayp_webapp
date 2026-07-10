@@ -175,6 +175,19 @@ export function logPageViewEvent(path: string): void {
   fireFirebaseEvent('page_view', { page_path: path });
 }
 
+/**
+ * Поздняя идентификация: вебвью из мобилки получает только токены, объекта юзера
+ * в localStorage нет — профиль подтягивается запросом уже ПОСЛЕ initAnalytics.
+ * PostHog склеит анонимную часть сессии с персоной автоматически.
+ */
+export function identifyAnalyticsUser(
+  userId: string,
+  personProperties?: Record<string, string>,
+): void {
+  posthogIdentify(userId, personProperties);
+  setAnalyticsUser(userId);
+}
+
 export function setAnalyticsUser(userId: string): void {
   posthogIdentify(userId);
   if (!instance) return;

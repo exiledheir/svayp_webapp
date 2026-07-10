@@ -3,12 +3,12 @@ import Head from 'next/head';
 import axios from 'axios';
 import type { AppProps } from 'next/app';
 import { useRouter } from 'next/router';
-import { isAuthenticated, saveTokens, getRefreshFromCloud, getUser } from '@/lib/auth';
+import { isAuthenticated, saveTokens, getRefreshFromCloud, getUser, saveUser } from '@/lib/auth';
 import { restoreOnboardingFromCloud } from '@/lib/onboarding-storage';
 import { I18nProvider } from '@/lib/i18n';
 import { ThemeProvider } from '@/lib/theme';
 import { FeatureFlagsProvider } from '@/lib/feature-flags-context';
-import { initAnalytics, logPageViewEvent } from '@/lib/analytics';
+import { initAnalytics, logPageViewEvent, identifyAnalyticsUser } from '@/lib/analytics';
 import { initAppEvents, setAppEventsScreen } from '@/lib/app-events';
 import '@/styles/globals.css';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -62,6 +62,30 @@ export default function App({ Component, pageProps }: AppProps) {
         ...(phone ? { phone } : {}),
       },
     });
+
+    // Вебвью из мобилки: токены приходят query-параметрами, объекта юзера в
+    // localStorage нет — без этого identify не происходил вовсе и ВСЕ сессии
+    // вебвью были анонимными. Подтягиваем профиль и идентифицируем постфактум.
+    if (!user && isAuthenticated()) {
+      (async () => {
+        try {
+          const token = localStorage.getItem('auth_token');
+          const res = await fetch('/proxy/auth/me', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) return;
+          const body = await res.json();
+          const me = (body?.data ?? body) as Record<string, unknown> | null;
+          if (!me?.id) return;
+          saveUser(me);
+          identifyAnalyticsUser(String(me.id), {
+            ...(me.username ? { username: String(me.username) } : {}),
+            ...(me.phone_number ? { phone: String(me.phone_number) } : {}),
+            ...(me.full_name ? { name: String(me.full_name) } : {}),
+          });
+        } catch { /* аналитика не должна ломать приложение */ }
+      })();
+    }
 
     // Track page views, deduping the initial route (routeChangeComplete can
     // re-fire for the path we already logged manually).
