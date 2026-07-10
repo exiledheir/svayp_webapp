@@ -9,6 +9,7 @@ import posthog from 'posthog-js';
 // сессии, первый снимок экрана опаздывает и начало записи — чёрный экран
 // («initial snapshot arrived late» в плеере).
 import 'posthog-js/dist/recorder';
+import { isInFlutterWebView } from './flutter-bridge';
 
 const KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 const HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST;
@@ -18,6 +19,11 @@ let enabled = false;
 export function initPostHog(): void {
   if (typeof window === 'undefined' || !KEY || !HOST || enabled) return;
   try {
+    // Внутри Flutter-вебвью запись сессии ведёт мобильный SDK (posthog_flutter
+    // снимает и натив, и вебвью в ОДНУ запись). posthog-js здесь НЕ должен
+    // писать вторую, дублирующую web-запись — только события (они сшиваются
+    // с мобильной персоной по одному user_id). В браузере/Telegram — пишем.
+    const inFlutterWebView = isInFlutterWebView();
     posthog.init(KEY, {
       api_host: HOST,
       // page_view шлём сами из _app (единый путь с Firebase/app_events)
@@ -27,6 +33,7 @@ export function initPostHog(): void {
       // heatmaps и поиск по тексту кнопки. Кастомный словарь событий не трогает.
       autocapture: true,
       persistence: 'localStorage',
+      disable_session_recording: inFlutterWebView,
       session_recording: {
         maskAllInputs: true, // не записываем содержимое полей ввода
       },
