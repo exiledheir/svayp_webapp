@@ -416,6 +416,7 @@ export interface Translations {
   tryOnFailedSafety: string;
   tryOnFailedTimeout: string;
   tryOnFailedGeneric: string;
+  tryOnFailedBusy: string;
   close: string;
   retry: string;
   loadMore: string;
@@ -1131,6 +1132,7 @@ const en: Translations = {
   tryOnFailedTimeout:
     'This is taking longer than expected. Please try again in a moment.',
   tryOnFailedGeneric: "We couldn't create your try-on. Please try again.",
+  tryOnFailedBusy: 'Our AI is busy right now. Please wait a moment and try again.',
   close: 'Close',
   retry: 'Retry',
   loadMore: 'Load more',
@@ -1790,6 +1792,8 @@ const ru: Translations = {
     'Это занимает больше времени, чем обычно. Пожалуйста, попробуйте ещё раз через минуту.',
   tryOnFailedGeneric:
     'Не удалось создать примерку. Пожалуйста, попробуйте ещё раз.',
+  tryOnFailedBusy:
+    'Наш ИИ сейчас перегружен. Пожалуйста, подождите немного и попробуйте ещё раз.',
   close: 'Закрыть',
   retry: 'Повторить',
   loadMore: 'Показать ещё',
@@ -2447,6 +2451,8 @@ const uz: Translations = {
     "Bu kutilganidan ko'proq vaqt olmoqda. Iltimos, biroz o'tib qayta urinib ko'ring.",
   tryOnFailedGeneric:
     "Kiyib ko'rishni yaratib bo'lmadi. Iltimos, qayta urinib ko'ring.",
+  tryOnFailedBusy:
+    "AI hozir band. Iltimos, biroz kuting va qayta urinib ko'ring.",
   close: 'Yopish',
   retry: 'Qayta urinish',
   loadMore: 'Yana koʻrsatish',

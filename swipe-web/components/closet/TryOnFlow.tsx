@@ -23,7 +23,7 @@ import { compressImageForUpload } from '@/lib/image-utils';
  */
 export function mapTryOnFailure(
   reason: string | undefined,
-  msgs: { safety: string; timeout: string; generic: string },
+  msgs: { safety: string; timeout: string; busy: string; generic: string },
 ): string {
   const r = (reason ?? '').toLowerCase();
   if (
@@ -35,6 +35,18 @@ export function mapTryOnFailure(
     r.includes('rejected')
   ) {
     return msgs.safety;
+  }
+  // Движок перегружен / rate-limit (Azure 429 EngineOverloaded и т.п.) — просим подождать.
+  if (
+    r.includes('busy') ||
+    r.includes('overloaded') ||
+    r.includes('429') ||
+    r.includes('too many') ||
+    r.includes('rate') ||
+    r.includes('quota') ||
+    r.includes('currently servicing')
+  ) {
+    return msgs.busy;
   }
   if (r.includes('timed out') || r.includes('timeout')) {
     return msgs.timeout;
@@ -786,6 +798,7 @@ export function TryOnModal({
                   {mapTryOnFailure(failureReason, {
                     safety: t.tryOnFailedSafety,
                     timeout: t.tryOnFailedTimeout,
+                    busy: t.tryOnFailedBusy,
                     generic: t.tryOnFailedGeneric,
                   })}
                 </p>
