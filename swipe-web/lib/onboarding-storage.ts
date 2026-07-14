@@ -1,5 +1,8 @@
 const ONBOARDING_KEY = 'svayp_onboarding_complete';
 const CLOUD_ONBOARDING_KEY = 'svayp_ob';
+// "Add N items to unlock" get-started card: dismissed OR target reached.
+const GETSTARTED_KEY = 'svayp_getstarted_done';
+const CLOUD_GETSTARTED_KEY = 'svayp_gs';
 
 type TgCloudStorage = {
   setItem(key: string, value: string, cb?: (err: string | null) => void): void;
@@ -41,11 +44,20 @@ export function restoreOnboardingFromCloud(): Promise<void> {
   return new Promise((resolve) => {
     const cs = getCloudStorage();
     if (!cs) { resolve(); return; }
+    // Restore both the onboarding-complete and get-started flags in one round-trip.
+    let pending = 2;
+    const done = () => { if (--pending === 0) resolve(); };
     cs.getItem(CLOUD_ONBOARDING_KEY, (err, value) => {
       if (!err && value === 'true') {
         try { localStorage.setItem(ONBOARDING_KEY, 'true'); } catch { /* ignore */ }
       }
-      resolve();
+      done();
+    });
+    cs.getItem(CLOUD_GETSTARTED_KEY, (err, value) => {
+      if (!err && value === 'true') {
+        try { localStorage.setItem(GETSTARTED_KEY, 'true'); } catch { /* ignore */ }
+      }
+      done();
     });
   });
 }
@@ -54,6 +66,35 @@ export function clearOnboarding(): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.removeItem(ONBOARDING_KEY);
+  } catch { /* ignore */ }
+}
+
+// ─── "Add N items to unlock" get-started card ───────────────────────────────────
+
+/** Returns true once the get-started card was dismissed or its item target reached. */
+export function isGetStartedDone(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return localStorage.getItem(GETSTARTED_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/** Marks the get-started card done so it never shows again (mirrored to CloudStorage). */
+export function setGetStartedDone(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(GETSTARTED_KEY, 'true');
+  } catch { /* ignore */ }
+  getCloudStorage()?.setItem(CLOUD_GETSTARTED_KEY, 'true');
+}
+
+/** Clears the get-started flag (e.g. for `?reset=true` replays). */
+export function clearGetStarted(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(GETSTARTED_KEY);
   } catch { /* ignore */ }
 }
 

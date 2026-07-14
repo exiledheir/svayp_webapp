@@ -54,10 +54,26 @@ export interface ClosetItem {
   // Richer taxonomy (migration V96) — present for items created/edited via the
   // new picker. The local `category` above is still the source of truth for
   // layout/grouping; these carry the precise type + AI-detected attributes.
+  // The AI-assigned wardrobe section as returned by the backend. `'OTHER'` means
+  // the ANALYZE step couldn't confidently classify the item — used to route it to
+  // the post-upload "fix category" sheet. Absent for legacy/local items.
+  aiSection?: WardrobeCategory;
   subcategory?: WardrobeSubcategory;
   itemType?: WardrobeItemType | null;
   length?: WardrobeLength | null;
   fitType?: WardrobeFitType | null;
+  // AI-detected attributes (closet v2 detail sheet). Returned by the ANALYZE
+  // pipeline step and surfaced/edited in ItemDetailSheet. `displayName` is the
+  // human name shown to the user (backend `displayName` when available, else the
+  // user's own label). Optional so legacy/local items stay valid.
+  displayName?: string;
+  colorPrimary?: string;
+  season?: string;
+  material?: string;
+  pattern?: string;
+  styleTags?: string[];
+  timesWorn?: number;
+  lastWornAt?: string | null;
 }
 
 // ── Category mapping ──────────────────────────────────────────────────────────
@@ -163,10 +179,22 @@ function mapApiItemToClosetItem(item: WardrobeItemResponse): ClosetItem {
     isFavorite: item.isFavorite,
     isClean: item.isClean,
     createdAt: item.createdAt,
+    aiSection: item.category,
     subcategory: item.subcategory,
     itemType: item.itemType ?? null,
     length: item.length ?? null,
     fitType: item.fitType ?? null,
+    // AI-detected attributes — previously parsed by the API layer but dropped
+    // here. Kept so the v2 detail sheet can show/edit them. displayName falls
+    // back to the user's label until the backend returns a dedicated field.
+    displayName: item.userLabel || undefined,
+    colorPrimary: item.colorPrimary || undefined,
+    season: item.season || undefined,
+    material: item.material || undefined,
+    pattern: item.pattern || undefined,
+    styleTags: item.styleTags,
+    timesWorn: item.timesWorn,
+    lastWornAt: item.lastWornAt,
   };
 }
 
@@ -203,6 +231,20 @@ export async function addClosetItemFromFile(
     fitType: extras?.fitType ?? undefined,
   };
   return uploadWardrobeItem(file, options, onProgress, onJobId);
+}
+
+/**
+ * Acloset-style batch add: upload a photo with NO category hint so the backend
+ * ANALYZE step detects section/subcategory/attributes from scratch. The caller
+ * reviews (and fixes, if needed) the detected category afterwards. Mirrors the
+ * progress/jobId callbacks of `addClosetItemFromFile`.
+ */
+export async function addClosetItemAutoDetect(
+  file: File,
+  onProgress?: (status: WardrobeUploadStatus) => void,
+  onJobId?: (jobId: string) => void,
+): Promise<WardrobeUploadStatus> {
+  return uploadWardrobeItem(file, {}, onProgress, onJobId);
 }
 
 export async function removeClosetItem(id: string): Promise<void> {
