@@ -387,6 +387,68 @@ export async function deleteWardrobeItem(id: string): Promise<void> {
   await api.delete(`/wardrobe/items/${id}`);
 }
 
+// ── Beautify (on-demand AI product shot) ──────────────────────────────────────
+// Contract in docs/closet-v2-backend-handoff.md. Until the backend ships these,
+// createBeautifyJob rejects and the compare sheet degrades to "coming soon".
+
+export interface BeautifyJobResponse {
+  beautifyJobId: string;
+  itemId: string;
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  progressPercent: number;
+  currentStep: string | null;
+  beautifiedUrl: string | null;
+  beautifiedThumbnailUrl: string | null;
+  failureReason: string | null;
+}
+
+function mapBeautifyJob(raw: Record<string, unknown>): BeautifyJobResponse {
+  return {
+    beautifyJobId: (raw.beautifyJobId ?? raw.beautify_job_id ?? raw.id ?? '') as string,
+    itemId: (raw.itemId ?? raw.item_id ?? '') as string,
+    status: (raw.status ?? 'PENDING') as BeautifyJobResponse['status'],
+    progressPercent: (raw.progressPercent ?? raw.progress_percent ?? 0) as number,
+    currentStep: (raw.currentStep ?? raw.current_step ?? null) as string | null,
+    beautifiedUrl: (raw.beautifiedUrl ?? raw.beautified_url ?? null) as string | null,
+    beautifiedThumbnailUrl: (raw.beautifiedThumbnailUrl ?? raw.beautified_thumbnail_url ?? null) as string | null,
+    failureReason: (raw.failureReason ?? raw.failure_reason ?? null) as string | null,
+  };
+}
+
+export async function createBeautifyJob(itemId: string): Promise<BeautifyJobResponse> {
+  const res = await api.post(`/wardrobe/items/${itemId}/beautify`);
+  return mapBeautifyJob(unwrapData<Record<string, unknown>>(res));
+}
+
+export async function getBeautifyJob(itemId: string, jobId: string): Promise<BeautifyJobResponse> {
+  const res = await api.get(`/wardrobe/items/${itemId}/beautify/${jobId}`);
+  return mapBeautifyJob(unwrapData<Record<string, unknown>>(res));
+}
+
+export async function commitBeautify(
+  itemId: string,
+  jobId: string,
+  choice: 'BEAUTIFIED' | 'ORIGINAL',
+): Promise<WardrobeItemResponse> {
+  const res = await api.post(`/wardrobe/items/${itemId}/beautify/${jobId}/commit`, { choice });
+  return mapWardrobeItem(unwrapData<Record<string, unknown>>(res));
+}
+
+export async function watchBeautifyUntilDone(
+  itemId: string,
+  jobId: string,
+  onProgress?: (job: BeautifyJobResponse) => void,
+): Promise<BeautifyJobResponse> {
+  // Simple poll — the interim beautify path has no SSE stream yet.
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const job = await getBeautifyJob(itemId, jobId);
+    onProgress?.(job);
+    if (job.status === 'COMPLETED' || job.status === 'FAILED') return job;
+    await new Promise((r) => setTimeout(r, 2500));
+  }
+}
+
 // ── Full Upload Flow (convenience) ───────────────────────────────────────────
 
 export async function uploadWardrobeItem(

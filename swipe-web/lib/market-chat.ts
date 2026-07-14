@@ -99,16 +99,16 @@ export function sendMarketMessage(threadId: string, text: string): void {
 // ── Telegram deep link ───────────────────────────────────────────────────────
 // KNOWN LIMITATION (mock): a listing carries a phone, not a Telegram username,
 // and there is no reliable phone→profile deep link. So:
-//  1. if the seller has a username → open their profile (t.me/<username>)
+//  1. if the seller has a username → open their profile (telegram.me/<username>)
 //  2. otherwise → open a share dialog prefilled with the listing + the seller's
 //     phone as plain text the buyer can use to add the contact manually.
 // Replace with a real Telegram-username field when the backend lands.
 export function buildTelegramLink(seller: MarketSeller, listing: MarketListing, listingUrl: string): string {
   if (seller.telegramUsername) {
-    return `https://t.me/${seller.telegramUsername.replace(/^@/, '')}`;
+    return `https://telegram.me/${seller.telegramUsername.replace(/^@/, '')}`;
   }
   const text = `${listing.title}\n${listingUrl}${seller.phone ? `\n☎ ${seller.phone}` : ''}`;
-  return `https://t.me/share/url?url=${encodeURIComponent(listingUrl)}&text=${encodeURIComponent(text)}`;
+  return `https://telegram.me/share/url?url=${encodeURIComponent(listingUrl)}&text=${encodeURIComponent(text)}`;
 }
 
 /** Opens a Telegram link, preferring the in-WebView API when available. */

@@ -177,6 +177,18 @@ body.app-no-select [contenteditable]:not([contenteditable='false']) {
   100% { opacity: 0; }
 }
 
+/* ── Beautify reveal (onboarding "we cleaned up your photo") ───────── */
+@keyframes beautifyShine {
+  0%   { transform: translateX(-140%) skewX(-18deg); opacity: 0; }
+  25%  { opacity: 0.9; }
+  100% { transform: translateX(140%) skewX(-18deg); opacity: 0; }
+}
+@keyframes beautifyPop {
+  0%   { transform: scale(0.94); opacity: 0; }
+  60%  { transform: scale(1.02); opacity: 1; }
+  100% { transform: scale(1);    opacity: 1; }
+}
+
 /* ── Custom crop handles (corner brackets like mobile visual search) ── */
 .ReactCrop__crop-selection {
   border: 2px solid rgba(255,255,255,0.9) !important;
