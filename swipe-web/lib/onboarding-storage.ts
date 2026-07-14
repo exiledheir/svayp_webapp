@@ -177,3 +177,32 @@ export function setCanvasHintSeen(): void {
     localStorage.setItem(CANVAS_HINT_KEY, 'true');
   } catch { /* ignore */ }
 }
+
+// ─── Canvas editor onboarding (Acloset-style gesture tutorial) ──────────────────
+const CANVAS_EDIT_ONBOARD_KEY = 'svayp_canvas_edit_onboarded';
+
+/** Returns true once the user has completed the one-time canvas-editor tutorial. */
+export function isCanvasEditOnboarded(): boolean {
+  if (typeof window === 'undefined') return true;
+  try {
+    return localStorage.getItem(CANVAS_EDIT_ONBOARD_KEY) === 'true';
+  } catch {
+    return true;
+  }
+}
+
+/** Marks the canvas-editor tutorial as completed so it never shows again. */
+export function setCanvasEditOnboarded(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(CANVAS_EDIT_ONBOARD_KEY, 'true');
+  } catch { /* ignore */ }
+}
+
+/** Clears the canvas-editor tutorial flag (e.g. for `?reset=true` replays). */
+export function clearCanvasEditOnboarded(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(CANVAS_EDIT_ONBOARD_KEY);
+  } catch { /* ignore */ }
+}

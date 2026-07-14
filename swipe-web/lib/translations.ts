@@ -433,6 +433,7 @@ export interface Translations {
   cv_rv_complete_hint: string;
   cv_rv_tryon: string;
   cv_rv_edit_cat: string;
+  cv_rv_item_n: string;
   cv_rv_more: string;
   cv_rv_added_toast: string;
   cv_rv_rejected: string;
@@ -471,6 +472,15 @@ export interface Translations {
   cv_bt_intro_skip_add: string;
   cv_bt_never: string;
   cv_bt_per_photo: string;
+  cv_ce_move_title: string;
+  cv_ce_move_body: string;
+  cv_ce_resize_title: string;
+  cv_ce_resize_body: string;
+  cv_ce_layer_title: string;
+  cv_ce_layer_body: string;
+  cv_ce_next: string;
+  cv_ce_done: string;
+  cv_ce_all: string;
   ob_welcome_title: string;
   ob_welcome_body: string;
   ob_welcome_cta: string;
@@ -1213,6 +1223,7 @@ const en: Translations = {
   cv_rv_complete_hint: 'Set the category for every item to continue',
   cv_rv_tryon: 'Try it on now',
   cv_rv_edit_cat: 'Edit category',
+  cv_rv_item_n: 'Item {n} of {total}',
   cv_rv_more: 'More details',
   cv_rv_added_toast: 'Added to your closet',
   cv_rv_rejected: "We couldn't detect clothing in this photo",
@@ -1251,6 +1262,15 @@ const en: Translations = {
   cv_bt_intro_skip_add: 'Add without beautifying',
   cv_bt_never: "Don't show this again",
   cv_bt_per_photo: 'per photo',
+  cv_ce_move_title: 'Move',
+  cv_ce_move_body: 'Drag with one finger to place each piece anywhere.',
+  cv_ce_resize_title: 'Resize',
+  cv_ce_resize_body: 'Pinch with two fingers to make an item bigger or smaller.',
+  cv_ce_layer_title: 'Build your look',
+  cv_ce_layer_body: 'Tap the closet to add pieces, then swap, layer or remove them.',
+  cv_ce_next: 'Next',
+  cv_ce_done: 'Got it',
+  cv_ce_all: 'All',
   ob_welcome_title: 'Welcome to Libas AI',
   ob_welcome_body: "Let's create your first outfit in just a minute. Follow along — we'll guide you through every step.",
   ob_welcome_cta: 'Get started',
@@ -1988,6 +2008,7 @@ const ru: Translations = {
   cv_rv_complete_hint: 'Укажите категорию для каждой вещи, чтобы продолжить',
   cv_rv_tryon: 'Примерить сейчас',
   cv_rv_edit_cat: 'Изменить категорию',
+  cv_rv_item_n: 'Вещь {n} из {total}',
   cv_rv_more: 'Подробнее',
   cv_rv_added_toast: 'Добавлено в гардероб',
   cv_rv_rejected: 'Не удалось распознать одежду на этом фото',
@@ -2026,6 +2047,15 @@ const ru: Translations = {
   cv_bt_intro_skip_add: 'Добавить без улучшения',
   cv_bt_never: 'Больше не показывать',
   cv_bt_per_photo: 'за фото',
+  cv_ce_move_title: 'Перемещение',
+  cv_ce_move_body: 'Перетаскивайте одним пальцем, чтобы разместить вещь в любом месте.',
+  cv_ce_resize_title: 'Размер',
+  cv_ce_resize_body: 'Сводите и разводите два пальца, чтобы увеличить или уменьшить вещь.',
+  cv_ce_layer_title: 'Соберите образ',
+  cv_ce_layer_body: 'Нажмите на гардероб, чтобы добавить вещи, затем меняйте, слои или удаляйте их.',
+  cv_ce_next: 'Далее',
+  cv_ce_done: 'Понятно',
+  cv_ce_all: 'Все',
   ob_welcome_title: 'Добро пожаловать в Libas AI',
   ob_welcome_body: 'Соберём ваш первый образ всего за минуту. Просто следуйте подсказкам — покажем каждый шаг.',
   ob_welcome_cta: 'Начать',
@@ -2762,6 +2792,7 @@ const uz: Translations = {
   cv_rv_complete_hint: "Davom etish uchun har bir buyum kategoriyasini tanlang",
   cv_rv_tryon: 'Hoziroq kiyib ko\'rish',
   cv_rv_edit_cat: "Toifani o'zgartirish",
+  cv_rv_item_n: '{total} tadan {n}-buyum',
   cv_rv_more: "Batafsil",
   cv_rv_added_toast: "Garderobga qo'shildi",
   cv_rv_rejected: 'Bu suratda kiyim aniqlanmadi',
@@ -2800,6 +2831,15 @@ const uz: Translations = {
   cv_bt_intro_skip_add: "Yaxshilamasdan qo'shish",
   cv_bt_never: "Boshqa ko'rsatilmasin",
   cv_bt_per_photo: 'har surat uchun',
+  cv_ce_move_title: "Ko'chirish",
+  cv_ce_move_body: 'Bir barmoq bilan surib, har bir buyumni xohlagan joyga qo\'ying.',
+  cv_ce_resize_title: "O'lcham",
+  cv_ce_resize_body: 'Ikki barmoq bilan qisib, buyumni kattalashtiring yoki kichraytiring.',
+  cv_ce_layer_title: 'Obraz yarating',
+  cv_ce_layer_body: 'Buyum qo\'shish uchun garderobni bosing, so\'ng ularni almashtiring, qatlang yoki o\'chiring.',
+  cv_ce_next: 'Keyingi',
+  cv_ce_done: 'Tushunarli',
+  cv_ce_all: 'Hammasi',
   ob_welcome_title: "Libas AI'ga xush kelibsiz",
   ob_welcome_body: "Birinchi uslubingizni atigi bir daqiqada yig'amiz. Ko'rsatmalarga amal qiling — har bir qadamni ko'rsatamiz.",
   ob_welcome_cta: 'Boshlash',
