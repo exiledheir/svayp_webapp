@@ -35,7 +35,7 @@ import BeautifyIntroSheet from '@/components/closet/BeautifyIntroSheet';
 import ClosetGateShowcase from '@/components/closet/ClosetGateShowcase';
 import CoinsSheet from '@/components/closet/CoinsSheet';
 import Diamond from '@/components/closet/Diamond';
-import { getCoins } from '@/lib/coins';
+import { getCoins, ACTION_COST } from '@/lib/coins';
 import ItemDetailSheet from '@/components/closet/ItemDetailSheet';
 import { saveUploadPreview, getUploadPreview, clearUploadPreview } from '@/lib/upload-previews';
 import { compressImageForUpload } from '@/lib/image-utils';
@@ -1958,6 +1958,7 @@ export default function ClosetPage() {
           }}
           onRegenerate={handleNewOutfit}
           onShowPlans={() => setShowPremiumGate('generation')}
+          onAddProduct={addCatalogItem}
           canRegenerate={canGenerate}
           plansEnabled={plansEnabled}
         />
@@ -3097,38 +3098,34 @@ function OutfitCard({
         </button>
       )}
 
-      {/* Top-right action buttons */}
-      {(canGenerateOutfit || isEmpty) && (
-        <div className="absolute top-3.5 right-3.5 flex flex-col items-center gap-1.5 z-10">
-          {onRegenerate && (
-            <div className="flex flex-col items-center gap-0.5">
-              <button
-                onClick={isAiSuggesting || isEmpty ? undefined : onRegenerate}
-                disabled={isAiSuggesting || isEmpty}
-                className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform disabled:opacity-40"
-                style={{
-                  background: isAiSuggesting ? 'rgba(99,102,241,0.08)' : (theme === 'dark' ? '#2a2a2a' : '#ffffff'),
-                  boxShadow: isAiSuggesting ? 'none' : (theme === 'dark' ? '0 2px 8px rgba(0,0,0,0.4)' : '0 2px 8px rgba(0,0,0,0.14), 0 1px 3px rgba(0,0,0,0.08)'),
-                }}
-                title={isAiSuggesting ? t.aiThinking : t.regenerateWithAI}
-              >
-                {isAiSuggesting ? (
-                  <Loader2 size={14} strokeWidth={2.2} className="text-indigo-500 animate-spin" />
-                ) : (
-                  <Sparkles size={18} style={{ color: 'rgb(243, 112, 167)' }} />
-                )}
-              </button>
-              {!isAiSuggesting && (
-                <span className="text-[9px] font-semibold leading-none whitespace-nowrap" style={{ color: 'rgb(243, 112, 167)' }}>
-                  {t.generateOutfitLabel}
-                </span>
-              )}
-              <span className="text-[9px] font-semibold leading-none" style={{ color: isAiSuggesting ? '#6366f1' : '#9ca3af' }}>
-                {isAiSuggesting ? 'AI…' : `${genCount}/${regenLimit}`}
-              </span>
-            </div>
+      {/* Top-right: Generate-outfit pill with its diamond cost */}
+      {(canGenerateOutfit || isEmpty) && onRegenerate && (
+        <button
+          onClick={isAiSuggesting || isEmpty ? undefined : onRegenerate}
+          disabled={isAiSuggesting || isEmpty}
+          className="absolute top-3.5 right-3.5 z-10 flex items-center gap-1.5 h-9 pl-3 pr-1.5 rounded-full active:scale-[0.96] transition-transform disabled:opacity-50"
+          style={{
+            background: theme === 'dark' ? '#2a2a2a' : '#ffffff',
+            border: theme === 'dark' ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(243,112,167,0.22)',
+            boxShadow: theme === 'dark' ? '0 3px 10px rgba(0,0,0,0.4)' : '0 3px 12px rgba(243,112,167,0.18), 0 1px 3px rgba(0,0,0,0.06)',
+          }}
+          title={isAiSuggesting ? t.aiThinking : t.regenerateWithAI}
+        >
+          {isAiSuggesting ? (
+            <Loader2 size={15} strokeWidth={2.3} className="animate-spin" style={{ color: '#F370A7' }} />
+          ) : (
+            <Sparkles size={15} style={{ color: '#F370A7' }} />
           )}
-        </div>
+          <span className="text-[12px] font-bold whitespace-nowrap" style={{ color: theme === 'dark' ? '#fff' : '#141118' }}>
+            {isAiSuggesting ? t.aiThinking : t.generateOutfitLabel}
+          </span>
+          {!isAiSuggesting && (
+            <span className="flex items-center gap-0.5 h-[22px] pl-1.5 pr-2 rounded-full" style={{ background: 'rgba(243,112,167,0.12)' }}>
+              <Diamond size={12} />
+              <span className="text-[11px] font-extrabold leading-none" style={{ color: '#C94E86' }}>{ACTION_COST.createOutfit}</span>
+            </span>
+          )}
+        </button>
       )}
 
       {/* Flat-lay Canvas */}
@@ -3279,7 +3276,10 @@ function OutfitCard({
           }}
         >
           <span>{t.tryItOn}</span>
-          <span className="opacity-70 text-[10px] font-medium">{tryOnCount}/{tryOnLimit}</span>
+          <span className="flex items-center gap-0.5 h-[19px] pl-1 pr-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.24)' }}>
+            <Diamond size={11} />
+            <span className="text-[10px] font-extrabold leading-none">{ACTION_COST.tryOn}</span>
+          </span>
         </button>
         )}
       </div>
@@ -3723,7 +3723,10 @@ function CalendarTab({
             >
               <Sparkles size={13} />
               <span>{t.tryItOn}</span>
-              <span className="opacity-60 text-[11px]">{tryOnCount}/{tryOnLimit}</span>
+              <span className="flex items-center gap-0.5 h-[18px] pl-1 pr-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.24)' }}>
+                <Diamond size={11} />
+                <span className="text-[10px] font-extrabold leading-none">{ACTION_COST.tryOn}</span>
+              </span>
             </button>
           </>
         );

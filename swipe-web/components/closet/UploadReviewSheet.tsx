@@ -144,11 +144,27 @@ export default function UploadReviewSheet({
   }
 
   // ── Category / attributes editor — overlays the review window (z-64) ─────
+  const editItem = editCatId ? items.find((i) => i.id === editCatId) ?? null : null;
+  const editItemIdx = editCatId ? items.findIndex((i) => i.id === editCatId) : -1;
   const editorOverlay = editCatId && editSel ? (
       <div className="fixed inset-0 z-[64] flex items-end justify-center" style={{ background: 'rgba(15,8,14,0.42)' }} onClick={() => { setEditCatId(null); setEditSel(null); }}>
         <div className="w-full max-w-[460px] rounded-t-3xl flex flex-col" style={{ background: dark ? '#1c1c1e' : '#fff', maxHeight: '92%' }} onClick={(e) => e.stopPropagation()}>
           <div className="flex justify-center pt-3 pb-1"><div className="w-9 h-1 rounded-full" style={{ background: dark ? '#3a3a3c' : '#e2dbe1' }} /></div>
-          <h3 className="text-[16px] font-bold text-center pb-2" style={{ color: ink }}>{t.cv_rv_edit_cat}</h3>
+          {/* Which item are we editing — thumbnail + title (+ n/N when multiple) */}
+          <div className="flex items-center justify-center gap-2.5 pt-1 pb-2.5 px-5">
+            <span className="w-11 h-11 rounded-xl flex-none overflow-hidden flex items-center justify-center" style={{ background: dark ? '#2a2a2c' : '#f5f2f5', border: `1px solid ${line}` }}>
+              {editItem?.imageData ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={editItem.imageData} alt="" className="w-full h-full object-cover" />
+              ) : null}
+            </span>
+            <div className="text-left">
+              <h3 className="text-[16px] font-bold leading-tight" style={{ color: ink }}>{t.cv_rv_edit_cat}</h3>
+              {items.length > 1 && editItemIdx >= 0 && (
+                <p className="text-[12px] font-semibold mt-0.5" style={{ color: sub }}>{t.cv_rv_item_n.replace('{n}', String(editItemIdx + 1)).replace('{total}', String(items.length))}</p>
+              )}
+            </div>
+          </div>
           <div className="px-5 pb-3 overflow-y-auto">
             <ItemOptionsPicker value={editSel} onChange={setEditSel} dark={dark} />
           </div>
