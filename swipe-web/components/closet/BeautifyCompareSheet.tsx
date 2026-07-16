@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Check, Sparkles, Loader2, X } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { createBeautifyJob, watchBeautifyUntilDone, commitBeautify } from '@/lib/wardrobe-api';
+import { isInsufficientCoins } from '@/lib/api';
 import type { ClosetItem } from '@/lib/closet-storage';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events } from '@/lib/analytics-events';
@@ -18,22 +19,30 @@ export default function BeautifyCompareSheet({
   item,
   onClose,
   onCommitted,
+  onNeedCoins,
   dark,
   intro = false,
+  presetBeautifiedUrl = null,
+  presetJobId = null,
 }: {
   item: ClosetItem;
   onClose: () => void;
   onCommitted: (itemId: string, choice: 'BEAUTIFIED' | 'ORIGINAL', imageUrl?: string) => void;
+  /** Нехватка монет (402) — родитель открывает экран покупки. */
+  onNeedCoins?: () => void;
   dark: boolean;
   /** Acloset-style first-run framing ("Introducing Beautify …") over the compare. */
   intro?: boolean;
+  /** Результат уже посчитан в фоне (loader был в гардеробе) → сразу «сравнение». */
+  presetBeautifiedUrl?: string | null;
+  presetJobId?: string | null;
 }) {
   const { t } = useI18n();
-  const [phase, setPhase] = useState<Phase>('working');
-  const [beautifiedUrl, setBeautifiedUrl] = useState<string | null>(null);
+  const [phase, setPhase] = useState<Phase>(presetBeautifiedUrl ? 'compare' : 'working');
+  const [beautifiedUrl, setBeautifiedUrl] = useState<string | null>(presetBeautifiedUrl);
   const [selected, setSelected] = useState<'BEAUTIFIED' | 'ORIGINAL'>('BEAUTIFIED');
   const [committing, setCommitting] = useState(false);
-  const jobIdRef = useRef<string | null>(null);
+  const jobIdRef = useRef<string | null>(presetJobId);
   const started = useRef(false);
 
   const ink = dark ? '#fff' : '#141118';
@@ -44,6 +53,8 @@ export default function BeautifyCompareSheet({
   useEffect(() => {
     if (started.current) return;
     started.current = true;
+    // Результат уже готов (посчитан в фоне) — ничего не запускаем, показываем сравнение.
+    if (presetBeautifiedUrl) return;
     let alive = true;
     (async () => {
       try {
@@ -60,8 +71,15 @@ export default function BeautifyCompareSheet({
           setPhase('failed');
           logAnalyticsEvent(Events.BEAUTIFY_FAILED);
         }
-      } catch {
+      } catch (err) {
         if (!alive) return;
+        // Нехватка монет (402) → экран покупки, а не "coming soon".
+        if (isInsufficientCoins(err)) {
+          logAnalyticsEvent(Events.BEAUTIFY_FAILED, { code: 'INSUFFICIENT_COINS' });
+          onClose();
+          onNeedCoins?.();
+          return;
+        }
         // Endpoint missing (404) or network error → treat as not-yet-available.
         setPhase('soon');
       }

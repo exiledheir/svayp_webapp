@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import Diamond from '@/components/closet/Diamond';
-import { COIN_PACKAGES, ACTION_COST, coinsPrice } from '@/lib/coins';
+import { coinsPrice, coinPackages, actionCosts, type CoinPricing } from '@/lib/coins';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events } from '@/lib/analytics-events';
 
@@ -19,14 +19,19 @@ export default function CoinsSheet({
   needMore = false,
   dark,
   onClose,
+  pricing = null,
 }: {
   balance: number;
   needMore?: boolean;
   dark: boolean;
   onClose: () => void;
+  /** Прайс с сервера (/app/coins/pricing). null → фолбэк на локальные константы. */
+  pricing?: CoinPricing | null;
 }) {
   const { t } = useI18n();
-  const [qty, setQty] = useState<number>(COIN_PACKAGES[0]);
+  const packages = coinPackages(pricing);
+  const cost = actionCosts(pricing);
+  const [qty, setQty] = useState<number>(packages[0]);
 
   // Swipe-down-to-close: only start the drag when the content is scrolled to top,
   // so it doesn't fight the scrollable list.
@@ -55,7 +60,7 @@ export default function CoinsSheet({
   const rowBg = dark ? '#141014' : '#faf7fb';
 
   const fmt = (n: number) => n.toLocaleString('uz-UZ');
-  const price = coinsPrice(qty);
+  const price = coinsPrice(qty, pricing);
 
   function buy() {
     if (qty < 1) return;
@@ -67,9 +72,9 @@ export default function CoinsSheet({
 
   const actions = [
     { label: t.cn_do_upload, cost: 0, free: true },
-    { label: t.cn_do_outfit, cost: ACTION_COST.createOutfit, free: false },
-    { label: t.cn_do_beautify, cost: ACTION_COST.beautify, free: false },
-    { label: t.cn_do_tryon, cost: ACTION_COST.tryOn, free: false },
+    { label: t.cn_do_outfit, cost: cost.createOutfit, free: false },
+    { label: t.cn_do_beautify, cost: cost.beautify, free: false },
+    { label: t.cn_do_tryon, cost: cost.tryOn, free: false },
   ];
 
   return (
@@ -115,8 +120,8 @@ export default function CoinsSheet({
           {/* Packages */}
           <p className="text-[15px] font-extrabold mt-5 mb-2.5" style={{ color: ink }}>{t.cn_pack_title}</p>
           <div className="grid grid-cols-3 gap-2.5">
-            {COIN_PACKAGES.map((pkg) => {
-              const p = coinsPrice(pkg);
+            {packages.map((pkg) => {
+              const p = coinsPrice(pkg, pricing);
               const active = qty === pkg;
               return (
                 <button

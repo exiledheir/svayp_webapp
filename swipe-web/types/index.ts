@@ -167,6 +167,10 @@ export interface WardrobeItemResponse {
   timesWorn: number;
   lastWornAt: string | null;
   createdAt: string;
+  /** Товар каталога, из которого клонирована вещь (from-catalog); иначе null. */
+  sourceProductId?: string | null;
+  /** Вещь уже улучшена (beautify) — повторно улучшать нельзя. */
+  beautified?: boolean;
 }
 
 export interface WardrobeStats {

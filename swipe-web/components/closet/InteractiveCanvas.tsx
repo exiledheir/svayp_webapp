@@ -7,7 +7,7 @@ import { UPPER_CATS, LOWER_CATS, SHOES_CATS, ACC_CATS, type SavedCanvasLayout, t
 import { useI18n } from '@/lib/i18n';
 import { isCanvasHintSeen, setCanvasHintSeen, isCanvasEditOnboarded, setCanvasEditOnboarded } from '@/lib/onboarding-storage';
 import CanvasOnboarding from '@/components/closet/CanvasOnboarding';
-import { getAllProducts, getFavoriteProducts } from '@/lib/api';
+import { getCatalogReadyProducts } from '@/lib/api';
 import type { Product } from '@/types';
 
 interface CanvasItem {
@@ -56,8 +56,9 @@ export default function InteractiveCanvas({
   onSave: (layout: SavedCanvasLayout) => void;
   onRegenerate: () => void;
   onShowPlans: () => void;
-  /** Import a shop product into the closet (resolves once it's in `allItems`). */
-  onAddProduct?: (product: Product) => void | Promise<void>;
+  /** Добавляет товар в гардероб и резолвится добавленной (или уже существующей)
+   *  вещью, чтобы канва положила её на доску напрямую. */
+  onAddProduct?: (product: Product) => Promise<ClosetItem | null>;
   canRegenerate: boolean;
   plansEnabled: boolean;
   /** Force-show the drag hint even if the user has seen it before (used in onboarding). */
@@ -85,31 +86,7 @@ export default function InteractiveCanvas({
   const [shopLoading, setShopLoading] = useState(false);
   const shopLoadedRef = useRef(false);
   const [shopAdding, setShopAdding] = useState<Set<string>>(new Set());
-  const [shopAdded, setShopAdded] = useState<Set<string>>(new Set());
 
-  // Latest allItems (for the shop auto-place watcher, which runs after an async import).
-  const allItemsRef = useRef(allItems);
-  useEffect(() => { allItemsRef.current = allItems; }, [allItems]);
-  // When an imported shop item lands in allItems, drop it onto the canvas.
-  const pendingShopRef = useRef<{ before: Set<string>; productId: string }[]>([]);
-  useEffect(() => {
-    if (pendingShopRef.current.length === 0) return;
-    const consumed = new Set<string>(); // don't hand the same new item to two imports
-    const remaining: { before: Set<string>; productId: string }[] = [];
-    for (const p of pendingShopRef.current) {
-      const fresh = allItems.find((i) => !p.before.has(i.id) && !consumed.has(i.id));
-      if (fresh) {
-        consumed.add(fresh.id);
-        addItem(fresh);
-        setShopAdding((prev) => { const n = new Set(prev); n.delete(p.productId); return n; });
-        setShopAdded((prev) => new Set(prev).add(p.productId));
-      } else {
-        remaining.push(p);
-      }
-    }
-    pendingShopRef.current = remaining;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allItems]);
 
   const DEFAULT_FRAC = 0.4;
   function openPicker(source: 'closet' | 'shop') {
@@ -127,13 +104,13 @@ export default function InteractiveCanvas({
     shopLoadedRef.current = true;
     setShopLoading(true);
     try {
-      const [liked, all] = await Promise.all([
-        getFavoriteProducts(0, 12).catch(() => [] as Product[]),
-        getAllProducts(0, 24).catch(() => ({ products: [] as Product[], total: 0 })),
-      ]);
+      // Курируемый набор: только предобработанные товары (catalog-ready). Берём
+      // одной страницей до 100 — их немного (десятки), пагинация на канве не нужна;
+      // 24 обрезали часть готовых товаров, из-за чего в магазине было «мало».
+      const r = await getCatalogReadyProducts(0, 100).catch(() => ({ products: [] as Product[], total: 0 }));
       const seen = new Set<string>();
       const merged: Product[] = [];
-      for (const p of [...liked, ...all.products]) { if (!seen.has(p.id)) { seen.add(p.id); merged.push(p); } }
+      for (const p of r.products) { if (!seen.has(p.id)) { seen.add(p.id); merged.push(p); } }
       setShopProducts(merged);
     } finally {
       setShopLoading(false);
@@ -141,20 +118,22 @@ export default function InteractiveCanvas({
   }
 
   function addShopProduct(product: Product) {
-    if (!onAddProduct || shopAdding.has(product.id) || shopAdded.has(product.id)) return;
+    if (!onAddProduct || shopAdding.has(product.id)) return;
     setShopAdding((prev) => new Set(prev).add(product.id));
-    pendingShopRef.current.push({ before: new Set(allItemsRef.current.map((i) => i.id)), productId: product.id });
-    Promise.resolve(onAddProduct(product)).catch(() => {
-      pendingShopRef.current = pendingShopRef.current.filter((p) => p.productId !== product.id);
-      setShopAdding((prev) => { const n = new Set(prev); n.delete(product.id); return n; });
-    });
-    // Safety net: if the import never lands (e.g. plan-gated), stop the spinner.
-    setTimeout(() => {
-      if (pendingShopRef.current.some((p) => p.productId === product.id)) {
-        pendingShopRef.current = pendingShopRef.current.filter((p) => p.productId !== product.id);
-        setShopAdding((prev) => { const n = new Set(prev); n.delete(product.id); return n; });
-      }
-    }, 30000);
+    // onAddProduct возвращает добавленную (или уже существующую — from-catalog
+    // идемпотентен) вещь. Кладём её на канву НАПРЯМУЮ, а не ждём нового id в
+    // allItems: иначе для уже-добавленной в гардероб вещи «нового» id нет и
+    // спиннер висел вечно.
+    // «Добавлено» (галку) НЕ храним отдельно — оно выводится из состава канвы по
+    // sourceProductId (см. рендер сетки), поэтому удаление вещи с канвы само
+    // снимает галку и товар снова становится добавляемым.
+    const stop = () => setShopAdding((prev) => { const n = new Set(prev); n.delete(product.id); return n; });
+    Promise.resolve(onAddProduct(product))
+      .then((item) => {
+        if (item) addItem(item);
+        stop();
+      })
+      .catch(() => stop());
   }
 
   // Drag the picker handle to resize / close it, following the finger.
@@ -699,7 +678,8 @@ export default function InteractiveCanvas({
               }
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={ci.item.imageData} alt={ci.item.category} className="absolute inset-0 w-full h-full object-contain" decoding="sync" draggable={false} style={{ pointerEvents: 'none', WebkitUserDrag: 'none' } as any} />
+              {/* На канве вещь крупная — полноразмерная картинка вместо 400px-миниатюры. */}
+              <img src={ci.item.fullImage ?? ci.item.imageData} alt={ci.item.category} className="absolute inset-0 w-full h-full object-contain" decoding="sync" draggable={false} style={{ pointerEvents: 'none', WebkitUserDrag: 'none' } as any} />
             </div>
           </div>
           );
@@ -912,7 +892,9 @@ export default function InteractiveCanvas({
                     <div className="grid grid-cols-3 gap-2.5">
                       {shopProducts.map((p) => {
                         const adding = shopAdding.has(p.id);
-                        const added = shopAdded.has(p.id);
+                        // «Добавлено» = вещь этого товара сейчас НА КАНВЕ. Удалили с
+                        // канвы → галка снимается, товар снова можно добавить.
+                        const added = canvasItems.some((ci) => ci.item.sourceProductId === p.id);
                         return (
                           <button key={p.id} onClick={() => addShopProduct(p)} disabled={adding || added}
                             className="relative aspect-[3/4] rounded-xl overflow-hidden border active:scale-[0.96] transition-transform"

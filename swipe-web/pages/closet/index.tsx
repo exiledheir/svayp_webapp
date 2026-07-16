@@ -9,12 +9,12 @@ import { FEATURES } from '@/lib/feature-flags';
 import { useRootBackGuard } from '@/lib/use-root-back-guard';
 import { useOverlayBackClose } from '@/lib/use-overlay-back-close';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
-import { fetchClosetItems, addClosetItemFromFile, addClosetItemAutoDetect, removeClosetItem, updateClosetItemApi, getClosetItems, addClosetItem, deleteClosetItem, updateClosetItem } from '@/lib/closet-storage';
+import { fetchClosetItems, addClosetItemFromFile, addClosetItemAutoDetect, removeClosetItem, updateClosetItemApi, getClosetItems, addClosetItem, deleteClosetItem, updateClosetItem, getClosetItemById, mapApiItemToClosetItem } from '@/lib/closet-storage';
 import type { ClosetItem, ClosetCategory } from '@/lib/closet-storage';
 import type { WardrobeUploadStatus, PlanTier, PlanLimits, PlanUsage, TryOnJobResponse, WardrobeSection, WardrobeSubcategory, Product } from '@/types';
 import ItemOptionsPicker, { defaultSelectionForSection, isSelectionComplete, type ItemOptionsSelection } from '@/components/closet/ItemOptionsPicker';
 import { subcategoryToLocal, sectionForSubcategory, subcategoriesForSection, SECTION_ORDER, localToSubcategory, taxLabel } from '@/lib/wardrobe-taxonomy';
-import { getUserPlan, generateOutfitSuggestions, fetchAiCanvasSuggest, createTryOnJob, watchTryOnUntilDone, getOutfitCalendar, createOutfitCanvas, updateOutfitCanvas, deleteOutfitCanvas, getOutfitCanvases, getOutfitCanvas, listUploads, watchUploadUntilDone, getTryOnJob, getTryOnJobHistory, deleteTryOnJob, getUserProfile } from '@/lib/wardrobe-api';
+import { getUserPlan, generateOutfitSuggestions, fetchAiCanvasSuggest, createTryOnJob, watchTryOnUntilDone, getOutfitCalendar, createOutfitCanvas, updateOutfitCanvas, deleteOutfitCanvas, getOutfitCanvases, getOutfitCanvas, listUploads, watchUploadUntilDone, getTryOnJob, getTryOnJobHistory, deleteTryOnJob, getUserProfile, addWardrobeItemFromCatalog, createBeautifyJob, watchBeautifyUntilDone, commitBeautify } from '@/lib/wardrobe-api';
 import type { SseHandle } from '@/types';
 import { useI18n } from '@/lib/i18n';
 import type { Locale } from '@/lib/translations';
@@ -35,7 +35,8 @@ import BeautifyIntroSheet from '@/components/closet/BeautifyIntroSheet';
 import ClosetGateShowcase from '@/components/closet/ClosetGateShowcase';
 import CoinsSheet from '@/components/closet/CoinsSheet';
 import Diamond from '@/components/closet/Diamond';
-import { getCoins, ACTION_COST } from '@/lib/coins';
+import { ACTION_COST, actionCosts, fetchCoinBalance, fetchCoinPricing, type CoinPricing } from '@/lib/coins';
+import { isInsufficientCoins } from '@/lib/api';
 import ItemDetailSheet from '@/components/closet/ItemDetailSheet';
 import { saveUploadPreview, getUploadPreview, clearUploadPreview } from '@/lib/upload-previews';
 import { compressImageForUpload } from '@/lib/image-utils';
@@ -360,18 +361,35 @@ export default function ClosetPage() {
     warmImageCache(items.map((i) => i.imageData));
   }, [items]);
   // 'browse' = opened from the header diamond chip (no "not enough" prompt).
-  const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | 'tryOn' | 'canvas' | 'browse' | null>(null);
+  const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | 'tryOn' | 'canvas' | 'browse' | 'beautify' | null>(null);
   const { plan, limits, usage, fetchPlan, canGenerate, canTryOn, calendarDays } = usePlan();
-  // Diamond balance (in-app currency). Local placeholder until the coins backend
-  // ships — seeded with the starter bonus. See lib/coins.ts.
+  // Diamond/coin balance — реальный баланс с бэка (/me/coins). Рефетчим после
+  // каждого платного действия (см. refreshCoins) и при открытии CoinsSheet.
   const [coins, setCoinsState] = useState(0);
-  useEffect(() => { setCoinsState(getCoins()); }, []);
+  const [coinPricing, setCoinPricing] = useState<CoinPricing | null>(null);
+  const refreshCoins = useCallback(() => {
+    fetchCoinBalance().then((b) => setCoinsState(b.balance)).catch(() => { /* offline — keep last known */ });
+  }, []);
+  useEffect(() => {
+    refreshCoins();
+    fetchCoinPricing().then(setCoinPricing).catch(() => { /* fallback to local constants */ });
+  }, [refreshCoins]);
+
+  // Монеты реально списываются только когда включён enforcement И юзер на FREE
+  // (у pro/premium — старые безлимитные квоты, монеты не тратятся — зеркалит
+  // CoinGateService на бэке). В этом режиме платные действия гейтим по БАЛАНСУ
+  // МОНЕТ, а не по старой подписочной квоте (иначе исчерпанная квота FREE ложно
+  // открывала CoinsSheet «недостаточно», хотя монет полно).
+  const coinsApply = !!coinPricing?.enforcementEnabled && plan === 'free';
+  const coinCosts = actionCosts(coinPricing);
 
   // Single overall wardrobe item limit (across all categories), not per category.
   // Demo items don't count toward the limit.
   // Pending (in-flight) uploads are included so rapid back-to-back submissions
   // can't bypass the cap before any upload completes.
   function canAddItem(): boolean {
+    // Под монетами «Добавить одежду — Бесплатно» и без подписочного лимита вещей.
+    if (coinsApply) return true;
     const completedCount = items.filter((i) => !DEMO_ITEM_IDS.has(i.id)).length;
     const pendingCount = pendingUploads.size;
     return completedCount + pendingCount < limits.wardrobeItems;
@@ -433,7 +451,9 @@ export default function ClosetPage() {
       });
   }, []);
 
-  const canAddCanvas = canvases.length < limits.outfitCanvases;
+  // Доски образов бесплатны и не лимитируются планом (решение продукта, июль 2026).
+  // Платной остаётся AI-генерация образа (💎, гейт `canGenerate` ниже).
+  const canAddCanvas = true;
 
   // Demo mode: true when ALL items in the wardrobe are the placeholder demo items
   const hasDemoItems = items.length > 0 && items.every((i) => DEMO_ITEM_IDS.has(i.id));
@@ -475,10 +495,58 @@ export default function ClosetPage() {
   const [reviewIds, setReviewIds] = useState<string[]>([]);
   // Closet v2: item currently open in the Beautify compare sheet
   const [beautifyItem, setBeautifyItem] = useState<ClosetItem | null>(null);
+  // Beautify в фоне: тап → закрываем модалку, показываем loader на вещи в гардеробе,
+  // enhance крутится в фоне; по готовности открываем сравнение с готовым результатом.
+  const [beautifyingIds, setBeautifyingIds] = useState<Set<string>>(new Set());
+  const [beautifyPreset, setBeautifyPreset] = useState<{ url: string; jobId: string } | null>(null);
+
+  async function startBeautifyBackground(item: ClosetItem) {
+    if (beautifyingIds.has(item.id)) return;
+    setBeautifyItem(null); // не держим модалку — уходим в гардероб
+    setBeautifyingIds((prev) => new Set(prev).add(item.id));
+    const clear = () => setBeautifyingIds((prev) => { const n = new Set(prev); n.delete(item.id); return n; });
+
+    // Вещи из магазина сюда не попадают: они приходят СРАЗУ улучшенными
+    // (клон с PROCESSED) и кнопки ✨ на них нет.
+    try {
+      const job = await createBeautifyJob(item.id);
+      const done = await watchBeautifyUntilDone(item.id, job.beautifyJobId);
+      if (done.status === 'COMPLETED' && done.beautifiedUrl) {
+        // Без окна сравнения — сразу применяем улучшенный вариант.
+        try { await commitBeautify(item.id, job.beautifyJobId, 'BEAUTIFIED'); } catch { /* best-effort */ }
+        const url = done.beautifiedUrl;
+        // Держим loader, пока НОВАЯ картинка не докачается (иначе после снятия
+        // loader'а пару секунд видна старая) → переключение мгновенное.
+        await new Promise<void>((resolve) => {
+          const im = new window.Image();
+          const finish = () => resolve();
+          im.onload = finish; im.onerror = finish;
+          setTimeout(finish, 7000); // страховка от вечного ожидания
+          im.src = url;
+        });
+        setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, imageData: url, fullImage: url, beautified: true } : i)));
+        clear();
+        try { localStorage.setItem('svayp_has_beautified', '1'); } catch { /* private mode */ }
+        setOutfitToastMsg(t.cv_bt_beautified);
+        setTimeout(() => setOutfitToastMsg(null), 2000);
+        refreshCoins(); // Beautify платный — обновляем баланс
+        load();
+      } else {
+        clear();
+        setOutfitToastMsg(t.cv_bt_failed);
+        setTimeout(() => setOutfitToastMsg(null), 2500);
+      }
+    } catch (err) {
+      clear();
+      if (isInsufficientCoins(err)) { setShowPremiumGate('beautify'); return; }
+      setOutfitToastMsg(t.cv_bt_failed);
+      setTimeout(() => setOutfitToastMsg(null), 2500);
+    }
+  }
   // Closet v2: "Introducing Beautify" educational popup (predefined before/after
   // demo). Auto-opens once every batch item has a complete category ("final
   // step"). Handlers live in the batch section below (they read batchReview).
-  const [beautifyIntroFor, setBeautifyIntroFor] = useState<{ localId: string | null; from: 'beautify' | 'add' } | null>(null);
+  const [beautifyIntroFor, setBeautifyIntroFor] = useState<{ localId: string | null; from: 'beautify' | 'add' | 'wardrobe' } | null>(null);
   const beautifyIntroShownRef = useRef(false);
   // Closet v2: Beautify requested in the add step → auto-open compare once the
   // item finishes uploading; plus the first-run explainer.
@@ -488,7 +556,7 @@ export default function ClosetPage() {
   useEffect(() => {
     if (!pendingBeautifyId) return;
     const it = items.find((i) => i.id === pendingBeautifyId);
-    if (it) { setBeautifyItem(it); setPendingBeautifyId(null); }
+    if (it) { setPendingBeautifyId(null); startBeautifyBackground(it); }
   }, [pendingBeautifyId, items]);
   const [outfitBlockedModal, setOutfitBlockedModal] = useState<{ title: string; body: string } | null>(null);
   const tryOnCancelRef = useRef(false);
@@ -535,11 +603,22 @@ export default function ClosetPage() {
   const [batchPhase, setBatchPhase] = useState<'removing' | 'identifying'>('removing');
   // Local review items shown after the imitation; edited in memory until finalize.
   const [batchReview, setBatchReview] = useState<BatchReviewItem[]>([]);
+  // localIds whose AI category detection (ANALYZE) is still in flight — the row
+  // shows a "determining…" state until it resolves, then AI pre-fills the category.
+  const [batchDetecting, setBatchDetecting] = useState<Set<string>>(new Set());
   const [batchReviewOpen, setBatchReviewOpen] = useState(false);
   const [finalizingBatch, setFinalizingBatch] = useState(false);
   const batchCancelRef = useRef(false);
   // localId → background upload result (real wardrobe id once done).
   const uploadTrackerRef = useRef<Map<string, { promise: Promise<void>; realId: string | null; failed: boolean }>>(new Map());
+  // localIds the USER explicitly edited in the review sheet (via editBatchCategory).
+  // finalizeBatch only PATCHes these — the AI-detected selection for everything else
+  // is already persisted server-side by ANALYZE, so re-sending it is redundant AND
+  // unsafe: ANALYZE's raw length/fitType strings (e.g. GPT output like "mid") aren't
+  // guaranteed to match the Length/FitType enum constants (MIDI, REGULAR, …), so
+  // round-tripping them through this PATCH can 400. User edits always come from the
+  // picker UI, which only emits valid canonical enum values.
+  const userEditedLocalIdsRef = useRef<Set<string>>(new Set());
 
   // ── Pull-to-refresh ─────────────────────────────────────────────────────────
   const mainScrollRef = useRef<HTMLElement>(null);
@@ -691,6 +770,9 @@ export default function ClosetPage() {
       status: 'processing',
     }));
     setBatchAdd({ jobs });
+    // Все строки стартуют в состоянии "AI определяет категорию"; снимается по мере
+    // готовности ANALYZE в фоновом аплоаде ниже.
+    setBatchDetecting(new Set(jobs.map((j) => j.localId)));
 
     // Read data-URL previews (shown in both the processing screen and the review).
     const previews: Record<string, string> = {};
@@ -715,10 +797,38 @@ export default function ClosetPage() {
         await acquire();
         try {
           const file = await compressImageForUpload(files[i]);
-          const status = await addClosetItemAutoDetect(file);
-          rec.realId = status.wardrobeItemId ?? null;
+          // Пре-заполняем строку ревью, как только у вещи ЕСТЬ категория+вырезка.
+          // ML шлёт ANALYZE-колбэк сразу по готовности gpt (раньше конца пайплайна),
+          // поэтому не ждём COMPLETED — категория появляется на ~10с раньше.
+          let prefilled = false;
+          const prefill = async (realId: string, done: boolean) => {
+            if (prefilled) return;
+            try {
+              const detected = await getClosetItemById(realId);
+              if (!detected.subcategory && !done) return; // категория ещё не записана
+              prefilled = true;
+              const localId = j.localId;
+              const cutout = detected.imageData || detected.thumbnailUrl;
+              setBatchReview((prev) => prev.map((ri) =>
+                ri.localId === localId
+                  ? { ...ri, selection: selectionFromItem(detected), previewImage: cutout || ri.previewImage }
+                  : ri));
+              setBatchDetecting((prev) => { const n = new Set(prev); n.delete(localId); return n; });
+            } catch (e) { if (done) console.error('detect fetch failed:', e); }
+          };
+          const status = await addClosetItemAutoDetect(file, (s) => {
+            if (s.wardrobeItemId && (s.status === 'ANALYZE' || s.status === 'EMBED')) {
+              rec.realId = s.wardrobeItemId;
+              prefill(s.wardrobeItemId, false);
+            }
+          });
+          rec.realId = status.wardrobeItemId ?? rec.realId;
+          if (rec.realId) await prefill(rec.realId, true);
         } catch (err) { console.error('Batch upload failed:', err); rec.failed = true; }
-        finally { release(); }
+        finally {
+          setBatchDetecting((prev) => { const n = new Set(prev); n.delete(j.localId); return n; });
+          release();
+        }
       })();
       tracker.set(j.localId, rec);
     });
@@ -746,6 +856,7 @@ export default function ClosetPage() {
 
   // Review edits (in-memory until finalize).
   function editBatchCategory(localId: string, sel: ItemOptionsSelection) {
+    userEditedLocalIdsRef.current.add(localId);
     setBatchReview((prev) => prev.map((ri) => (ri.localId === localId ? { ...ri, selection: sel } : ri)));
   }
   function deleteBatchItem(localId: string) {
@@ -756,14 +867,29 @@ export default function ClosetPage() {
   }
 
   // Add to Closet — wait for the background uploads, persist each chosen category.
-  async function finalizeBatch() {
+  async function finalizeBatch(selectedIds: string[]) {
     setFinalizingBatch(true);
     const tracker = uploadTrackerRef.current;
+    const keep = new Set(selectedIds);
     try {
       await Promise.all([...tracker.values()].map((r) => r.promise));
+      // В гардероб попадают ТОЛЬКО выбранные: невыбранные строки удаляем с бэка
+      // (вещь уже создана аплоадом — иначе осиротеет и всплывёт в гардеробе).
       for (const ri of batchReview) {
+        if (keep.has(ri.localId)) continue;
         const rec = tracker.get(ri.localId);
-        if (rec?.realId && ri.selection.subcategory) {
+        if (rec?.realId) {
+          try { await removeClosetItem(rec.realId); } catch (e) { console.error('Remove unselected failed:', e); }
+        }
+      }
+      for (const ri of batchReview) {
+        if (!keep.has(ri.localId)) continue;
+        const rec = tracker.get(ri.localId);
+        // Only persist rows the user actually edited — the AI-detected selection
+        // is already saved server-side by ANALYZE. Re-sending it is redundant and
+        // unsafe: ANALYZE's raw length/fitType strings aren't guaranteed to match
+        // the Length/FitType enum constants, so round-tripping them here can 400.
+        if (rec?.realId && ri.selection.subcategory && userEditedLocalIdsRef.current.has(ri.localId)) {
           try {
             await updateClosetItemApi(rec.realId, {
               section: ri.selection.section,
@@ -777,41 +903,76 @@ export default function ClosetPage() {
       }
       logAnalyticsEvent(Events.ADD_ITEM_SAVED, { [Params.HAS_BG_REMOVED]: false, [Params.FLOW]: 'closet' });
       logWardrobeMilestone();
+      // Отмеченные кнопкой Beautify (и выбранные галочкой) начинают улучшаться
+      // сразу после добавления — в гардеробе на них розовый лоадер «Улучшаем…».
+      for (const ri of batchReview) {
+        if (!keep.has(ri.localId) || !reviewBeautifyMarks.has(ri.localId)) continue;
+        const rec = tracker.get(ri.localId);
+        if (rec?.realId) {
+          startBeautifyBackground({
+            id: rec.realId,
+            imageData: ri.previewImage,
+            category: ri.selection.subcategory ? subcategoryToLocal(ri.selection.subcategory) : 'tops',
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
       await load();
       fetchPlan();
     } finally {
       setFinalizingBatch(false);
       setBatchReviewOpen(false);
       setBatchReview([]);
+      setReviewBeautifyMarks(new Set());
+      userEditedLocalIdsRef.current = new Set();
       uploadTrackerRef.current = new Map();
     }
   }
 
   // Beautify a batch item — await its background upload for the real id, then open
   // the compare sheet on the user's own photo.
-  async function beautifyBatchItem(localId: string) {
-    const ri = batchReview.find((r) => r.localId === localId);
-    const rec = uploadTrackerRef.current.get(localId);
-    if (!ri || !rec) return;
-    if (rec.realId == null) { try { await rec.promise; } catch { /* ignore */ } }
-    if (rec.realId) {
-      setBeautifyItem({ id: rec.realId, imageData: ri.previewImage, category: subcategoryToLocal(ri.selection.subcategory ?? 'TOPS'), createdAt: new Date().toISOString() });
-    }
+  // Отметки Beautify в ревью: тап по кнопке только помечает строку; реальное
+  // улучшение стартует после «Добавить в гардероб» (finalizeBatch).
+  const [reviewBeautifyMarks, setReviewBeautifyMarks] = useState<Set<string>>(new Set());
+  function toggleReviewBeautify(localId: string) {
+    setReviewBeautifyMarks((prev) => {
+      const n = new Set(prev);
+      if (n.has(localId)) n.delete(localId); else n.add(localId);
+      return n;
+    });
   }
 
   // Review "Beautify" pill → always show the educational popup first (unless the
   // user ticked "Don't show again"), then run beautify from there.
+  function beautifyIntroNever(): boolean {
+    try { return localStorage.getItem('svayp_beautify_intro_never') === '1'; } catch { return false; }
+  }
+  // Тап Beautify в ревью: intro-попап (первый раз) → далее просто TOGGLE отметки.
+  // Улучшение стартует после «Добавить в гардероб» (finalizeBatch).
   function handleReviewBeautify(item: ClosetItem) {
-    let never = false;
-    try { never = localStorage.getItem('svayp_beautify_intro_never') === '1'; } catch { /* private mode */ }
-    if (never) { beautifyBatchItem(item.id); return; }
-    setBeautifyIntroFor({ localId: item.id, from: 'beautify' });
+    if (!beautifyIntroNever() && !reviewBeautifyMarks.has(item.id)) {
+      setBeautifyIntroFor({ localId: item.id, from: 'beautify' });
+      return;
+    }
+    toggleReviewBeautify(item.id);
+  }
+  // Тап ✨ на карточке гардероба: тот же intro-гейт, затем фоновый beautify.
+  function handleWardrobeBeautify(item: ClosetItem) {
+    if (beautifyIntroNever()) { startBeautifyBackground(item); return; }
+    setBeautifyIntroFor({ localId: item.id, from: 'wardrobe' });
   }
   // Beautify intro popup actions.
   function openBeautifyFromIntro() {
-    const localId = beautifyIntroFor?.localId ?? null;
+    const intro = beautifyIntroFor;
     setBeautifyIntroFor(null);
-    if (localId) beautifyBatchItem(localId);
+    if (!intro?.localId) return;
+    if (intro.from === 'wardrobe') {
+      const it = items.find((i) => i.id === intro.localId);
+      if (it) startBeautifyBackground(it);
+    } else {
+      // Ревью: intro лишь отмечает кнопку — улучшение стартует при добавлении.
+      toggleReviewBeautify(intro.localId);
+    }
   }
   function skipBeautifyIntro() { setBeautifyIntroFor(null); }
 
@@ -826,19 +987,10 @@ export default function ClosetPage() {
     fitType: ri.selection.fitType,
     createdAt: '',
   }));
-  const allBatchComplete = batchReview.length > 0 && batchReview.every((ri) => isSelectionComplete(ri.selection));
 
-  // Final step: once every item has a complete category, auto-open the Beautify
-  // intro once (unless the user chose "Don't show again").
-  useEffect(() => {
-    if (!closetV2 || !FEATURES.beautifyEnabled) return;
-    if (!batchReviewOpen || !allBatchComplete || beautifyIntroShownRef.current) return;
-    let never = false;
-    try { never = localStorage.getItem('svayp_beautify_intro_never') === '1'; } catch { /* private mode */ }
-    beautifyIntroShownRef.current = true;
-    if (never) return;
-    setBeautifyIntroFor({ localId: batchReview[0]?.localId ?? null, from: 'add' });
-  }, [batchReviewOpen, allBatchComplete]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Intro-попап Beautify больше НЕ всплывает автоматически после анализа —
+  // beautify запускается напрямую значком ✨ на карточке (фоновый, авто-сохранение).
+  // (авто-показ отключён по просьбе продукта — «пусть не выходит».)
 
   // Header for the batch processing screen, driven by the imitated timeline.
   const batchHeaderLabel = batchPhase === 'identifying' ? t.cv_proc_identifying : t.cv_proc_removing;
@@ -990,15 +1142,91 @@ export default function ClosetPage() {
     }
   }
 
-  // Closet v2 — instant add from the shop catalog. Interim path: fetch the
-  // product image and run it through the normal upload pipeline (bg-removal +
-  // ANALYZE fills the real category/attributes). Swaps to /wardrobe/items/
-  // from-catalog once that endpoint ships. The sheet stays open so the user can
-  // add several in a row.
-  async function addCatalogItem(product: Product) {
-    if (plansEnabled && !canAddItem()) { setShowPremiumGate('items'); return; }
+  // Closet v2 — instant add from the shop catalog. Fast path: /wardrobe/items/
+  // from-catalog clones the product's pre-processed canonical item (no ML) — the
+  // item appears instantly. If the product isn't backfilled yet (422
+  // CATALOG_ITEM_NOT_READY), falls back to the normal upload pipeline.
+  // Заглушка «загружается» держится минимум столько же, сколько идёт обычная
+  // загрузка, чтобы добавление из магазина ощущалось так же (from-catalog по факту
+  // мгновенный).
+  const CATALOG_PLACEHOLDER_MS = 5000;
+
+  // loadingCard=true (гардероб): показываем заглушку ~5с как у обычной загрузки.
+  // loadingCard=false (канва): без заглушки/таймаута — from-catalog мгновенный,
+  // сразу load() → авто-размещение обработанной вещи на канве.
+  async function addCatalogItem(product: Product, opts?: { loadingCard?: boolean }): Promise<ClosetItem | null> {
+    const loadingCard = opts?.loadingCard !== false;
+    if (plansEnabled && !canAddItem()) { setShowPremiumGate('items'); return null; }
+    const clearAdding = () => setAddingProductIds((prev) => { const n = new Set(prev); n.delete(product.id); return n; });
+    setAddingProductIds((prev) => new Set(prev).add(product.id));
+
+    // Pending-карточка с прогрессом — как у обычной загрузки вещи. Секцию берём
+    // по РЕАЛЬНОЙ подкатегории вернувшейся вещи (from-catalog отдаёт её сразу),
+    // чтобы заглушка появлялась в правильном разделе (платок → Аксессуары, а не Верх).
+    const pendingId = `catalog_${product.id}_${Date.now()}`;
+    const imgUrl = product.images?.[0] ?? '';
+    const startedAt = Date.now();
+    const steps = [t.stepProcessing, t.stepRemovingBg, t.stepAnalyzing, t.stepAlmostDone];
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const showPlaceholder = (cat: ClosetCategory) => {
+      if (!loadingCard) return;
+      setPendingUploads((prev) => new Map(prev).set(pendingId, { category: cat, imageData: imgUrl, step: steps[0], progress: 8, startedAt }));
+      let tick = 0;
+      timer = setInterval(() => {
+        tick += 1;
+        setPendingUploads((prev) => {
+          const next = new Map(prev); const ex = next.get(pendingId);
+          if (ex) next.set(pendingId, { ...ex, progress: Math.min(95, 8 + tick * 20), step: steps[Math.min(steps.length - 1, tick)] });
+          return next;
+        });
+      }, 1000);
+    };
+    const clearPlaceholder = () => {
+      if (timer) clearInterval(timer);
+      setPendingUploads((prev) => { const n = new Map(prev); n.delete(pendingId); return n; });
+    };
+
+    try {
+      const created = await addWardrobeItemFromCatalog(product.id);
+      showPlaceholder(created.subcategory ? subcategoryToLocal(created.subcategory) : 'accessories');
+      // Гардероб: держим заглушку ~5с для паритета с загрузкой. Канва: сразу
+      // размещаем обработанную вещь без таймаута.
+      if (loadingCard) {
+        await new Promise((r) => setTimeout(r, Math.max(0, CATALOG_PLACEHOLDER_MS - (Date.now() - startedAt))));
+      }
+      logAnalyticsEvent(Events.LIBRARY_ITEM_ADDED, { [Params.PRODUCT_ID]: product.id, [Params.FLOW]: 'closet' });
+      logWardrobeMilestone();
+      clearPlaceholder();
+      setAddedProductIds((prev) => new Set(prev).add(product.id));
+      setOutfitToastMsg(t.cv_shop_added);
+      setTimeout(() => setOutfitToastMsg(null), 2000);
+      await load();
+      fetchPlan();
+      clearAdding();
+      return mapApiItemToClosetItem(created);
+    } catch (err) {
+      clearPlaceholder();
+      const code = (err as { response?: { data?: { error?: { code?: string }; code?: string } } })?.response?.data;
+      const errCode = code?.error?.code ?? code?.code;
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (isInsufficientCoins(err) || status === 402) { setShowPremiumGate('items'); clearAdding(); return null; }
+      // Товар ещё не предобработан бэкфиллом → фолбэк на обычную загрузку.
+      if (errCode !== 'CATALOG_ITEM_NOT_READY' && status !== 422) {
+        console.error('from-catalog failed, falling back to upload:', err);
+      }
+    }
+    // addCatalogItemViaUpload заново выставит/снимет addingProductIds в своём finally
+    // и покажет собственную pending-карточку (реальная загрузка). Товар ещё не
+    // готов бэкфиллом — на канву сразу класть нечего (вернём null).
+    await addCatalogItemViaUpload(product);
+    return null;
+  }
+
+  // Fallback: fetch the product image and run it through the normal upload
+  // pipeline (bg-removal + ANALYZE fills the real category/attributes).
+  async function addCatalogItemViaUpload(product: Product) {
     const imgUrl = product.images?.[0];
-    if (!imgUrl) return;
+    if (!imgUrl) { setAddingProductIds((prev) => { const n = new Set(prev); n.delete(product.id); return n; }); return; }
     setAddingProductIds((prev) => new Set(prev).add(product.id));
     const pendingId = `pending_${Date.now()}`;
     const category: ClosetCategory = 'tops'; // neutral hint; ANALYZE re-detects
@@ -1064,6 +1292,11 @@ export default function ClosetPage() {
       const localItems = getClosetItems().filter((li) => li.id.startsWith('local_'));
       const allFetched = [...apiItems, ...localItems];
       if (seq === loadSeqRef.current) {
+        // «Добавлено» в каталоге магазина выводим из РЕАЛЬНОГО состава гардероба
+        // (по sourceProductId), а не из накопителя — тогда удаление вещи из
+        // гардероба само снимает зелёную галку у товара.
+        setAddedProductIds(new Set(
+          allFetched.map((i) => i.sourceProductId).filter(Boolean) as string[]));
         if (allFetched.length > 0) {
           setItems(allFetched);
         } else {
@@ -1110,9 +1343,12 @@ export default function ClosetPage() {
     (async () => {
       try {
         const page = await listUploads(0, 20);
-        const STALE_MS = 30 * 60 * 1000;
+        // Пайплайн живёт максимум ~10 мин (ML hard-timeout 600с) — всё старше
+        // 15 мин мертво (обычно прерванный рестартом ML прогон), не resume-им.
+        // INITIATED = init без загруженного файла — не завершится никогда.
+        const STALE_MS = 15 * 60 * 1000;
         const inProgress = page.content.filter(
-          (u) => u.status !== 'COMPLETED' && u.status !== 'FAILED'
+          (u) => u.status !== 'COMPLETED' && u.status !== 'FAILED' && (u.status as string) !== 'INITIATED'
                && !dismissedUploadJobsRef.current.has(u.uploadJobId)
                && (Date.now() - new Date(u.updatedAt).getTime()) < STALE_MS
         );
@@ -1350,7 +1586,9 @@ export default function ClosetPage() {
       openAdd('TOPS');
       return;
     }
-    if (!canGenerate) {
+    if (coinsApply) {
+      if (coins < coinCosts.createOutfit) { setShowPremiumGate('generation'); return; }
+    } else if (!canGenerate) {
       if (plansEnabled) { setShowPremiumGate('generation'); return; }
     }
 
@@ -1369,7 +1607,14 @@ export default function ClosetPage() {
         [Params.OUTFIT_COUNT_RETURNED]: aiResult.itemIds.length,
       });
       layout = buildLayoutFromIds(aiResult.itemIds, items);
+      refreshCoins(); // AI-генерация образа платная — обновляем баланс
     } catch (err: unknown) {
+      // Нехватка монет (реальный монетный бэк) → экран покупки, не generic-ошибка.
+      if (isInsufficientCoins(err)) {
+        logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: 'INSUFFICIENT_COINS' });
+        setShowPremiumGate('generation');
+        return;
+      }
       const errData = (err as { response?: { data?: { error?: { code?: string; message?: string }; code?: string } } })?.response?.data;
       const code = errData?.error?.code ?? errData?.code;
       if (code === 'NOT_ENOUGH_CLOTHES') {
@@ -1485,7 +1730,8 @@ export default function ClosetPage() {
   const tryOnPersonKeyRef = useRef<string | undefined>(undefined);
 
   function handleTryItOnFromItems(calItems: ClosetItem[]) {
-    if (plansEnabled && !canTryOn) { setShowPremiumGate('tryOn'); return; }
+    if (coinsApply) { if (coins < coinCosts.tryOn) { setShowPremiumGate('tryOn'); return; } }
+    else if (plansEnabled && !canTryOn) { setShowPremiumGate('tryOn'); return; }
     const itemIds = calItems.map((i) => i.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
     if (itemIds.length === 0) return;
 
@@ -1586,6 +1832,7 @@ export default function ClosetPage() {
               tryOnStartTimeRef.current = null;
               setTryOnState({ status: 'completed', resultUrl: result.resultImageUrl });
               saveTryOnResult(result.resultImageUrl);
+              refreshCoins(); // примерка платная — обновляем баланс (возврат при FAILED учтён на бэке)
             } else {
               logAnalyticsEvent(Events.TRYON_FAILED, { [Params.ERROR_CODE]: result.failureReason ?? 'unknown' });
               setTryOnState({ status: 'failed', failureReason: result.failureReason ?? 'Try-on failed. Please try again.' });
@@ -1618,7 +1865,9 @@ export default function ClosetPage() {
   }
 
   function handleTryItOn(canvasIdx = 0) {
-    if (plansEnabled && !canTryOn) {
+    if (coinsApply) {
+      if (coins < coinCosts.tryOn) { setShowPremiumGate('tryOn'); return; }
+    } else if (plansEnabled && !canTryOn) {
       setShowPremiumGate('tryOn');
       return;
     }
@@ -1882,7 +2131,6 @@ export default function ClosetPage() {
           }}
           onRegenerate={(idx) => handleNewOutfit(idx)}
           onShowPlans={() => setShowPremiumGate('generation')}
-          onShowCanvasPlans={() => setShowPremiumGate('canvas')}
           onTryItOn={(idx) => handleTryItOn(idx)}
           onDeleteCanvas={handleDeleteCanvas}
           onAddItem={(cat) => openAdd(localCatToSection(cat))}
@@ -1906,6 +2154,8 @@ export default function ClosetPage() {
               onViewAll={() => openViewAllSection(section)}
               onRemovePending={removePendingUpload}
               onAddItem={() => openAdd(section)}
+              beautifyingIds={beautifyingIds}
+              onBeautify={FEATURES.beautifyEnabled ? handleWardrobeBeautify : undefined}
             />
           );
         })}
@@ -1958,7 +2208,7 @@ export default function ClosetPage() {
           }}
           onRegenerate={handleNewOutfit}
           onShowPlans={() => setShowPremiumGate('generation')}
-          onAddProduct={addCatalogItem}
+          onAddProduct={(p) => addCatalogItem(p, { loadingCard: false })}
           canRegenerate={canGenerate}
           plansEnabled={plansEnabled}
         />
@@ -1976,7 +2226,7 @@ export default function ClosetPage() {
             onDelete={(id) => { handleDelete(id); setEditItem(null); }}
             onRename={handleRenameItem}
             onEditCategory={(id, sel) => handleUpdateItem(id, sel)}
-            onBeautify={(item) => setBeautifyItem(item)}
+            onBeautify={(item) => startBeautifyBackground(item)}
             onTryOn={(item) => { setEditItem(null); handleTryItOnFromItems([item]); }}
             onChanged={() => load()}
           />
@@ -2007,11 +2257,13 @@ export default function ClosetPage() {
           dark={theme === 'dark'}
           beautifyEnabled={FEATURES.beautifyEnabled}
           requireComplete
+          detectingIds={batchDetecting}
           finalizing={finalizingBatch}
           onClose={() => { if (!finalizingBatch) { setBatchReviewOpen(false); setBatchReview([]); } }}
           onConfirm={finalizeBatch}
           onTryOn={() => { /* try-on happens after the item is in the closet */ }}
           onBeautify={handleReviewBeautify}
+          beautifyMarked={reviewBeautifyMarks}
           onRename={() => { /* naming is not part of the taxonomy review */ }}
           onEditCategory={editBatchCategory}
           onDelete={deleteBatchItem}
@@ -2023,14 +2275,19 @@ export default function ClosetPage() {
         <BeautifyCompareSheet
           item={beautifyItem}
           dark={theme === 'dark'}
-          onClose={() => setBeautifyItem(null)}
+          presetBeautifiedUrl={beautifyPreset?.url ?? null}
+          presetJobId={beautifyPreset?.jobId ?? null}
+          onClose={() => { setBeautifyItem(null); setBeautifyPreset(null); }}
+          onNeedCoins={() => setShowPremiumGate('beautify')}
           onCommitted={(id, choice, imageUrl) => {
+            setBeautifyPreset(null);
             // Mark that the user has now beautified — the intro won't show again.
             try { localStorage.setItem('svayp_has_beautified', '1'); } catch { /* private mode */ }
             if (choice === 'BEAUTIFIED' && imageUrl) {
               setItems((prev) => prev.map((i) => (i.id === id ? { ...i, imageData: imageUrl } : i)));
               setBatchReview((prev) => prev.map((ri) => (uploadTrackerRef.current.get(ri.localId)?.realId === id ? { ...ri, previewImage: imageUrl } : ri)));
             }
+            refreshCoins(); // Beautify платный — обновляем баланс
             load();
           }}
         />
@@ -2070,6 +2327,7 @@ export default function ClosetPage() {
       {showPremiumGate && (
         <CoinsSheet
           balance={coins}
+          pricing={coinPricing}
           needMore={showPremiumGate !== 'browse'}
           dark={theme === 'dark'}
           onClose={() => {
@@ -2078,6 +2336,7 @@ export default function ClosetPage() {
               [Params.CURRENT_PLAN]: plan,
             });
             setShowPremiumGate(null);
+            refreshCoins(); // баланс мог измениться (покупка/возврат)
           }}
         />
       )}
@@ -2496,7 +2755,7 @@ export default function ClosetPage() {
 }
 
 // ─── My Outfits ─────────────────────────────────────────────────────────────────
-function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnError, tryOnHasMore, onRetryTryOns, onLoadMoreTryOns, onDeleteTryOn, calendarDays, canTryOn, onTryItOnItems, allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onShowCanvasPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem, allowAutoGenerate, plansEnabled }: {
+function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnError, tryOnHasMore, onRetryTryOns, onLoadMoreTryOns, onDeleteTryOn, calendarDays, canTryOn, onTryItOnItems, allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem, allowAutoGenerate, plansEnabled }: {
   activeTab: 'boards' | 'outfits' | 'dressme' | 'calendar';
   onTabChange: (tab: 'boards' | 'outfits' | 'dressme' | 'calendar') => void;
   tryOnJobs: TryOnJobResponse[];
@@ -2519,7 +2778,6 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
   canAddCanvas: boolean;
   allowAutoGenerate: boolean;
   plansEnabled: boolean;
-  onShowCanvasPlans: () => void;
   onViewItems: (idx: number) => void;
   onRegenerate: (idx: number) => void;
   onAddCanvas: () => void;
@@ -2582,8 +2840,8 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
             onDelete={idx > 0 ? () => onDeleteCanvas(idx) : undefined}
             onAddItem={onAddItem}
             allowAutoGenerate={allowAutoGenerate}
-            isLocked={plansEnabled && idx >= limits.outfitCanvases}
-            onShowPlans={plansEnabled && idx >= limits.outfitCanvases ? onShowCanvasPlans : onShowPlans}
+            isLocked={false} /* доски не лимитируются планом (июль 2026) */
+            onShowPlans={onShowPlans}
           />
         )) : (
           <OutfitCard
@@ -2604,59 +2862,31 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
           />
         )}
 
-        {/* New outfit card — add board if plan allows, otherwise upgrade prompt */}
-        {!isEmpty && (
-          canAddCanvas ? (
-            <button
-              onClick={onAddCanvas}
-              className="shrink-0 rounded-[28px] flex flex-col items-center justify-center gap-3 border-2 border-dashed active:scale-[0.98] transition-transform"
+        {/* New outfit card — доски бесплатны и не лимитируются планом (июль 2026) */}
+        {!isEmpty && canAddCanvas && (
+          <button
+            onClick={onAddCanvas}
+            className="shrink-0 rounded-[28px] flex flex-col items-center justify-center gap-3 border-2 border-dashed active:scale-[0.98] transition-transform"
+            style={{
+              width: 'min(82vw, 340px)',
+              height: 440,
+              borderColor: theme === 'dark' ? '#4a4a4a' : '#D1D5DB',
+              background: theme === 'dark' ? 'rgba(42,42,42,0.6)' : 'rgba(249,250,251,0.8)',
+            }}
+          >
+            <div
+              className="w-16 h-16 rounded-full flex items-center justify-center"
               style={{
-                width: 'min(82vw, 340px)',
-                height: 440,
-                borderColor: theme === 'dark' ? '#4a4a4a' : '#D1D5DB',
-                background: theme === 'dark' ? 'rgba(42,42,42,0.6)' : 'rgba(249,250,251,0.8)',
+                background: theme === 'dark' ? '#2a2a2a' : '#F3F4F6',
+                boxShadow: theme === 'dark' ? '0 2px 8px rgba(0,0,0,0.4)' : '0 2px 8px rgba(0,0,0,0.08)',
               }}
             >
-              <div
-                className="w-16 h-16 rounded-full flex items-center justify-center"
-                style={{
-                  background: theme === 'dark' ? '#2a2a2a' : '#F3F4F6',
-                  boxShadow: theme === 'dark' ? '0 2px 8px rgba(0,0,0,0.4)' : '0 2px 8px rgba(0,0,0,0.08)',
-                }}
-              >
-                <Plus size={26} strokeWidth={2} style={{ color: theme === 'dark' ? '#888' : '#9ca3af' }} />
-              </div>
-              <div className="text-center px-6">
-                <p className="text-[14px] font-bold" style={{ color: theme === 'dark' ? '#f0f0f0' : '#1f2937' }}>{t.newOutfit}</p>
-                <p className="text-[12px] mt-0.5" style={{ color: theme === 'dark' ? '#888' : '#9ca3af' }}>{limits.outfitCanvases - canvases.length} {t.moreAvailable}</p>
-              </div>
-            </button>
-          ) : (
-            <button
-              onClick={onShowPlans}
-              className="shrink-0 rounded-[28px] flex flex-col items-center justify-center gap-3 border-2 border-dashed active:scale-[0.98] transition-transform"
-              style={{
-                width: 'min(82vw, 340px)',
-                height: 440,
-                borderColor: '#B8860B',
-                background: 'linear-gradient(160deg, rgba(184,134,11,0.04), rgba(139,105,20,0.08))',
-              }}
-            >
-              <div
-                className="w-16 h-16 rounded-full flex items-center justify-center"
-                style={{
-                  background: 'linear-gradient(135deg, #FFF8DC, #FFD700)',
-                  boxShadow: '0 4px 20px rgba(184,134,11,0.25)',
-                }}
-              >
-                <Plus size={26} strokeWidth={2} style={{ color: '#8B6914' }} />
-              </div>
-              <div className="text-center px-6">
-                <p className="text-[14px] font-bold text-gray-700">{t.newOutfit}</p>
-                <p className="text-[12px] font-semibold mt-0.5" style={{ color: '#8B6914' }}>{t.upgradeToGetMore}</p>
-              </div>
-            </button>
-          )
+              <Plus size={26} strokeWidth={2} style={{ color: theme === 'dark' ? '#888' : '#9ca3af' }} />
+            </div>
+            <div className="text-center px-6">
+              <p className="text-[14px] font-bold" style={{ color: theme === 'dark' ? '#f0f0f0' : '#1f2937' }}>{t.newOutfit}</p>
+            </div>
+          </button>
         )}
 
         <div className="w-6 shrink-0" />
@@ -3331,9 +3561,13 @@ interface ClothingSectionProps {
   onViewAll: () => void;
   onRemovePending?: (id: string) => void;
   onAddItem?: () => void;
+  /** id вещей, для которых сейчас крутится Beautify в фоне (loader-оверлей на карточке). */
+  beautifyingIds?: Set<string>;
+  /** Тап по значку Beautify на карточке (undefined → значок не показываем). */
+  onBeautify?: (item: ClosetItem) => void;
 }
 
-function ClothingSection({ title, cats, filter, items, totalCount, pendingItems = [], onFilterChange, onTapItem, onViewAll, onRemovePending, onAddItem }: ClothingSectionProps) {
+function ClothingSection({ title, cats, filter, items, totalCount, pendingItems = [], onFilterChange, onTapItem, onViewAll, onRemovePending, onAddItem, beautifyingIds, onBeautify }: ClothingSectionProps) {
   const { t, locale } = useI18n();
   const isEmpty = items.length === 0 && pendingItems.length === 0;
   return (
@@ -3395,7 +3629,9 @@ function ClothingSection({ title, cats, filter, items, totalCount, pendingItems 
             />
           ))}
           {items.map((item) => (
-            <ClothingItemCard key={item.id} item={item} onTap={() => onTapItem(item)} />
+            <ClothingItemCard key={item.id} item={item} onTap={() => onTapItem(item)}
+              isProcessing={beautifyingIds?.has(item.id)} beautifying
+              onBeautify={onBeautify && !item.beautified && !item.sourceProductId ? () => onBeautify(item) : undefined} />
           ))}
         </div>
       )}
@@ -3418,7 +3654,7 @@ function FilterChip({ label, selected, onClick }: { label: string; selected: boo
   );
 }
 
-function ClothingItemCard({ item, onTap, isProcessing, startedAt, onRemove }: { item: ClosetItem; onTap: () => void; isProcessing?: boolean; processingStep?: string; processingProgress?: number; startedAt?: number; onRemove?: () => void }) {
+function ClothingItemCard({ item, onTap, isProcessing, startedAt, onRemove, beautifying, onBeautify }: { item: ClosetItem; onTap: () => void; isProcessing?: boolean; processingStep?: string; processingProgress?: number; startedAt?: number; onRemove?: () => void; beautifying?: boolean; onBeautify?: () => void }) {
   const { t, locale } = useI18n();
 
   // Simulated progress — runs a local timer so the card always animates
@@ -3452,12 +3688,26 @@ function ClothingItemCard({ item, onTap, isProcessing, startedAt, onRemove }: { 
     >
       <div className="relative w-full h-full">
         {item.imageData ? (
-          <Image src={item.imageData} alt={item.category} fill className={`object-contain ${isProcessing ? 'opacity-50' : ''}`} unoptimized={needsUnoptimized(item.imageData)} />
+          // beautified → unoptimized: next/image грузил бы /_next/image?url=…
+          // (другой URL, чем предзагретый raw) → секунда старого фото после свапа.
+          <Image src={item.imageData} alt={item.category} fill className={`object-contain ${isProcessing ? 'opacity-50' : ''}`} unoptimized={needsUnoptimized(item.imageData) || !!item.beautified} />
         ) : (
           <div className="w-full h-full bg-gray-200 animate-pulse" />
         )}
       </div>
-      {/* Processing overlay */}
+      {/* Beautify — прямо на карточке (в попапе вещи кнопки больше нет) */}
+      {!isProcessing && onBeautify && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onBeautify(); }}
+          className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full flex items-center justify-center active:scale-90 transition-transform"
+          style={{ background: '#F370A7', boxShadow: '0 2px 6px -1px rgba(243,112,167,0.55)' }}
+          aria-label="Beautify"
+        >
+          <Sparkles size={14} className="text-white" />
+        </button>
+      )}
+      {/* Processing overlay. Beautify визуально ДРУГОЙ (розовый + Sparkles),
+          чтобы не путался с зелёным лоадером обычной загрузки. */}
       {isProcessing && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 backdrop-blur-[2px]">
           {onRemove && (
@@ -3468,11 +3718,25 @@ function ClothingItemCard({ item, onTap, isProcessing, startedAt, onRemove }: { 
               <X size={13} className="text-white" />
             </button>
           )}
-          <div className="w-8 h-8 mb-1.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-          <span className="text-[9px] font-medium text-white text-center px-2 leading-tight">{currentPhase.label()}</span>
-          <div className="w-[70%] h-1 mt-1.5 rounded-full bg-white/20 overflow-hidden">
-            <div className="h-full bg-green-400 rounded-full transition-all duration-1000" style={{ width: `${simProgress}%` }} />
-          </div>
+          {beautifying ? (
+            <>
+              <div className="w-9 h-9 mb-1.5 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#F9A9CB,#F370A7)' }}>
+                <Sparkles size={16} className="text-white" />
+              </div>
+              <span className="text-[9px] font-semibold text-white text-center px-2 leading-tight">{t.cv_bt_working}</span>
+              <div className="w-[70%] h-1 mt-1.5 rounded-full bg-white/20 overflow-hidden">
+                <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${simProgress}%`, background: '#F370A7' }} />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-8 h-8 mb-1.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+              <span className="text-[9px] font-medium text-white text-center px-2 leading-tight">{currentPhase.label()}</span>
+              <div className="w-[70%] h-1 mt-1.5 rounded-full bg-white/20 overflow-hidden">
+                <div className="h-full bg-green-400 rounded-full transition-all duration-1000" style={{ width: `${simProgress}%` }} />
+              </div>
+            </>
+          )}
         </div>
       )}
       {/* Category label */}

@@ -20,7 +20,8 @@ export default function BeautifyIntroSheet({
   onSkip,
 }: {
   dark: boolean;
-  from: 'beautify' | 'add';
+  /** 'wardrobe' — тап ✨ на карточке гардероба; текст skip-кнопки как у 'beautify'. */
+  from: 'beautify' | 'add' | 'wardrobe';
   onBeautify: () => void;
   onSkip: () => void;
 }) {
@@ -42,17 +43,10 @@ export default function BeautifyIntroSheet({
     <div className="fixed inset-0 z-[66] flex items-end justify-center" style={{ background: 'rgba(15,8,14,0.5)' }} onClick={handleSkip}>
       <div className="relative w-full max-w-[460px] rounded-t-3xl flex flex-col" style={{ background: surface, maxHeight: '95%' }} onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-center pt-3 pb-1"><div className="w-9 h-1 rounded-full" style={{ background: dark ? '#3a3a3c' : '#e2dbe1' }} /></div>
-        {/* Don't show again (top-left) */}
-        <button onClick={() => setNever((v) => !v)} className="absolute top-3.5 left-3.5 flex items-center gap-1.5 active:opacity-70">
-          <span className="w-5 h-5 rounded-md flex items-center justify-center" style={never ? { background: '#F370A7' } : { border: `1.6px solid ${dark ? '#48484a' : '#c9c7cd'}` }}>
-            {never && <Check size={13} strokeWidth={3} color="#fff" />}
-          </span>
-          <span className="text-[12.5px] font-medium" style={{ color: sub }}>{t.cv_bt_never}</span>
-        </button>
         <button onClick={handleSkip} aria-label={t.close} className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center" style={{ color: sub }}><X size={20} /></button>
 
-        {/* Header (extra top padding clears the top-left checkbox / top-right close) */}
-        <div className="px-8 pt-9 text-center">
+        {/* Header */}
+        <div className="px-8 pt-4 text-center">
           <p className="text-[12.5px] font-bold tracking-wide" style={{ color: '#F370A7' }}>{t.cv_bt_auto_kicker}</p>
           <h3 className="text-[22px] font-extrabold leading-tight mt-1" style={{ color: ink }}>{t.cv_bt_auto_headline}</h3>
         </div>
@@ -102,6 +96,13 @@ export default function BeautifyIntroSheet({
             style={{ height: 52, border: `1.5px solid ${dark ? '#3a3a3c' : '#e0dde2'}`, color: ink, background: 'transparent' }}
           >
             {from === 'add' ? t.cv_bt_intro_skip_add : t.cv_bt_intro_skip}
+          </button>
+          {/* «Больше не показывать» — по центру под кнопками, не мешает шапке */}
+          <button onClick={() => setNever((v) => !v)} className="mt-1 h-9 flex items-center justify-center gap-2 active:opacity-70">
+            <span className="w-5 h-5 rounded-md flex items-center justify-center flex-none" style={never ? { background: '#F370A7' } : { border: `1.6px solid ${dark ? '#48484a' : '#c9c7cd'}` }}>
+              {never && <Check size={13} strokeWidth={3} color="#fff" />}
+            </span>
+            <span className="text-[13px] font-medium" style={{ color: sub }}>{t.cv_bt_never}</span>
           </button>
         </div>
 

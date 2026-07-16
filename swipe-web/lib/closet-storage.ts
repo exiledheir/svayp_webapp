@@ -4,6 +4,7 @@ import type {
 } from '@/types';
 import {
   getWardrobeItems,
+  getWardrobeItem,
   deleteWardrobeItem,
   updateWardrobeItem,
   uploadWardrobeItem,
@@ -74,6 +75,13 @@ export interface ClosetItem {
   styleTags?: string[];
   timesWorn?: number;
   lastWornAt?: string | null;
+  /** Товар каталога, из которого добавлена вещь (from-catalog); иначе отсутствует. */
+  sourceProductId?: string | null;
+  /** Вещь уже улучшена (beautify) — повторно улучшать нельзя (скрываем кнопку). */
+  beautified?: boolean;
+  /** Полноразмерная картинка (imageUrl). imageData — 400px-миниатюра для гридов;
+   *  канва рендерит вещи крупно и берёт fullImage, чтобы не мылить. */
+  fullImage?: string;
 }
 
 // ── Category mapping ──────────────────────────────────────────────────────────
@@ -168,7 +176,7 @@ export function toApiCategory(localCategory: ClosetCategory): WardrobeCategory {
   return LOCAL_TO_CATEGORY[localCategory] ?? 'OTHER';
 }
 
-function mapApiItemToClosetItem(item: WardrobeItemResponse): ClosetItem {
+export function mapApiItemToClosetItem(item: WardrobeItemResponse): ClosetItem {
   return {
     id: item.id,
     category: toLocalCategory(item.subcategory),
@@ -195,10 +203,18 @@ function mapApiItemToClosetItem(item: WardrobeItemResponse): ClosetItem {
     styleTags: item.styleTags,
     timesWorn: item.timesWorn,
     lastWornAt: item.lastWornAt,
+    sourceProductId: item.sourceProductId ?? null,
+    beautified: item.beautified ?? false,
+    fullImage: item.imageUrl || undefined,
   };
 }
 
 // ── API-backed functions ──────────────────────────────────────────────────────
+
+/** Одна вещь по id с AI-таксономией (для пре-заполнения ревью после ANALYZE). */
+export async function getClosetItemById(id: string): Promise<ClosetItem> {
+  return mapApiItemToClosetItem(await getWardrobeItem(id));
+}
 
 export async function fetchClosetItems(): Promise<ClosetItem[]> {
   const page = await getWardrobeItems({ size: 100 });

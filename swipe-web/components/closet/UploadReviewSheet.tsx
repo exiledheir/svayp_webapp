@@ -41,18 +41,24 @@ export default function UploadReviewSheet({
   onClose,
   onConfirm,
   onBeautify,
+  beautifyMarked,
   onEditCategory,
   onDelete,
   beautifyEnabled,
   dark,
   requireComplete = false,
   finalizing = false,
+  detectingIds,
 }: {
   items: ClosetItem[];
   onClose: () => void;
-  onConfirm: () => void;
+  /** Подтверждение добавления: в гардероб попадают ТОЛЬКО выбранные id. */
+  onConfirm: (selectedIds: string[]) => void;
   onTryOn: (items: ClosetItem[]) => void;
+  /** Toggle отметки Beautify на строке: улучшение стартует после «Добавить в гардероб». */
   onBeautify: (item: ClosetItem) => void;
+  /** id строк, отмеченных на Beautify (кнопка в состоянии «нажата»). */
+  beautifyMarked?: Set<string>;
   onRename: (id: string, name: string) => void;
   onEditCategory: (id: string, sel: ItemOptionsSelection) => void;
   onDelete: (id: string) => void;
@@ -62,10 +68,14 @@ export default function UploadReviewSheet({
   requireComplete?: boolean;
   /** Persisting to the closet — shows a spinner + blocks interaction. */
   finalizing?: boolean;
+  /** localIds still awaiting AI category detection — row shows a "determining…" state. */
+  detectingIds?: Set<string>;
 }) {
   const { t, locale } = useI18n();
   const [editCatId, setEditCatId] = useState<string | null>(null);
   const [editSel, setEditSel] = useState<ItemOptionsSelection | null>(null);
+  // Fullscreen-просмотр фото по тапу на миниатюру.
+  const [zoomSrc, setZoomSrc] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(() => new Set(items.map((i) => i.id)));
   const viewed = useRef(false);
   const autoOpenedRef = useRef(false);
@@ -76,13 +86,15 @@ export default function UploadReviewSheet({
     logAnalyticsEvent(Events.REVIEW_SHEET_VIEWED, { [Params.ITEM_COUNT]: items.length });
   }, [items.length]);
 
-  // Auto-open the category/details editor for the first item missing a category
-  // (once), so the user is prompted to fill it right after upload.
+  // Auto-open the category/details editor for the first item the AI couldn't
+  // classify (once), so the user is prompted to fix it. Waits until detection
+  // finished — we don't want to prompt for a category the AI is about to fill.
   useEffect(() => {
     if (!requireComplete || autoOpenedRef.current) return;
+    if (detectingIds && detectingIds.size > 0) return;
     const firstIncomplete = items.find((i) => !itemComplete(i));
     if (firstIncomplete) { autoOpenedRef.current = true; openCategoryEditor(firstIncomplete); }
-  }, [requireComplete, items]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [requireComplete, items, detectingIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep the selection in sync as items are deleted from the list.
   useEffect(() => {
@@ -111,8 +123,11 @@ export default function UploadReviewSheet({
     if (!item.subcategory) return false;
     return isSelectionComplete({ section: sectionForSubcategory(item.subcategory) ?? 'TOPS', subcategory: item.subcategory, itemType: item.itemType ?? null, length: item.length ?? null, fitType: item.fitType ?? null });
   }
-  const allComplete = items.every(itemComplete);
-  const confirmDisabled = finalizing || (requireComplete && !allComplete);
+  const anyDetecting = !!detectingIds && detectingIds.size > 0;
+  const allComplete = items.every(itemComplete) && !anyDetecting;
+  // Пустой выбор блокирует добавление — в гардероб попадают только выбранные.
+  const confirmDisabled = finalizing || anyDetecting || selected.size === 0
+    || (requireComplete && !allComplete);
 
   function toggleOne(id: string) {
     setSelected((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
@@ -205,7 +220,8 @@ export default function UploadReviewSheet({
           const section = sectionOf(item);
           const attrs = attrsOf(item);
           const checked = selected.has(item.id);
-          const incomplete = requireComplete && !itemComplete(item);
+          const detecting = !!detectingIds?.has(item.id);
+          const incomplete = !detecting && requireComplete && !itemComplete(item);
           return (
             <div key={item.id} className="flex items-center gap-3 px-4 py-3.5" style={{ borderBottom: `1px solid ${line}` }}>
               {/* select */}
@@ -215,16 +231,26 @@ export default function UploadReviewSheet({
                 </span>
               </button>
 
-              {/* thumbnail */}
-              <span className="w-[74px] h-[74px] rounded-2xl flex-none overflow-hidden flex items-center justify-center" style={{ background: dark ? '#2a2a2c' : '#f5f2f5', border: `1px solid ${line}` }}>
+              {/* thumbnail — тап открывает фото на весь экран */}
+              <button
+                onClick={() => item.imageData && setZoomSrc(item.imageData)}
+                className="w-[74px] h-[74px] rounded-2xl flex-none overflow-hidden flex items-center justify-center active:scale-[0.96] transition-transform"
+                style={{ background: dark ? '#2a2a2c' : '#f5f2f5', border: `1px solid ${line}` }}
+              >
                 {item.imageData ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={item.imageData} alt="" className="w-full h-full object-cover" />
                 ) : null}
-              </span>
+              </button>
 
               {/* structured taxonomy */}
               <div className="flex-1 min-w-0">
+                {detecting ? (
+                  <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold" style={{ color: '#F370A7' }}>
+                    <Loader2 size={13} className="animate-spin" />{t.cv_proc_identifying}
+                  </span>
+                ) : (
+                <>
                 <button onClick={() => openCategoryEditor(item)} className="inline-flex items-center gap-1 text-[12.5px] font-bold px-2.5 py-1 rounded-full" style={{ background: dark ? 'rgba(243,112,167,0.16)' : '#f3f1f5', color: dark ? '#e6d7e0' : '#4b4550' }}>
                   <span>{SECTION_EMOJI[section]}</span>
                   {taxLabel(section, locale)}
@@ -235,18 +261,24 @@ export default function UploadReviewSheet({
                     <AlertCircle size={13} />{t.cv_rv_add_details}
                   </button>
                 )}
-                {beautifyEnabled && (
-                  <button
-                    onClick={() => onBeautify(item)}
-                    className="inline-flex items-center gap-1.5 mt-2 h-7 pl-3 pr-2.5 rounded-full text-white text-[12px] font-bold active:scale-[0.96] transition-transform"
-                    style={{ background: '#F370A7' }}
-                  >
-                    {t.cv_bt_button}
-                    <span className="flex items-center gap-0.5 pl-1.5 ml-0.5" style={{ borderLeft: '1px solid rgba(255,255,255,0.35)' }}>
-                      <Diamond size={12} />{BEAUTIFY_COST}
-                    </span>
-                  </button>
+                </>
                 )}
+                {beautifyEnabled && !detecting && (() => {
+                  const marked = !!beautifyMarked?.has(item.id);
+                  return (
+                    <button
+                      onClick={() => onBeautify(item)}
+                      className="inline-flex items-center gap-1.5 mt-2 h-7 pl-3 pr-2.5 rounded-full text-white text-[12px] font-bold active:scale-[0.96] transition-all"
+                      style={{ background: marked ? '#141014' : '#F370A7', boxShadow: marked ? 'inset 0 0 0 1.5px #F370A7' : 'none' }}
+                    >
+                      {marked && <Check size={13} strokeWidth={3} />}
+                      {t.cv_bt_button}
+                      <span className="flex items-center gap-0.5 pl-1.5 ml-0.5" style={{ borderLeft: '1px solid rgba(255,255,255,0.35)' }}>
+                        <Diamond size={12} />{BEAUTIFY_COST}
+                      </span>
+                    </button>
+                  );
+                })()}
               </div>
 
               {/* edit taxonomy */}
@@ -264,7 +296,7 @@ export default function UploadReviewSheet({
           <p className="text-[12px] text-center mb-2" style={{ color: sub }}>{t.cv_rv_complete_hint}</p>
         )}
         <button
-          onClick={() => { if (confirmDisabled) return; logAnalyticsEvent(Events.REVIEW_CONFIRMED, { [Params.ITEM_COUNT]: items.length }); onConfirm(); }}
+          onClick={() => { if (confirmDisabled) return; logAnalyticsEvent(Events.REVIEW_CONFIRMED, { [Params.ITEM_COUNT]: selected.size }); onConfirm([...selected]); }}
           disabled={confirmDisabled}
           className="w-full h-14 rounded-2xl text-white text-[16px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40 disabled:active:scale-100"
           style={{ background: '#F370A7' }}
@@ -274,6 +306,13 @@ export default function UploadReviewSheet({
       </div>
     </div>
     {editorOverlay}
+    {/* Fullscreen-просмотр фото — тап в любом месте закрывает */}
+    {zoomSrc && (
+      <div className="fixed inset-0 z-[70] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.9)' }} onClick={() => setZoomSrc(null)}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={zoomSrc} alt="" className="max-w-full max-h-full object-contain" />
+      </div>
+    )}
     </>
   );
 }
