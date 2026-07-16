@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Images, Camera, Plus, Check, Loader2 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
-import { getFavoriteProducts, getAllProducts } from '@/lib/api';
+import { getCatalogReadyProducts } from '@/lib/api';
 import type { Product } from '@/types';
 
 const PAGE_SIZE = 20;
@@ -36,8 +36,6 @@ export default function AddItemSheet({
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  // Multi-select in the shop catalog — tap several, then add together.
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const pageRef = useRef(0);
   const hasMoreRef = useRef(true);
   const idsRef = useRef<Set<string>>(new Set());
@@ -47,25 +45,23 @@ export default function AddItemSheet({
   const dragStartRef = useRef<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Initial catalog: user's liked products first, then the general feed.
+  // Курируемый каталог: только предобработанные товары (catalog-ready), чтобы
+  // «добавить в гардероб» было мгновенным, без ML-фолбэка на неготовых.
   useEffect(() => {
     if (!showShop) return;
     let alive = true;
     setLoading(true);
     (async () => {
       try {
-        const [liked, all] = await Promise.all([
-          getFavoriteProducts(0, 12).catch(() => [] as Product[]),
-          getAllProducts(0, PAGE_SIZE).catch(() => ({ products: [] as Product[], total: 0 })),
-        ]);
+        const r = await getCatalogReadyProducts(0, PAGE_SIZE).catch(() => ({ products: [] as Product[], total: 0 }));
         if (!alive) return;
         const merged: Product[] = [];
-        for (const p of [...liked, ...all.products]) {
+        for (const p of r.products) {
           if (!idsRef.current.has(p.id)) { idsRef.current.add(p.id); merged.push(p); }
         }
         setProducts(merged);
         pageRef.current = 0;
-        hasMoreRef.current = all.products.length >= PAGE_SIZE;
+        hasMoreRef.current = r.products.length >= PAGE_SIZE;
       } finally {
         if (alive) setLoading(false);
       }
@@ -78,7 +74,7 @@ export default function AddItemSheet({
     setLoadingMore(true);
     try {
       const next = pageRef.current + 1;
-      const r = await getAllProducts(next, PAGE_SIZE);
+      const r = await getCatalogReadyProducts(next, PAGE_SIZE);
       const fresh = r.products.filter((p) => !idsRef.current.has(p.id));
       fresh.forEach((p) => idsRef.current.add(p.id));
       if (fresh.length) setProducts((prev) => [...prev, ...fresh]);
@@ -97,12 +93,13 @@ export default function AddItemSheet({
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 340) loadMore();
   }
 
-  function toggleSelect(id: string) {
-    setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
-  }
-  function addSelected() {
-    products.filter((p) => selected.has(p.id)).forEach((p) => onAddProduct(p));
-    setSelected(new Set());
+  // Один тап по товару = добавить и сразу выйти из шита. Уже добавленную в
+  // гардероб вещь (addedProductIds — из реального состава гардероба) повторно не
+  // добавляем: карточка помечена галкой и не тапабельна.
+  function pickProduct(p: Product) {
+    if (addingProductIds.has(p.id) || addedProductIds.has(p.id)) return;
+    onAddProduct(p);
+    onClose();
   }
 
   function onTouchStart(e: React.TouchEvent) {
@@ -183,13 +180,13 @@ export default function AddItemSheet({
                 {products.map((p) => {
                   const adding = addingProductIds.has(p.id);
                   const added = addedProductIds.has(p.id);
-                  const isSel = selected.has(p.id);
                   return (
                     <button
                       key={p.id}
-                      onClick={() => { if (!adding && !added) toggleSelect(p.id); }}
+                      onClick={() => pickProduct(p)}
+                      disabled={adding || added}
                       className="relative rounded-2xl p-2.5 text-left active:scale-[0.98] transition-transform"
-                      style={{ background: dark ? '#141014' : '#fff', border: `1.5px solid ${added ? '#2FB27A' : isSel ? '#F370A7' : dark ? '#2a2a2c' : '#ececed'}` }}
+                      style={{ background: dark ? '#141014' : '#fff', border: `1.5px solid ${added ? '#2FB27A' : dark ? '#2a2a2c' : '#ececed'}`, opacity: added ? 0.6 : 1 }}
                     >
                       <div className="rounded-xl mb-2 overflow-hidden" style={{ aspectRatio: '4 / 5', background: idleRow }}>
                         {p.images?.[0] ? (
@@ -201,9 +198,9 @@ export default function AddItemSheet({
                       <span className="block text-[11px] mt-0.5 truncate" style={{ color: sub }}>{p.brand}</span>
                       <span
                         className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-white"
-                        style={{ background: added ? '#2FB27A' : (isSel || adding) ? '#F370A7' : 'rgba(15,8,14,0.35)', boxShadow: added || (!isSel && !adding) ? 'none' : '0 4px 10px -3px rgba(243,112,167,0.6)' }}
+                        style={{ background: added ? '#2FB27A' : adding ? '#F370A7' : 'rgba(15,8,14,0.35)' }}
                       >
-                        {adding ? <Loader2 size={15} className="animate-spin" /> : added ? <Check size={15} strokeWidth={3} /> : isSel ? <Check size={15} strokeWidth={3} /> : <Plus size={16} strokeWidth={2.6} />}
+                        {adding ? <Loader2 size={15} className="animate-spin" /> : added ? <Check size={15} strokeWidth={3} /> : <Plus size={16} strokeWidth={2.6} />}
                       </span>
                     </button>
                   );
@@ -217,18 +214,6 @@ export default function AddItemSheet({
           )}
         </div>
 
-        {/* Sticky "add selected" bar */}
-        {selected.size > 0 && (
-          <div className="flex-none px-5 pt-2.5 pb-6" style={{ borderTop: `1px solid ${dark ? '#2a2a2c' : '#ececed'}`, background: dark ? '#1c1c1e' : '#fff' }}>
-            <button
-              onClick={addSelected}
-              className="w-full h-13 rounded-2xl text-white text-[15px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
-              style={{ background: '#F370A7', height: 52 }}
-            >
-              <Plus size={18} strokeWidth={2.6} />{t.cv_shop_add_n.replace('{n}', String(selected.size))}
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

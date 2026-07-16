@@ -160,14 +160,9 @@ export default function ItemDetailSheet({
             )}
           </div>
 
-          {/* Primary actions */}
-          <div className="grid grid-cols-2 gap-2.5 mt-3.5">
-            {beautifyEnabled && !readOnly && (
-              <button onClick={() => onBeautify(item)} className="h-12 rounded-2xl text-white text-[14px] font-bold flex items-center justify-center gap-1.5" style={{ background: '#F370A7' }}>
-                <Sparkles size={16} />{t.cv_bt_button}
-              </button>
-            )}
-            <button onClick={() => onTryOn(item)} className={`h-12 rounded-2xl text-white text-[14px] font-bold flex items-center justify-center ${beautifyEnabled && !readOnly ? '' : 'col-span-2'}`} style={{ background: '#141014' }}>
+          {/* Primary actions — Beautify вынесен на карточку в гардеробе, тут только Try on */}
+          <div className="grid grid-cols-1 gap-2.5 mt-3.5">
+            <button onClick={() => onTryOn(item)} className="h-12 rounded-2xl text-white text-[14px] font-bold flex items-center justify-center" style={{ background: '#141014' }}>
               {t.cv_dt_tryon}
             </button>
           </div>
