@@ -8,6 +8,11 @@ export const Events = {
   CLOSET_GUIDE_OPENED: 'closet_guide_opened',
   CLOSET_GUIDE_VIDEO_PLAYED: 'closet_guide_video_played',
   CLOSET_FEEDBACK_CTA_TAPPED: 'closet_feedback_cta_tapped',
+  // "Add N items to unlock" get-started card (persistent closet nudge)
+  GET_STARTED_CARD_VIEWED: 'get_started_card_viewed',
+  GET_STARTED_CARD_ADD_TAPPED: 'get_started_card_add_tapped',
+  GET_STARTED_CARD_DISMISSED: 'get_started_card_dismissed',
+  GET_STARTED_CARD_COMPLETED: 'get_started_card_completed',
 
   // ── Add Item Funnel ────────────────────────────────────────────────────────
   ADD_ITEM_STARTED: 'add_item_started',
@@ -16,6 +21,20 @@ export const Events = {
   ADD_ITEM_BG_REMOVAL_FAILED: 'add_item_bg_removal_failed',
   ADD_ITEM_CATEGORY_SELECTED: 'add_item_category_selected',
   ADD_ITEM_SAVED: 'add_item_saved',
+
+  // ── Closet v2: detect & review, beautify, catalog, item detail ─────────────
+  REVIEW_SHEET_VIEWED: 'review_sheet_viewed',
+  REVIEW_ITEM_CORRECTED: 'review_item_corrected',
+  REVIEW_NAME_EDITED: 'review_name_edited',
+  REVIEW_CONFIRMED: 'review_confirmed',
+  REVIEW_TRYON_TAPPED: 'review_tryon_tapped',
+  BEAUTIFY_STARTED: 'beautify_started',
+  BEAUTIFY_COMPLETED: 'beautify_completed',
+  BEAUTIFY_FAILED: 'beautify_failed',
+  BEAUTIFY_CHOICE_COMMITTED: 'beautify_choice_committed',
+  LIBRARY_ITEM_ADDED: 'library_item_added',
+  ITEM_DETAIL_VIEWED: 'item_detail_viewed',
+  ITEM_MARKED_WORN: 'item_marked_worn',
 
   // ── Outfit Generation Funnel ───────────────────────────────────────────────
   OUTFITS_TAB_VIEWED: 'outfits_tab_viewed',
@@ -62,6 +81,7 @@ export const Events = {
   ONBOARDING_SKIPPED: 'onboarding_skipped',
   ONBOARDING_STEP_VIEWED: 'onboarding_step_viewed',
   ONBOARDING_STEP_COMPLETED: 'onboarding_step_completed',
+  BEAUTIFY_REVEAL_VIEWED: 'beautify_reveal_viewed',
 
   // ── Market (C2C) Funnel ────────────────────────────────────────────────────
   MARKET_FEED_VIEWED: 'market_feed_viewed',
@@ -144,4 +164,6 @@ export const Params = {
   COLOR: 'color',
   BRAND: 'brand',
   PRICE: 'price',
+  CHOICE: 'choice',
+  FIELD: 'field',
 } as const;

@@ -4,6 +4,8 @@ import Image from 'next/image';
 import { Camera, Image as ImageIcon, Check, Plus } from 'lucide-react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
 import { addClosetItemFromFile, type ClosetCategory } from '@/lib/closet-storage';
+import { getWardrobeItem } from '@/lib/wardrobe-api';
+import type { WardrobeUploadStatus } from '@/types';
 import { compressImageForUpload } from '@/lib/image-utils';
 import ItemOptionsPicker, { defaultSelectionForSection, isSelectionComplete, type ItemOptionsSelection } from '@/components/closet/ItemOptionsPicker';
 import { sectionsForGroup, subcategoryToLocal } from '@/lib/wardrobe-taxonomy';
@@ -33,12 +35,19 @@ export default function AddItemStep({
   title,
   body,
   onItemAdded,
+  captureReveal = false,
 }: {
   group: 'upper' | 'lower' | 'shoes';
   title: string;
   body: string;
   /** Called immediately when the user confirms — upload continues in background. */
-  onItemAdded: (category: ClosetCategory, uploadPromise: Promise<unknown>) => void;
+  onItemAdded: (
+    category: ClosetCategory,
+    uploadPromise: Promise<unknown>,
+    reveal?: { before: string; afterPromise: Promise<string | null> },
+  ) => void;
+  /** Upper step only: capture original→cutout data for the Beautify reveal. */
+  captureReveal?: boolean;
 }) {
   const { t } = useI18n();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -101,6 +110,30 @@ export default function AddItemStep({
       fitType: sel.fitType,
     };
 
+    // Beautify reveal (upper step only): resolve the background-removed cutout URL
+    // as soon as the upload pipeline produces it — without blocking the flow.
+    let resolveAfter: ((u: string | null) => void) | undefined;
+    let afterSettled = false;
+    const afterPromise = captureReveal
+      ? new Promise<string | null>((r) => { resolveAfter = r; })
+      : undefined;
+    const settleAfter = (u: string | null) => {
+      if (afterSettled) return;
+      afterSettled = true;
+      resolveAfter?.(u);
+    };
+    const handleProgress = (status: WardrobeUploadStatus) => {
+      if (!captureReveal || afterSettled || !status.wardrobeItemId) return;
+      // The cutout image exists once the pipeline reaches EMBED (see closet grid).
+      if (status.status === 'EMBED' || status.status === 'ANALYZE' || status.status === 'COMPLETED') {
+        const id = status.wardrobeItemId;
+        afterSettled = true; // claim it so later events don't re-fetch
+        getWardrobeItem(id)
+          .then((it) => resolveAfter?.(it.thumbnailUrl || it.imageUrl))
+          .catch(() => resolveAfter?.(null));
+      }
+    };
+
     const uploadPromise = (async () => {
       let f = currentFile;
       if (snap.crop && snap.w > 0 && snap.h > 0) {
@@ -109,15 +142,20 @@ export default function AddItemStep({
         f = new File([blob], f.name, { type: 'image/png' });
       }
       f = await compressImageForUpload(f);
-      await addClosetItemFromFile(f, cat, extras, () => {});
+      await addClosetItemFromFile(f, cat, extras, handleProgress);
       logAnalyticsEvent(Events.ADD_ITEM_BG_REMOVAL_COMPLETED, { [Params.FLOW]: 'onboarding' });
       logAnalyticsEvent(Events.ADD_ITEM_SAVED, { [Params.CATEGORY]: cat, [Params.HAS_BG_REMOVED]: true, [Params.FLOW]: 'onboarding' });
     })().catch(() => {
       logAnalyticsEvent(Events.ADD_ITEM_BG_REMOVAL_FAILED, { [Params.FLOW]: 'onboarding' });
+      settleAfter(null); // never leave the reveal hanging on failure
     });
 
     // Advance immediately — upload runs in the background.
-    onItemAdded(cat, uploadPromise);
+    onItemAdded(
+      cat,
+      uploadPromise,
+      captureReveal ? { before: snap.rawImage, afterPromise: afterPromise! } : undefined,
+    );
   }
 
   // ── Crop + category selection ────────────────────────────────────────────────
@@ -179,6 +217,7 @@ export default function AddItemStep({
       <div className="px-6 pt-4 pb-2">
         <h2 className="text-[28px] font-black tracking-tight text-gray-900 dark:text-white mb-2 leading-tight">{title}</h2>
         <p className="text-[16px] font-medium leading-relaxed text-gray-600 dark:text-gray-300 max-w-[34ch]">{body}</p>
+        <p className="text-[13px] text-gray-400 mt-1.5 max-w-[36ch]">{t.ob_add_any_photo}</p>
       </div>
 
       {/* Clothing hero image */}

@@ -1,4 +1,4 @@
-import { api } from '@/lib/api';
+import { api, isInsufficientCoins } from '@/lib/api';
 import { watchWithSse } from '@/lib/sse-client';
 import type {
   WardrobeCategory,
@@ -320,6 +320,8 @@ function mapWardrobeItem(raw: Record<string, unknown>): WardrobeItemResponse {
     timesWorn: (raw.timesWorn ?? raw.times_worn ?? 0) as number,
     lastWornAt: (raw.lastWornAt ?? raw.last_worn_at ?? null) as string | null,
     createdAt: (raw.createdAt ?? raw.created_at ?? '') as string,
+    sourceProductId: (raw.sourceProductId ?? raw.source_product_id ?? null) as string | null,
+    beautified: (raw.beautified ?? false) as boolean,
   };
 }
 
@@ -331,8 +333,11 @@ export async function getWardrobeStats(): Promise<WardrobeStats> {
 export async function getWardrobeItems(
   params: { category?: WardrobeCategory; page?: number; size?: number } = {},
 ): Promise<PageResponse<WardrobeItemResponse>> {
+  // no-cache + cache-buster: WebView кэширует GET — после beautify/commit load()
+  // возвращал СТАРЫЙ список и перетирал только что применённую картинку.
   const res = await api.get('/wardrobe/items', {
-    params: { page: params.page ?? 0, size: params.size ?? 30, ...(params.category ? { category: params.category } : {}) },
+    params: { page: params.page ?? 0, size: params.size ?? 30, _t: Date.now(), ...(params.category ? { category: params.category } : {}) },
+    headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
   });
   const raw = unwrapData<Record<string, unknown>>(res);
   const content = (raw.content ?? []) as Record<string, unknown>[];
@@ -385,6 +390,108 @@ export async function markItemWorn(id: string): Promise<WardrobeItemResponse> {
 
 export async function deleteWardrobeItem(id: string): Promise<void> {
   await api.delete(`/wardrobe/items/${id}`);
+}
+
+/**
+ * Мгновенно добавить товар магазина в гардероб (клон каноничной обработанной
+ * вещи товара на бэке — без ML). Требует, чтобы товар был предобработан бэкфиллом
+ * (иначе 422 CATALOG_ITEM_NOT_READY — вызывающий делает фолбэк на обычную загрузку).
+ */
+export async function addWardrobeItemFromCatalog(productId: string): Promise<WardrobeItemResponse> {
+  const res = await api.post('/wardrobe/items/from-catalog', { productId });
+  return mapWardrobeItem(unwrapData<Record<string, unknown>>(res));
+}
+
+// ── Beautify (on-demand AI product shot) ──────────────────────────────────────
+// Contract in docs/closet-v2-backend-handoff.md. Until the backend ships these,
+// createBeautifyJob rejects and the compare sheet degrades to "coming soon".
+
+export interface BeautifyJobResponse {
+  beautifyJobId: string;
+  itemId: string;
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  progressPercent: number;
+  currentStep: string | null;
+  beautifiedUrl: string | null;
+  beautifiedThumbnailUrl: string | null;
+  failureReason: string | null;
+}
+
+function mapBeautifyJob(raw: Record<string, unknown>): BeautifyJobResponse {
+  return {
+    beautifyJobId: (raw.beautifyJobId ?? raw.beautify_job_id ?? raw.id ?? '') as string,
+    itemId: (raw.itemId ?? raw.item_id ?? '') as string,
+    status: (raw.status ?? 'PENDING') as BeautifyJobResponse['status'],
+    progressPercent: (raw.progressPercent ?? raw.progress_percent ?? 0) as number,
+    currentStep: (raw.currentStep ?? raw.current_step ?? null) as string | null,
+    beautifiedUrl: (raw.beautifiedUrl ?? raw.beautified_url ?? null) as string | null,
+    beautifiedThumbnailUrl: (raw.beautifiedThumbnailUrl ?? raw.beautified_thumbnail_url ?? null) as string | null,
+    failureReason: (raw.failureReason ?? raw.failure_reason ?? null) as string | null,
+  };
+}
+
+export async function createBeautifyJob(itemId: string): Promise<BeautifyJobResponse> {
+  const res = await api.post(`/wardrobe/items/${itemId}/beautify`);
+  return mapBeautifyJob(unwrapData<Record<string, unknown>>(res));
+}
+
+export async function getBeautifyJob(itemId: string, jobId: string): Promise<BeautifyJobResponse> {
+  // no-cache + cache-buster: WebView иначе отдаёт из кэша ПЕРВЫЙ ответ (PENDING)
+  // на всех поллах, и статус COMPLETED не доезжает → «Улучшаем…» висит вечно.
+  const res = await api.get(`/wardrobe/items/${itemId}/beautify/${jobId}?t=${Date.now()}`, {
+    headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+  });
+  return mapBeautifyJob(unwrapData<Record<string, unknown>>(res));
+}
+
+/**
+ * Каталожный beautify: вещь из магазина показывает исходное фото, а готовая
+ * вырезка уже лежит в БД (бэкфилл). Бэкенд списывает 2 монеты и мгновенно
+ * переключает картинку — без ML. 402 при нехватке монет.
+ */
+export async function applyPresetBeautify(itemId: string): Promise<WardrobeItemResponse> {
+  const res = await api.post(`/wardrobe/items/${itemId}/beautify/apply-preset`);
+  return mapWardrobeItem(unwrapData<Record<string, unknown>>(res));
+}
+
+export async function commitBeautify(
+  itemId: string,
+  jobId: string,
+  choice: 'BEAUTIFIED' | 'ORIGINAL',
+): Promise<WardrobeItemResponse> {
+  const res = await api.post(`/wardrobe/items/${itemId}/beautify/${jobId}/commit`, { choice });
+  return mapWardrobeItem(unwrapData<Record<string, unknown>>(res));
+}
+
+export async function watchBeautifyUntilDone(
+  itemId: string,
+  jobId: string,
+  onProgress?: (job: BeautifyJobResponse) => void,
+): Promise<BeautifyJobResponse> {
+  // Поллинг с предохранителем: ML-enhance имеет hard-timeout ~300с (после чего
+  // бэк ставит FAILED и возвращает монеты), но чтобы UI НИКОГДА не висел «вечно»
+  // при сетевых сбоях — ограничиваем и время, и число подряд идущих ошибок.
+  const DEADLINE = Date.now() + 330_000; // чуть больше ML-таймаута
+  let errStreak = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    try {
+      const job = await getBeautifyJob(itemId, jobId);
+      errStreak = 0;
+      onProgress?.(job);
+      if (job.status === 'COMPLETED' || job.status === 'FAILED') return job;
+    } catch (err) {
+      // 402 (или иная терминальная ошибка) — пробрасываем сразу, её ловит sheet.
+      if (isInsufficientCoins(err)) throw err;
+      if (++errStreak >= 4) throw err; // 4 подряд сбоя — не висим, отдаём ошибку
+    }
+    if (Date.now() > DEADLINE) {
+      return { beautifyJobId: jobId, itemId, status: 'FAILED', progressPercent: 0,
+        currentStep: null, beautifiedUrl: null, beautifiedThumbnailUrl: null,
+        failureReason: 'timeout' };
+    }
+    await new Promise((r) => setTimeout(r, 2500));
+  }
 }
 
 // ── Full Upload Flow (convenience) ───────────────────────────────────────────

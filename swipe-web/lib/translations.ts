@@ -350,6 +350,137 @@ export interface Translations {
   onboarding_btn_add_item: string;
   // ── Interactive onboarding wizard ──
   ob_skip: string;
+  ob_add_any_photo: string;
+  ob_beautify_title: string;
+  ob_beautify_subtitle: string;
+  ob_beautify_before: string;
+  ob_beautify_after: string;
+  ob_beautify_cta: string;
+  gs_title: string;
+  gs_progress: string;
+  gs_cta: string;
+  gs_dismiss: string;
+  // ── Closet v2 (add & try-on redesign) ──────────────────────────────────────
+  cv_hero_title: string;
+  cv_hero_subtitle: string;
+  cv_add_item: string;
+  cv_add_title: string;
+  cv_add_reassure: string;
+  // Build-your-closet gate (unlock once a top + a bottom exist)
+  cv_build_title: string;
+  cv_build_subtitle: string;
+  cv_build_top: string;
+  cv_build_bottom: string;
+  cv_build_dress: string;
+  cv_build_shoes: string;
+  cv_build_adding: string;
+  cv_show_bt_title: string;
+  cv_show_bt_cap: string;
+  cv_show_to_title: string;
+  cv_show_to_cap: string;
+  cv_show_to_mannequin: string;
+  cv_show_to_me: string;
+  cv_show_to_covered: string;
+  // ── Diamonds (coins) ──────────────────────────────────────────────────────
+  cn_title: string;
+  cn_have: string;
+  cn_need_more: string;
+  cn_do_title: string;
+  cn_do_upload: string;
+  cn_free: string;
+  cn_do_outfit: string;
+  cn_do_beautify: string;
+  cn_do_tryon: string;
+  cn_pack_title: string;
+  cn_off: string;
+  cn_custom: string;
+  cn_custom_ph: string;
+  cn_total: string;
+  cn_hint_next: string;
+  cn_warn: string;
+  cn_survey: string;
+  cn_buy: string;
+  cn_note: string;
+  cn_currency: string;
+  cn_tg_msg: string;
+  // Batch add — processing screen + "fix category" sheet
+  cv_proc_removing: string;
+  cv_proc_identifying: string;
+  cv_fix_title: string;
+  cv_fix_subtitle: string;
+  cv_fix_done: string;
+  cv_fix_later: string;
+  cv_src_gallery: string;
+  cv_src_gallery_sub: string;
+  cv_src_camera: string;
+  cv_src_camera_sub: string;
+  cv_shop_title: string;
+  cv_shop_add_n: string;
+  cv_shop_hint: string;
+  cv_shop_search: string;
+  cv_shop_added: string;
+  cv_shop_empty: string;
+  cv_rv_adding: string;
+  cv_rv_new_items: string;
+  cv_rv_identifying: string;
+  cv_rv_select_all: string;
+  cv_rv_delete: string;
+  cv_rv_beautify_banner: string;
+  cv_rv_confirm: string;
+  cv_rv_add_to_closet: string;
+  cv_rv_detail_view: string;
+  cv_rv_add_details: string;
+  cv_rv_complete_hint: string;
+  cv_rv_tryon: string;
+  cv_rv_edit_cat: string;
+  cv_rv_item_n: string;
+  cv_rv_more: string;
+  cv_rv_added_toast: string;
+  cv_rv_rejected: string;
+  cv_rv_processing: string;
+  cv_bt_button: string;
+  cv_bt_title: string;
+  cv_bt_subtitle: string;
+  cv_bt_original: string;
+  cv_bt_beautified: string;
+  cv_bt_save: string;
+  cv_bt_keep: string;
+  cv_bt_working: string;
+  cv_bt_ready: string;
+  cv_bt_failed: string;
+  cv_bt_soon: string;
+  cv_dt_original: string;
+  cv_dt_beautified: string;
+  cv_dt_color: string;
+  cv_dt_season: string;
+  cv_dt_material: string;
+  cv_dt_pattern: string;
+  cv_dt_style: string;
+  cv_dt_worn: string;
+  cv_dt_worn_never: string;
+  cv_dt_mark_worn: string;
+  cv_dt_tryon: string;
+  cv_dt_name_placeholder: string;
+  cv_bt_intro_title: string;
+  cv_bt_intro_body: string;
+  cv_bt_intro_cta: string;
+  cv_bt_auto_kicker: string;
+  cv_bt_auto_headline: string;
+  cv_bt_intro_caption: string;
+  cv_bt_intro_do: string;
+  cv_bt_intro_skip: string;
+  cv_bt_intro_skip_add: string;
+  cv_bt_never: string;
+  cv_bt_per_photo: string;
+  cv_ce_move_title: string;
+  cv_ce_move_body: string;
+  cv_ce_resize_title: string;
+  cv_ce_resize_body: string;
+  cv_ce_layer_title: string;
+  cv_ce_layer_body: string;
+  cv_ce_next: string;
+  cv_ce_done: string;
+  cv_ce_all: string;
   ob_welcome_title: string;
   ob_welcome_body: string;
   ob_welcome_cta: string;
@@ -1014,6 +1145,134 @@ const en: Translations = {
   onboarding_btn_add_item: 'Add Item',
   // ── Interactive onboarding wizard ──
   ob_skip: 'Skip tour',
+  ob_add_any_photo: "Any photo works — even a quick snap. We'll tidy it up for you.",
+  ob_beautify_title: 'We cleaned up your photo automatically',
+  ob_beautify_subtitle: 'Background removed — only your clothing stays.',
+  ob_beautify_before: 'Before',
+  ob_beautify_after: 'After',
+  ob_beautify_cta: 'Nice →',
+  gs_title: 'Add {n} more items to unlock personalized styling',
+  gs_progress: '{done} of {total} added',
+  gs_cta: 'Add item',
+  gs_dismiss: 'Dismiss',
+  // ── Closet v2 ──
+  cv_hero_title: 'Build your closet',
+  cv_hero_subtitle: 'Snap a photo — we name it, cut it out, and file it. All by AI.',
+  cv_add_item: 'Add item',
+  cv_add_title: 'Add to closet',
+  cv_add_reassure: "Any photo works. We clean it up, name it, and sort every item into your closet.",
+  cv_build_title: 'Add a top and a bottom',
+  cv_build_subtitle: 'Add a top and a bottom — or a dress and shoes — to unlock your personalized styling.',
+  cv_build_top: 'Top',
+  cv_build_bottom: 'Bottom',
+  cv_build_dress: 'Dress',
+  cv_build_shoes: 'Shoes',
+  cv_build_adding: 'Adding your items…',
+  cv_show_bt_title: 'Snap it, we clean it up',
+  cv_show_bt_cap: 'Photograph any item — AI cuts out the background and files it in your closet.',
+  cv_show_to_title: 'Try it on',
+  cv_show_to_cap: 'See how it looks on you before you wear it.',
+  cv_show_to_mannequin: 'See any item on a mannequin',
+  cv_show_to_me: 'Or try it on your own photo',
+  cv_show_to_covered: 'Modest styling, fully covered',
+  cn_title: 'Diamonds',
+  cn_have: 'You have {n}',
+  cn_need_more: 'Not enough diamonds — top up to continue.',
+  cn_do_title: 'What you can do',
+  cn_do_upload: 'Add clothing',
+  cn_free: 'Free',
+  cn_do_outfit: 'Create an outfit',
+  cn_do_beautify: 'Beautify',
+  cn_do_tryon: 'Try it on',
+  cn_pack_title: 'Buy diamonds',
+  cn_off: '−{n}%',
+  cn_custom: 'Or enter your own amount',
+  cn_custom_ph: 'Number of diamonds',
+  cn_total: 'Total',
+  cn_hint_next: 'Add {n} more for −30%',
+  cn_warn: 'Generation results can’t be refunded — every run spends diamonds.',
+  cn_survey: 'Sometimes you can earn diamonds by completing surveys.',
+  cn_buy: 'Buy {n} diamonds',
+  cn_note: 'Diamonds are credited after we verify your payment — usually within a few minutes. We’ll confirm in Telegram.',
+  cn_currency: 'UZS',
+  cn_tg_msg: 'I want to buy {n} diamonds ({price}). My phone: ',
+  cv_proc_removing: 'Removing background… ✂️',
+  cv_proc_identifying: 'Identifying category… 🏷️',
+  cv_fix_title: 'Help us identify these items',
+  cv_fix_subtitle: 'Pick the right category so we can style them.',
+  cv_fix_done: 'Done',
+  cv_fix_later: 'Fill in later',
+  cv_src_gallery: 'Gallery',
+  cv_src_gallery_sub: 'Choose from your photos',
+  cv_src_camera: 'Camera',
+  cv_src_camera_sub: 'Take a new photo',
+  cv_shop_title: 'Add from the shop',
+  cv_shop_add_n: 'Add {n} to closet',
+  cv_shop_hint: 'One tap · no photo',
+  cv_shop_search: 'Search the shop…',
+  cv_shop_added: 'Added to closet',
+  cv_shop_empty: 'No products found',
+  cv_rv_adding: 'Adding {n} items…',
+  cv_rv_new_items: '{n} new items',
+  cv_rv_identifying: 'Identifying…',
+  cv_rv_select_all: 'Select all',
+  cv_rv_delete: 'Delete',
+  cv_rv_beautify_banner: 'Not satisfied with a photo? Improve it with Beautify.',
+  cv_rv_confirm: 'Looks good',
+  cv_rv_add_to_closet: 'Add to Closet',
+  cv_rv_detail_view: 'Detail view',
+  cv_rv_add_details: 'Add details',
+  cv_rv_complete_hint: 'Set the category for every item to continue',
+  cv_rv_tryon: 'Try it on now',
+  cv_rv_edit_cat: 'Edit category',
+  cv_rv_item_n: 'Item {n} of {total}',
+  cv_rv_more: 'More details',
+  cv_rv_added_toast: 'Added to your closet',
+  cv_rv_rejected: "We couldn't detect clothing in this photo",
+  cv_rv_processing: 'Preparing…',
+  cv_bt_button: 'Beautify',
+  cv_bt_title: 'Which one looks better?',
+  cv_bt_subtitle: 'You choose what we keep',
+  cv_bt_original: 'Original photo',
+  cv_bt_beautified: 'Beautified photo',
+  cv_bt_save: 'Save beautified version',
+  cv_bt_keep: 'Keep original photo',
+  cv_bt_working: 'Beautifying…',
+  cv_bt_ready: 'Beautified version ready — tap to compare',
+  cv_bt_failed: "Beautify didn't work — try again",
+  cv_bt_soon: 'Beautify is coming soon',
+  cv_dt_original: 'Original',
+  cv_dt_beautified: 'Beautified',
+  cv_dt_color: 'Colour',
+  cv_dt_season: 'Season',
+  cv_dt_material: 'Material',
+  cv_dt_pattern: 'Pattern',
+  cv_dt_style: 'Style',
+  cv_dt_worn: 'Worn {n} times',
+  cv_dt_worn_never: 'Not worn yet',
+  cv_dt_mark_worn: 'Mark worn',
+  cv_dt_tryon: 'Try on',
+  cv_dt_name_placeholder: 'Name this item',
+  cv_bt_intro_title: 'Meet Beautify',
+  cv_bt_intro_body: "Beautify turns your photo into a clean studio product shot. We'll create an enhanced version — you choose whether to keep it.",
+  cv_bt_intro_cta: 'Got it',
+  cv_bt_auto_kicker: 'Introducing Beautify',
+  cv_bt_auto_headline: "We'll clean up your photos automatically",
+  cv_bt_intro_caption: 'Beautify removes the background and turns your photo into a clean product shot.',
+  cv_bt_intro_do: 'Beautify my photo',
+  cv_bt_intro_skip: 'Maybe later',
+  cv_bt_intro_skip_add: 'Add without beautifying',
+  cv_bt_never: "Don't show this again",
+  cv_bt_per_photo: 'per photo',
+  cv_ce_move_title: 'Move',
+  cv_ce_move_body: 'Drag with one finger to place each piece anywhere.',
+  cv_ce_resize_title: 'Resize',
+  cv_ce_resize_body: 'Pinch with two fingers to make an item bigger or smaller.',
+  cv_ce_layer_title: 'Build your look',
+  cv_ce_layer_body: 'Tap the closet to add pieces, then swap, layer or remove them.',
+  cv_ce_next: 'Next',
+  cv_ce_done: 'Got it',
+  cv_ce_all: 'All',
   ob_welcome_title: 'Welcome to Libas AI',
   ob_welcome_body: "Let's create your first outfit in just a minute. Follow along — we'll guide you through every step.",
   ob_welcome_cta: 'Get started',
@@ -1673,6 +1932,134 @@ const ru: Translations = {
   onboarding_btn_add_item: 'Добавить вещь',
   // ── Interactive onboarding wizard ──
   ob_skip: 'Пропустить',
+  ob_add_any_photo: 'Подойдёт любое фото — даже быстрый снимок. Мы всё аккуратно обработаем.',
+  ob_beautify_title: 'Мы автоматически очистили ваше фото',
+  ob_beautify_subtitle: 'Фон удалён — осталась только одежда.',
+  ob_beautify_before: 'До',
+  ob_beautify_after: 'После',
+  ob_beautify_cta: 'Отлично →',
+  gs_title: 'Добавьте ещё {n} вещей, чтобы открыть персональный стиль',
+  gs_progress: '{done} из {total} добавлено',
+  gs_cta: 'Добавить',
+  gs_dismiss: 'Скрыть',
+  // ── Closet v2 ──
+  cv_hero_title: 'Соберите гардероб',
+  cv_hero_subtitle: 'Сфотографируйте — мы назовём, вырежем фон и разложим. Всё за счёт ИИ.',
+  cv_add_item: 'Добавить',
+  cv_add_title: 'Добавить в гардероб',
+  cv_build_title: 'Добавьте верх и низ',
+  cv_build_subtitle: 'Добавьте верх и низ — или платье и обувь — чтобы открыть персональный стиль.',
+  cv_build_top: 'Верх',
+  cv_build_bottom: 'Низ',
+  cv_build_dress: 'Платье',
+  cv_build_shoes: 'Обувь',
+  cv_build_adding: 'Добавляем вещи…',
+  cv_show_bt_title: 'Сфотографируйте — мы очистим',
+  cv_show_bt_cap: 'Снимите любую вещь — ИИ уберёт фон и добавит её в гардероб.',
+  cv_show_to_title: 'Примерка',
+  cv_show_to_cap: 'Посмотрите, как вещь смотрится на вас, до того как наденете.',
+  cv_show_to_mannequin: 'Примерьте на манекене',
+  cv_show_to_me: 'Или на своём фото',
+  cv_show_to_covered: 'Скромный образ, полностью закрыто',
+  cn_title: 'Монеты',
+  cn_have: 'У вас {n}',
+  cn_need_more: 'Недостаточно монет — пополните, чтобы продолжить.',
+  cn_do_title: 'Что можно делать',
+  cn_do_upload: 'Добавить одежду',
+  cn_free: 'Бесплатно',
+  cn_do_outfit: 'Создать образ',
+  cn_do_beautify: 'Beautify',
+  cn_do_tryon: 'Примерить',
+  cn_pack_title: 'Купить монеты',
+  cn_off: '−{n}%',
+  cn_custom: 'Или введите своё количество',
+  cn_custom_ph: 'Количество монет',
+  cn_total: 'Итого',
+  cn_hint_next: 'Добавьте ещё {n} и получите −30%',
+  cn_warn: 'Результат генерации не возвращается — каждый запуск списывает монеты.',
+  cn_survey: 'Иногда монеты можно получить за прохождение опросов.',
+  cn_buy: 'Купить {n} монет',
+  cn_note: 'Монеты зачислим сразу после проверки платежа — обычно за несколько минут. Подтвердим в Telegram.',
+  cn_currency: 'сум',
+  cn_tg_msg: 'Хочу купить {n} монет ({price}). Мой номер: ',
+  cv_proc_removing: 'Удаление фона… ✂️',
+  cv_proc_identifying: 'Определяем категорию… 🏷️',
+  cv_fix_title: 'Помогите определить эти вещи',
+  cv_fix_subtitle: 'Выберите правильную категорию, чтобы мы могли их стилизовать.',
+  cv_fix_done: 'Готово',
+  cv_fix_later: 'Заполнить позже',
+  cv_add_reassure: 'Подойдёт любое фото. Мы обработаем его, дадим название и разложим по гардеробу.',
+  cv_src_gallery: 'Галерея',
+  cv_src_gallery_sub: 'Выберите из своих фото',
+  cv_src_camera: 'Камера',
+  cv_src_camera_sub: 'Сделать новое фото',
+  cv_shop_title: 'Добавить из магазина',
+  cv_shop_add_n: 'Добавить {n} в гардероб',
+  cv_shop_hint: 'В один тап · без фото',
+  cv_shop_search: 'Поиск по магазину…',
+  cv_shop_added: 'Добавлено в гардероб',
+  cv_shop_empty: 'Товары не найдены',
+  cv_rv_adding: 'Добавляем {n} вещей…',
+  cv_rv_new_items: '{n} новых вещей',
+  cv_rv_identifying: 'Распознаём…',
+  cv_rv_select_all: 'Выбрать все',
+  cv_rv_delete: 'Удалить',
+  cv_rv_beautify_banner: 'Не нравится фото? Улучшите его с Beautify.',
+  cv_rv_confirm: 'Готово',
+  cv_rv_add_to_closet: 'Добавить в гардероб',
+  cv_rv_detail_view: 'Подробно',
+  cv_rv_add_details: 'Добавьте детали',
+  cv_rv_complete_hint: 'Укажите категорию для каждой вещи, чтобы продолжить',
+  cv_rv_tryon: 'Примерить сейчас',
+  cv_rv_edit_cat: 'Изменить категорию',
+  cv_rv_item_n: 'Вещь {n} из {total}',
+  cv_rv_more: 'Подробнее',
+  cv_rv_added_toast: 'Добавлено в гардероб',
+  cv_rv_rejected: 'Не удалось распознать одежду на этом фото',
+  cv_rv_processing: 'Готовим…',
+  cv_bt_button: 'Beautify',
+  cv_bt_title: 'Какой вариант лучше?',
+  cv_bt_subtitle: 'Вы выбираете, что оставить',
+  cv_bt_original: 'Оригинал',
+  cv_bt_beautified: 'Улучшенное фото',
+  cv_bt_save: 'Сохранить улучшенное',
+  cv_bt_keep: 'Оставить оригинал',
+  cv_bt_working: 'Улучшаем…',
+  cv_bt_ready: 'Улучшенное фото готово — нажмите, чтобы сравнить',
+  cv_bt_failed: 'Не получилось — попробуйте ещё раз',
+  cv_bt_soon: 'Beautify скоро появится',
+  cv_dt_original: 'Оригинал',
+  cv_dt_beautified: 'Улучшенное',
+  cv_dt_color: 'Цвет',
+  cv_dt_season: 'Сезон',
+  cv_dt_material: 'Материал',
+  cv_dt_pattern: 'Узор',
+  cv_dt_style: 'Стиль',
+  cv_dt_worn: 'Носили {n} раз',
+  cv_dt_worn_never: 'Ещё не носили',
+  cv_dt_mark_worn: 'Отметить',
+  cv_dt_tryon: 'Примерить',
+  cv_dt_name_placeholder: 'Название вещи',
+  cv_bt_intro_title: 'Знакомьтесь — Beautify',
+  cv_bt_intro_body: 'Beautify превращает фото в аккуратный студийный снимок. Мы сделаем улучшенную версию — вы решаете, оставить её или нет.',
+  cv_bt_intro_cta: 'Понятно',
+  cv_bt_auto_kicker: 'Знакомьтесь — Beautify',
+  cv_bt_auto_headline: 'Мы автоматически улучшим ваши фото',
+  cv_bt_intro_caption: 'Beautify убирает фон и превращает фото в аккуратный продуктовый снимок.',
+  cv_bt_intro_do: 'Улучшить моё фото',
+  cv_bt_intro_skip: 'Позже',
+  cv_bt_intro_skip_add: 'Добавить без улучшения',
+  cv_bt_never: 'Больше не показывать',
+  cv_bt_per_photo: 'за фото',
+  cv_ce_move_title: 'Перемещение',
+  cv_ce_move_body: 'Перетаскивайте одним пальцем, чтобы разместить вещь в любом месте.',
+  cv_ce_resize_title: 'Размер',
+  cv_ce_resize_body: 'Сводите и разводите два пальца, чтобы увеличить или уменьшить вещь.',
+  cv_ce_layer_title: 'Соберите образ',
+  cv_ce_layer_body: 'Нажмите на гардероб, чтобы добавить вещи, затем меняйте, слои или удаляйте их.',
+  cv_ce_next: 'Далее',
+  cv_ce_done: 'Понятно',
+  cv_ce_all: 'Все',
   ob_welcome_title: 'Добро пожаловать в Libas AI',
   ob_welcome_body: 'Соберём ваш первый образ всего за минуту. Просто следуйте подсказкам — покажем каждый шаг.',
   ob_welcome_cta: 'Начать',
@@ -2332,6 +2719,134 @@ const uz: Translations = {
   onboarding_btn_add_item: "Kiyim qo'shish",
   // ── Interactive onboarding wizard ──
   ob_skip: "O'tkazib yuborish",
+  ob_add_any_photo: "Istalgan surat mos keladi — hatto tez olingan surat ham. Qolganini o'zimiz tartibga solamiz.",
+  ob_beautify_title: 'Suratingizni avtomatik ravishda tozalab berdik',
+  ob_beautify_subtitle: 'Fon olib tashlandi — faqat kiyimingiz qoldi.',
+  ob_beautify_before: 'Oldin',
+  ob_beautify_after: 'Keyin',
+  ob_beautify_cta: "Zo'r →",
+  gs_title: "Shaxsiy uslub tavsiyalari uchun yana {n} ta kiyim qo'shing",
+  gs_progress: "{total} tadan {done} tasi qo'shildi",
+  gs_cta: "Qo'shish",
+  gs_dismiss: 'Yopish',
+  // ── Closet v2 ──
+  cv_hero_title: "Garderobingizni yig'ing",
+  cv_hero_subtitle: "Suratga oling — biz nomlaymiz, fonini olib tashlaymiz va joylashtiramiz. Hammasi AI bilan.",
+  cv_add_item: "Qo'shish",
+  cv_add_title: "Garderobga qo'shish",
+  cv_build_title: "Yuqori va pastki kiyim qo'shing",
+  cv_build_subtitle: "Yuqori va pastki — yoki libos va poyabzal qo'shib, shaxsiy uslubni oching.",
+  cv_build_top: 'Yuqori',
+  cv_build_bottom: 'Pastki',
+  cv_build_dress: 'Libos',
+  cv_build_shoes: 'Poyabzal',
+  cv_build_adding: "Buyumlaringiz qo'shilmoqda…",
+  cv_show_bt_title: 'Suratga oling — tozalaymiz',
+  cv_show_bt_cap: 'Har qanday buyumni suratga oling — AI fonni olib tashlab, garderobga joylaydi.',
+  cv_show_to_title: 'Kiyib ko‘rish',
+  cv_show_to_cap: 'Kiyishdan oldin buyum sizga qanday yarashishini ko‘ring.',
+  cv_show_to_mannequin: 'Manekenda ko‘ring',
+  cv_show_to_me: 'Yoki o‘z suratingizda',
+  cv_show_to_covered: 'Yopiq, hijobli uslub',
+  cn_title: 'Tangalar',
+  cn_have: 'Sizda {n} ta',
+  cn_need_more: 'Tangalar yetarli emas — davom etish uchun to‘ldiring.',
+  cn_do_title: 'Nima qila olasiz',
+  cn_do_upload: 'Kiyim qo‘shish',
+  cn_free: 'Bepul',
+  cn_do_outfit: 'Obraz yaratish',
+  cn_do_beautify: 'Beautify',
+  cn_do_tryon: 'Kiyib ko‘rish',
+  cn_pack_title: 'Tanga sotib olish',
+  cn_off: '−{n}%',
+  cn_custom: 'Yoki o‘z miqdoringizni kiriting',
+  cn_custom_ph: 'Tangalar soni',
+  cn_total: 'Jami',
+  cn_hint_next: 'Yana {n} ta qo‘shing va −30% oling',
+  cn_warn: 'Natija qaytarilmaydi — har bir ishga tushirish tanga sarflaydi.',
+  cn_survey: 'Ba’zan so‘rovnomalar orqali tanga topishingiz mumkin.',
+  cn_buy: '{n} ta tanga sotib olish',
+  cn_note: 'Tangalar to‘lov tekshirilgach zudlik bilan — odatda bir necha daqiqada — qo‘shiladi. Telegramda tasdiqlaymiz.',
+  cn_currency: 'so‘m',
+  cn_tg_msg: '{n} ta tanga sotib olmoqchiman ({price}). Raqamim: ',
+  cv_proc_removing: "Fon o'chirilmoqda… ✂️",
+  cv_proc_identifying: 'Kategoriya aniqlanmoqda… 🏷️',
+  cv_fix_title: 'Ushbu buyumlarni aniqlashga yordam bering',
+  cv_fix_subtitle: "To'g'ri kategoriyani tanlang, shunda biz ularni stillashtira olamiz.",
+  cv_fix_done: 'Tayyor',
+  cv_fix_later: "Keyinroq to'ldirish",
+  cv_add_reassure: "Istalgan surat mos keladi. Biz uni tozalaymiz, nomlaymiz va garderobga joylaymiz.",
+  cv_src_gallery: 'Galereya',
+  cv_src_gallery_sub: 'Suratlaringizdan tanlang',
+  cv_src_camera: 'Kamera',
+  cv_src_camera_sub: 'Yangi surat oling',
+  cv_shop_title: "Do'kondan qo'shish",
+  cv_shop_add_n: "{n} tasini qo'shish",
+  cv_shop_hint: "Bir teginish · surat shart emas",
+  cv_shop_search: "Do'kondan qidirish…",
+  cv_shop_added: "Garderobga qo'shildi",
+  cv_shop_empty: 'Mahsulot topilmadi',
+  cv_rv_adding: "{n} ta kiyim qo'shilyapti…",
+  cv_rv_new_items: "{n} ta yangi kiyim",
+  cv_rv_identifying: 'Aniqlanyapti…',
+  cv_rv_select_all: 'Hammasini tanlash',
+  cv_rv_delete: "O'chirish",
+  cv_rv_beautify_banner: "Surat yoqmadimi? Beautify bilan yaxshilang.",
+  cv_rv_confirm: 'Tayyor',
+  cv_rv_add_to_closet: "Garderobga qo'shish",
+  cv_rv_detail_view: 'Batafsil',
+  cv_rv_add_details: "Ma'lumot qo'shing",
+  cv_rv_complete_hint: "Davom etish uchun har bir buyum kategoriyasini tanlang",
+  cv_rv_tryon: 'Hoziroq kiyib ko\'rish',
+  cv_rv_edit_cat: "Toifani o'zgartirish",
+  cv_rv_item_n: '{total} tadan {n}-buyum',
+  cv_rv_more: "Batafsil",
+  cv_rv_added_toast: "Garderobga qo'shildi",
+  cv_rv_rejected: 'Bu suratda kiyim aniqlanmadi',
+  cv_rv_processing: 'Tayyorlanyapti…',
+  cv_bt_button: 'Beautify',
+  cv_bt_title: 'Qaysi biri chiroyliroq?',
+  cv_bt_subtitle: "Nimani saqlashni o'zingiz tanlaysiz",
+  cv_bt_original: 'Asl surat',
+  cv_bt_beautified: 'Yaxshilangan surat',
+  cv_bt_save: 'Yaxshilanganini saqlash',
+  cv_bt_keep: 'Aslini qoldirish',
+  cv_bt_working: 'Yaxshilanyapti…',
+  cv_bt_ready: 'Yaxshilangan surat tayyor — solishtirish uchun bosing',
+  cv_bt_failed: 'Ishlamadi — qayta urinib ko\'ring',
+  cv_bt_soon: 'Beautify tez orada',
+  cv_dt_original: 'Asl',
+  cv_dt_beautified: 'Yaxshilangan',
+  cv_dt_color: 'Rang',
+  cv_dt_season: 'Fasl',
+  cv_dt_material: 'Mato',
+  cv_dt_pattern: 'Naqsh',
+  cv_dt_style: 'Uslub',
+  cv_dt_worn: '{n} marta kiyilgan',
+  cv_dt_worn_never: 'Hali kiyilmagan',
+  cv_dt_mark_worn: 'Belgilash',
+  cv_dt_tryon: "Kiyib ko'rish",
+  cv_dt_name_placeholder: 'Kiyim nomi',
+  cv_bt_intro_title: 'Beautify bilan tanishing',
+  cv_bt_intro_body: "Beautify suratingizni toza studiya ko'rinishiga aylantiradi. Biz yaxshilangan variantni tayyorlaymiz — saqlashni o'zingiz hal qilasiz.",
+  cv_bt_intro_cta: 'Tushunarli',
+  cv_bt_auto_kicker: 'Beautify bilan tanishing',
+  cv_bt_auto_headline: 'Suratlaringizni avtomatik tozalaymiz',
+  cv_bt_intro_caption: "Beautify fonni olib tashlaydi va suratni toza mahsulot ko'rinishiga aylantiradi.",
+  cv_bt_intro_do: 'Suratimni yaxshilash',
+  cv_bt_intro_skip: 'Keyinroq',
+  cv_bt_intro_skip_add: "Yaxshilamasdan qo'shish",
+  cv_bt_never: "Boshqa ko'rsatilmasin",
+  cv_bt_per_photo: 'har surat uchun',
+  cv_ce_move_title: "Ko'chirish",
+  cv_ce_move_body: 'Bir barmoq bilan surib, har bir buyumni xohlagan joyga qo\'ying.',
+  cv_ce_resize_title: "O'lcham",
+  cv_ce_resize_body: 'Ikki barmoq bilan qisib, buyumni kattalashtiring yoki kichraytiring.',
+  cv_ce_layer_title: 'Obraz yarating',
+  cv_ce_layer_body: 'Buyum qo\'shish uchun garderobni bosing, so\'ng ularni almashtiring, qatlang yoki o\'chiring.',
+  cv_ce_next: 'Keyingi',
+  cv_ce_done: 'Tushunarli',
+  cv_ce_all: 'Hammasi',
   ob_welcome_title: "Libas AI'ga xush kelibsiz",
   ob_welcome_body: "Birinchi uslubingizni atigi bir daqiqada yig'amiz. Ko'rsatmalarga amal qiling — har bir qadamni ko'rsatamiz.",
   ob_welcome_cta: 'Boshlash',
