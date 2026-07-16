@@ -18,7 +18,7 @@ import { getUserPlan, generateOutfitSuggestions, fetchAiCanvasSuggest, createTry
 import type { SseHandle } from '@/types';
 import { useI18n } from '@/lib/i18n';
 import type { Locale } from '@/lib/translations';
-import { isOnboardingComplete, isCanvasHintSeen, setCanvasHintSeen, isGetStartedDone, setGetStartedDone } from '@/lib/onboarding-storage';
+import { isCanvasHintSeen, setCanvasHintSeen, isGetStartedDone, setGetStartedDone } from '@/lib/onboarding-storage';
 import { saveTryOnResult, saveActiveTryOnJob, getActiveTryOnJobWithCloud, clearActiveTryOnJob } from '@/lib/tryon-history';
 import { logAnalyticsEvent, clearAnalyticsUser } from '@/lib/analytics';
 import { reportPurchaseFunnel } from '@/lib/purchase-funnel';
@@ -232,13 +232,6 @@ export default function ClosetPage() {
   // to avoid a hydration mismatch (server always renders the browser variant).
   const [isFlutterWebView, setIsFlutterWebView] = useState(false);
   useEffect(() => { setIsFlutterWebView(isInFlutterWebView()); }, []);
-
-  // Redirect to onboarding on first-ever visit (before any other effects run)
-  useEffect(() => {
-    if (!isOnboardingComplete()) {
-      router.replace('/onboarding');
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     // Immediately show whatever is in localStorage (prevents flicker)
