@@ -1957,7 +1957,10 @@ export default function ClosetPage() {
 
         {/* Right: action buttons + profile + guide */}
         <div className="flex items-center gap-1.5">
-            {/* Diamond balance — opens the buy-diamonds sheet */}
+            {/* Diamond balance (subscription badge) — opens the buy-diamonds
+                sheet. Gated by the `feature.subscription_badge.enabled` flag so it
+                can be hidden for the App/Play review account. */}
+            {plansEnabled && (
             <button
               onClick={() => setShowPremiumGate('browse')}
               className="flex items-center gap-1.5 pl-2 pr-3 h-8 rounded-full text-[13px] font-extrabold active:scale-[0.95] transition-all"
@@ -1971,6 +1974,7 @@ export default function ClosetPage() {
               <Diamond size={16} />
               <span style={{ fontVariantNumeric: 'tabular-nums' }}>{coins}</span>
             </button>
+            )}
             {/* Profile icon — hidden inside the Flutter app (it has its own) */}
             {profileEnabled && !isFlutterWebView && (
               <button
@@ -3294,28 +3298,26 @@ function OutfitCard({
     return resolved;
   }, [savedLayout, allItems]);
 
-  // Auto-trigger regen ONLY when canGenerateOutfit transitions false→true AFTER the
-  // initial page load has settled (items + canvases both loaded). This prevents the
-  // AI API from being called on every reload, which would burn through the user's quota.
-  const prevCanGenerateOutfit = React.useRef(canGenerateOutfit);
+  // Auto-generate the user's FIRST outfit as soon as the wardrobe is ready (a top
+  // + bottom, or a dress) — no need to tap the generate button. Fires at most once
+  // ever (localStorage guard) so page reloads with a ready-but-unsaved wardrobe
+  // don't re-call the paid AI endpoint and burn the user's quota. Unlike the old
+  // false→true transition check, this also fires when the wardrobe is already ready
+  // on load / once `allowAutoGenerate` settles, which is the common first-run case.
+  const autoGenFiredRef = React.useRef(false);
   React.useEffect(() => {
-    const justBecameReady = !prevCanGenerateOutfit.current && canGenerateOutfit;
-    prevCanGenerateOutfit.current = canGenerateOutfit;
-
-    // Only fire when: wardrobe *just* became outfit-ready in this session (user added an item),
-    // the initial load has fully settled, and there's still nothing to display.
-    if (!justBecameReady) return;
-    if (!allowAutoGenerate) return;
+    if (autoGenFiredRef.current) return;
+    if (!allowAutoGenerate || !canGenerateOutfit) return;
+    if (displayEntries.length > 0 || isAiSuggesting || !onRegenerate) return;
     const isDemo = allItems.length > 0 && allItems.every((i) => DEMO_ITEM_IDS.has(i.id));
-    if (
-      !isDemo &&
-      displayEntries.length === 0 &&
-      !isAiSuggesting &&
-      onRegenerate
-    ) {
-      onRegenerate();
-    }
-  }, [canGenerateOutfit, allowAutoGenerate]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (isDemo) return;
+    let alreadyDone = false;
+    try { alreadyDone = localStorage.getItem('libas_first_outfit_autogen') === '1'; } catch { /* private mode */ }
+    if (alreadyDone) return;
+    try { localStorage.setItem('libas_first_outfit_autogen', '1'); } catch { /* private mode */ }
+    autoGenFiredRef.current = true;
+    onRegenerate();
+  }, [canGenerateOutfit, allowAutoGenerate, displayEntries.length, isAiSuggesting]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div
