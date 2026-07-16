@@ -4,16 +4,12 @@ import { Sparkles, Check } from 'lucide-react';
 import {
   isOnboardingComplete, setOnboardingComplete, clearOnboarding,
   setOnboardingStep, getOnboardingStep, clearOnboardingStep,
-  setClosetTourDone,
+  setClosetTourDone, clearGetStarted,
 } from '@/lib/onboarding-storage';
 import { fetchClosetItems, type ClosetItem, type ClosetCategory } from '@/lib/closet-storage';
-import {
-  UPPER_CATS, LOWER_CATS, SHOES_CATS, ACC_CATS, FULL_BODY_CATS,
-  type SavedCanvasLayout,
-} from '@/lib/closet-types';
-import { createOutfitCanvas } from '@/lib/wardrobe-api';
-import InteractiveCanvas from '@/components/closet/InteractiveCanvas';
+import { FULL_BODY_CATS, type SavedCanvasLayout } from '@/lib/closet-types';
 import AddItemStep from '@/components/onboarding/AddItemStep';
+import BeautifyReveal from '@/components/onboarding/BeautifyReveal';
 import GenerateStep from '@/components/onboarding/GenerateStep';
 import TryOnStep from '@/components/onboarding/TryOnStep';
 import { useI18n } from '@/lib/i18n';
@@ -26,8 +22,10 @@ const WELCOME = 0, ADD_UPPER = 1, ADD_LOWER = 2, GENERATE = 3, EDIT = 4, TRY_ON 
 // (full-body) is added instead of ADD_LOWER. Numbered above DONE so existing
 // step ordering is untouched; treated as part of the "add" phase for progress.
 const ADD_SHOES = 7;
-// Action steps shown in the progress indicator (add → generate → edit → try-on)
-const PROGRESS_STEPS = [ADD_UPPER, GENERATE, EDIT, TRY_ON];
+// Action steps shown in the progress indicator (add → generate → try-on).
+// EDIT is kept as a numeric constant only so persisted `svayp_onboarding_step`
+// values still resolve correctly; the canvas-edit step is no longer shown.
+const PROGRESS_STEPS = [ADD_UPPER, GENERATE, TRY_ON];
 // Second-item steps that belong to the same "add" phase as ADD_UPPER.
 const ADD_SECOND_STEPS = [ADD_LOWER, ADD_SHOES];
 const STEP_NAMES: Record<number, string> = {
@@ -46,6 +44,10 @@ export default function OnboardingPage() {
   const [hasAddedItem, setHasAddedItem] = useState(false);
   const [layout, setLayout] = useState<SavedCanvasLayout | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // Beautify reveal (original → background-removed cutout): captured on the first
+  // item, shown once after the second item is added, then continues to GENERATE.
+  const [reveal, setReveal] = useState<{ before: string; afterPromise: Promise<string | null> } | null>(null);
+  const revealRef = useRef<{ before: string; afterPromise: Promise<string | null> } | null>(null);
   const didStart = useRef(false);
   // Holds promises for background uploads started in AddItemStep.
   const pendingUploadsRef = useRef<Promise<unknown>[]>([]);
@@ -56,6 +58,7 @@ export default function OnboardingPage() {
     if (params.get('reset') === 'true') {
       clearOnboarding();
       clearOnboardingStep();
+      clearGetStarted();
     } else if (isOnboardingComplete()) {
       // Onboarding is only ever entered FROM the closet (closet/index redirects
       // here). Inside the app shell this page runs in the CLOSET tab's WebView —
@@ -138,10 +141,15 @@ export default function OnboardingPage() {
   }
 
   // ── Step transitions ───────────────────────────────────────────────────────
-  function handleUpperAdded(category: ClosetCategory, uploadP: Promise<unknown>) {
+  function handleUpperAdded(
+    category: ClosetCategory,
+    uploadP: Promise<unknown>,
+    revealData?: { before: string; afterPromise: Promise<string | null> },
+  ) {
     completeStep('add_upper');
     setHasAddedItem(true);
     pendingUploadsRef.current.push(uploadP);
+    if (revealData) revealRef.current = revealData;
     if (FULL_BODY_CATS.includes(category)) {
       // A dress/jumpsuit is a complete top+bottom — pair it with shoes instead
       // of a bottom, then generate a top (dress) + shoes outfit.
@@ -156,48 +164,34 @@ export default function OnboardingPage() {
     completeStep('add_lower');
     setHasAddedItem(true);
     pendingUploadsRef.current.push(uploadP);
-    setStep(GENERATE);
+    advanceAfterSecondItem();
   }
 
   function handleShoesAdded(_cat: ClosetCategory, uploadP: Promise<unknown>) {
     completeStep('add_shoes');
     setHasAddedItem(true);
     pendingUploadsRef.current.push(uploadP);
-    setStep(GENERATE);
+    advanceAfterSecondItem();
   }
 
-  async function persistCanvas(l: SavedCanvasLayout) {
-    const apiItems = l
-      .filter((e) => !e.id.startsWith('local_') && !e.id.startsWith('pending_'))
-      .map((e) => ({ wardrobeItemId: e.id, x: e.x, y: e.y, scale: e.scale, zIndex: e.zIndex, itemGroup: e.group }));
-    if (apiItems.length === 0) return;
-    try { await createOutfitCanvas({ items: apiItems }); } catch { /* non-blocking */ }
+  /** After the second item: show the Beautify reveal once, else go to GENERATE. */
+  function advanceAfterSecondItem() {
+    if (revealRef.current) setReveal(revealRef.current);
+    else setStep(GENERATE);
   }
 
   if (!ready) {
     return <div className="phone-container bg-white dark:bg-[#111111]" style={{ height: '100dvh' }} />;
   }
 
-  // EDIT step renders the full-screen canvas editor directly (it owns its own chrome).
-  if (step === EDIT) {
+  // Beautify reveal: shown once after the second item is added, then GENERATE.
+  if (reveal) {
     return (
-      <>
-        <InteractiveCanvas
-          upper={addedItems.filter((i) => UPPER_CATS.includes(i.category))}
-          lower={addedItems.filter((i) => LOWER_CATS.includes(i.category))}
-          shoes={addedItems.filter((i) => SHOES_CATS.includes(i.category))}
-          acc={addedItems.filter((i) => ACC_CATS.includes(i.category))}
-          initialLayout={layout}
-          allItems={addedItems}
-          onClose={() => { setStep(TRY_ON); }}
-          onSave={(l) => { completeStep('edit'); setLayout(l); persistCanvas(l); setStep(TRY_ON); }}
-          onRegenerate={() => { }}
-          onShowPlans={() => { }}
-          canRegenerate={false}
-          plansEnabled={false}
-          alwaysShowHint={true}
-        />
-      </>
+      <BeautifyReveal
+        before={reveal.before}
+        afterPromise={reveal.afterPromise}
+        onDone={() => { revealRef.current = null; setReveal(null); setStep(GENERATE); }}
+      />
     );
   }
 
@@ -269,7 +263,7 @@ export default function OnboardingPage() {
       )}
 
       {step === ADD_UPPER && (
-        <AddItemStep key="add-upper" group="upper" title={t.ob_add_upper_title} body={t.ob_add_upper_body} onItemAdded={handleUpperAdded} />
+        <AddItemStep key="add-upper" group="upper" captureReveal title={t.ob_add_upper_title} body={t.ob_add_upper_body} onItemAdded={handleUpperAdded} />
       )}
 
       {step === ADD_LOWER && (
@@ -286,7 +280,7 @@ export default function OnboardingPage() {
           title={t.ob_generate_title}
           body={t.ob_generate_body}
           onGenerated={(l, its) => { completeStep('generate'); setLayout(l); setAddedItems(its); }}
-          onContinue={() => setStep(EDIT)}
+          onContinue={() => setStep(TRY_ON)}
         />
       )}
 

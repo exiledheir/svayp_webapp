@@ -1,14 +1,14 @@
 import { needsUnoptimized } from '@/lib/img';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Plus, X, Crown, RefreshCw, Share2, Loader2 } from 'lucide-react';
+import { Plus, X, RefreshCw, Loader2, Check } from 'lucide-react';
 import type { ClosetItem } from '@/lib/closet-storage';
 import { UPPER_CATS, LOWER_CATS, SHOES_CATS, ACC_CATS, type SavedCanvasLayout, type CanvasGroup } from '@/lib/closet-types';
 import { useI18n } from '@/lib/i18n';
-import { isCanvasHintSeen, setCanvasHintSeen } from '@/lib/onboarding-storage';
-import { captureCanvasSnapshot } from '@/lib/canvas-snapshot';
-import { shareImageBlob } from '@/lib/share-image';
-import ShareSheet from '@/components/ShareSheet';
+import { isCanvasHintSeen, setCanvasHintSeen, isCanvasEditOnboarded, setCanvasEditOnboarded } from '@/lib/onboarding-storage';
+import CanvasOnboarding from '@/components/closet/CanvasOnboarding';
+import { getCatalogReadyProducts } from '@/lib/api';
+import type { Product } from '@/types';
 
 interface CanvasItem {
   item: ClosetItem;
@@ -18,6 +18,17 @@ interface CanvasItem {
   zIndex: number;
   group: CanvasGroup;
 }
+
+// Bottom-toolbar button — either a picker source (closet/shop) or an edit action.
+type ToolBtn = {
+  key: string;
+  label: string;
+  kind: 'source' | 'action';
+  source?: 'closet' | 'shop';
+  needsSelection?: boolean;
+  action?: () => void;
+  icon: React.ReactNode;
+};
 
 export default function InteractiveCanvas({
   upper,
@@ -30,6 +41,7 @@ export default function InteractiveCanvas({
   onSave,
   onRegenerate,
   onShowPlans,
+  onAddProduct,
   canRegenerate,
   plansEnabled,
   alwaysShowHint = false,
@@ -44,6 +56,9 @@ export default function InteractiveCanvas({
   onSave: (layout: SavedCanvasLayout) => void;
   onRegenerate: () => void;
   onShowPlans: () => void;
+  /** Добавляет товар в гардероб и резолвится добавленной (или уже существующей)
+   *  вещью, чтобы канва положила её на доску напрямую. */
+  onAddProduct?: (product: Product) => Promise<ClosetItem | null>;
   canRegenerate: boolean;
   plansEnabled: boolean;
   /** Force-show the drag hint even if the user has seen it before (used in onboarding). */
@@ -52,8 +67,97 @@ export default function InteractiveCanvas({
   const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const nextZ = useRef(10);
-  const [isSharing, setIsSharing] = useState(false);
-  const [showShareSheet, setShowShareSheet] = useState(false);
+  // Category tab in the closet (add) picker.
+  const [pickerTab, setPickerTab] = useState<'all' | CanvasGroup>('all');
+  // One-time Acloset-style gesture tutorial (normal edit mode only).
+  const [showEditOnboarding, setShowEditOnboarding] = useState(false);
+
+  // ── Docked closet/shop picker — a bottom panel that shrinks the canvas
+  // (not an overlay). Its height is drag-controlled so it can be swiped down
+  // and closed with the finger. ────────────────────────────────────────────
+  const vh = () => (typeof window !== 'undefined' ? window.innerHeight : 800);
+  const [pickerSource, setPickerSource] = useState<'closet' | 'shop'>('closet');
+  const [pickerH, setPickerH] = useState(0); // panel height in px; 0 = closed
+  const [pickerDragging, setPickerDragging] = useState(false);
+  const pickerDragRef = useRef<{ startY: number; startH: number } | null>(null);
+
+  // Shop catalog (lazy-loaded on first shop open) + per-product import state.
+  const [shopProducts, setShopProducts] = useState<Product[]>([]);
+  const [shopLoading, setShopLoading] = useState(false);
+  const shopLoadedRef = useRef(false);
+  const [shopAdding, setShopAdding] = useState<Set<string>>(new Set());
+
+
+  const DEFAULT_FRAC = 0.4;
+  function openPicker(source: 'closet' | 'shop') {
+    setPickerSource(source);
+    setPickerH(Math.round(vh() * DEFAULT_FRAC));
+    if (source === 'shop') loadShop();
+  }
+  function togglePicker(source: 'closet' | 'shop') {
+    if (pickerH > 0 && pickerSource === source) { setPickerH(0); return; }
+    openPicker(source);
+  }
+
+  async function loadShop() {
+    if (shopLoadedRef.current) return;
+    shopLoadedRef.current = true;
+    setShopLoading(true);
+    try {
+      // Курируемый набор: только предобработанные товары (catalog-ready). Берём
+      // одной страницей до 100 — их немного (десятки), пагинация на канве не нужна;
+      // 24 обрезали часть готовых товаров, из-за чего в магазине было «мало».
+      const r = await getCatalogReadyProducts(0, 100).catch(() => ({ products: [] as Product[], total: 0 }));
+      const seen = new Set<string>();
+      const merged: Product[] = [];
+      for (const p of r.products) { if (!seen.has(p.id)) { seen.add(p.id); merged.push(p); } }
+      setShopProducts(merged);
+    } finally {
+      setShopLoading(false);
+    }
+  }
+
+  function addShopProduct(product: Product) {
+    if (!onAddProduct || shopAdding.has(product.id)) return;
+    setShopAdding((prev) => new Set(prev).add(product.id));
+    // onAddProduct возвращает добавленную (или уже существующую — from-catalog
+    // идемпотентен) вещь. Кладём её на канву НАПРЯМУЮ, а не ждём нового id в
+    // allItems: иначе для уже-добавленной в гардероб вещи «нового» id нет и
+    // спиннер висел вечно.
+    // «Добавлено» (галку) НЕ храним отдельно — оно выводится из состава канвы по
+    // sourceProductId (см. рендер сетки), поэтому удаление вещи с канвы само
+    // снимает галку и товар снова становится добавляемым.
+    const stop = () => setShopAdding((prev) => { const n = new Set(prev); n.delete(product.id); return n; });
+    Promise.resolve(onAddProduct(product))
+      .then((item) => {
+        if (item) addItem(item);
+        stop();
+      })
+      .catch(() => stop());
+  }
+
+  // Drag the picker handle to resize / close it, following the finger.
+  function pickerTouchStart(e: React.TouchEvent) {
+    pickerDragRef.current = { startY: e.touches[0].clientY, startH: pickerH };
+    setPickerDragging(true);
+  }
+  function pickerTouchMove(e: React.TouchEvent) {
+    if (!pickerDragRef.current) return;
+    const dy = e.touches[0].clientY - pickerDragRef.current.startY;
+    const maxH = Math.round(vh() * 0.82);
+    setPickerH(Math.max(0, Math.min(maxH, pickerDragRef.current.startH - dy)));
+  }
+  function pickerTouchEnd() {
+    if (!pickerDragRef.current) return;
+    pickerDragRef.current = null;
+    setPickerDragging(false);
+    const h = vh();
+    setPickerH((cur) => {
+      if (cur < h * 0.18) return 0;                 // swiped down far → close
+      if (cur > h * 0.62) return Math.round(h * 0.75); // pulled up → expand
+      return Math.round(h * DEFAULT_FRAC);          // otherwise snap to 40%
+    });
+  }
 
   // Build initial canvas items
   const buildInitialItems = useCallback((): CanvasItem[] => {
@@ -112,6 +216,23 @@ export default function InteractiveCanvas({
       setCanvasHintSeen();
     }, 3200);
     return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Show the one-time gesture tutorial the first time a user opens the editor
+  // (skipped during registration onboarding, which has its own guided demo).
+  useEffect(() => {
+    if (alwaysShowHint || isCanvasEditOnboarded()) return;
+    setShowEditOnboarding(true);
+    setShowDragHint(false); // don't run the legacy drag hint under the tutorial
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Open the closet picker docked at 40% on entering the editor, so the canvas
+  // starts shrunk with items ready to place (normal edit mode only).
+  useEffect(() => {
+    if (alwaysShowHint) return;
+    setPickerH(Math.round(vh() * DEFAULT_FRAC));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -379,8 +500,14 @@ export default function InteractiveCanvas({
 
   function addItem(item: ClosetItem) {
     const group = getItemGroup(item);
-    setCanvasItems((prev) => [...prev, { item, x: 30, y: 30, scale: 1, zIndex: nextZ.current++, group }]);
-    setAddPicker(false);
+    setCanvasItems((prev) => {
+      // Cascade newly-added items slightly so they don't stack in one spot.
+      const n = prev.length;
+      const x = 20 + (n % 4) * 11;
+      const y = 16 + (n % 4) * 11;
+      return [...prev, { item, x, y, scale: 1, zIndex: nextZ.current++, group }];
+    });
+    setAddPicker(false); // closes the onboarding overlay; docked picker stays open
   }
 
   // Swap item within same category
@@ -428,33 +555,6 @@ export default function InteractiveCanvas({
     onSave(deduped);
   }
 
-  // Build a deduped SavedCanvasLayout from the current canvas (same rule as save:
-  // last/top occurrence of each item wins), for rendering a shareable snapshot.
-  function buildCurrentLayout(): SavedCanvasLayout {
-    const seen = new Set<string>();
-    const layout: SavedCanvasLayout = [];
-    for (let i = canvasItems.length - 1; i >= 0; i--) {
-      const ci = canvasItems[i];
-      if (seen.has(ci.item.id)) continue;
-      seen.add(ci.item.id);
-      layout.unshift({ id: ci.item.id, x: ci.x, y: ci.y, scale: ci.scale, zIndex: ci.zIndex, group: ci.group });
-    }
-    return layout;
-  }
-
-  async function handleShare() {
-    if (canvasItems.length === 0 || isSharing) return;
-    setIsSharing(true);
-    try {
-      const blob = await captureCanvasSnapshot(buildCurrentLayout(), allItems);
-      await shareImageBlob(blob, `libas-outfit-${Date.now()}.png`);
-    } catch {
-      /* share cancelled or render failed — no-op */
-    } finally {
-      setIsSharing(false);
-    }
-  }
-
   // Deselect when tapping empty canvas
   function handleCanvasTap() {
     if (demo.active) { cancelDemo(); return; }
@@ -483,25 +583,19 @@ export default function InteractiveCanvas({
           </p>
         </header>
       ) : (
-        <header className="shrink-0 flex items-center justify-between px-4 h-14 border-b border-gray-100">
-          <div className="flex items-center gap-3">
-            <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-              <X size={17} strokeWidth={2} className="text-gray-700" />
-            </button>
-            <span className="text-[15px] font-semibold text-gray-900">{t.myOutfits}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {plansEnabled && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onShowPlans(); }}
-                className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
-                style={{ background: 'linear-gradient(135deg, #B8860B, #8B6914)', boxShadow: '0 2px 8px rgba(184,134,11,0.25)' }}
-                title="View plans"
-              >
-                <Crown size={14} strokeWidth={2} color="#FFD700" />
-              </button>
-            )}
-          </div>
+        <header className="shrink-0 flex items-center justify-between px-3 h-14">
+          <button onClick={onClose} aria-label={t.close} className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center active:scale-[0.92] transition-transform">
+            <X size={18} strokeWidth={2} className="text-gray-800" />
+          </button>
+          <span className="text-[15px] font-bold text-gray-900">{t.myOutfits}</span>
+          <button
+            onClick={handleSave}
+            disabled={canvasItems.length === 0}
+            className="h-9 px-5 rounded-full text-white text-[14px] font-bold disabled:opacity-40 active:scale-[0.95] transition-transform"
+            style={{ background: '#F370A7' }}
+          >
+            {t.save}
+          </button>
         </header>
       )}
 
@@ -532,10 +626,11 @@ export default function InteractiveCanvas({
             <p className="text-[14px] font-semibold text-gray-500 text-center leading-snug">
               {t.canvasEmptyHint}
             </p>
-            {/* Arrow pointing right toward the Add button */}
+            {/* Arrow points to the Add button — right during onboarding, down to
+                the bottom toolbar in normal editing. */}
             <div className="flex items-center gap-1 mt-1">
               <span className="text-[12px] text-gray-400 font-medium">{t.addToCloset}</span>
-              <svg width="20" height="12" viewBox="0 0 20 12" fill="none">
+              <svg width="20" height="12" viewBox="0 0 20 12" fill="none" style={{ transform: alwaysShowHint ? undefined : 'rotate(90deg)' }}>
                 <path d="M1 6h16M13 1l5 5-5 5" stroke="#F370A7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </div>
@@ -583,21 +678,24 @@ export default function InteractiveCanvas({
               }
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={ci.item.imageData} alt={ci.item.category} className="absolute inset-0 w-full h-full object-contain" decoding="sync" draggable={false} style={{ pointerEvents: 'none', WebkitUserDrag: 'none' } as any} />
+              {/* На канве вещь крупная — полноразмерная картинка вместо 400px-миниатюры. */}
+              <img src={ci.item.fullImage ?? ci.item.imageData} alt={ci.item.category} className="absolute inset-0 w-full h-full object-contain" decoding="sync" draggable={false} style={{ pointerEvents: 'none', WebkitUserDrag: 'none' } as any} />
             </div>
           </div>
           );
         })}
         </div>
 
-        {/* Action buttons — icon-only, right side */}
+        {/* Action buttons — right side, only during the registration onboarding
+            demo (normal editing uses the bottom toolbar). */}
+        {alwaysShowHint && (
         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-[9999]">
           {[
             { label: 'Swap',   icon: <RefreshCw size={16} />,         action: () => { if (selectedIdx !== null) setSwapTarget(selectedIdx); }, needsSelection: true,  pink: false },
             { label: 'Front',  icon: (<svg width="16" height="16" viewBox="0 0 16 16"><rect x="1" y="5" width="8" height="8" rx="1.2" stroke="currentColor" strokeWidth="1.4" fill="none"/><rect x="7" y="1" width="8" height="8" rx="1.2" fill="currentColor"/></svg>), action: bringToFront, needsSelection: true,  pink: false },
             { label: 'Back',   icon: (<svg width="16" height="16" viewBox="0 0 16 16"><rect x="1" y="5" width="8" height="8" rx="1.2" fill="currentColor"/><rect x="7" y="1" width="8" height="8" rx="1.2" stroke="currentColor" strokeWidth="1.4" fill="white"/></svg>), action: sendToBack,   needsSelection: true,  pink: false },
             { label: 'Delete', icon: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14"/></svg>), action: deleteSelected, needsSelection: true,  pink: false },
-            { label: 'Add',    icon: <Plus size={16} />,              action: () => setAddPicker(true),                                            needsSelection: false, pink: true  },
+            { label: 'Add',    icon: <Plus size={16} />,              action: () => { setPickerTab('all'); setAddPicker(true); },                    needsSelection: false, pink: true  },
           ].map((btn) => {
             const disabled = btn.needsSelection && selectedIdx === null;
             return (
@@ -617,6 +715,7 @@ export default function InteractiveCanvas({
             );
           })}
         </div>
+        )}
 
         {/* Hint text — always at bottom while hint is active (suppressed during the demo) */}
         {showDragHint && !demoEligible && canvasItems.length > 0 && (
@@ -653,52 +752,230 @@ export default function InteractiveCanvas({
         </div>
       )}
 
-      {/* Save + Share buttons — bottom of screen */}
-      <div
-        className="shrink-0 px-5 py-3 bg-white border-t border-gray-100 flex gap-3"
-        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0.75rem))' }}
-      >
-        <button
-          onClick={() => setShowShareSheet(true)}
-          disabled={canvasItems.length === 0 || isSharing}
-          aria-label={t.share}
-          title={t.share}
-          className="shrink-0 w-14 py-3.5 rounded-2xl bg-gray-100 text-gray-700 disabled:opacity-40 transition-opacity flex items-center justify-center"
+      {/* Footer — onboarding keeps the big Continue button; normal editing shows
+          a floating toolbar (closet · swap · layer · delete). */}
+      {alwaysShowHint ? (
+        <div
+          className="shrink-0 px-5 py-3 bg-white border-t border-gray-100"
+          style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0.75rem))' }}
         >
-          {isSharing ? <Loader2 size={18} className="animate-spin" /> : <Share2 size={18} />}
-        </button>
-        {showShareSheet && (
-          <ShareSheet onClose={() => setShowShareSheet(false)} onExternal={handleShare} />
-        )}
-        <button
-          onClick={handleSave}
-          disabled={canvasItems.length === 0 || !continueReady}
-          className="flex-1 py-3.5 rounded-2xl text-white text-[15px] font-semibold disabled:opacity-40 transition-opacity flex items-center justify-center"
-          style={{ backgroundColor: '#F370A7' }}
+          <button
+            onClick={handleSave}
+            disabled={canvasItems.length === 0 || !continueReady}
+            className="w-full py-3.5 rounded-2xl text-white text-[15px] font-semibold disabled:opacity-40 transition-opacity flex items-center justify-center"
+            style={{ backgroundColor: '#F370A7' }}
+          >
+            {t.save}
+          </button>
+        </div>
+      ) : (
+        <div
+          className="shrink-0 flex justify-center px-4 pt-2 pb-4"
+          style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))' }}
         >
-          {t.save}
-        </button>
-      </div>
+          <div className="flex items-center gap-0.5 rounded-full bg-white px-2 py-1.5" style={{ boxShadow: '0 8px 28px rgba(0,0,0,0.13), 0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #f0eef1' }}>
+            {([
+              { key: 'closet', label: t.addToCloset, kind: 'source' as const, source: 'closet' as const,
+                icon: (<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="1.7"/><line x1="12" y1="3.5" x2="12" y2="20.5"/><line x1="9.4" y1="11" x2="9.4" y2="13"/><line x1="14.6" y1="11" x2="14.6" y2="13"/></svg>) },
+              ...(onAddProduct ? [{ key: 'shop', label: t.cv_shop_title, kind: 'source' as const, source: 'shop' as const,
+                icon: (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>) }] : []),
+              { key: 'swap', label: 'Swap', kind: 'action' as const, needsSelection: true,
+                action: () => { if (selectedIdx !== null) setSwapTarget(selectedIdx); },
+                icon: <RefreshCw size={19} strokeWidth={1.9} /> },
+              { key: 'front', label: 'Bring to front', kind: 'action' as const, needsSelection: true,
+                action: bringToFront,
+                icon: (<svg width="19" height="19" viewBox="0 0 16 16"><rect x="1" y="5" width="8" height="8" rx="1.2" stroke="currentColor" strokeWidth="1.4" fill="none"/><rect x="7" y="1" width="8" height="8" rx="1.2" fill="currentColor"/></svg>) },
+              { key: 'back', label: 'Send to back', kind: 'action' as const, needsSelection: true,
+                action: sendToBack,
+                icon: (<svg width="19" height="19" viewBox="0 0 16 16"><rect x="1" y="5" width="8" height="8" rx="1.2" fill="currentColor"/><rect x="7" y="1" width="8" height="8" rx="1.2" stroke="currentColor" strokeWidth="1.4" fill="#fff"/></svg>) },
+              { key: 'delete', label: 'Delete', kind: 'action' as const, needsSelection: true,
+                action: deleteSelected,
+                icon: (<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14"/></svg>) },
+            ] as ToolBtn[]).map((btn) => {
+              const isSource = btn.kind === 'source';
+              const active = isSource && pickerH > 0 && pickerSource === btn.source;
+              const disabled = btn.kind === 'action' && !!btn.needsSelection && selectedIdx === null;
+              return (
+                <button
+                  key={btn.key}
+                  onClick={() => { if (isSource) togglePicker(btn.source!); else if (!disabled) btn.action!(); }}
+                  disabled={disabled}
+                  aria-label={btn.label}
+                  title={btn.label}
+                  className="relative w-11 h-11 rounded-full flex items-center justify-center active:scale-90 transition-transform"
+                  style={{
+                    color: active ? '#fff' : isSource ? '#F370A7' : disabled ? '#cbc8ce' : '#39343f',
+                    background: active ? '#F370A7' : isSource ? 'rgba(243,112,167,0.10)' : 'transparent',
+                  }}
+                >
+                  {btn.key === 'closet' && canvasItems.length === 0 && !active && (
+                    <span className="absolute inset-0 rounded-full animate-ping" style={{ backgroundColor: '#F370A7', opacity: 0.3 }} />
+                  )}
+                  <span className="relative">{btn.icon}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
-      {/* Add item picker */}
-      {addPicker && (
-        <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/30 backdrop-blur-sm" onClick={() => setAddPicker(false)}>
-          <div className="w-full max-w-[430px] rounded-t-3xl bg-white max-h-[60vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-center pt-3 pb-2"><div className="w-9 h-1 rounded-full bg-gray-200" /></div>
-            <div className="px-5 pb-2">
-              <h3 className="text-[14px] font-bold text-gray-900">{t.addToCloset}</h3>
-            </div>
-            <div className="flex-1 overflow-y-auto px-5 pb-8">
-              <div className="grid grid-cols-3 gap-2.5">
-                {getAllItems().map((item) => (
-                  <button key={item.id} onClick={() => addItem(item)} className="relative aspect-[3/4] rounded-xl overflow-hidden border border-gray-100">
-                    <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized={needsUnoptimized(item.imageData)} />
-                  </button>
-                ))}
+      {/* Docked closet / shop picker — a bottom panel that shrinks the canvas.
+          Drag its handle down to close it (follows the finger). */}
+      {!alwaysShowHint && (
+        <div
+          className="shrink-0 bg-white overflow-hidden"
+          style={{
+            height: pickerH,
+            borderTopLeftRadius: 22,
+            borderTopRightRadius: 22,
+            borderTop: pickerH > 0 ? '1px solid #efeef1' : 'none',
+            boxShadow: pickerH > 0 ? '0 -10px 28px rgba(0,0,0,0.07)' : 'none',
+            transition: pickerDragging ? 'none' : 'height 0.28s cubic-bezier(0.22,1,0.36,1)',
+          }}
+        >
+          {pickerH > 0 && (() => {
+            const groupsPresent = (['upper', 'lower', 'shoes', 'acc'] as CanvasGroup[]).filter((g) => getGroupItems(g).length > 0);
+            const tabs: { key: 'all' | CanvasGroup; label: string }[] = [
+              { key: 'all', label: t.cv_ce_all },
+              ...groupsPresent.map((g) => ({ key: g, label: getGroupLabel(g) })),
+            ];
+            const closetItems = pickerTab === 'all' ? getAllItems() : getGroupItems(pickerTab);
+            return (
+              <div className="h-full flex flex-col">
+                {/* Drag handle + source/category row */}
+                <div className="flex-none">
+                  <div
+                    className="pt-2.5 pb-1.5 touch-none cursor-grab active:cursor-grabbing"
+                    onTouchStart={pickerTouchStart}
+                    onTouchMove={pickerTouchMove}
+                    onTouchEnd={pickerTouchEnd}
+                  >
+                    <div className="w-10 h-1.5 rounded-full bg-gray-200 mx-auto" />
+                  </div>
+                  {pickerSource === 'closet' ? (
+                    <div className="flex gap-2 overflow-x-auto hide-scrollbar px-4 py-2">
+                      {tabs.map((tab) => {
+                        const on = pickerTab === tab.key;
+                        return (
+                          <button key={tab.key} onClick={() => setPickerTab(tab.key)}
+                            className="shrink-0 h-8 px-3.5 rounded-full text-[13px] font-semibold transition-colors active:scale-95"
+                            style={{ background: on ? '#141118' : '#f3f1f5', color: on ? '#fff' : '#6b6570' }}>
+                            {tab.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-[14px] font-bold text-gray-900 text-center py-2">{t.cv_shop_title}</p>
+                  )}
+                </div>
+
+                {/* Items */}
+                <div className="flex-1 overflow-y-auto px-4 pb-5">
+                  {pickerSource === 'closet' ? (
+                    closetItems.length === 0 ? (
+                      <p className="text-center text-[13px] text-gray-400 py-10">{t.cv_shop_empty}</p>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-2.5">
+                        {closetItems.map((item) => (
+                          <button key={item.id} onClick={() => addItem(item)} className="relative aspect-[3/4] rounded-xl overflow-hidden border border-gray-100 active:scale-[0.96] transition-transform">
+                            <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized={needsUnoptimized(item.imageData)} />
+                          </button>
+                        ))}
+                      </div>
+                    )
+                  ) : shopLoading && shopProducts.length === 0 ? (
+                    <div className="flex items-center justify-center py-10 text-gray-400"><Loader2 size={20} className="animate-spin" /></div>
+                  ) : shopProducts.length === 0 ? (
+                    <p className="text-center text-[13px] text-gray-400 py-10">{t.cv_shop_empty}</p>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-2.5">
+                      {shopProducts.map((p) => {
+                        const adding = shopAdding.has(p.id);
+                        // «Добавлено» = вещь этого товара сейчас НА КАНВЕ. Удалили с
+                        // канвы → галка снимается, товар снова можно добавить.
+                        const added = canvasItems.some((ci) => ci.item.sourceProductId === p.id);
+                        return (
+                          <button key={p.id} onClick={() => addShopProduct(p)} disabled={adding || added}
+                            className="relative aspect-[3/4] rounded-xl overflow-hidden border active:scale-[0.96] transition-transform"
+                            style={{ borderColor: added ? '#2FB27A' : '#eee' }}>
+                            {p.images?.[0] ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={p.images[0]} alt="" className="w-full h-full object-cover" loading="lazy" />
+                            ) : <div className="w-full h-full bg-gray-100" />}
+                            <span className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-white"
+                              style={{ background: added ? '#2FB27A' : adding ? '#F370A7' : 'rgba(15,8,14,0.35)' }}>
+                              {adding ? <Loader2 size={13} className="animate-spin" /> : added ? <Check size={13} strokeWidth={3} /> : <Plus size={14} strokeWidth={2.6} />}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Closet picker — categorized (All · Tops · Bottoms · Shoes · Accessories) */}
+      {addPicker && (() => {
+        const groupsPresent = (['upper', 'lower', 'shoes', 'acc'] as CanvasGroup[]).filter((g) => getGroupItems(g).length > 0);
+        const tabs: { key: 'all' | CanvasGroup; label: string }[] = [
+          { key: 'all', label: t.cv_ce_all },
+          ...groupsPresent.map((g) => ({ key: g, label: getGroupLabel(g) })),
+        ];
+        const pickerItems = pickerTab === 'all' ? getAllItems() : getGroupItems(pickerTab);
+        return (
+          <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/30 backdrop-blur-sm" onClick={() => setAddPicker(false)}>
+            <div className="w-full max-w-[460px] rounded-t-3xl bg-white max-h-[74vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-center pt-3 pb-1"><div className="w-9 h-1 rounded-full bg-gray-200" /></div>
+              <h3 className="text-[15px] font-bold text-gray-900 text-center pb-2.5">{t.addToCloset}</h3>
+              {/* Category tabs */}
+              <div className="flex gap-2 overflow-x-auto hide-scrollbar px-5 pb-3">
+                {tabs.map((tab) => {
+                  const active = pickerTab === tab.key;
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => setPickerTab(tab.key)}
+                      className="shrink-0 h-8 px-3.5 rounded-full text-[13px] font-semibold transition-colors active:scale-95"
+                      style={{ background: active ? '#141118' : '#f3f1f5', color: active ? '#fff' : '#6b6570' }}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex-1 overflow-y-auto px-5 pb-8">
+                {pickerItems.length === 0 ? (
+                  <p className="text-center text-[13px] text-gray-400 py-12">{t.cv_shop_empty}</p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {pickerItems.map((item) => (
+                      <button key={item.id} onClick={() => addItem(item)} className="relative aspect-[3/4] rounded-xl overflow-hidden border border-gray-100 active:scale-[0.97] transition-transform">
+                        <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized={needsUnoptimized(item.imageData)} />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        </div>
+        );
+      })()}
+
+      {/* One-time gesture tutorial (first open only) */}
+      {showEditOnboarding && (
+        <CanvasOnboarding
+          onDone={() => {
+            setCanvasEditOnboarded();
+            setShowEditOnboarding(false);
+            setShowDragHint(false);
+            setCanvasHintSeen();
+          }}
+        />
       )}
     </div>
   );

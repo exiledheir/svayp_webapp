@@ -2,22 +2,23 @@ import { needsUnoptimized } from '@/lib/img';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2, ArrowUpRight, BookOpen, Share2 } from 'lucide-react';
+import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2, ArrowUpRight, BookOpen, Share2, Check } from 'lucide-react';
 import { getUser, clearTokens } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags-context';
+import { FEATURES } from '@/lib/feature-flags';
 import { useRootBackGuard } from '@/lib/use-root-back-guard';
 import { useOverlayBackClose } from '@/lib/use-overlay-back-close';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
-import { fetchClosetItems, addClosetItemFromFile, removeClosetItem, updateClosetItemApi, getClosetItems, addClosetItem, deleteClosetItem, updateClosetItem } from '@/lib/closet-storage';
+import { fetchClosetItems, addClosetItemFromFile, addClosetItemAutoDetect, removeClosetItem, updateClosetItemApi, getClosetItems, addClosetItem, deleteClosetItem, updateClosetItem, getClosetItemById, mapApiItemToClosetItem } from '@/lib/closet-storage';
 import type { ClosetItem, ClosetCategory } from '@/lib/closet-storage';
-import type { WardrobeUploadStatus, PlanTier, PlanLimits, PlanUsage, TryOnJobResponse, WardrobeSection, WardrobeSubcategory } from '@/types';
+import type { WardrobeUploadStatus, PlanTier, PlanLimits, PlanUsage, TryOnJobResponse, WardrobeSection, WardrobeSubcategory, Product } from '@/types';
 import ItemOptionsPicker, { defaultSelectionForSection, isSelectionComplete, type ItemOptionsSelection } from '@/components/closet/ItemOptionsPicker';
 import { subcategoryToLocal, sectionForSubcategory, subcategoriesForSection, SECTION_ORDER, localToSubcategory, taxLabel } from '@/lib/wardrobe-taxonomy';
-import { getUserPlan, generateOutfitSuggestions, fetchAiCanvasSuggest, createTryOnJob, watchTryOnUntilDone, getOutfitCalendar, createOutfitCanvas, updateOutfitCanvas, deleteOutfitCanvas, getOutfitCanvases, getOutfitCanvas, listUploads, watchUploadUntilDone, getTryOnJob, getTryOnJobHistory, deleteTryOnJob, getUserProfile } from '@/lib/wardrobe-api';
+import { getUserPlan, generateOutfitSuggestions, fetchAiCanvasSuggest, createTryOnJob, watchTryOnUntilDone, getOutfitCalendar, createOutfitCanvas, updateOutfitCanvas, deleteOutfitCanvas, getOutfitCanvases, getOutfitCanvas, listUploads, watchUploadUntilDone, getTryOnJob, getTryOnJobHistory, deleteTryOnJob, getUserProfile, addWardrobeItemFromCatalog, createBeautifyJob, watchBeautifyUntilDone, commitBeautify } from '@/lib/wardrobe-api';
 import type { SseHandle } from '@/types';
 import { useI18n } from '@/lib/i18n';
 import type { Locale } from '@/lib/translations';
-import { isOnboardingComplete, isCanvasHintSeen, setCanvasHintSeen } from '@/lib/onboarding-storage';
+import { isOnboardingComplete, isCanvasHintSeen, setCanvasHintSeen, isGetStartedDone, setGetStartedDone } from '@/lib/onboarding-storage';
 import { saveTryOnResult, saveActiveTryOnJob, getActiveTryOnJobWithCloud, clearActiveTryOnJob } from '@/lib/tryon-history';
 import { logAnalyticsEvent, clearAnalyticsUser } from '@/lib/analytics';
 import { reportPurchaseFunnel } from '@/lib/purchase-funnel';
@@ -26,6 +27,18 @@ import { useTheme } from '@/lib/theme';
 import { isInFlutterWebView } from '@/lib/flutter-bridge';
 import { shareImageBlob, fetchImageBlob } from '@/lib/share-image';
 import ShareSheet from '@/components/ShareSheet';
+import GetStartedCard from '@/components/closet/GetStartedCard';
+import AddItemSheet from '@/components/closet/AddItemSheet';
+import UploadReviewSheet from '@/components/closet/UploadReviewSheet';
+import AddProcessingSheet, { type BatchJob } from '@/components/closet/AddProcessingSheet';
+import BeautifyCompareSheet from '@/components/closet/BeautifyCompareSheet';
+import BeautifyIntroSheet from '@/components/closet/BeautifyIntroSheet';
+import ClosetGateShowcase from '@/components/closet/ClosetGateShowcase';
+import CoinsSheet from '@/components/closet/CoinsSheet';
+import Diamond from '@/components/closet/Diamond';
+import { ACTION_COST, actionCosts, fetchCoinBalance, fetchCoinPricing, type CoinPricing } from '@/lib/coins';
+import { isInsufficientCoins } from '@/lib/api';
+import ItemDetailSheet from '@/components/closet/ItemDetailSheet';
 import { saveUploadPreview, getUploadPreview, clearUploadPreview } from '@/lib/upload-previews';
 import { compressImageForUpload } from '@/lib/image-utils';
 import {
@@ -64,6 +77,11 @@ function localCatToSection(cat: ClosetCategory): WardrobeSection {
   if (SHOES_CATS.includes(cat)) return 'FOOTWEAR';
   return 'ACCESSORIES';
 }
+
+// One item in the optimistic batch review: the user's original preview plus the
+// taxonomy selection they build in the review (persisted to the backend row on
+// "Add to Closet"). `previewImage` is a data URL held only for the review.
+type BatchReviewItem = { localId: string; previewImage: string; selection: ItemOptionsSelection };
 
 function getCroppedImage(imageSrc: string, crop: PixelCrop, displayWidth: number, displayHeight: number): Promise<string> {
   return new Promise((resolve) => {
@@ -104,6 +122,9 @@ const DEMO_CANVAS_LAYOUT: SavedCanvasLayout = [
   { id: 'da66eb48-1cd7-4087-8a1f-16a011bcae3e', x: 32, y: 58, scale: 0.72, zIndex: 3, group: 'shoes' },
   { id: 'fb18130c-1192-4d32-aa84-0d5a837a3bcd', x: 63, y: 17, scale: 0.6,  zIndex: 4, group: 'acc'   },
 ];
+
+// Item target for the "Add N items to unlock" get-started card (= free-plan limit).
+const GET_STARTED_TARGET = 5;
 
 
 // ─── Plan system ────────────────────────────────────────────────────────────────
@@ -196,6 +217,7 @@ export default function ClosetPage() {
   const { t, locale, setLocale } = useI18n();
   const { theme, setTheme } = useTheme();
   const { plansEnabled, profileEnabled } = useFeatureFlags();
+  const { closetV2 } = FEATURES;
 
   // Root tab page — trap Back so it doesn't exit to a blank WebView screen.
   useRootBackGuard();
@@ -242,6 +264,52 @@ export default function ClosetPage() {
       .catch(() => { /* silently ignore — we already have the localStorage fallback */ });
   }, []);
   const [items, setItems] = useState<ClosetItem[]>([]);
+  // ── "Add N items to unlock" get-started card ──────────────────────────────
+  const realItemCount = useMemo(
+    () => items.filter((i) => !DEMO_ITEM_IDS.has(i.id)).length,
+    [items],
+  );
+  // Resolved after mount (localStorage) to avoid a hydration mismatch.
+  const [gsHidden, setGsHidden] = useState(true);
+  useEffect(() => { setGsHidden(isGetStartedDone()); }, []);
+  // Auto-complete once the item target is reached.
+  useEffect(() => {
+    if (!gsHidden && realItemCount >= GET_STARTED_TARGET && !isGetStartedDone()) {
+      setGetStartedDone();
+      setGsHidden(true);
+      logAnalyticsEvent(Events.GET_STARTED_CARD_COMPLETED, { [Params.ITEM_COUNT]: realItemCount });
+    }
+  }, [gsHidden, realItemCount]);
+  const showGetStarted = !gsHidden && realItemCount < GET_STARTED_TARGET;
+  // ── Build-your-closet gate (closet v2) ────────────────────────────────────
+  // The closet unlocks once it can form an outfit: a top + a bottom, OR a
+  // dress/set + footwear. Demo items don't count. Until then we show only the
+  // hero + a forced progress loader. The loader shows whichever pair the user is
+  // working toward (top/bottom by default, dress/footwear if they started that).
+  const realItems = useMemo(() => items.filter((i) => !DEMO_ITEM_IDS.has(i.id)), [items]);
+  const hasTopReal = realItems.some((i) => UPPER_CATS.includes(i.category) && !FULL_BODY_CATS.includes(i.category));
+  const hasBottomReal = realItems.some((i) => LOWER_CATS.includes(i.category));
+  const hasDressReal = realItems.some((i) => FULL_BODY_CATS.includes(i.category));
+  const hasFootwearReal = realItems.some((i) => SHOES_CATS.includes(i.category));
+  const closetUnlocked = (hasTopReal && hasBottomReal) || (hasDressReal && hasFootwearReal);
+  // Show the dress+footwear path only when they started that way (a dress/footwear
+  // and no top/bottom yet); otherwise default to top+bottom.
+  const gateDressPath = !hasTopReal && !hasBottomReal && (hasDressReal || hasFootwearReal);
+  // `firstLoadDone` gates the state so existing users never flash the gate before
+  // their items arrive; once latched it stays true across reloads (no reflicker).
+  const [firstLoadDone, setFirstLoadDone] = useState(false);
+  const buildMode = closetV2 && !closetUnlocked && firstLoadDone;
+  // Milestones for the gate progress loader (adapts to the active outfit path).
+  const gateMilestones = gateDressPath
+    ? [
+        { img: '/images/onboarding/closet_items/dress.png', label: t.cv_build_dress, done: hasDressReal },
+        { img: '/images/closet/add_shoes_onboarding.webp', label: t.cv_build_shoes, done: hasFootwearReal },
+      ]
+    : [
+        { img: '/images/onboarding/closet_items/top.png', label: t.cv_build_top, done: hasTopReal },
+        { img: '/images/onboarding/closet_items/skirt.png', label: t.cv_build_bottom, done: hasBottomReal },
+      ];
+  const gateDoneCount = gateMilestones.filter((m) => m.done).length;
   // Selected "Type" chip per section (null = All).
   const [sectionFilter, setSectionFilter] = useState<Partial<Record<WardrobeSection, WardrobeSubcategory | null>>>({});
   const [viewAll, setViewAll] = useState<{ title: string; items: ClosetItem[] } | null>(null);
@@ -293,14 +361,36 @@ export default function ClosetPage() {
   useEffect(() => {
     warmImageCache(items.map((i) => i.imageData));
   }, [items]);
-  const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | 'tryOn' | 'canvas' | null>(null);
+  // 'browse' = opened from the header diamond chip (no "not enough" prompt).
+  const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | 'tryOn' | 'canvas' | 'browse' | 'beautify' | null>(null);
   const { plan, limits, usage, fetchPlan, canGenerate, canTryOn, calendarDays } = usePlan();
+  // Diamond/coin balance — реальный баланс с бэка (/me/coins). Рефетчим после
+  // каждого платного действия (см. refreshCoins) и при открытии CoinsSheet.
+  const [coins, setCoinsState] = useState(0);
+  const [coinPricing, setCoinPricing] = useState<CoinPricing | null>(null);
+  const refreshCoins = useCallback(() => {
+    fetchCoinBalance().then((b) => setCoinsState(b.balance)).catch(() => { /* offline — keep last known */ });
+  }, []);
+  useEffect(() => {
+    refreshCoins();
+    fetchCoinPricing().then(setCoinPricing).catch(() => { /* fallback to local constants */ });
+  }, [refreshCoins]);
+
+  // Монеты реально списываются только когда включён enforcement И юзер на FREE
+  // (у pro/premium — старые безлимитные квоты, монеты не тратятся — зеркалит
+  // CoinGateService на бэке). В этом режиме платные действия гейтим по БАЛАНСУ
+  // МОНЕТ, а не по старой подписочной квоте (иначе исчерпанная квота FREE ложно
+  // открывала CoinsSheet «недостаточно», хотя монет полно).
+  const coinsApply = !!coinPricing?.enforcementEnabled && plan === 'free';
+  const coinCosts = actionCosts(coinPricing);
 
   // Single overall wardrobe item limit (across all categories), not per category.
   // Demo items don't count toward the limit.
   // Pending (in-flight) uploads are included so rapid back-to-back submissions
   // can't bypass the cap before any upload completes.
   function canAddItem(): boolean {
+    // Под монетами «Добавить одежду — Бесплатно» и без подписочного лимита вещей.
+    if (coinsApply) return true;
     const completedCount = items.filter((i) => !DEMO_ITEM_IDS.has(i.id)).length;
     const pendingCount = pendingUploads.size;
     return completedCount + pendingCount < limits.wardrobeItems;
@@ -363,7 +453,9 @@ export default function ClosetPage() {
       });
   }, []);
 
-  const canAddCanvas = canvases.length < limits.outfitCanvases;
+  // Доски образов бесплатны и не лимитируются планом (решение продукта, июль 2026).
+  // Платной остаётся AI-генерация образа (💎, гейт `canGenerate` ниже).
+  const canAddCanvas = true;
 
   // Demo mode: true when ALL items in the wardrobe are the placeholder demo items
   const hasDemoItems = items.length > 0 && items.every((i) => DEMO_ITEM_IDS.has(i.id));
@@ -398,6 +490,76 @@ export default function ClosetPage() {
   const [saveFailed, setSaveFailed] = useState(false);
   const [tryOnDeleteFailed, setTryOnDeleteFailed] = useState(false);
   const [outfitToastMsg, setOutfitToastMsg] = useState<string | null>(null);
+  // Closet v2: shop-catalog instant-add progress (per product id)
+  const [addingProductIds, setAddingProductIds] = useState<Set<string>>(new Set());
+  const [addedProductIds, setAddedProductIds] = useState<Set<string>>(new Set());
+  // Closet v2: ids awaiting the post-upload detect & review sheet
+  const [reviewIds, setReviewIds] = useState<string[]>([]);
+  // Closet v2: item currently open in the Beautify compare sheet
+  const [beautifyItem, setBeautifyItem] = useState<ClosetItem | null>(null);
+  // Beautify в фоне: тап → закрываем модалку, показываем loader на вещи в гардеробе,
+  // enhance крутится в фоне; по готовности открываем сравнение с готовым результатом.
+  const [beautifyingIds, setBeautifyingIds] = useState<Set<string>>(new Set());
+  const [beautifyPreset, setBeautifyPreset] = useState<{ url: string; jobId: string } | null>(null);
+
+  async function startBeautifyBackground(item: ClosetItem) {
+    if (beautifyingIds.has(item.id)) return;
+    setBeautifyItem(null); // не держим модалку — уходим в гардероб
+    setBeautifyingIds((prev) => new Set(prev).add(item.id));
+    const clear = () => setBeautifyingIds((prev) => { const n = new Set(prev); n.delete(item.id); return n; });
+
+    // Вещи из магазина сюда не попадают: они приходят СРАЗУ улучшенными
+    // (клон с PROCESSED) и кнопки ✨ на них нет.
+    try {
+      const job = await createBeautifyJob(item.id);
+      const done = await watchBeautifyUntilDone(item.id, job.beautifyJobId);
+      if (done.status === 'COMPLETED' && done.beautifiedUrl) {
+        // Без окна сравнения — сразу применяем улучшенный вариант.
+        try { await commitBeautify(item.id, job.beautifyJobId, 'BEAUTIFIED'); } catch { /* best-effort */ }
+        const url = done.beautifiedUrl;
+        // Держим loader, пока НОВАЯ картинка не докачается (иначе после снятия
+        // loader'а пару секунд видна старая) → переключение мгновенное.
+        await new Promise<void>((resolve) => {
+          const im = new window.Image();
+          const finish = () => resolve();
+          im.onload = finish; im.onerror = finish;
+          setTimeout(finish, 7000); // страховка от вечного ожидания
+          im.src = url;
+        });
+        setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, imageData: url, fullImage: url, beautified: true } : i)));
+        clear();
+        try { localStorage.setItem('svayp_has_beautified', '1'); } catch { /* private mode */ }
+        setOutfitToastMsg(t.cv_bt_beautified);
+        setTimeout(() => setOutfitToastMsg(null), 2000);
+        refreshCoins(); // Beautify платный — обновляем баланс
+        load();
+      } else {
+        clear();
+        setOutfitToastMsg(t.cv_bt_failed);
+        setTimeout(() => setOutfitToastMsg(null), 2500);
+      }
+    } catch (err) {
+      clear();
+      if (isInsufficientCoins(err)) { setShowPremiumGate('beautify'); return; }
+      setOutfitToastMsg(t.cv_bt_failed);
+      setTimeout(() => setOutfitToastMsg(null), 2500);
+    }
+  }
+  // Closet v2: "Introducing Beautify" educational popup (predefined before/after
+  // demo). Auto-opens once every batch item has a complete category ("final
+  // step"). Handlers live in the batch section below (they read batchReview).
+  const [beautifyIntroFor, setBeautifyIntroFor] = useState<{ localId: string | null; from: 'beautify' | 'add' | 'wardrobe' } | null>(null);
+  const beautifyIntroShownRef = useRef(false);
+  // Closet v2: Beautify requested in the add step → auto-open compare once the
+  // item finishes uploading; plus the first-run explainer.
+  const [addBeautifyRequested, setAddBeautifyRequested] = useState(false);
+  const [showBeautifyIntro, setShowBeautifyIntro] = useState(false);
+  const [pendingBeautifyId, setPendingBeautifyId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pendingBeautifyId) return;
+    const it = items.find((i) => i.id === pendingBeautifyId);
+    if (it) { setPendingBeautifyId(null); startBeautifyBackground(it); }
+  }, [pendingBeautifyId, items]);
   const [outfitBlockedModal, setOutfitBlockedModal] = useState<{ title: string; body: string } | null>(null);
   const tryOnCancelRef = useRef(false);
   const activeTryOnHandleRef = useRef<SseHandle | null>(null);
@@ -435,6 +597,30 @@ export default function ClosetPage() {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const cropImgRef = useRef<HTMLImageElement>(null);
   const addFileRef = useRef<File | null>(null);
+  // ── Closet v2 — Acloset-style batch add (optimistic) ─────────────────────
+  // `batchAdd` drives the full-screen processing sheet (pure 1s+1s imitation —
+  // the real bg-removal backend isn't wired yet). Uploads run in the background
+  // while the user reviews local items; categories persist at "Add to Closet".
+  const [batchAdd, setBatchAdd] = useState<{ jobs: BatchJob[] } | null>(null);
+  const [batchPhase, setBatchPhase] = useState<'removing' | 'identifying'>('removing');
+  // Local review items shown after the imitation; edited in memory until finalize.
+  const [batchReview, setBatchReview] = useState<BatchReviewItem[]>([]);
+  // localIds whose AI category detection (ANALYZE) is still in flight — the row
+  // shows a "determining…" state until it resolves, then AI pre-fills the category.
+  const [batchDetecting, setBatchDetecting] = useState<Set<string>>(new Set());
+  const [batchReviewOpen, setBatchReviewOpen] = useState(false);
+  const [finalizingBatch, setFinalizingBatch] = useState(false);
+  const batchCancelRef = useRef(false);
+  // localId → background upload result (real wardrobe id once done).
+  const uploadTrackerRef = useRef<Map<string, { promise: Promise<void>; realId: string | null; failed: boolean }>>(new Map());
+  // localIds the USER explicitly edited in the review sheet (via editBatchCategory).
+  // finalizeBatch only PATCHes these — the AI-detected selection for everything else
+  // is already persisted server-side by ANALYZE, so re-sending it is redundant AND
+  // unsafe: ANALYZE's raw length/fitType strings (e.g. GPT output like "mid") aren't
+  // guaranteed to match the Length/FitType enum constants (MIDI, REGULAR, …), so
+  // round-tripping them through this PATCH can 400. User edits always come from the
+  // picker UI, which only emits valid canonical enum values.
+  const userEditedLocalIdsRef = useRef<Set<string>>(new Set());
 
   // ── Pull-to-refresh ─────────────────────────────────────────────────────────
   const mainScrollRef = useRef<HTMLElement>(null);
@@ -499,6 +685,7 @@ export default function ClosetPage() {
     setAddCrop(undefined);
     setAddCompletedCrop(undefined);
     setAddCroppedPreview(null);
+    setAddBeautifyRequested(false);
     setAddStep('crop');
     setShowAddPicker(true);
   }
@@ -525,8 +712,15 @@ export default function ClosetPage() {
   }
 
   function handleAddFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    if (files.length === 0) return;
+    logAnalyticsEvent(Events.ADD_ITEM_PHOTO_SELECTED, { [Params.FLOW]: 'closet' });
+    // Closet v2 — go straight to the Acloset-style batch flow (no crop, no manual
+    // category; the AI detects everything). The legacy crop→details wizard is only
+    // used in the non-v2 path.
+    if (closetV2) { handleBatchFiles(files); return; }
+    const file = files[0];
     addFileRef.current = file;
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -534,10 +728,282 @@ export default function ClosetPage() {
       // Pre-select full image so corner handles are visible immediately (crop is optional)
       setAddCrop({ unit: '%', x: 0, y: 0, width: 100, height: 100 });
       setAddCompletedCrop(undefined);
-      logAnalyticsEvent(Events.ADD_ITEM_PHOTO_SELECTED, { [Params.FLOW]: 'closet' });
     };
     reader.readAsDataURL(file);
-    e.target.value = '';
+  }
+
+  // ── Closet v2 — Acloset-style batch add ────────────────────────────────────
+  // Upload every selected photo with no category hint (the ANALYZE step detects
+  // it), showing a live processing screen. When all finish we route items the AI
+  // couldn't classify to the "fix category" sheet, then everything to the review
+  // list (per-item beautify + edit + "Add to Closet").
+  function updateBatchJob(localId: string, patch: Partial<BatchJob>) {
+    setBatchAdd((prev) => (prev ? { jobs: prev.jobs.map((j) => (j.localId === localId ? { ...j, ...patch } : j)) } : prev));
+  }
+
+  function cancelBatch() {
+    batchCancelRef.current = true;
+    setBatchAdd(null);
+  }
+
+  // Cancel-aware delay for the imitated processing stages: resolves early if the
+  // user backs out mid-flow.
+  function batchDelay(ms: number) {
+    return new Promise<void>((resolve) => {
+      const id = setTimeout(resolve, ms);
+      const started = Date.now();
+      const tick = () => {
+        if (batchCancelRef.current) { clearTimeout(id); resolve(); return; }
+        if (Date.now() - started < ms) setTimeout(tick, 120);
+      };
+      tick();
+    });
+  }
+
+  async function handleBatchFiles(files: File[]) {
+    if (plansEnabled && !canAddItem()) { setShowPremiumGate('items'); return; }
+    batchCancelRef.current = false;
+    setShowAddPicker(false);
+    setBatchPhase('removing');
+
+    const jobs: BatchJob[] = files.map((_, i) => ({
+      localId: `batch_${Date.now()}_${i}`,
+      previewImage: '',
+      status: 'processing',
+    }));
+    setBatchAdd({ jobs });
+    // Все строки стартуют в состоянии "AI определяет категорию"; снимается по мере
+    // готовности ANALYZE в фоновом аплоаде ниже.
+    setBatchDetecting(new Set(jobs.map((j) => j.localId)));
+
+    // Read data-URL previews (shown in both the processing screen and the review).
+    const previews: Record<string, string> = {};
+    await Promise.all(files.map((f, i) => new Promise<void>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => { const url = (ev.target?.result as string) ?? ''; previews[jobs[i].localId] = url; updateBatchJob(jobs[i].localId, { previewImage: url }); resolve(); };
+      reader.onerror = () => resolve();
+      reader.readAsDataURL(f);
+    })));
+
+    // Start the real uploads in the BACKGROUND (concurrency-capped) and track each
+    // item's promise + resulting wardrobe id. The review opens on the fixed
+    // imitation timeline below, not on the backend — so it feels instant.
+    const tracker = new Map<string, { promise: Promise<void>; realId: string | null; failed: boolean }>();
+    let active = 0;
+    const waiters: (() => void)[] = [];
+    const acquire = () => (active < 3 ? (active++, Promise.resolve()) : new Promise<void>((r) => waiters.push(() => { active++; r(); })));
+    const release = () => { active--; const w = waiters.shift(); if (w) w(); };
+    jobs.forEach((j, i) => {
+      const rec = { promise: Promise.resolve(), realId: null as string | null, failed: false };
+      rec.promise = (async () => {
+        await acquire();
+        try {
+          const file = await compressImageForUpload(files[i]);
+          // Пре-заполняем строку ревью, как только у вещи ЕСТЬ категория+вырезка.
+          // ML шлёт ANALYZE-колбэк сразу по готовности gpt (раньше конца пайплайна),
+          // поэтому не ждём COMPLETED — категория появляется на ~10с раньше.
+          let prefilled = false;
+          const prefill = async (realId: string, done: boolean) => {
+            if (prefilled) return;
+            try {
+              const detected = await getClosetItemById(realId);
+              if (!detected.subcategory && !done) return; // категория ещё не записана
+              prefilled = true;
+              const localId = j.localId;
+              const cutout = detected.imageData || detected.thumbnailUrl;
+              setBatchReview((prev) => prev.map((ri) =>
+                ri.localId === localId
+                  ? { ...ri, selection: selectionFromItem(detected), previewImage: cutout || ri.previewImage }
+                  : ri));
+              setBatchDetecting((prev) => { const n = new Set(prev); n.delete(localId); return n; });
+            } catch (e) { if (done) console.error('detect fetch failed:', e); }
+          };
+          const status = await addClosetItemAutoDetect(file, (s) => {
+            if (s.wardrobeItemId && (s.status === 'ANALYZE' || s.status === 'EMBED')) {
+              rec.realId = s.wardrobeItemId;
+              prefill(s.wardrobeItemId, false);
+            }
+          });
+          rec.realId = status.wardrobeItemId ?? rec.realId;
+          if (rec.realId) await prefill(rec.realId, true);
+        } catch (err) { console.error('Batch upload failed:', err); rec.failed = true; }
+        finally {
+          setBatchDetecting((prev) => { const n = new Set(prev); n.delete(j.localId); return n; });
+          release();
+        }
+      })();
+      tracker.set(j.localId, rec);
+    });
+    uploadTrackerRef.current = tracker;
+
+    // Pure 1s + 1s imitation (no backend dependency — bg-removal isn't wired yet).
+    await batchDelay(1000);
+    if (batchCancelRef.current) { setBatchAdd(null); return; }
+    setBatchPhase('identifying');
+    await batchDelay(1000);
+    if (batchCancelRef.current) { setBatchAdd(null); return; }
+
+    // Open the review with local items — categories start empty so the user must
+    // fill them (backend prefill will seed these later).
+    const reviewItems: BatchReviewItem[] = jobs.map((j) => ({
+      localId: j.localId,
+      previewImage: previews[j.localId] ?? '',
+      selection: defaultSelectionForSection('TOPS'),
+    }));
+    beautifyIntroShownRef.current = false;
+    setBatchReview(reviewItems);
+    setBatchAdd(null);
+    setBatchReviewOpen(true);
+  }
+
+  // Review edits (in-memory until finalize).
+  function editBatchCategory(localId: string, sel: ItemOptionsSelection) {
+    userEditedLocalIdsRef.current.add(localId);
+    setBatchReview((prev) => prev.map((ri) => (ri.localId === localId ? { ...ri, selection: sel } : ri)));
+  }
+  function deleteBatchItem(localId: string) {
+    setBatchReview((prev) => prev.filter((ri) => ri.localId !== localId));
+    // The background upload keeps running; the orphaned item is harmless (never
+    // gets a category and won't block finalize — we only persist listed items).
+    uploadTrackerRef.current.delete(localId);
+  }
+
+  // Add to Closet — wait for the background uploads, persist each chosen category.
+  async function finalizeBatch(selectedIds: string[]) {
+    setFinalizingBatch(true);
+    const tracker = uploadTrackerRef.current;
+    const keep = new Set(selectedIds);
+    try {
+      await Promise.all([...tracker.values()].map((r) => r.promise));
+      // В гардероб попадают ТОЛЬКО выбранные: невыбранные строки удаляем с бэка
+      // (вещь уже создана аплоадом — иначе осиротеет и всплывёт в гардеробе).
+      for (const ri of batchReview) {
+        if (keep.has(ri.localId)) continue;
+        const rec = tracker.get(ri.localId);
+        if (rec?.realId) {
+          try { await removeClosetItem(rec.realId); } catch (e) { console.error('Remove unselected failed:', e); }
+        }
+      }
+      for (const ri of batchReview) {
+        if (!keep.has(ri.localId)) continue;
+        const rec = tracker.get(ri.localId);
+        // Only persist rows the user actually edited — the AI-detected selection
+        // is already saved server-side by ANALYZE. Re-sending it is redundant and
+        // unsafe: ANALYZE's raw length/fitType strings aren't guaranteed to match
+        // the Length/FitType enum constants, so round-tripping them here can 400.
+        if (rec?.realId && ri.selection.subcategory && userEditedLocalIdsRef.current.has(ri.localId)) {
+          try {
+            await updateClosetItemApi(rec.realId, {
+              section: ri.selection.section,
+              subcategory: ri.selection.subcategory ?? undefined,
+              itemType: ri.selection.itemType,
+              length: ri.selection.length,
+              fitType: ri.selection.fitType,
+            });
+          } catch (e) { console.error('Persist category failed:', e); }
+        }
+      }
+      logAnalyticsEvent(Events.ADD_ITEM_SAVED, { [Params.HAS_BG_REMOVED]: false, [Params.FLOW]: 'closet' });
+      logWardrobeMilestone();
+      // Отмеченные кнопкой Beautify (и выбранные галочкой) начинают улучшаться
+      // сразу после добавления — в гардеробе на них розовый лоадер «Улучшаем…».
+      for (const ri of batchReview) {
+        if (!keep.has(ri.localId) || !reviewBeautifyMarks.has(ri.localId)) continue;
+        const rec = tracker.get(ri.localId);
+        if (rec?.realId) {
+          startBeautifyBackground({
+            id: rec.realId,
+            imageData: ri.previewImage,
+            category: ri.selection.subcategory ? subcategoryToLocal(ri.selection.subcategory) : 'tops',
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+      await load();
+      fetchPlan();
+    } finally {
+      setFinalizingBatch(false);
+      setBatchReviewOpen(false);
+      setBatchReview([]);
+      setReviewBeautifyMarks(new Set());
+      userEditedLocalIdsRef.current = new Set();
+      uploadTrackerRef.current = new Map();
+    }
+  }
+
+  // Beautify a batch item — await its background upload for the real id, then open
+  // the compare sheet on the user's own photo.
+  // Отметки Beautify в ревью: тап по кнопке только помечает строку; реальное
+  // улучшение стартует после «Добавить в гардероб» (finalizeBatch).
+  const [reviewBeautifyMarks, setReviewBeautifyMarks] = useState<Set<string>>(new Set());
+  function toggleReviewBeautify(localId: string) {
+    setReviewBeautifyMarks((prev) => {
+      const n = new Set(prev);
+      if (n.has(localId)) n.delete(localId); else n.add(localId);
+      return n;
+    });
+  }
+
+  // Review "Beautify" pill → always show the educational popup first (unless the
+  // user ticked "Don't show again"), then run beautify from there.
+  function beautifyIntroNever(): boolean {
+    try { return localStorage.getItem('svayp_beautify_intro_never') === '1'; } catch { return false; }
+  }
+  // Тап Beautify в ревью: intro-попап (первый раз) → далее просто TOGGLE отметки.
+  // Улучшение стартует после «Добавить в гардероб» (finalizeBatch).
+  function handleReviewBeautify(item: ClosetItem) {
+    if (!beautifyIntroNever() && !reviewBeautifyMarks.has(item.id)) {
+      setBeautifyIntroFor({ localId: item.id, from: 'beautify' });
+      return;
+    }
+    toggleReviewBeautify(item.id);
+  }
+  // Тап ✨ на карточке гардероба: тот же intro-гейт, затем фоновый beautify.
+  function handleWardrobeBeautify(item: ClosetItem) {
+    if (beautifyIntroNever()) { startBeautifyBackground(item); return; }
+    setBeautifyIntroFor({ localId: item.id, from: 'wardrobe' });
+  }
+  // Beautify intro popup actions.
+  function openBeautifyFromIntro() {
+    const intro = beautifyIntroFor;
+    setBeautifyIntroFor(null);
+    if (!intro?.localId) return;
+    if (intro.from === 'wardrobe') {
+      const it = items.find((i) => i.id === intro.localId);
+      if (it) startBeautifyBackground(it);
+    } else {
+      // Ревью: intro лишь отмечает кнопку — улучшение стартует при добавлении.
+      toggleReviewBeautify(intro.localId);
+    }
+  }
+  function skipBeautifyIntro() { setBeautifyIntroFor(null); }
+
+  // Local review items adapted to ClosetItem shape for the review sheet.
+  const batchReviewItems: ClosetItem[] = batchReview.map((ri) => ({
+    id: ri.localId,
+    imageData: ri.previewImage,
+    category: ri.selection.subcategory ? subcategoryToLocal(ri.selection.subcategory) : 'tops',
+    subcategory: ri.selection.subcategory ?? undefined,
+    itemType: ri.selection.itemType,
+    length: ri.selection.length,
+    fitType: ri.selection.fitType,
+    createdAt: '',
+  }));
+
+  // Intro-попап Beautify больше НЕ всплывает автоматически после анализа —
+  // beautify запускается напрямую значком ✨ на карточке (фоновый, авто-сохранение).
+  // (авто-показ отключён по просьбе продукта — «пусть не выходит».)
+
+  // Header for the batch processing screen, driven by the imitated timeline.
+  const batchHeaderLabel = batchPhase === 'identifying' ? t.cv_proc_identifying : t.cv_proc_removing;
+
+  // Closet v2 — Beautify tap in the add step. First time shows the explainer,
+  // then requesting it auto-opens the compare sheet after the item uploads.
+  function handleBeautifyTapInAdd() {
+    let seen = false;
+    try { seen = localStorage.getItem('svayp_bt_intro') === 'true'; } catch { /* private mode */ }
+    if (!seen) { setShowBeautifyIntro(true); return; }
+    setAddBeautifyRequested((v) => !v);
   }
 
   async function handleAddSave() {
@@ -549,6 +1015,8 @@ export default function ClosetPage() {
       return;
     }
     setAddSaving(true);
+    // Whether the user asked to Beautify this item in the add step.
+    const wantBeautify = closetV2 && FEATURES.beautifyEnabled && addBeautifyRequested;
 
     // Prepare file + image before closing sheet. The crop (if any) was already
     // applied when leaving the crop step, so reuse that pre-cropped preview.
@@ -585,14 +1053,17 @@ export default function ClosetPage() {
     setPendingUploads((prev) => new Map(prev).set(pendingId, { category, imageData: previewImage, step: t.uploading, progress: 0, startedAt: uploadStartedAt }));
     setAddRawImage('');
     setShowAddPicker(false);
+    setAddBeautifyRequested(false);
     addFileRef.current = null;
     setAddSaving(false);
 
     // Run upload in background
     if (fileToUpload) {
       let activeJobId: string | null = null;
+      let capturedItemId: string | null = null;
       try {
         await addClosetItemFromFile(fileToUpload, category, extras, (status) => {
+          if (status.wardrobeItemId) capturedItemId = status.wardrobeItemId;
           setPendingUploads((prev) => {
             const next = new Map(prev);
             const existing = next.get(pendingId);
@@ -626,6 +1097,13 @@ export default function ClosetPage() {
         setPendingUploads((prev) => { const next = new Map(prev); next.delete(pendingId); return next; });
         await load();
         fetchPlan();
+        // Closet v2 — if the user tapped Beautify in the add step, auto-open the
+        // compare sheet; otherwise open the detect & review sheet so they can
+        // confirm/correct the AI's name & category.
+        if (closetV2 && capturedItemId) {
+          if (wantBeautify) setPendingBeautifyId(capturedItemId);
+          else setReviewIds((prev) => [...new Set([...prev, capturedItemId!])]);
+        }
       } catch (err) {
         console.error('Failed to upload item:', err);
         logAnalyticsEvent(Events.ADD_ITEM_BG_REMOVAL_FAILED);
@@ -666,6 +1144,127 @@ export default function ClosetPage() {
     }
   }
 
+  // Closet v2 — instant add from the shop catalog. Fast path: /wardrobe/items/
+  // from-catalog clones the product's pre-processed canonical item (no ML) — the
+  // item appears instantly. If the product isn't backfilled yet (422
+  // CATALOG_ITEM_NOT_READY), falls back to the normal upload pipeline.
+  // Заглушка «загружается» держится минимум столько же, сколько идёт обычная
+  // загрузка, чтобы добавление из магазина ощущалось так же (from-catalog по факту
+  // мгновенный).
+  const CATALOG_PLACEHOLDER_MS = 5000;
+
+  // loadingCard=true (гардероб): показываем заглушку ~5с как у обычной загрузки.
+  // loadingCard=false (канва): без заглушки/таймаута — from-catalog мгновенный,
+  // сразу load() → авто-размещение обработанной вещи на канве.
+  async function addCatalogItem(product: Product, opts?: { loadingCard?: boolean }): Promise<ClosetItem | null> {
+    const loadingCard = opts?.loadingCard !== false;
+    if (plansEnabled && !canAddItem()) { setShowPremiumGate('items'); return null; }
+    const clearAdding = () => setAddingProductIds((prev) => { const n = new Set(prev); n.delete(product.id); return n; });
+    setAddingProductIds((prev) => new Set(prev).add(product.id));
+
+    // Pending-карточка с прогрессом — как у обычной загрузки вещи. Секцию берём
+    // по РЕАЛЬНОЙ подкатегории вернувшейся вещи (from-catalog отдаёт её сразу),
+    // чтобы заглушка появлялась в правильном разделе (платок → Аксессуары, а не Верх).
+    const pendingId = `catalog_${product.id}_${Date.now()}`;
+    const imgUrl = product.images?.[0] ?? '';
+    const startedAt = Date.now();
+    const steps = [t.stepProcessing, t.stepRemovingBg, t.stepAnalyzing, t.stepAlmostDone];
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const showPlaceholder = (cat: ClosetCategory) => {
+      if (!loadingCard) return;
+      setPendingUploads((prev) => new Map(prev).set(pendingId, { category: cat, imageData: imgUrl, step: steps[0], progress: 8, startedAt }));
+      let tick = 0;
+      timer = setInterval(() => {
+        tick += 1;
+        setPendingUploads((prev) => {
+          const next = new Map(prev); const ex = next.get(pendingId);
+          if (ex) next.set(pendingId, { ...ex, progress: Math.min(95, 8 + tick * 20), step: steps[Math.min(steps.length - 1, tick)] });
+          return next;
+        });
+      }, 1000);
+    };
+    const clearPlaceholder = () => {
+      if (timer) clearInterval(timer);
+      setPendingUploads((prev) => { const n = new Map(prev); n.delete(pendingId); return n; });
+    };
+
+    try {
+      const created = await addWardrobeItemFromCatalog(product.id);
+      showPlaceholder(created.subcategory ? subcategoryToLocal(created.subcategory) : 'accessories');
+      // Гардероб: держим заглушку ~5с для паритета с загрузкой. Канва: сразу
+      // размещаем обработанную вещь без таймаута.
+      if (loadingCard) {
+        await new Promise((r) => setTimeout(r, Math.max(0, CATALOG_PLACEHOLDER_MS - (Date.now() - startedAt))));
+      }
+      logAnalyticsEvent(Events.LIBRARY_ITEM_ADDED, { [Params.PRODUCT_ID]: product.id, [Params.FLOW]: 'closet' });
+      logWardrobeMilestone();
+      clearPlaceholder();
+      setAddedProductIds((prev) => new Set(prev).add(product.id));
+      setOutfitToastMsg(t.cv_shop_added);
+      setTimeout(() => setOutfitToastMsg(null), 2000);
+      await load();
+      fetchPlan();
+      clearAdding();
+      return mapApiItemToClosetItem(created);
+    } catch (err) {
+      clearPlaceholder();
+      const code = (err as { response?: { data?: { error?: { code?: string }; code?: string } } })?.response?.data;
+      const errCode = code?.error?.code ?? code?.code;
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (isInsufficientCoins(err) || status === 402) { setShowPremiumGate('items'); clearAdding(); return null; }
+      // Товар ещё не предобработан бэкфиллом → фолбэк на обычную загрузку.
+      if (errCode !== 'CATALOG_ITEM_NOT_READY' && status !== 422) {
+        console.error('from-catalog failed, falling back to upload:', err);
+      }
+    }
+    // addCatalogItemViaUpload заново выставит/снимет addingProductIds в своём finally
+    // и покажет собственную pending-карточку (реальная загрузка). Товар ещё не
+    // готов бэкфиллом — на канву сразу класть нечего (вернём null).
+    await addCatalogItemViaUpload(product);
+    return null;
+  }
+
+  // Fallback: fetch the product image and run it through the normal upload
+  // pipeline (bg-removal + ANALYZE fills the real category/attributes).
+  async function addCatalogItemViaUpload(product: Product) {
+    const imgUrl = product.images?.[0];
+    if (!imgUrl) { setAddingProductIds((prev) => { const n = new Set(prev); n.delete(product.id); return n; }); return; }
+    setAddingProductIds((prev) => new Set(prev).add(product.id));
+    const pendingId = `pending_${Date.now()}`;
+    const category: ClosetCategory = 'tops'; // neutral hint; ANALYZE re-detects
+    const uploadStartedAt = Date.now();
+    let activeJobId: string | null = null;
+    try {
+      const blob = await fetchImageBlob(imgUrl);
+      let file = new File([blob], `catalog-${product.id}.jpg`, { type: blob.type || 'image/jpeg' });
+      setPendingUploads((prev) => new Map(prev).set(pendingId, { category, imageData: imgUrl, step: t.uploading, progress: 0, startedAt: uploadStartedAt }));
+      file = await compressImageForUpload(file);
+      await addClosetItemFromFile(file, category, undefined, (status) => {
+        setPendingUploads((prev) => {
+          const next = new Map(prev);
+          const ex = next.get(pendingId);
+          if (ex) next.set(pendingId, { ...ex, step: formatStep(status.currentStep), progress: status.progressPercent });
+          return next;
+        });
+        if (status.wardrobeItemId && (status.status === 'EMBED' || status.status === 'ANALYZE')) load();
+      }, (jobId) => { activeJobId = jobId; saveUploadPreview(jobId, imgUrl, category, uploadStartedAt); });
+      if (activeJobId) clearUploadPreview(activeJobId);
+      logAnalyticsEvent(Events.LIBRARY_ITEM_ADDED, { [Params.PRODUCT_ID]: product.id, [Params.FLOW]: 'closet' });
+      logWardrobeMilestone();
+      setPendingUploads((prev) => { const next = new Map(prev); next.delete(pendingId); return next; });
+      setAddedProductIds((prev) => new Set(prev).add(product.id));
+      setOutfitToastMsg(t.cv_shop_added);
+      setTimeout(() => setOutfitToastMsg(null), 2000);
+      await load();
+      fetchPlan();
+    } catch (err) {
+      console.error('Failed to add catalog item:', err);
+      setPendingUploads((prev) => { const next = new Map(prev); next.delete(pendingId); return next; });
+    } finally {
+      setAddingProductIds((prev) => { const n = new Set(prev); n.delete(product.id); return n; });
+    }
+  }
+
   function formatStep(step: string): string {
     const STEP_LABELS: Record<string, string> = {
       UPLOADED: t.stepProcessing,
@@ -695,6 +1294,11 @@ export default function ClosetPage() {
       const localItems = getClosetItems().filter((li) => li.id.startsWith('local_'));
       const allFetched = [...apiItems, ...localItems];
       if (seq === loadSeqRef.current) {
+        // «Добавлено» в каталоге магазина выводим из РЕАЛЬНОГО состава гардероба
+        // (по sourceProductId), а не из накопителя — тогда удаление вещи из
+        // гардероба само снимает зелёную галку у товара.
+        setAddedProductIds(new Set(
+          allFetched.map((i) => i.sourceProductId).filter(Boolean) as string[]));
         if (allFetched.length > 0) {
           setItems(allFetched);
         } else {
@@ -715,7 +1319,7 @@ export default function ClosetPage() {
         }
       }
     } finally {
-      if (seq === loadSeqRef.current) setIsLoading(false);
+      if (seq === loadSeqRef.current) { setIsLoading(false); setFirstLoadDone(true); }
     }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -741,9 +1345,12 @@ export default function ClosetPage() {
     (async () => {
       try {
         const page = await listUploads(0, 20);
-        const STALE_MS = 30 * 60 * 1000;
+        // Пайплайн живёт максимум ~10 мин (ML hard-timeout 600с) — всё старше
+        // 15 мин мертво (обычно прерванный рестартом ML прогон), не resume-им.
+        // INITIATED = init без загруженного файла — не завершится никогда.
+        const STALE_MS = 15 * 60 * 1000;
         const inProgress = page.content.filter(
-          (u) => u.status !== 'COMPLETED' && u.status !== 'FAILED'
+          (u) => u.status !== 'COMPLETED' && u.status !== 'FAILED' && (u.status as string) !== 'INITIATED'
                && !dismissedUploadJobsRef.current.has(u.uploadJobId)
                && (Date.now() - new Date(u.updatedAt).getTime()) < STALE_MS
         );
@@ -906,6 +1513,15 @@ export default function ClosetPage() {
     load();
   }
 
+  // Closet v2 — rename an item (review sheet / detail sheet). Persists to the
+  // user label; the display name falls back to it until the backend adds a
+  // dedicated displayName field.
+  function handleRenameItem(id: string, name: string) {
+    if (DEMO_ITEM_IDS.has(id) || id.startsWith('local_')) return;
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, displayName: name } : i)));
+    updateClosetItemApi(id, { userLabel: name }).catch(() => {});
+  }
+
   function handleUpdateItem(id: string, sel: ItemOptionsSelection) {
     if (DEMO_ITEM_IDS.has(id)) return;
     const subcategory = sel.subcategory;
@@ -972,7 +1588,9 @@ export default function ClosetPage() {
       openAdd('TOPS');
       return;
     }
-    if (!canGenerate) {
+    if (coinsApply) {
+      if (coins < coinCosts.createOutfit) { setShowPremiumGate('generation'); return; }
+    } else if (!canGenerate) {
       if (plansEnabled) { setShowPremiumGate('generation'); return; }
     }
 
@@ -991,7 +1609,14 @@ export default function ClosetPage() {
         [Params.OUTFIT_COUNT_RETURNED]: aiResult.itemIds.length,
       });
       layout = buildLayoutFromIds(aiResult.itemIds, items);
+      refreshCoins(); // AI-генерация образа платная — обновляем баланс
     } catch (err: unknown) {
+      // Нехватка монет (реальный монетный бэк) → экран покупки, не generic-ошибка.
+      if (isInsufficientCoins(err)) {
+        logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: 'INSUFFICIENT_COINS' });
+        setShowPremiumGate('generation');
+        return;
+      }
       const errData = (err as { response?: { data?: { error?: { code?: string; message?: string }; code?: string } } })?.response?.data;
       const code = errData?.error?.code ?? errData?.code;
       if (code === 'NOT_ENOUGH_CLOTHES') {
@@ -1122,7 +1747,8 @@ export default function ClosetPage() {
   const tryOnPersonKeyRef = useRef<string | undefined>(undefined);
 
   function handleTryItOnFromItems(calItems: ClosetItem[]) {
-    if (plansEnabled && !canTryOn) { setShowPremiumGate('tryOn'); return; }
+    if (coinsApply) { if (coins < coinCosts.tryOn) { setShowPremiumGate('tryOn'); return; } }
+    else if (plansEnabled && !canTryOn) { setShowPremiumGate('tryOn'); return; }
     const itemIds = calItems.map((i) => i.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
     if (itemIds.length === 0) return;
 
@@ -1223,6 +1849,7 @@ export default function ClosetPage() {
               tryOnStartTimeRef.current = null;
               setTryOnState({ status: 'completed', resultUrl: result.resultImageUrl });
               saveTryOnResult(result.resultImageUrl);
+              refreshCoins(); // примерка платная — обновляем баланс (возврат при FAILED учтён на бэке)
             } else {
               logAnalyticsEvent(Events.TRYON_FAILED, { [Params.ERROR_CODE]: result.failureReason ?? 'unknown' });
               setTryOnState({ status: 'failed', failureReason: result.failureReason ?? 'Try-on failed. Please try again.' });
@@ -1255,7 +1882,9 @@ export default function ClosetPage() {
   }
 
   function handleTryItOn(canvasIdx = 0) {
-    if (plansEnabled && !canTryOn) {
+    if (coinsApply) {
+      if (coins < coinCosts.tryOn) { setShowPremiumGate('tryOn'); return; }
+    } else if (plansEnabled && !canTryOn) {
       setShowPremiumGate('tryOn');
       return;
     }
@@ -1335,22 +1964,20 @@ export default function ClosetPage() {
 
         {/* Right: action buttons + profile + guide */}
         <div className="flex items-center gap-1.5">
-            {/* Calendar with text */}
-            {/* Plan with text — hidden when plans are disabled */}
-            {plansEnabled && (
-              <button
-                onClick={() => setShowPremiumGate('generation')}
-                className="flex items-center gap-1 px-2.5 h-8 rounded-full text-[11px] font-bold active:scale-[0.95] transition-all"
-                style={{
-                  background: plan === 'free' ? (theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)') : PLAN_COLORS[plan].bg,
-                  color: plan === 'free' ? (theme === 'dark' ? '#aaa' : '#888') : PLAN_COLORS[plan].text,
-                }}
-                aria-label="Plan"
-              >
-                <Crown size={11} strokeWidth={2} color={plan === 'free' ? '#aaa' : PLAN_COLORS[plan].crownColor} />
-                <span>{plan === 'free' ? 'Free' : plan === 'pro' ? 'Plus' : 'Premium'}</span>
-              </button>
-            )}
+            {/* Diamond balance — opens the buy-diamonds sheet */}
+            <button
+              onClick={() => setShowPremiumGate('browse')}
+              className="flex items-center gap-1.5 pl-2 pr-3 h-8 rounded-full text-[13px] font-extrabold active:scale-[0.95] transition-all"
+              style={{
+                background: theme === 'dark' ? 'rgba(243,112,167,0.16)' : '#fdeef6',
+                border: `1px solid ${theme === 'dark' ? 'rgba(243,112,167,0.32)' : '#F8D3E4'}`,
+                color: theme === 'dark' ? '#F5EAF0' : '#B03A72',
+              }}
+              aria-label={t.cn_title}
+            >
+              <Diamond size={16} />
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>{coins}</span>
+            </button>
             {/* Profile icon — hidden inside the Flutter app (it has its own) */}
             {profileEnabled && !isFlutterWebView && (
               <button
@@ -1431,7 +2058,40 @@ export default function ClosetPage() {
             }}
           />
         </div>
-        {/* ── My Outfits ────────────────────────────────────────── */}
+        {/* ── Build your closet hero (v2 gate: until a top + bottom exist) ── */}
+        {buildMode && (
+          <div
+            className="mx-4 mt-3 rounded-3xl overflow-hidden"
+            style={{
+              background: theme === 'dark' ? 'linear-gradient(180deg,#241823,#191319)' : 'linear-gradient(180deg,#faf7fb,#f1ecf3)',
+              border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : '#efe7ef'}`,
+            }}
+          >
+            <div className="px-5 pt-5 pb-1">
+              <h2 className="text-[22px] font-extrabold tracking-[-0.5px] text-black dark:text-white">{t.cv_hero_title}</h2>
+              <p className="text-[13.5px] mt-1 leading-snug" style={{ color: theme === 'dark' ? '#b7a6b3' : '#8a7f88' }}>{t.cv_hero_subtitle}</p>
+            </div>
+            <ClosetGateShowcase dark={theme === 'dark'} />
+          </div>
+        )}
+        {/* ── Get-started nudge (legacy top card; v2 docks it at the bottom) ── */}
+        {showGetStarted && !closetV2 && (
+          <GetStartedCard
+            count={realItemCount}
+            target={GET_STARTED_TARGET}
+            onAdd={() => {
+              logAnalyticsEvent(Events.GET_STARTED_CARD_ADD_TAPPED, { [Params.ITEM_COUNT]: realItemCount });
+              openAdd('TOPS');
+            }}
+            onDismiss={() => {
+              setGetStartedDone();
+              setGsHidden(true);
+              logAnalyticsEvent(Events.GET_STARTED_CARD_DISMISSED, { [Params.ITEM_COUNT]: realItemCount });
+            }}
+          />
+        )}
+        {/* ── My Outfits (hidden until the closet is unlocked: top + bottom) ── */}
+        {!buildMode && (
         <OutfitSection
           activeTab={closetTab}
           onTabChange={setClosetTab}
@@ -1488,14 +2148,14 @@ export default function ClosetPage() {
           }}
           onRegenerate={(idx) => handleNewOutfit(idx)}
           onShowPlans={() => setShowPremiumGate('generation')}
-          onShowCanvasPlans={() => setShowPremiumGate('canvas')}
           onTryItOn={(idx) => handleTryItOn(idx)}
           onDeleteCanvas={handleDeleteCanvas}
           onAddItem={(cat) => openAdd(localCatToSection(cat))}
         />
+        )}
 
-        {/* ── Sections (new taxonomy: Tops · Bottoms · Dresses & Sets · Outerwear · Footwear · Accessories) ── */}
-        {SECTION_ORDER.map((section) => {
+        {/* ── Sections (new taxonomy: Tops · Bottoms · Dresses & Sets · Outerwear · Footwear · Accessories) — hidden during the build-your-closet gate ── */}
+        {!buildMode && SECTION_ORDER.map((section) => {
           const filter = sectionFilter[section] ?? null;
           return (
             <ClothingSection
@@ -1511,6 +2171,8 @@ export default function ClosetPage() {
               onViewAll={() => openViewAllSection(section)}
               onRemovePending={removePendingUpload}
               onAddItem={() => openAdd(section)}
+              beautifyingIds={beautifyingIds}
+              onBeautify={FEATURES.beautifyEnabled ? handleWardrobeBeautify : undefined}
             />
           );
         })}
@@ -1563,26 +2225,128 @@ export default function ClosetPage() {
           }}
           onRegenerate={handleNewOutfit}
           onShowPlans={() => setShowPremiumGate('generation')}
+          onAddProduct={(p) => addCatalogItem(p, { loadingCard: false })}
           canRegenerate={canGenerate}
           plansEnabled={plansEnabled}
         />
       )}
 
-      {/* ── Item Edit Sheet ────────────────────────────────── */}
+      {/* ── Item Detail / Edit Sheet ───────────────────────── */}
       {editItem && (
-        <ItemEditSheet
-          item={editItem}
-          onClose={() => setEditItem(null)}
-          onDelete={(id) => { handleDelete(id); setEditItem(null); }}
-          onSave={(id, sel) => { handleUpdateItem(id, sel); setEditItem(null); }}
+        closetV2 ? (
+          <ItemDetailSheet
+            item={editItem}
+            readOnly={DEMO_ITEM_IDS.has(editItem.id)}
+            beautifyEnabled={FEATURES.beautifyEnabled}
+            dark={theme === 'dark'}
+            onClose={() => setEditItem(null)}
+            onDelete={(id) => { handleDelete(id); setEditItem(null); }}
+            onRename={handleRenameItem}
+            onEditCategory={(id, sel) => handleUpdateItem(id, sel)}
+            onBeautify={(item) => startBeautifyBackground(item)}
+            onTryOn={(item) => { setEditItem(null); handleTryItOnFromItems([item]); }}
+            onChanged={() => load()}
+          />
+        ) : (
+          <ItemEditSheet
+            item={editItem}
+            onClose={() => setEditItem(null)}
+            onDelete={(id) => { handleDelete(id); setEditItem(null); }}
+            onSave={(id, sel) => { handleUpdateItem(id, sel); setEditItem(null); }}
+          />
+        )
+      )}
+
+      {/* ── Batch processing screen (closet v2 Acloset-style add) ── */}
+      {closetV2 && batchAdd && (
+        <AddProcessingSheet
+          jobs={batchAdd.jobs}
+          headerLabel={batchHeaderLabel}
+          dark={theme === 'dark'}
+          onCancel={cancelBatch}
         />
       )}
 
-      {/* ── Premium Gate Sheet — only when plans feature is enabled ── */}
-      {plansEnabled && showPremiumGate && (
-        <PremiumGateSheet
-          reason={showPremiumGate}
-          currentPlan={plan}
+      {/* ── Review window (closet v2 — optimistic local items) ── */}
+      {closetV2 && batchReviewOpen && batchReviewItems.length > 0 && (
+        <UploadReviewSheet
+          items={batchReviewItems}
+          dark={theme === 'dark'}
+          beautifyEnabled={FEATURES.beautifyEnabled}
+          requireComplete
+          detectingIds={batchDetecting}
+          finalizing={finalizingBatch}
+          onClose={() => { if (!finalizingBatch) { setBatchReviewOpen(false); setBatchReview([]); } }}
+          onConfirm={finalizeBatch}
+          onTryOn={() => { /* try-on happens after the item is in the closet */ }}
+          onBeautify={handleReviewBeautify}
+          beautifyMarked={reviewBeautifyMarks}
+          onRename={() => { /* naming is not part of the taxonomy review */ }}
+          onEditCategory={editBatchCategory}
+          onDelete={deleteBatchItem}
+        />
+      )}
+
+      {/* ── Beautify Compare Sheet (closet v2) ─────────────── */}
+      {closetV2 && beautifyItem && (
+        <BeautifyCompareSheet
+          item={beautifyItem}
+          dark={theme === 'dark'}
+          presetBeautifiedUrl={beautifyPreset?.url ?? null}
+          presetJobId={beautifyPreset?.jobId ?? null}
+          onClose={() => { setBeautifyItem(null); setBeautifyPreset(null); }}
+          onNeedCoins={() => setShowPremiumGate('beautify')}
+          onCommitted={(id, choice, imageUrl) => {
+            setBeautifyPreset(null);
+            // Mark that the user has now beautified — the intro won't show again.
+            try { localStorage.setItem('svayp_has_beautified', '1'); } catch { /* private mode */ }
+            if (choice === 'BEAUTIFIED' && imageUrl) {
+              setItems((prev) => prev.map((i) => (i.id === id ? { ...i, imageData: imageUrl } : i)));
+              setBatchReview((prev) => prev.map((ri) => (uploadTrackerRef.current.get(ri.localId)?.realId === id ? { ...ri, previewImage: imageUrl } : ri)));
+            }
+            refreshCoins(); // Beautify платный — обновляем баланс
+            load();
+          }}
+        />
+      )}
+
+      {/* ── "Introducing Beautify" educational popup (closet v2) ── */}
+      {closetV2 && beautifyIntroFor && (
+        <BeautifyIntroSheet
+          dark={theme === 'dark'}
+          from={beautifyIntroFor.from}
+          onBeautify={openBeautifyFromIntro}
+          onSkip={skipBeautifyIntro}
+        />
+      )}
+
+      {/* ── Beautify first-run explainer (add step) ── */}
+      {showBeautifyIntro && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center px-8" style={{ background: 'rgba(15,8,14,0.55)' }} onClick={() => setShowBeautifyIntro(false)}>
+          <div className="w-full max-w-sm rounded-3xl p-6 text-center" style={{ background: theme === 'dark' ? '#1c1c1e' : '#fff' }} onClick={(e) => e.stopPropagation()}>
+            <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#F9A9CB,#F370A7)' }}>
+              <Sparkles size={30} color="#fff" />
+            </div>
+            <h3 className="text-[19px] font-extrabold mb-2" style={{ color: theme === 'dark' ? '#fff' : '#141118' }}>{t.cv_bt_intro_title}</h3>
+            <p className="text-[14px] leading-relaxed mb-5" style={{ color: theme === 'dark' ? '#c9bcc6' : '#5b4f57' }}>{t.cv_bt_intro_body}</p>
+            <button
+              onClick={() => { setShowBeautifyIntro(false); try { localStorage.setItem('svayp_bt_intro', 'true'); } catch { /* private mode */ } setAddBeautifyRequested(true); }}
+              className="w-full h-12 rounded-full text-white text-[15px] font-bold"
+              style={{ background: '#F370A7' }}
+            >
+              {t.cv_bt_intro_cta}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Buy-diamonds sheet (from the header chip or a "not enough" gate) ── */}
+      {showPremiumGate && (
+        <CoinsSheet
+          balance={coins}
+          pricing={coinPricing}
+          needMore={showPremiumGate !== 'browse'}
+          dark={theme === 'dark'}
           onClose={() => {
             logAnalyticsEvent(Events.UPGRADE_MODAL_DISMISSED, {
               [Params.TRIGGER]: showPremiumGate,
@@ -1590,6 +2354,7 @@ export default function ClosetPage() {
             });
             reportPurchaseFunnel('PAYWALL_DISMISSED', showPremiumGate ?? undefined);
             setShowPremiumGate(null);
+            refreshCoins(); // баланс мог измениться (покупка/возврат)
           }}
         />
       )}
@@ -1652,17 +2417,92 @@ export default function ClosetPage() {
         />
       )}
 
-      {/* ── Floating Add Button ── */}
-      <div className="absolute right-6 z-50" style={{ bottom: '20px' }}>
-        <button
-          onClick={() => openAdd('TOPS')}
-          className="relative w-14 h-14 rounded-full flex items-center justify-center shadow-xl active:scale-[0.95] transition-transform"
-          style={{ backgroundColor: '#F370A7' }}
-          aria-label="Add item"
-        >
-          <Plus size={24} strokeWidth={2.5} color="white" />
-        </button>
+      {/* ── Docked "add a top + a bottom to unlock" loader (v2 gate) ── */}
+      {buildMode && (
+        <div className="absolute left-0 right-0 z-40" style={{ bottom: 0 }}>
+          <div
+            className="mx-3 mb-3 rounded-2xl px-4 pt-4 pb-4"
+            style={{
+              background: theme === 'dark' ? '#1c1620' : '#ffffff',
+              border: `1px solid ${theme === 'dark' ? 'rgba(243,112,167,0.28)' : '#F8D3E4'}`,
+              boxShadow: '0 -6px 24px -12px rgba(20,10,20,0.22)',
+            }}
+          >
+            {/* Title */}
+            <p className="text-[13.5px] font-bold leading-snug" style={{ color: theme === 'dark' ? '#F5EAF0' : '#141118' }}>
+              {t.cv_build_subtitle}
+            </p>
+
+            {/* Progress with item thumbnails (top/bottom or dress/footwear) */}
+            <div className="flex items-center gap-1 mt-4 px-1">
+              {gateMilestones.map((m, i) => (
+                <React.Fragment key={m.label}>
+                  {i > 0 && (
+                    <div className="flex-1 h-1.5 rounded-full overflow-hidden -mt-4" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(243,112,167,0.14)' }}>
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(gateDoneCount / 2) * 100}%`, background: 'linear-gradient(90deg,#F9A9CB,#F370A7)' }} />
+                    </div>
+                  )}
+                  <div className="flex flex-col items-center gap-1.5 flex-none">
+                    <div className="relative w-14 h-14 rounded-full flex items-center justify-center overflow-hidden" style={{ background: theme === 'dark' ? '#241823' : '#faf3f7', border: `2px solid ${m.done ? '#2FB27A' : (theme === 'dark' ? 'rgba(255,255,255,0.10)' : '#F1D9E6')}`, opacity: m.done ? 1 : 0.5 }}>
+                      <Image src={m.img} alt="" width={48} height={48} className="object-contain" unoptimized={needsUnoptimized(m.img)} />
+                      {m.done && (
+                        <span className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center" style={{ width: 18, height: 18, background: '#2FB27A', border: `2px solid ${theme === 'dark' ? '#1c1620' : '#fff'}` }}>
+                          <Check size={9} strokeWidth={3.5} color="#fff" />
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[11.5px] font-bold" style={{ color: m.done ? '#2FB27A' : (theme === 'dark' ? '#B79AAC' : '#B03A72') }}>{m.label}</span>
+                  </div>
+                </React.Fragment>
+              ))}
+            </div>
+
+            {/* CTA (or in-flight spinner) */}
+            {pendingUploads.size > 0 ? (
+              <div className="mt-3 h-12 rounded-2xl flex items-center justify-center gap-2 text-[14px] font-bold" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.06)' : '#faf0f5', color: theme === 'dark' ? '#F5EAF0' : '#B03A72' }}>
+                <Loader2 size={17} className="animate-spin" />
+                {t.cv_build_adding}
+              </div>
+            ) : (
+              <button
+                onClick={() => openAdd('TOPS')}
+                className="mt-3 w-full h-12 rounded-2xl flex items-center justify-center gap-2 text-white text-[15px] font-bold active:scale-[0.98] transition-transform"
+                style={{ background: '#F370A7' }}
+                aria-label={t.cv_add_item}
+              >
+                <Plus size={20} strokeWidth={2.6} color="white" />
+                {t.cv_add_item}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Floating Add Button (hidden during the gate — the loader carries the add CTA) ── */}
+      {!buildMode && (
+      <div className="absolute right-5 z-50" style={{ bottom: '20px' }}>
+        {closetV2 ? (
+          <button
+            onClick={() => openAdd('TOPS')}
+            className="flex items-center gap-2 pl-4 pr-5 rounded-full text-white text-[15px] font-bold shadow-xl active:scale-[0.96] transition-transform"
+            style={{ background: '#F370A7', height: 52 }}
+            aria-label={t.cv_add_item}
+          >
+            <Plus size={20} strokeWidth={2.6} color="white" />
+            {t.cv_add_item}
+          </button>
+        ) : (
+          <button
+            onClick={() => openAdd('TOPS')}
+            className="relative w-14 h-14 rounded-full flex items-center justify-center shadow-xl active:scale-[0.95] transition-transform"
+            style={{ backgroundColor: '#F370A7' }}
+            aria-label="Add item"
+          >
+            <Plus size={24} strokeWidth={2.5} color="white" />
+          </button>
+        )}
       </div>
+      )}
 
       {/* ── How-to-use guide ── */}
       <ClosetGuide open={showGuide} onClose={() => setShowGuide(false)} />
@@ -1671,17 +2511,30 @@ export default function ClosetPage() {
       <PhotoTipsSheet open={showItemTips} kind="item" position="fixed" onClose={() => setShowItemTips(false)} />
 
       {/* ── Hidden file inputs for add flow ── */}
-      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAddFileChange} />
+      <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleAddFileChange} />
       <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAddFileChange} />
 
       {/* ── Photo Picker Sheet (shared with market/create) ── */}
       {showAddPicker && !addRawImage && (
-        <PhotoSourceSheet
-          position="fixed"
-          onClose={() => setShowAddPicker(false)}
-          onGallery={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'gallery', [Params.FLOW]: 'closet' }); fileInputRef.current?.click(); setShowAddPicker(false); }}
-          onCamera={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'camera', [Params.FLOW]: 'closet' }); cameraInputRef.current?.click(); setShowAddPicker(false); }}
-        />
+        closetV2 ? (
+          <AddItemSheet
+            dark={theme === 'dark'}
+            showShop={closetV2}
+            addingProductIds={addingProductIds}
+            addedProductIds={addedProductIds}
+            onClose={() => setShowAddPicker(false)}
+            onGallery={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'gallery', [Params.FLOW]: 'closet' }); fileInputRef.current?.click(); setShowAddPicker(false); }}
+            onCamera={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'camera', [Params.FLOW]: 'closet' }); cameraInputRef.current?.click(); setShowAddPicker(false); }}
+            onAddProduct={(p) => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'library', [Params.FLOW]: 'closet' }); addCatalogItem(p); }}
+          />
+        ) : (
+          <PhotoSourceSheet
+            position="fixed"
+            onClose={() => setShowAddPicker(false)}
+            onGallery={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'gallery', [Params.FLOW]: 'closet' }); fileInputRef.current?.click(); setShowAddPicker(false); }}
+            onCamera={() => { logAnalyticsEvent(Events.ADD_ITEM_STARTED, { [Params.SOURCE]: 'camera', [Params.FLOW]: 'closet' }); cameraInputRef.current?.click(); setShowAddPicker(false); }}
+          />
+        )
       )}
 
       {/* ── Add Item Wizard (2 steps: crop → details, mirrors market create) ── */}
@@ -1742,6 +2595,20 @@ export default function ClosetPage() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={addCroppedPreview ?? addRawImage} alt="Item" style={{ maxHeight: '32vh', maxWidth: '100%', display: 'block', borderRadius: 12 }} />
               </div>
+              {closetV2 && FEATURES.beautifyEnabled && (
+                <button
+                  type="button"
+                  onClick={handleBeautifyTapInAdd}
+                  className="w-full mb-5 h-12 rounded-2xl flex items-center justify-center gap-2 text-[14px] font-bold active:scale-[0.98] transition-transform"
+                  style={addBeautifyRequested
+                    ? { background: '#F370A7', color: '#fff' }
+                    : { background: theme === 'dark' ? 'rgba(243,112,167,0.16)' : '#fdeaf3', color: '#F370A7' }}
+                >
+                  <Sparkles size={16} />
+                  {t.cv_bt_button}
+                  {addBeautifyRequested && <Check size={15} strokeWidth={3} />}
+                </button>
+              )}
               <ItemOptionsPicker
                 value={addSelection}
                 onChange={(next) => {
@@ -1906,7 +2773,7 @@ export default function ClosetPage() {
 }
 
 // ─── My Outfits ─────────────────────────────────────────────────────────────────
-function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnError, tryOnHasMore, onRetryTryOns, onLoadMoreTryOns, onDeleteTryOn, calendarDays, canTryOn, onTryItOnItems, allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onShowCanvasPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem, allowAutoGenerate, plansEnabled }: {
+function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnError, tryOnHasMore, onRetryTryOns, onLoadMoreTryOns, onDeleteTryOn, calendarDays, canTryOn, onTryItOnItems, allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem, allowAutoGenerate, plansEnabled }: {
   activeTab: 'boards' | 'outfits' | 'dressme' | 'calendar';
   onTabChange: (tab: 'boards' | 'outfits' | 'dressme' | 'calendar') => void;
   tryOnJobs: TryOnJobResponse[];
@@ -1929,7 +2796,6 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
   canAddCanvas: boolean;
   allowAutoGenerate: boolean;
   plansEnabled: boolean;
-  onShowCanvasPlans: () => void;
   onViewItems: (idx: number) => void;
   onRegenerate: (idx: number) => void;
   onAddCanvas: () => void;
@@ -1992,8 +2858,8 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
             onDelete={idx > 0 ? () => onDeleteCanvas(idx) : undefined}
             onAddItem={onAddItem}
             allowAutoGenerate={allowAutoGenerate}
-            isLocked={plansEnabled && idx >= limits.outfitCanvases}
-            onShowPlans={plansEnabled && idx >= limits.outfitCanvases ? onShowCanvasPlans : onShowPlans}
+            isLocked={false} /* доски не лимитируются планом (июль 2026) */
+            onShowPlans={onShowPlans}
           />
         )) : (
           <OutfitCard
@@ -2014,59 +2880,31 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
           />
         )}
 
-        {/* New outfit card — add board if plan allows, otherwise upgrade prompt */}
-        {!isEmpty && (
-          canAddCanvas ? (
-            <button
-              onClick={onAddCanvas}
-              className="shrink-0 rounded-[28px] flex flex-col items-center justify-center gap-3 border-2 border-dashed active:scale-[0.98] transition-transform"
+        {/* New outfit card — доски бесплатны и не лимитируются планом (июль 2026) */}
+        {!isEmpty && canAddCanvas && (
+          <button
+            onClick={onAddCanvas}
+            className="shrink-0 rounded-[28px] flex flex-col items-center justify-center gap-3 border-2 border-dashed active:scale-[0.98] transition-transform"
+            style={{
+              width: 'min(82vw, 340px)',
+              height: 440,
+              borderColor: theme === 'dark' ? '#4a4a4a' : '#D1D5DB',
+              background: theme === 'dark' ? 'rgba(42,42,42,0.6)' : 'rgba(249,250,251,0.8)',
+            }}
+          >
+            <div
+              className="w-16 h-16 rounded-full flex items-center justify-center"
               style={{
-                width: 'min(82vw, 340px)',
-                height: 440,
-                borderColor: theme === 'dark' ? '#4a4a4a' : '#D1D5DB',
-                background: theme === 'dark' ? 'rgba(42,42,42,0.6)' : 'rgba(249,250,251,0.8)',
+                background: theme === 'dark' ? '#2a2a2a' : '#F3F4F6',
+                boxShadow: theme === 'dark' ? '0 2px 8px rgba(0,0,0,0.4)' : '0 2px 8px rgba(0,0,0,0.08)',
               }}
             >
-              <div
-                className="w-16 h-16 rounded-full flex items-center justify-center"
-                style={{
-                  background: theme === 'dark' ? '#2a2a2a' : '#F3F4F6',
-                  boxShadow: theme === 'dark' ? '0 2px 8px rgba(0,0,0,0.4)' : '0 2px 8px rgba(0,0,0,0.08)',
-                }}
-              >
-                <Plus size={26} strokeWidth={2} style={{ color: theme === 'dark' ? '#888' : '#9ca3af' }} />
-              </div>
-              <div className="text-center px-6">
-                <p className="text-[14px] font-bold" style={{ color: theme === 'dark' ? '#f0f0f0' : '#1f2937' }}>{t.newOutfit}</p>
-                <p className="text-[12px] mt-0.5" style={{ color: theme === 'dark' ? '#888' : '#9ca3af' }}>{limits.outfitCanvases - canvases.length} {t.moreAvailable}</p>
-              </div>
-            </button>
-          ) : (
-            <button
-              onClick={onShowPlans}
-              className="shrink-0 rounded-[28px] flex flex-col items-center justify-center gap-3 border-2 border-dashed active:scale-[0.98] transition-transform"
-              style={{
-                width: 'min(82vw, 340px)',
-                height: 440,
-                borderColor: '#B8860B',
-                background: 'linear-gradient(160deg, rgba(184,134,11,0.04), rgba(139,105,20,0.08))',
-              }}
-            >
-              <div
-                className="w-16 h-16 rounded-full flex items-center justify-center"
-                style={{
-                  background: 'linear-gradient(135deg, #FFF8DC, #FFD700)',
-                  boxShadow: '0 4px 20px rgba(184,134,11,0.25)',
-                }}
-              >
-                <Plus size={26} strokeWidth={2} style={{ color: '#8B6914' }} />
-              </div>
-              <div className="text-center px-6">
-                <p className="text-[14px] font-bold text-gray-700">{t.newOutfit}</p>
-                <p className="text-[12px] font-semibold mt-0.5" style={{ color: '#8B6914' }}>{t.upgradeToGetMore}</p>
-              </div>
-            </button>
-          )
+              <Plus size={26} strokeWidth={2} style={{ color: theme === 'dark' ? '#888' : '#9ca3af' }} />
+            </div>
+            <div className="text-center px-6">
+              <p className="text-[14px] font-bold" style={{ color: theme === 'dark' ? '#f0f0f0' : '#1f2937' }}>{t.newOutfit}</p>
+            </div>
+          </button>
         )}
 
         <div className="w-6 shrink-0" />
@@ -2508,38 +3346,34 @@ function OutfitCard({
         </button>
       )}
 
-      {/* Top-right action buttons */}
-      {(canGenerateOutfit || isEmpty) && (
-        <div className="absolute top-3.5 right-3.5 flex flex-col items-center gap-1.5 z-10">
-          {onRegenerate && (
-            <div className="flex flex-col items-center gap-0.5">
-              <button
-                onClick={isAiSuggesting || isEmpty ? undefined : onRegenerate}
-                disabled={isAiSuggesting || isEmpty}
-                className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform disabled:opacity-40"
-                style={{
-                  background: isAiSuggesting ? 'rgba(99,102,241,0.08)' : (theme === 'dark' ? '#2a2a2a' : '#ffffff'),
-                  boxShadow: isAiSuggesting ? 'none' : (theme === 'dark' ? '0 2px 8px rgba(0,0,0,0.4)' : '0 2px 8px rgba(0,0,0,0.14), 0 1px 3px rgba(0,0,0,0.08)'),
-                }}
-                title={isAiSuggesting ? t.aiThinking : t.regenerateWithAI}
-              >
-                {isAiSuggesting ? (
-                  <Loader2 size={14} strokeWidth={2.2} className="text-indigo-500 animate-spin" />
-                ) : (
-                  <Sparkles size={18} style={{ color: 'rgb(243, 112, 167)' }} />
-                )}
-              </button>
-              {!isAiSuggesting && (
-                <span className="text-[9px] font-semibold leading-none whitespace-nowrap" style={{ color: 'rgb(243, 112, 167)' }}>
-                  {t.generateOutfitLabel}
-                </span>
-              )}
-              <span className="text-[9px] font-semibold leading-none" style={{ color: isAiSuggesting ? '#6366f1' : '#9ca3af' }}>
-                {isAiSuggesting ? 'AI…' : `${genCount}/${regenLimit}`}
-              </span>
-            </div>
+      {/* Top-right: Generate-outfit pill with its diamond cost */}
+      {(canGenerateOutfit || isEmpty) && onRegenerate && (
+        <button
+          onClick={isAiSuggesting || isEmpty ? undefined : onRegenerate}
+          disabled={isAiSuggesting || isEmpty}
+          className="absolute top-3.5 right-3.5 z-10 flex items-center gap-1.5 h-9 pl-3 pr-1.5 rounded-full active:scale-[0.96] transition-transform disabled:opacity-50"
+          style={{
+            background: theme === 'dark' ? '#2a2a2a' : '#ffffff',
+            border: theme === 'dark' ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(243,112,167,0.22)',
+            boxShadow: theme === 'dark' ? '0 3px 10px rgba(0,0,0,0.4)' : '0 3px 12px rgba(243,112,167,0.18), 0 1px 3px rgba(0,0,0,0.06)',
+          }}
+          title={isAiSuggesting ? t.aiThinking : t.regenerateWithAI}
+        >
+          {isAiSuggesting ? (
+            <Loader2 size={15} strokeWidth={2.3} className="animate-spin" style={{ color: '#F370A7' }} />
+          ) : (
+            <Sparkles size={15} style={{ color: '#F370A7' }} />
           )}
-        </div>
+          <span className="text-[12px] font-bold whitespace-nowrap" style={{ color: theme === 'dark' ? '#fff' : '#141118' }}>
+            {isAiSuggesting ? t.aiThinking : t.generateOutfitLabel}
+          </span>
+          {!isAiSuggesting && (
+            <span className="flex items-center gap-0.5 h-[22px] pl-1.5 pr-2 rounded-full" style={{ background: 'rgba(243,112,167,0.12)' }}>
+              <Diamond size={12} />
+              <span className="text-[11px] font-extrabold leading-none" style={{ color: '#C94E86' }}>{ACTION_COST.createOutfit}</span>
+            </span>
+          )}
+        </button>
       )}
 
       {/* Flat-lay Canvas */}
@@ -2690,7 +3524,10 @@ function OutfitCard({
           }}
         >
           <span>{t.tryItOn}</span>
-          <span className="opacity-70 text-[10px] font-medium">{tryOnCount}/{tryOnLimit}</span>
+          <span className="flex items-center gap-0.5 h-[19px] pl-1 pr-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.24)' }}>
+            <Diamond size={11} />
+            <span className="text-[10px] font-extrabold leading-none">{ACTION_COST.tryOn}</span>
+          </span>
         </button>
         )}
       </div>
@@ -2742,9 +3579,13 @@ interface ClothingSectionProps {
   onViewAll: () => void;
   onRemovePending?: (id: string) => void;
   onAddItem?: () => void;
+  /** id вещей, для которых сейчас крутится Beautify в фоне (loader-оверлей на карточке). */
+  beautifyingIds?: Set<string>;
+  /** Тап по значку Beautify на карточке (undefined → значок не показываем). */
+  onBeautify?: (item: ClosetItem) => void;
 }
 
-function ClothingSection({ title, cats, filter, items, totalCount, pendingItems = [], onFilterChange, onTapItem, onViewAll, onRemovePending, onAddItem }: ClothingSectionProps) {
+function ClothingSection({ title, cats, filter, items, totalCount, pendingItems = [], onFilterChange, onTapItem, onViewAll, onRemovePending, onAddItem, beautifyingIds, onBeautify }: ClothingSectionProps) {
   const { t, locale } = useI18n();
   const isEmpty = items.length === 0 && pendingItems.length === 0;
   return (
@@ -2806,7 +3647,9 @@ function ClothingSection({ title, cats, filter, items, totalCount, pendingItems 
             />
           ))}
           {items.map((item) => (
-            <ClothingItemCard key={item.id} item={item} onTap={() => onTapItem(item)} />
+            <ClothingItemCard key={item.id} item={item} onTap={() => onTapItem(item)}
+              isProcessing={beautifyingIds?.has(item.id)} beautifying
+              onBeautify={onBeautify && !item.beautified && !item.sourceProductId ? () => onBeautify(item) : undefined} />
           ))}
         </div>
       )}
@@ -2829,7 +3672,7 @@ function FilterChip({ label, selected, onClick }: { label: string; selected: boo
   );
 }
 
-function ClothingItemCard({ item, onTap, isProcessing, startedAt, onRemove }: { item: ClosetItem; onTap: () => void; isProcessing?: boolean; processingStep?: string; processingProgress?: number; startedAt?: number; onRemove?: () => void }) {
+function ClothingItemCard({ item, onTap, isProcessing, startedAt, onRemove, beautifying, onBeautify }: { item: ClosetItem; onTap: () => void; isProcessing?: boolean; processingStep?: string; processingProgress?: number; startedAt?: number; onRemove?: () => void; beautifying?: boolean; onBeautify?: () => void }) {
   const { t, locale } = useI18n();
 
   // Simulated progress — runs a local timer so the card always animates
@@ -2863,12 +3706,26 @@ function ClothingItemCard({ item, onTap, isProcessing, startedAt, onRemove }: { 
     >
       <div className="relative w-full h-full">
         {item.imageData ? (
-          <Image src={item.imageData} alt={item.category} fill className={`object-contain ${isProcessing ? 'opacity-50' : ''}`} unoptimized={needsUnoptimized(item.imageData)} />
+          // beautified → unoptimized: next/image грузил бы /_next/image?url=…
+          // (другой URL, чем предзагретый raw) → секунда старого фото после свапа.
+          <Image src={item.imageData} alt={item.category} fill className={`object-contain ${isProcessing ? 'opacity-50' : ''}`} unoptimized={needsUnoptimized(item.imageData) || !!item.beautified} />
         ) : (
           <div className="w-full h-full bg-gray-200 animate-pulse" />
         )}
       </div>
-      {/* Processing overlay */}
+      {/* Beautify — прямо на карточке (в попапе вещи кнопки больше нет) */}
+      {!isProcessing && onBeautify && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onBeautify(); }}
+          className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full flex items-center justify-center active:scale-90 transition-transform"
+          style={{ background: '#F370A7', boxShadow: '0 2px 6px -1px rgba(243,112,167,0.55)' }}
+          aria-label="Beautify"
+        >
+          <Sparkles size={14} className="text-white" />
+        </button>
+      )}
+      {/* Processing overlay. Beautify визуально ДРУГОЙ (розовый + Sparkles),
+          чтобы не путался с зелёным лоадером обычной загрузки. */}
       {isProcessing && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 backdrop-blur-[2px]">
           {onRemove && (
@@ -2879,11 +3736,25 @@ function ClothingItemCard({ item, onTap, isProcessing, startedAt, onRemove }: { 
               <X size={13} className="text-white" />
             </button>
           )}
-          <div className="w-8 h-8 mb-1.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-          <span className="text-[9px] font-medium text-white text-center px-2 leading-tight">{currentPhase.label()}</span>
-          <div className="w-[70%] h-1 mt-1.5 rounded-full bg-white/20 overflow-hidden">
-            <div className="h-full bg-green-400 rounded-full transition-all duration-1000" style={{ width: `${simProgress}%` }} />
-          </div>
+          {beautifying ? (
+            <>
+              <div className="w-9 h-9 mb-1.5 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#F9A9CB,#F370A7)' }}>
+                <Sparkles size={16} className="text-white" />
+              </div>
+              <span className="text-[9px] font-semibold text-white text-center px-2 leading-tight">{t.cv_bt_working}</span>
+              <div className="w-[70%] h-1 mt-1.5 rounded-full bg-white/20 overflow-hidden">
+                <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${simProgress}%`, background: '#F370A7' }} />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="w-8 h-8 mb-1.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+              <span className="text-[9px] font-medium text-white text-center px-2 leading-tight">{currentPhase.label()}</span>
+              <div className="w-[70%] h-1 mt-1.5 rounded-full bg-white/20 overflow-hidden">
+                <div className="h-full bg-green-400 rounded-full transition-all duration-1000" style={{ width: `${simProgress}%` }} />
+              </div>
+            </>
+          )}
         </div>
       )}
       {/* Category label */}
@@ -3134,7 +4005,10 @@ function CalendarTab({
             >
               <Sparkles size={13} />
               <span>{t.tryItOn}</span>
-              <span className="opacity-60 text-[11px]">{tryOnCount}/{tryOnLimit}</span>
+              <span className="flex items-center gap-0.5 h-[18px] pl-1 pr-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.24)' }}>
+                <Diamond size={11} />
+                <span className="text-[10px] font-extrabold leading-none">{ACTION_COST.tryOn}</span>
+              </span>
             </button>
           </>
         );
@@ -3270,232 +4144,3 @@ function ItemEditSheet({
   );
 }
 
-// ─── Premium Gate Sheet ─────────────────────────────────────────────────────────
-function PremiumGateSheet({
-  reason,
-  currentPlan,
-  onClose,
-}: {
-  reason: 'generation' | 'items' | 'tryOn' | 'canvas';
-  currentPlan: UserPlan;
-  onClose: () => void;
-}) {
-  const { t } = useI18n();
-  const [yearly, setYearly] = useState(false);
-
-  const plans: {
-    key: UserPlan;
-    label: string;
-    monthlyPrice: number;
-    yearlyPrice: number;
-    yearlyOriginal: number;
-    color: string;
-    gradient: string;
-  }[] = [
-    {
-      key: 'free' as UserPlan,
-      label: 'Free',
-      monthlyPrice: 0,
-      yearlyPrice: 0,
-      yearlyOriginal: 0,
-      color: '#6b7280',
-      gradient: '#f3f4f6',
-    },
-    {
-      key: 'pro' as UserPlan,
-      label: 'Plus',
-      monthlyPrice: 29_000,
-      yearlyPrice: 278_400,
-      yearlyOriginal: 348_000,
-      color: '#F370A7',
-      gradient: 'linear-gradient(135deg, #F370A7 0%, #e0559a 100%)',
-    },
-    {
-      key: 'premium' as UserPlan,
-      label: 'Premium',
-      monthlyPrice: 79_000,
-      yearlyPrice: 758_400,
-      yearlyOriginal: 948_000,
-      color: '#B8860B',
-      gradient: 'linear-gradient(135deg, #B8860B 0%, #8B6914 100%)',
-    },
-  ];
-
-  function handleUpgrade(_planKey: UserPlan) {
-    logAnalyticsEvent(Events.UPGRADE_CTA_TAPPED, {
-      [Params.TRIGGER]: reason,
-      [Params.CURRENT_PLAN]: currentPlan,
-      [Params.DESTINATION]: 'telegram_web',
-    });
-    reportPurchaseFunnel('UPGRADE_CLICKED', reason);
-    // CTA сразу открывает Telegram — фиксируем и следующий шаг воронки
-    reportPurchaseFunnel('TELEGRAM_OPENED', reason);
-    window.open('https://t.me/libasai_admin', '_blank');
-  }
-
-  function formatPrice(price: number) {
-    return price.toLocaleString('uz-UZ');
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-[430px] rounded-t-3xl bg-white overflow-y-auto"
-        style={{ maxHeight: '92vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Drag handle */}
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-9 h-1 rounded-full bg-gray-200" />
-        </div>
-
-        <div className="px-5 pb-8">
-          {/* Header */}
-          <div className="flex justify-center mb-3 mt-3">
-            <div
-              className="w-14 h-14 rounded-full flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, #F370A7 0%, #e0559a 100%)', boxShadow: '0 4px 20px rgba(243,112,167,0.35)' }}
-            >
-              <Crown size={26} color="#fff" strokeWidth={1.8} />
-            </div>
-          </div>
-
-          <h2 className="text-[20px] font-extrabold text-gray-900 text-center mb-2">{t.choosePlan}</h2>
-          <p className="text-[13px] text-gray-500 text-center mb-5 leading-snug px-2">
-            {reason === 'generation'
-              ? t.reachedRegenLimit.replace('{n}', String(PLAN_LIMITS_FALLBACK[currentPlan].regenerations))
-              : reason === 'canvas'
-              ? t.reachedCanvasLimit.replace('{n}', String(PLAN_LIMITS_FALLBACK[currentPlan].outfitCanvases))
-              : reason === 'tryOn'
-              ? t.reachedTryOnLimit.replace('{n}', String(PLAN_LIMITS_FALLBACK[currentPlan].tryItOns))
-              : t.reachedItemLimit.replace('{n}', String(PLAN_LIMITS_FALLBACK[currentPlan].wardrobeItems))}
-          </p>
-
-          {/* Monthly / Yearly toggle */}
-          <div className="flex items-center justify-center gap-2 mb-5">
-            <button
-              onClick={() => setYearly(false)}
-              className={`px-4 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
-                !yearly ? 'bg-black text-white' : 'bg-gray-100 text-gray-500'
-              }`}
-            >
-              {t.monthly}
-            </button>
-            <button
-              onClick={() => setYearly(true)}
-              className={`px-4 py-1.5 rounded-full text-[12px] font-semibold transition-colors relative ${
-                yearly ? 'bg-black text-white' : 'bg-gray-100 text-gray-500'
-              }`}
-            >
-              {t.yearly}
-              <span
-                className="absolute -top-2 -right-2 px-1.5 py-0.5 rounded-full text-[8px] font-bold text-white"
-                style={{ background: '#ef4444' }}
-              >
-                -20%
-              </span>
-            </button>
-          </div>
-
-          {/* Plan cards */}
-          <div className="grid grid-cols-3 gap-2 mb-5">
-            {plans.map((p) => {
-              const isCurrent = currentPlan === p.key;
-              const isPro = p.key === 'pro';
-              const price = yearly ? p.yearlyPrice : p.monthlyPrice;
-              const originalYearly = p.yearlyOriginal;
-              const isFree = p.key === 'free';
-
-              return (
-                <div
-                  key={p.key}
-                  className="rounded-2xl flex flex-col relative overflow-visible"
-                  style={{
-                    border: isPro ? '2.5px solid #F370A7' : '1.5px solid #e5e7eb',
-                    paddingTop: isPro ? '20px' : '12px',
-                    paddingBottom: '12px',
-                    paddingLeft: '10px',
-                    paddingRight: '10px',
-                    background: isPro ? 'linear-gradient(160deg, #fff5f9 0%, #fff 100%)' : '#fff',
-                    boxShadow: isPro ? '0 4px 20px rgba(243,112,167,0.18)' : 'none',
-                  }}
-                >
-                  {/* Most popular badge — Pro only */}
-                  {isPro && (
-                    <span
-                      className="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full text-[9px] font-bold text-white whitespace-nowrap"
-                      style={{ background: 'linear-gradient(135deg, #F370A7 0%, #e0559a 100%)', boxShadow: '0 2px 8px rgba(243,112,167,0.4)' }}
-                    >
-                      ⭐ {t.mostPopular}
-                    </span>
-                  )}
-
-                  {/* Plan icon + name */}
-                  <div className="flex flex-col items-center gap-1 mb-2">
-                    <Crown size={isPro ? 18 : 15} strokeWidth={2} color={p.color} />
-                    <span className="text-[13px] font-bold" style={{ color: p.color }}>{p.label}</span>
-                  </div>
-
-                  {/* Price */}
-                  <div className="text-center mb-2">
-                    {isFree ? (
-                      <div className="flex flex-col items-center">
-                        <span className="text-[16px] font-bold text-gray-900">0</span>
-                        <span className="text-[9px] text-gray-400">{t.sumPerMo}</span>
-                      </div>
-                    ) : yearly ? (
-                      <div className="flex flex-col items-center">
-                        <span className="text-[10px] text-gray-400 line-through">{formatPrice(originalYearly)}</span>
-                        <span className="text-[15px] font-bold text-gray-900">{formatPrice(price)}</span>
-                        <span className="text-[9px] text-gray-400">{t.sumPerYear}</span>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center">
-                        <span className="text-[15px] font-bold text-gray-900">{formatPrice(price)}</span>
-                        <span className="text-[9px] text-gray-400">{t.sumPerMo}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Features */}
-                  <div className="flex flex-col gap-1 mb-3 flex-1">
-                    <span className="text-[9px] text-gray-500">{PLAN_LIMITS_FALLBACK[p.key].wardrobeItems} {t.items}</span>
-                    <span className="text-[9px] text-gray-500">{PLAN_LIMITS_FALLBACK[p.key].outfitCanvases} {t.outfitCanvases}</span>
-                    <span className="text-[9px] text-gray-500">
-                      {PLAN_LIMITS_FALLBACK[p.key].regenerations > 0
-                        ? `${PLAN_LIMITS_FALLBACK[p.key].regenerations} ${t.regens}`
-                        : t.ruleBasedOutfits}
-                    </span>
-                    <span className="text-[9px] text-gray-500">{PLAN_LIMITS_FALLBACK[p.key].tryItOns} {t.tryOns}</span>
-                    {PLAN_LIMITS_FALLBACK[p.key].calendarDays > 0 && (
-                      <span className="text-[9px] text-gray-500">{PLAN_LIMITS_FALLBACK[p.key].calendarDays} {t.calDays}</span>
-                    )}
-                  </div>
-
-                  {/* CTA */}
-                  {isCurrent ? (
-                    <div className="w-full py-2 rounded-xl text-center text-gray-400 font-medium text-[10px] bg-gray-50">
-                      {t.currentPlan}
-                    </div>
-                  ) : !isFree ? (
-                    <button
-                      onClick={() => handleUpgrade(p.key)}
-                      className="w-full py-2 rounded-xl text-white font-bold text-[10px] active:scale-[0.97] transition-transform"
-                      style={{ background: p.gradient, boxShadow: isPro ? '0 2px 10px rgba(243,112,167,0.35)' : 'none' }}
-                    >
-                      {t.upgrade}
-                    </button>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-
-        </div>
-      </div>
-    </div>
-  );
-}

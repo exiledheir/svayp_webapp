@@ -14,7 +14,7 @@ import { createSupportChat } from '@/lib/api';
 import { openNativeChat } from '@/lib/flutter-bridge';
 
 /** Telegram handle for Libas Admin — the universal fallback that always works. */
-export const LIBAS_ADMIN_TELEGRAM_URL = 'https://t.me/libasai_admin';
+export const LIBAS_ADMIN_TELEGRAM_URL = 'https://telegram.me/libasai_admin';
 
 function openAdminTelegram(): void {
   if (typeof window !== 'undefined') {

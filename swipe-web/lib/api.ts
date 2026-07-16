@@ -94,6 +94,27 @@ api.interceptors.response.use(
   }
 );
 
+// ── Helper: detect the 402 INSUFFICIENT_COINS paywall ─────────────────────────
+// Backend returns HTTP 402 with body { error: { code: "INSUFFICIENT_COINS",
+// details: [{field:"required", rejectedValue}, {field:"balance", rejectedValue}] } }
+// on paid actions (try-on / ai-suggest / beautify). Returns the amounts so the UI
+// can open the buy-coins sheet, or null if the error is something else.
+export function isInsufficientCoins(err: unknown): { required: number; balance: number } | null {
+  const e = err as { response?: { status?: number; data?: unknown } };
+  if (e?.response?.status !== 402) return null;
+  const data = e.response.data as Record<string, unknown> | undefined;
+  const error = (data?.error ?? data) as Record<string, unknown> | undefined;
+  if (!error || error.code !== 'INSUFFICIENT_COINS') return null;
+  const details = Array.isArray(error.details) ? (error.details as Array<Record<string, unknown>>) : [];
+  const pick = (field: string): number => {
+    const row = details.find((d) => d.field === field);
+    const v = row?.rejectedValue;
+    const n = typeof v === 'number' ? v : parseInt(String(v ?? ''), 10);
+    return Number.isFinite(n) ? n : 0;
+  };
+  return { required: pick('required'), balance: pick('balance') };
+}
+
 // ── Helper: unwrap the nested data structures the backend uses ────────────────
 
 function unwrapList(d: unknown): unknown[] {
@@ -287,6 +308,20 @@ export async function getAllProducts(page = 0, size = 20, search?: string, categ
   if (search) params.search = search;
   if (category) params.category = category;
   const res = await api.get('/products/all', { params });
+  const list = unwrapList(res.data).map(mapProduct);
+  const d = res.data as Record<string, unknown>;
+  const inner = d?.data as Record<string, unknown> | undefined;
+  const total = (inner?.total ?? list.length) as number;
+  return { products: list, total };
+}
+
+/**
+ * Курируемый каталог для «добавить в гардероб / примерить»: только товары,
+ * предобработанные бэкфиллом (catalog_ready). Показываем именно их, чтобы не
+ * было медленного ML-фолбэка/ошибок примерки на неготовых товарах.
+ */
+export async function getCatalogReadyProducts(page = 0, size = 20): Promise<{ products: Product[]; total: number }> {
+  const res = await api.get('/products/catalog-ready', { params: { page, size } });
   const list = unwrapList(res.data).map(mapProduct);
   const d = res.data as Record<string, unknown>;
   const inner = d?.data as Record<string, unknown> | undefined;

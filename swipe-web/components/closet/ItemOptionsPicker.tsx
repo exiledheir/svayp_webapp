@@ -28,15 +28,14 @@ export function defaultSelectionForSection(section: WardrobeSection): ItemOption
   return { section, subcategory: null, itemType: null, length: null, fitType: null };
 }
 
-/** Whether every applicable field has been chosen (all fields are required). */
+/**
+ * Whether the item is classified enough to add. Only the subcategory (тип вещи)
+ * is required — itemType / length / fit are OPTIONAL refinements (июль 2026):
+ * AI auto-detect (FashionCLIP) reliably gives category+subcategory but not the
+ * fine attributes, so we don't block the user on them.
+ */
 export function isSelectionComplete(sel: ItemOptionsSelection): boolean {
-  if (!sel.subcategory) return false;
-  const def = getSubcategoryDef(sel.subcategory);
-  if (!def) return true;
-  if (def.itemTypes && def.itemTypes.length > 0 && !sel.itemType) return false;
-  if (def.lengths && def.lengths.length > 0 && !sel.length) return false;
-  if (def.hasFit && !sel.fitType) return false;
-  return true;
+  return !!sel.subcategory;
 }
 
 interface ItemOptionsPickerProps {
