@@ -12,7 +12,7 @@ export const COIN_UNIT_DISCOUNTED_UZS = 168;
 export const COIN_DISCOUNT_THRESHOLD = 200;
 export const COIN_DISCOUNT_PCT = 30;
 export const COIN_PACKAGES = [100, 200, 500];
-export const STARTER_BONUS = 15; // выровнено с бэком (coins.starter_bonus); реальное значение — из pricing.starterBonusCoins
+export const STARTER_BONUS = 20; // выровнено с бэком (coins.starter_bonus); реальное значение — из pricing.starterBonusCoins
 
 /** Фолбэк-стоимость действий в монетах (реальные — из pricing.actions). Upload бесплатен. */
 export const ACTION_COST = { createOutfit: 1, beautify: 2, tryOn: 5 } as const;
