@@ -2091,6 +2091,7 @@ export default function ClosetPage() {
         <OutfitSection
           activeTab={closetTab}
           onTabChange={setClosetTab}
+          onOpenFeed={() => router.push('/feed')}
           tryOnJobs={tryOnJobs}
           tryOnLoading={tryOnLoading}
           tryOnError={tryOnError}
@@ -2769,9 +2770,10 @@ export default function ClosetPage() {
 }
 
 // ─── My Outfits ─────────────────────────────────────────────────────────────────
-function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnError, tryOnHasMore, onRetryTryOns, onLoadMoreTryOns, onDeleteTryOn, calendarDays, canTryOn, onTryItOnItems, allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem, allowAutoGenerate, plansEnabled }: {
+function OutfitSection({ activeTab, onTabChange, onOpenFeed, tryOnJobs, tryOnLoading, tryOnError, tryOnHasMore, onRetryTryOns, onLoadMoreTryOns, onDeleteTryOn, calendarDays, canTryOn, onTryItOnItems, allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem, allowAutoGenerate, plansEnabled }: {
   activeTab: 'boards' | 'outfits' | 'dressme' | 'calendar';
   onTabChange: (tab: 'boards' | 'outfits' | 'dressme' | 'calendar') => void;
+  onOpenFeed: () => void;
   tryOnJobs: TryOnJobResponse[];
   tryOnLoading: boolean;
   tryOnError: boolean;
@@ -2807,15 +2809,20 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
 
   return (
     <div className="mt-4">
-      {/* ── Tabs: Boards · Outfits · Dress Me ─────────────────────── */}
+      {/* ── Tabs: Boards · Outfits · Calendar · Feed ───────────────── */}
+      {/* Dress Me tab retired (июль 2026) — DressMeReels kept below, just
+          no longer surfaced in the strip; "Feed" opens the full /feed page. */}
       <div className="px-4 mb-3.5 flex justify-center">
         <div className="inline-flex p-1 rounded-full gap-1" style={{ background: theme === 'dark' ? '#1f1f1f' : '#F1F1F3' }}>
-          {([['boards', t.tabBoards], ['outfits', t.tabOutfits], ['dressme', t.tabDressMe], ['calendar', t.tabCalendar]] as const).map(([key, label]) => {
-            const active = activeTab === key;
+          {([['boards', t.tabBoards], ['outfits', t.tabOutfits], ['calendar', t.tabCalendar], ['feed', t.tabFeed]] as const).map(([key, label]) => {
+            const active = key !== 'feed' && activeTab === key;
             return (
               <button
                 key={key}
-                onClick={() => onTabChange(key)}
+                onClick={() => {
+                  if (key === 'feed') { onOpenFeed(); return; }
+                  onTabChange(key);
+                }}
                 className="px-3 py-1.5 rounded-full text-[13px] font-semibold transition-all active:scale-95 whitespace-nowrap"
                 style={{
                   background: active ? (theme === 'dark' ? '#2e2e2e' : '#FFFFFF') : 'transparent',
