@@ -11,6 +11,7 @@ import type { FeedPost } from '@/types/feed';
 import FeedGuard from '@/components/feed/FeedGuard';
 import FeedCard from '@/components/feed/FeedCard';
 import CommentsSheet from '@/components/feed/CommentsSheet';
+import ClosetSectionTabs from '@/components/ClosetSectionTabs';
 import { getPageCache, setPageCache } from '@/lib/page-cache';
 
 const PAGE_SIZE = 10;
@@ -186,6 +187,13 @@ function FeedHome() {
               <User size={18} />
             </button>
           </div>
+        </div>
+
+        {/* Sub-tabs (Boards · Outfits · Calendar · Feed) — same strip as the
+            Closet page so the other tabs stay reachable while viewing the Feed;
+            tapping one routes back to /closet on that tab. */}
+        <div className="shrink-0 bg-white dark:bg-[#1c1c1e] border-b border-black/5 dark:border-white/10">
+          <ClosetSectionTabs active="feed" className="px-4 py-2" />
         </div>
 
         {/* Feed list (pull down from the top to refresh) */}

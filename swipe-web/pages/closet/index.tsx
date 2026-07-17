@@ -39,6 +39,7 @@ import Diamond from '@/components/closet/Diamond';
 import { ACTION_COST, actionCosts, fetchCoinBalance, fetchCoinPricing, type CoinPricing } from '@/lib/coins';
 import { isInsufficientCoins } from '@/lib/api';
 import ItemDetailSheet from '@/components/closet/ItemDetailSheet';
+import ClosetSectionTabs from '@/components/ClosetSectionTabs';
 import { saveUploadPreview, getUploadPreview, clearUploadPreview } from '@/lib/upload-previews';
 import { compressImageForUpload } from '@/lib/image-utils';
 import {
@@ -313,6 +314,12 @@ export default function ClosetPage() {
   const [canvasInitialLayout, setCanvasInitialLayout] = useState<SavedCanvasLayout | null>(null);
   // ── Closet top-section tabs: Boards / Outfits / Dress Me ─────────────────
   const [closetTab, setClosetTab] = useState<'boards' | 'outfits' | 'dressme' | 'calendar'>('boards');
+  // Honour ?tab=… so tapping Boards/Outfits/Calendar from the Feed page (which
+  // renders the same tab strip) returns here on the chosen tab.
+  useEffect(() => {
+    const q = router.query.tab;
+    if (q === 'boards' || q === 'outfits' || q === 'calendar') setClosetTab(q);
+  }, [router.query.tab]);
   // Try-on history (Outfits tab) — loaded lazily on first visit, paginated.
   const [tryOnJobs, setTryOnJobs] = useState<TryOnJobResponse[]>([]);
   const [tryOnLoading, setTryOnLoading] = useState(false);
@@ -2091,7 +2098,6 @@ export default function ClosetPage() {
         <OutfitSection
           activeTab={closetTab}
           onTabChange={setClosetTab}
-          onOpenFeed={() => router.push('/feed')}
           tryOnJobs={tryOnJobs}
           tryOnLoading={tryOnLoading}
           tryOnError={tryOnError}
@@ -2770,10 +2776,9 @@ export default function ClosetPage() {
 }
 
 // ─── My Outfits ─────────────────────────────────────────────────────────────────
-function OutfitSection({ activeTab, onTabChange, onOpenFeed, tryOnJobs, tryOnLoading, tryOnError, tryOnHasMore, onRetryTryOns, onLoadMoreTryOns, onDeleteTryOn, calendarDays, canTryOn, onTryItOnItems, allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem, allowAutoGenerate, plansEnabled }: {
+function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnError, tryOnHasMore, onRetryTryOns, onLoadMoreTryOns, onDeleteTryOn, calendarDays, canTryOn, onTryItOnItems, allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem, allowAutoGenerate, plansEnabled }: {
   activeTab: 'boards' | 'outfits' | 'dressme' | 'calendar';
   onTabChange: (tab: 'boards' | 'outfits' | 'dressme' | 'calendar') => void;
-  onOpenFeed: () => void;
   tryOnJobs: TryOnJobResponse[];
   tryOnLoading: boolean;
   tryOnError: boolean;
@@ -2811,31 +2816,9 @@ function OutfitSection({ activeTab, onTabChange, onOpenFeed, tryOnJobs, tryOnLoa
     <div className="mt-4">
       {/* ── Tabs: Boards · Outfits · Calendar · Feed ───────────────── */}
       {/* Dress Me tab retired (июль 2026) — DressMeReels kept below, just
-          no longer surfaced in the strip; "Feed" opens the full /feed page. */}
-      <div className="px-4 mb-3.5 flex justify-center">
-        <div className="inline-flex p-1 rounded-full gap-1" style={{ background: theme === 'dark' ? '#1f1f1f' : '#F1F1F3' }}>
-          {([['boards', t.tabBoards], ['outfits', t.tabOutfits], ['calendar', t.tabCalendar], ['feed', t.tabFeed]] as const).map(([key, label]) => {
-            const active = key !== 'feed' && activeTab === key;
-            return (
-              <button
-                key={key}
-                onClick={() => {
-                  if (key === 'feed') { onOpenFeed(); return; }
-                  onTabChange(key);
-                }}
-                className="px-3 py-1.5 rounded-full text-[13px] font-semibold transition-all active:scale-95 whitespace-nowrap"
-                style={{
-                  background: active ? (theme === 'dark' ? '#2e2e2e' : '#FFFFFF') : 'transparent',
-                  color: active ? '#F370A7' : (theme === 'dark' ? '#9ca3af' : '#6b7280'),
-                  boxShadow: active ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+          no longer surfaced in the strip; "Feed" opens the full /feed page,
+          which renders this same strip so the other tabs stay reachable. */}
+      <ClosetSectionTabs active={activeTab} onLocalSelect={onTabChange} />
 
       {activeTab === 'boards' && (
       <div
