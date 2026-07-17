@@ -312,6 +312,30 @@ export default function ClosetPage() {
   const [canvases, setCanvases] = useState<{ id: string | null; layout: SavedCanvasLayout }[]>([]);
   const [editingCanvasIdx, setEditingCanvasIdx] = useState<number | null>(null);
   const [canvasInitialLayout, setCanvasInitialLayout] = useState<SavedCanvasLayout | null>(null);
+  // ── First-outfit auto-generation guard ────────────────────────────────────
+  // User-scoped (falls back to a device key before the profile has loaded) so a
+  // re-registration or second account on the SAME device still gets its first
+  // outfit auto-built. The old flag was device-wide and never cleared, so anyone
+  // who had already run the flow once — re-registration, shared/test device —
+  // was left staring at an empty canvas. Written only AFTER a generation
+  // actually succeeds (see handleNewOutfit), so a failed first attempt retries
+  // on the next visit instead of sticking forever.
+  const firstOutfitKey = useMemo(() => {
+    const u = getUser();
+    const uid = (u?.id ?? u?.userId ?? u?.user_id) as string | number | undefined;
+    return `libas_first_outfit_autogen:${uid ?? 'device'}`;
+  }, []);
+  // Default `true` (assume done) until the client-side read settles, so we never
+  // fire before knowing the guard's real value (localStorage is unavailable in SSR).
+  const [autoGenDone, setAutoGenDone] = useState(true);
+  useEffect(() => {
+    try { setAutoGenDone(localStorage.getItem(firstOutfitKey) === '1'); }
+    catch { setAutoGenDone(false); }
+  }, [firstOutfitKey]);
+  const markFirstOutfitDone = useCallback(() => {
+    setAutoGenDone(true);
+    try { localStorage.setItem(firstOutfitKey, '1'); } catch { /* private mode */ }
+  }, [firstOutfitKey]);
   // ── Closet top-section tabs: Boards / Outfits / Dress Me ─────────────────
   const [closetTab, setClosetTab] = useState<'boards' | 'outfits' | 'dressme' | 'calendar'>('boards');
   // Honour ?tab=… so tapping Boards/Outfits/Calendar from the Feed page (which
@@ -369,7 +393,7 @@ export default function ClosetPage() {
   const [coins, setCoinsState] = useState(0);
   const [coinPricing, setCoinPricing] = useState<CoinPricing | null>(null);
   const refreshCoins = useCallback(() => {
-    fetchCoinBalance().then((b) => setCoinsState(b.balance)).catch(() => { /* offline — keep last known */ });
+    return fetchCoinBalance().then((b) => setCoinsState(b.balance)).catch(() => { /* offline — keep last known */ });
   }, []);
   useEffect(() => {
     refreshCoins();
@@ -593,6 +617,10 @@ export default function ClosetPage() {
   const [addSaving, setAddSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [pendingUploads, setPendingUploads] = useState<Map<string, { category: ClosetCategory; imageData: string; step: string; progress: number; startedAt: number }>>(new Map());
+  // After an item is added (from the library/catalog or a photo), scroll the
+  // closet down to that item's section so the user actually sees it appear /
+  // process — landing back at the top hid where the item went.
+  const [scrollTargetSection, setScrollTargetSection] = useState<WardrobeSection | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const cropImgRef = useRef<HTMLImageElement>(null);
@@ -650,7 +678,8 @@ export default function ClosetPage() {
     if (pullDistance >= PULL_THRESHOLD && !isPullRefreshing) {
       setIsPullRefreshing(true);
       setPullDistance(0);
-      await Promise.all([load(), fetchPlan()]);
+      // Refresh the diamond balance too — it was going stale on pull-to-refresh.
+      await Promise.all([load(), fetchPlan(), refreshCoins()]);
       setIsPullRefreshing(false);
     } else {
       setPullDistance(0);
@@ -674,6 +703,20 @@ export default function ClosetPage() {
     el.addEventListener('touchmove', onMove, { passive: false });
     return () => el.removeEventListener('touchmove', onMove);
   }, []);
+
+  // Scroll to the section of a just-added item once its card has rendered. Runs
+  // after the pending-upload / items state that adds the card commits, so the
+  // section has grown to include it before we measure and scroll.
+  useEffect(() => {
+    if (!scrollTargetSection) return;
+    const container = mainScrollRef.current;
+    const el = document.getElementById(`closet-section-${scrollTargetSection}`);
+    if (container && el) {
+      const top = container.scrollTop + (el.getBoundingClientRect().top - container.getBoundingClientRect().top) - 8;
+      container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    }
+    setScrollTargetSection(null);
+  }, [scrollTargetSection, pendingUploads, items]);
 
   function openAdd(section: WardrobeSection = 'TOPS') {
     if (plansEnabled && !canAddItem()) {
@@ -1050,6 +1093,7 @@ export default function ClosetPage() {
 
     // Immediately close the add sheet and show placeholder in grid
     setPendingUploads((prev) => new Map(prev).set(pendingId, { category, imageData: previewImage, step: t.uploading, progress: 0, startedAt: uploadStartedAt }));
+    setScrollTargetSection(localCatToSection(category)); // reveal the processing card
     setAddRawImage('');
     setShowAddPicker(false);
     setAddBeautifyRequested(false);
@@ -1189,7 +1233,11 @@ export default function ClosetPage() {
 
     try {
       const created = await addWardrobeItemFromCatalog(product.id);
-      showPlaceholder(created.subcategory ? subcategoryToLocal(created.subcategory) : 'accessories');
+      const placedCat = created.subcategory ? subcategoryToLocal(created.subcategory) : 'accessories';
+      showPlaceholder(placedCat);
+      // Bring the section into view so the user sees the item added / processing
+      // (only for the wardrobe flow — the canvas picker passes loadingCard:false).
+      if (loadingCard) setScrollTargetSection(localCatToSection(placedCat));
       // Гардероб: держим заглушку ~5с для паритета с загрузкой. Канва: сразу
       // размещаем обработанную вещь без таймаута.
       if (loadingCard) {
@@ -1576,21 +1624,33 @@ export default function ClosetPage() {
 
   const [aiSuggestingIdx, setAiSuggestingIdx] = useState<number | null>(null);
 
-  async function handleNewOutfit(canvasIdx = 0) {
+  async function handleNewOutfit(canvasIdx = 0, opts?: { auto?: boolean }) {
     if (hasDemoItems) {
+      if (opts?.auto) return; // never block/interrupt on the silent first auto-gen
       setOutfitBlockedModal({ title: t.demoAddTitle, body: t.demoAddBody });
       return;
     }
     const hasUpper = items.some((i) => UPPER_CATS.includes(i.category));
     const hasLower = items.some((i) => LOWER_CATS.includes(i.category));
-    if (!hasUpper || !hasLower) {
+    const hasDress = items.some((i) => FULL_BODY_CATS.includes(i.category));
+    // A dress/jumpsuit is a complete outfit on its own, so it doesn't need a
+    // bottom — mirror OutfitCard's canGenerateOutfit so the 1-dress+1-shoes
+    // onboarding path generates instead of bouncing to the "add a top" sheet.
+    const canBuildOutfit = hasDress || (hasUpper && hasLower);
+    if (!canBuildOutfit) {
+      if (opts?.auto) return; // silent auto-gen never pops the add sheet
       openAdd('TOPS');
       return;
     }
-    if (coinsApply) {
-      if (coins < coinCosts.createOutfit) { setShowPremiumGate('generation'); return; }
-    } else if (!canGenerate) {
-      if (plansEnabled) { setShowPremiumGate('generation'); return; }
+    // The silent first auto-gen never puts up a paywall — if the user can't
+    // afford the AI call the backend rejects it and we fall back to a local
+    // placement below, so the canvas still fills.
+    if (!opts?.auto) {
+      if (coinsApply) {
+        if (coins < coinCosts.createOutfit) { setShowPremiumGate('generation'); return; }
+      } else if (!canGenerate) {
+        if (plansEnabled) { setShowPremiumGate('generation'); return; }
+      }
     }
 
     logAnalyticsEvent(Events.OUTFIT_GENERATE_TAPPED, {
@@ -1610,8 +1670,14 @@ export default function ClosetPage() {
       layout = buildLayoutFromIds(aiResult.itemIds, items);
       refreshCoins(); // AI-генерация образа платная — обновляем баланс
     } catch (err: unknown) {
-      // Нехватка монет (реальный монетный бэк) → экран покупки, не generic-ошибка.
-      if (isInsufficientCoins(err)) {
+      // Silent first auto-gen: never surface an error or leave the canvas empty.
+      // The just-added items may still be embedding on the backend (ai-suggest
+      // throws NOT_ENOUGH_CLOTHES), so fall back to a local top+bottom placement
+      // — the wardrobe is already known to form an outfit.
+      if (opts?.auto) {
+        logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: 'AUTO_FALLBACK' });
+        layout = generateRandomOutfit(items);
+      } else if (isInsufficientCoins(err)) {
         logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: 'INSUFFICIENT_COINS' });
         setShowPremiumGate('generation');
         return;
@@ -1663,6 +1729,10 @@ export default function ClosetPage() {
     }
 
     if (!layout) return;
+
+    // A layout exists now — the user has their first outfit, so don't auto-gen
+    // again (persisted per-user so it survives reloads without re-calling the AI).
+    markFirstOutfitDone();
 
     setCanvases((prev) => {
       const updated = [...prev];
@@ -2117,6 +2187,8 @@ export default function ClosetPage() {
           tryOnCount={usage.tryItOnsUsed}
           aiSuggestingIdx={aiSuggestingIdx}
           allowAutoGenerate={!isLoading && canvasesLoaded}
+          autoGenDone={autoGenDone}
+          onAutoGenerate={() => handleNewOutfit(0, { auto: true })}
           onViewItems={(idx) => {
             const layout = displayCanvases[idx]?.layout ?? null;
             setEditingCanvasIdx(idx);
@@ -2161,8 +2233,8 @@ export default function ClosetPage() {
         {!buildMode && SECTION_ORDER.map((section) => {
           const filter = sectionFilter[section] ?? null;
           return (
+            <div key={section} id={`closet-section-${section}`} style={{ scrollMarginTop: 8 }}>
             <ClothingSection
-              key={section}
               title={taxLabel(section, locale)}
               cats={subcategoriesForSection(section)}
               filter={filter}
@@ -2177,6 +2249,7 @@ export default function ClosetPage() {
               beautifyingIds={beautifyingIds}
               onBeautify={FEATURES.beautifyEnabled ? handleWardrobeBeautify : undefined}
             />
+            </div>
           );
         })}
 
@@ -2776,7 +2849,7 @@ export default function ClosetPage() {
 }
 
 // ─── My Outfits ─────────────────────────────────────────────────────────────────
-function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnError, tryOnHasMore, onRetryTryOns, onLoadMoreTryOns, onDeleteTryOn, calendarDays, canTryOn, onTryItOnItems, allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem, allowAutoGenerate, plansEnabled }: {
+function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnError, tryOnHasMore, onRetryTryOns, onLoadMoreTryOns, onDeleteTryOn, calendarDays, canTryOn, onTryItOnItems, allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem, allowAutoGenerate, autoGenDone, onAutoGenerate, plansEnabled }: {
   activeTab: 'boards' | 'outfits' | 'dressme' | 'calendar';
   onTabChange: (tab: 'boards' | 'outfits' | 'dressme' | 'calendar') => void;
   tryOnJobs: TryOnJobResponse[];
@@ -2798,6 +2871,8 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
   tryOnCount: number;
   canAddCanvas: boolean;
   allowAutoGenerate: boolean;
+  autoGenDone: boolean;
+  onAutoGenerate: () => void;
   plansEnabled: boolean;
   onViewItems: (idx: number) => void;
   onRegenerate: (idx: number) => void;
@@ -2844,6 +2919,8 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
             onDelete={idx > 0 ? () => onDeleteCanvas(idx) : undefined}
             onAddItem={onAddItem}
             allowAutoGenerate={allowAutoGenerate}
+            autoGenDone={autoGenDone}
+            onAutoGenerate={onAutoGenerate}
             isLocked={false} /* доски не лимитируются планом (июль 2026) */
             onShowPlans={onShowPlans}
           />
@@ -2863,6 +2940,8 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
             tryOnLimit={limits.tryItOns}
             onAddItem={onAddItem}
             allowAutoGenerate={allowAutoGenerate}
+            autoGenDone={autoGenDone}
+            onAutoGenerate={onAutoGenerate}
           />
         )}
 
@@ -3241,6 +3320,8 @@ function OutfitCard({
   onDelete,
   onAddItem,
   allowAutoGenerate,
+  autoGenDone,
+  onAutoGenerate,
   isLocked,
   onShowPlans,
 }: {
@@ -3259,6 +3340,8 @@ function OutfitCard({
   onDelete?: () => void | Promise<void>;
   onAddItem?: (cat: ClosetCategory) => void;
   allowAutoGenerate: boolean;
+  autoGenDone: boolean;
+  onAutoGenerate?: () => void;
   isLocked?: boolean;
   onShowPlans?: () => void;
 }) {
@@ -3288,25 +3371,22 @@ function OutfitCard({
   }, [savedLayout, allItems]);
 
   // Auto-generate the user's FIRST outfit as soon as the wardrobe is ready (a top
-  // + bottom, or a dress) — no need to tap the generate button. Fires at most once
-  // ever (localStorage guard) so page reloads with a ready-but-unsaved wardrobe
-  // don't re-call the paid AI endpoint and burn the user's quota. Unlike the old
-  // false→true transition check, this also fires when the wardrobe is already ready
-  // on load / once `allowAutoGenerate` settles, which is the common first-run case.
+  // + bottom, or a dress) — no need to tap the generate button. `autoGenDone` is
+  // the persisted, per-user guard (owned by the parent, set only after a
+  // generation succeeds) so reloads with a ready-but-unsaved wardrobe don't
+  // re-call the paid AI endpoint, while a failed first attempt still retries next
+  // visit. `autoGenFiredRef` dedupes within this mount. Firing while the wardrobe
+  // is already ready on load is intentional — that's the common first-run case.
   const autoGenFiredRef = React.useRef(false);
   React.useEffect(() => {
-    if (autoGenFiredRef.current) return;
+    if (autoGenFiredRef.current || autoGenDone) return;
     if (!allowAutoGenerate || !canGenerateOutfit) return;
-    if (displayEntries.length > 0 || isAiSuggesting || !onRegenerate) return;
+    if (displayEntries.length > 0 || isAiSuggesting || !onAutoGenerate) return;
     const isDemo = allItems.length > 0 && allItems.every((i) => DEMO_ITEM_IDS.has(i.id));
     if (isDemo) return;
-    let alreadyDone = false;
-    try { alreadyDone = localStorage.getItem('libas_first_outfit_autogen') === '1'; } catch { /* private mode */ }
-    if (alreadyDone) return;
-    try { localStorage.setItem('libas_first_outfit_autogen', '1'); } catch { /* private mode */ }
     autoGenFiredRef.current = true;
-    onRegenerate();
-  }, [canGenerateOutfit, allowAutoGenerate, displayEntries.length, isAiSuggesting]); // eslint-disable-line react-hooks/exhaustive-deps
+    onAutoGenerate();
+  }, [canGenerateOutfit, allowAutoGenerate, displayEntries.length, isAiSuggesting, autoGenDone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div
