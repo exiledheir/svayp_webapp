@@ -45,6 +45,8 @@ export default function BeautifyIntroSheet({
         <div className="flex justify-center pt-3 pb-1"><div className="w-9 h-1 rounded-full" style={{ background: dark ? '#3a3a3c' : '#e2dbe1' }} /></div>
         <button onClick={handleSkip} aria-label={t.close} className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center" style={{ color: sub }}><X size={20} /></button>
 
+        {/* Скроллируемая часть — на малых экранах кнопки и чекбокс всегда видны */}
+        <div className="overflow-y-auto min-h-0">
         {/* Header */}
         <div className="px-8 pt-4 text-center">
           <p className="text-[12.5px] font-bold tracking-wide" style={{ color: '#F370A7' }}>{t.cv_bt_auto_kicker}</p>
@@ -53,7 +55,9 @@ export default function BeautifyIntroSheet({
 
         {/* Animated before → after demo */}
         <div className="px-5 pt-4 pb-1">
-          <div className="bt-stage relative w-full rounded-2xl overflow-hidden" style={{ height: 320, background: stageBg }}>
+          {/* Адаптивная высота: на низких экранах демо сжимается, чтобы кнопки
+              и «Больше не показывать» не уезжали за нижний край. */}
+          <div className="bt-stage relative w-full rounded-2xl overflow-hidden" style={{ height: 'clamp(180px, 30vh, 320px)', background: stageBg }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={DEMO_ORIGINAL} alt="" className="bt-orig absolute inset-0 w-full h-full object-contain" />
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -77,9 +81,10 @@ export default function BeautifyIntroSheet({
             <span className="text-[13px]" style={{ color: sub }}>· {t.cv_bt_per_photo}</span>
           </div>
         </div>
+        </div>{/* /скроллируемая часть */}
 
-        {/* Actions */}
-        <div className="flex flex-col gap-2 px-5 pt-3 pb-6">
+        {/* Actions — вне скролла, всегда видны вместе с чекбоксом */}
+        <div className="flex flex-col gap-2 px-5 pt-3 pb-6 flex-none">
           <button
             onClick={handleBeautify}
             className="h-14 rounded-2xl text-white text-[16px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
