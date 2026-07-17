@@ -268,7 +268,8 @@ export default function UploadReviewSheet({
                   return (
                     <button
                       onClick={() => onBeautify(item)}
-                      className="inline-flex items-center gap-1.5 mt-2 h-7 pl-3 pr-2.5 rounded-full text-white text-[12px] font-bold active:scale-[0.96] transition-all"
+                      disabled={marked}
+                      className="inline-flex items-center gap-1.5 mt-2 h-7 pl-3 pr-2.5 rounded-full text-white text-[12px] font-bold active:scale-[0.96] transition-all disabled:active:scale-100"
                       style={{ background: marked ? '#141014' : '#F370A7', boxShadow: marked ? 'inset 0 0 0 1.5px #F370A7' : 'none' }}
                     >
                       {marked && <Check size={13} strokeWidth={3} />}

@@ -926,15 +926,12 @@ export default function ClosetPage() {
 
   // Beautify a batch item — await its background upload for the real id, then open
   // the compare sheet on the user's own photo.
-  // Отметки Beautify в ревью: тап по кнопке только помечает строку; реальное
-  // улучшение стартует после «Добавить в гардероб» (finalizeBatch).
+  // Отметки Beautify в ревью: тап по кнопке помечает строку ОДИН раз (one-shot,
+  // откатить/перенажать нельзя); реальное улучшение стартует после
+  // «Добавить в гардероб» (finalizeBatch).
   const [reviewBeautifyMarks, setReviewBeautifyMarks] = useState<Set<string>>(new Set());
-  function toggleReviewBeautify(localId: string) {
-    setReviewBeautifyMarks((prev) => {
-      const n = new Set(prev);
-      if (n.has(localId)) n.delete(localId); else n.add(localId);
-      return n;
-    });
+  function markReviewBeautify(localId: string) {
+    setReviewBeautifyMarks((prev) => new Set(prev).add(localId));
   }
 
   // Review "Beautify" pill → always show the educational popup first (unless the
@@ -942,14 +939,16 @@ export default function ClosetPage() {
   function beautifyIntroNever(): boolean {
     try { return localStorage.getItem('svayp_beautify_intro_never') === '1'; } catch { return false; }
   }
-  // Тап Beautify в ревью: intro-попап (первый раз) → далее просто TOGGLE отметки.
+  // Тап Beautify в ревью: intro-попап (первый раз) → отметка. One-shot: уже
+  // отмеченная строка повторные тапы игнорирует (кнопка задизейблена).
   // Улучшение стартует после «Добавить в гардероб» (finalizeBatch).
   function handleReviewBeautify(item: ClosetItem) {
-    if (!beautifyIntroNever() && !reviewBeautifyMarks.has(item.id)) {
+    if (reviewBeautifyMarks.has(item.id)) return;
+    if (!beautifyIntroNever()) {
       setBeautifyIntroFor({ localId: item.id, from: 'beautify' });
       return;
     }
-    toggleReviewBeautify(item.id);
+    markReviewBeautify(item.id);
   }
   // Тап ✨ на карточке гардероба: тот же intro-гейт, затем фоновый beautify.
   function handleWardrobeBeautify(item: ClosetItem) {
@@ -966,7 +965,7 @@ export default function ClosetPage() {
       if (it) startBeautifyBackground(it);
     } else {
       // Ревью: intro лишь отмечает кнопку — улучшение стартует при добавлении.
-      toggleReviewBeautify(intro.localId);
+      markReviewBeautify(intro.localId);
     }
   }
   function skipBeautifyIntro() { setBeautifyIntroFor(null); }
