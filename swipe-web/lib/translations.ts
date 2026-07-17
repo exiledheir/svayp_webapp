@@ -204,6 +204,7 @@ export interface Translations {
   tabOutfits: string;
   tabDressMe: string;
   tabCalendar: string;
+  tabFeed: string;
   noTryOnsYet: string;
   noTryOnsHint: string;
   dressMeNeedsItems: string;
@@ -1000,6 +1001,7 @@ const en: Translations = {
   tabOutfits: 'Outfits',
   tabDressMe: 'Dress Me',
   tabCalendar: 'Calendar',
+  tabFeed: 'Feed',
   noTryOnsYet: 'No try-ons yet',
   noTryOnsHint: 'Your virtual try-on results will appear here.',
   dressMeNeedsItems: 'Add tops, bottoms and footwear to mix and match looks.',
@@ -1787,6 +1789,7 @@ const ru: Translations = {
   tabOutfits: 'Образы',
   tabDressMe: 'Примерочная',
   tabCalendar: 'Календарь',
+  tabFeed: 'Лента',
   noTryOnsYet: 'Примерок пока нет',
   noTryOnsHint: 'Здесь появятся результаты виртуальной примерки.',
   dressMeNeedsItems: 'Добавьте верх, низ и обувь, чтобы собирать образы.',
@@ -2576,6 +2579,7 @@ const uz: Translations = {
   tabOutfits: 'Obrazlar',
   tabDressMe: 'Kiyintirish',
   tabCalendar: 'Kalendar',
+  tabFeed: 'Lenta',
   noTryOnsYet: "Hali primerka yo'q",
   noTryOnsHint: 'Virtual primerka natijalari shu yerda paydo boʻladi.',
   dressMeNeedsItems: 'Obraz yigʻish uchun yuqori, pastki va poyabzal qoʻshing.',
