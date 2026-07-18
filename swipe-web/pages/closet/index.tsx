@@ -460,11 +460,34 @@ export default function ClosetPage() {
           }));
           setCanvases(loaded);
         } else {
-          // Fallback to localStorage for the first canvas
+          // Бэк вернул НОЛЬ досок. Восстанавливаем «залипшую» пустую канву:
+          let restored = false;
           try {
             const s = localStorage.getItem('svayp_saved_layout');
-            if (s) setCanvases([{ id: null, layout: JSON.parse(s) }]);
+            if (s) {
+              const layout = JSON.parse(s) as SavedCanvasLayout;
+              if (Array.isArray(layout) && layout.length > 0) {
+                setCanvases([{ id: null, layout }]);
+                // До-сохраняем на бэк: прежние версии могли показать доску только
+                // локально и молча не сохранить — теперь она переживёт перезаход.
+                saveCanvasToBackend(layout, 0);
+                restored = true;
+              }
+            }
           } catch { /* ignore */ }
+          // Нет локального layout, но авто-ген уже помечен «сделано» (прошлая
+          // генерация не сохранилась под старым багом) → разово сбрасываем флаг,
+          // чтобы авто-ген смог собрать первый образ заново.
+          if (!restored) {
+            try {
+              const recoveryKey = `${firstOutfitKey}:recovered`;
+              if (localStorage.getItem(firstOutfitKey) === '1' && localStorage.getItem(recoveryKey) !== '1') {
+                localStorage.removeItem(firstOutfitKey);
+                localStorage.setItem(recoveryKey, '1');
+                setAutoGenDone(false);
+              }
+            } catch { /* ignore */ }
+          }
         }
         setCanvasesLoaded(true);
       })
@@ -1670,69 +1693,67 @@ export default function ClosetPage() {
       layout = buildLayoutFromIds(aiResult.itemIds, items);
       refreshCoins(); // AI-генерация образа платная — обновляем баланс
     } catch (err: unknown) {
-      // Silent first auto-gen: never surface an error or leave the canvas empty.
-      // The just-added items may still be embedding on the backend (ai-suggest
-      // throws NOT_ENOUGH_CLOTHES), so fall back to a local top+bottom placement
-      // — the wardrobe is already known to form an outfit.
       if (opts?.auto) {
+        // Тихая авто-генерация первого образа: НИКОГДА не показываем ошибку и не
+        // оставляем канву пустой. Вещи могли ещё эмбеддиться на бэке (ai-suggest
+        // кидает NOT_ENOUGH_CLOTHES) — кладём локальный top+bottom. ВАЖНО: не
+        // проваливаемся в разбор кодов ошибок ниже — их early-return выбрасывал бы
+        // этот запасной layout, и доска не появлялась вовсе (это и есть баг).
         logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: 'AUTO_FALLBACK' });
         layout = generateRandomOutfit(items);
       } else if (isInsufficientCoins(err)) {
         logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: 'INSUFFICIENT_COINS' });
         setShowPremiumGate('generation');
         return;
-      }
-      const errData = (err as { response?: { data?: { error?: { code?: string; message?: string }; code?: string } } })?.response?.data;
-      const code = errData?.error?.code ?? errData?.code;
-      if (code === 'NOT_ENOUGH_CLOTHES') {
-        // The backend can't build a valid outfit (e.g. bottoms still processing
-        // through the AI pipeline, or genuinely missing). Show the specific
-        // backend message instead of silently faking a random outfit — the
-        // silent fallback hid real problems from users.
-        logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: code });
-        const apiMsg = errData?.error?.message;
-        setOutfitBlockedModal({
-          title: t.tooFewItemsTitle,
-          body: apiMsg && apiMsg.trim() ? apiMsg : t.tooFewItemsBody,
-        });
-        return;
-      } else if (code === 'OUTFITS_EXHAUSTED') {
-        logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: code });
-        const apiMsg = errData?.error?.message;
-        // If message mentions wardrobe variety → user has too few items for new combos
-        const isTooFewItems = apiMsg && apiMsg.includes('мало одежды');
-        setOutfitBlockedModal({
-          title: isTooFewItems ? t.tooFewItemsTitle : t.outfitsExhaustedTitle,
-          body: isTooFewItems
-            ? t.tooFewItemsBody
-            : t.outfitsExhaustedBody,
-        });
-        return;
-      } else if (code === 'QUOTA_EXCEEDED') {
-        logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: code });
-        fetchPlan();
-        if (plansEnabled) { setShowPremiumGate('generation'); return; }
-        return;
       } else {
-        // Unknown failure (backend down / 401 / 500 …): still show a local random
-        // outfit so the button isn't dead, but SURFACE the failure — silently
-        // faking success made real outages look like "AI generates randomly and
-        // the counter never grows".
-        console.error('ai-suggest failed', err);
-        logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: code ?? 'unknown' });
-        setOutfitToastMsg(`${t.aiSuggestFailed}${code ? ` (${code})` : ''}`);
-        setTimeout(() => setOutfitToastMsg(null), 4000);
-        layout = generateRandomOutfit(items);
+        const errData = (err as { response?: { data?: { error?: { code?: string; message?: string }; code?: string } } })?.response?.data;
+        const code = errData?.error?.code ?? errData?.code;
+        if (code === 'NOT_ENOUGH_CLOTHES') {
+          // The backend can't build a valid outfit (e.g. bottoms still processing
+          // through the AI pipeline, or genuinely missing). Show the specific
+          // backend message instead of silently faking a random outfit — the
+          // silent fallback hid real problems from users.
+          logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: code });
+          const apiMsg = errData?.error?.message;
+          setOutfitBlockedModal({
+            title: t.tooFewItemsTitle,
+            body: apiMsg && apiMsg.trim() ? apiMsg : t.tooFewItemsBody,
+          });
+          return;
+        } else if (code === 'OUTFITS_EXHAUSTED') {
+          logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: code });
+          const apiMsg = errData?.error?.message;
+          // If message mentions wardrobe variety → user has too few items for new combos
+          const isTooFewItems = apiMsg && apiMsg.includes('мало одежды');
+          setOutfitBlockedModal({
+            title: isTooFewItems ? t.tooFewItemsTitle : t.outfitsExhaustedTitle,
+            body: isTooFewItems
+              ? t.tooFewItemsBody
+              : t.outfitsExhaustedBody,
+          });
+          return;
+        } else if (code === 'QUOTA_EXCEEDED') {
+          logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: code });
+          fetchPlan();
+          if (plansEnabled) { setShowPremiumGate('generation'); return; }
+          return;
+        } else {
+          // Unknown failure (backend down / 401 / 500 …): still show a local random
+          // outfit so the button isn't dead, but SURFACE the failure — silently
+          // faking success made real outages look like "AI generates randomly and
+          // the counter never grows".
+          console.error('ai-suggest failed', err);
+          logAnalyticsEvent(Events.OUTFIT_GENERATION_FAILED, { [Params.ERROR_CODE]: code ?? 'unknown' });
+          setOutfitToastMsg(`${t.aiSuggestFailed}${code ? ` (${code})` : ''}`);
+          setTimeout(() => setOutfitToastMsg(null), 4000);
+          layout = generateRandomOutfit(items);
+        }
       }
     } finally {
       setAiSuggestingIdx(null);
     }
 
     if (!layout) return;
-
-    // A layout exists now — the user has their first outfit, so don't auto-gen
-    // again (persisted per-user so it survives reloads without re-calling the AI).
-    markFirstOutfitDone();
 
     setCanvases((prev) => {
       const updated = [...prev];
@@ -1742,11 +1763,19 @@ export default function ClosetPage() {
     });
     try { localStorage.setItem('svayp_saved_layout', JSON.stringify(layout)); } catch { /* ignore */ }
     setCanvasInitialLayout(layout);
-    saveCanvasToBackend(layout, canvasIdx);
+
+    // Помечаем «первый образ сделан» (и выключаем авто-ген) ТОЛЬКО после того, как
+    // доска реально сохранилась на бэке. Раньше флаг ставился безусловно: если
+    // сохранение молча падало/пропускалось, авто-ген выключался навсегда, а доска
+    // оставалась пустой — тот самый баг «канва не появляется в гардеробе».
+    const persisted = await saveCanvasToBackend(layout, canvasIdx);
+    if (persisted) markFirstOutfitDone();
     fetchPlan();
   }
 
-  async function saveCanvasToBackend(layout: SavedCanvasLayout, canvasIdx: number) {
+  // Возвращает true, если доска реально создана/обновлена на бэке. Вызывающий
+  // (handleNewOutfit) по этому флагу решает, помечать ли «первый образ сделан».
+  async function saveCanvasToBackend(layout: SavedCanvasLayout, canvasIdx: number): Promise<boolean> {
     // Only save items that are real backend items (not local_)
     const apiItems = layout
       .filter((e) => !e.id.startsWith('local_') && !e.id.startsWith('pending_'))
@@ -1759,8 +1788,10 @@ export default function ClosetPage() {
         itemGroup: e.group,
       }));
 
-    // Backend requires at least 2 items; defer save until user adds more
-    if (apiItems.length < 2) return;
+    // Бэку достаточно ОДНОЙ clothing-вещи (upper/lower/shoes) — см.
+    // OutfitCanvasService.validateMinimumGroups. Прежний порог >= 2 молча не
+    // сохранял валидные образы (напр. одно платье, или пока грузится вторая вещь).
+    if (apiItems.length < 1) return false;
 
     const existingId = canvases[canvasIdx]?.id ?? null;
 
@@ -1798,14 +1829,15 @@ export default function ClosetPage() {
       } else {
         await doCreate();
       }
+      return true;
     } catch (err) {
-      const errCode = (err as { response?: { data?: { error?: { code?: string } } } })
-        ?.response?.data?.error?.code;
-      // Silently ignore composition errors — the outfit is shown to user but not persisted
-      if (errCode === 'INVALID_OUTFIT_COMPOSITION') return;
+      // Больше НЕ глотаем ошибки молча (в т.ч. INVALID_OUTFIT_COMPOSITION):
+      // раньше доска показывалась локально, но молча не сохранялась и пропадала
+      // после перезахода. Показываем пользователю, что сохранить не удалось.
       console.error('Failed to save canvas to backend:', err);
       setSaveFailed(true);
       setTimeout(() => setSaveFailed(false), 4000);
+      return false;
     }
   }
 
