@@ -5,8 +5,12 @@ import Diamond from '@/components/closet/Diamond';
 import { coinsPrice, coinPackages, actionCosts, type CoinPricing } from '@/lib/coins';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events } from '@/lib/analytics-events';
+import { isInFlutterWebView } from '@/lib/flutter-bridge';
 
-const TG_ADMIN = 'https://telegram.me/libasai_admin';
+// Use the t.me host: the native WebView's navigation delegate intercepts t.me
+// links and opens them EXTERNALLY (native Telegram app), whereas telegram.me is
+// not intercepted and loads the web landing page inside the WebView instead.
+const TG_ADMIN = 'https://t.me/libasai_admin';
 
 /**
  * Buy-diamonds sheet (coins BRD, stage 1: manual Telegram top-up). Shows the
@@ -67,7 +71,16 @@ export default function CoinsSheet({
     const priceStr = `${fmt(price.total)} ${t.cn_currency}`;
     const msg = t.cn_tg_msg.replace('{n}', String(qty)).replace('{price}', priceStr);
     logAnalyticsEvent(Events.UPGRADE_CTA_TAPPED);
-    window.open(`${TG_ADMIN}?text=${encodeURIComponent(msg)}`, '_blank');
+    const url = `${TG_ADMIN}?text=${encodeURIComponent(msg)}`;
+    // Inside the Flutter WebView (esp. iOS WKWebView) window.open('_blank') is a
+    // no-op — the tap appears to do nothing. A real top-frame navigation instead
+    // fires the native navigation delegate, which intercepts the t.me link and
+    // launches the Telegram app externally (the page itself never loads).
+    if (isInFlutterWebView()) {
+      window.location.href = url;
+    } else {
+      window.open(url, '_blank');
+    }
   }
 
   const actions = [
