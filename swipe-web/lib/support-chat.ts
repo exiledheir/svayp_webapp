@@ -11,13 +11,20 @@
  */
 import type { NextRouter } from 'next/router';
 import { createSupportChat } from '@/lib/api';
-import { openNativeChat } from '@/lib/flutter-bridge';
+import { openNativeChat, isInFlutterWebView } from '@/lib/flutter-bridge';
 
-/** Telegram handle for Libas Admin — the universal fallback that always works. */
-export const LIBAS_ADMIN_TELEGRAM_URL = 'https://telegram.me/libasai_admin';
+// t.me (not telegram.me): the native WebView intercepts t.me links and opens
+// them in the external Telegram app; telegram.me is not intercepted and would
+// load the web page inside the WebView instead.
+export const LIBAS_ADMIN_TELEGRAM_URL = 'https://t.me/libasai_admin';
 
 function openAdminTelegram(): void {
-  if (typeof window !== 'undefined') {
+  if (typeof window === 'undefined') return;
+  // Inside the Flutter WebView (esp. iOS WKWebView) window.open('_blank') is a
+  // no-op; a real navigation lets the native delegate launch Telegram externally.
+  if (isInFlutterWebView()) {
+    window.location.href = LIBAS_ADMIN_TELEGRAM_URL;
+  } else {
     window.open(LIBAS_ADMIN_TELEGRAM_URL, '_blank');
   }
 }
