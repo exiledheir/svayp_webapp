@@ -698,6 +698,20 @@ export async function deleteTryOnJob(id: string): Promise<void> {
 }
 
 /**
+ * Оценка результата примерки: рейтинг 1..5 + опциональный комментарий.
+ * Повторная отправка по той же примерке обновляет оценку.
+ */
+export async function submitTryOnFeedback(
+  jobId: string,
+  data: { rating: number; note?: string },
+): Promise<void> {
+  await api.post(`/outfits/try-on/${jobId}/feedback`, {
+    rating: data.rating,
+    note: data.note?.trim() || undefined,
+  });
+}
+
+/**
  * Try-on history for the current user (newest first), paginated.
  * Pass status (e.g. 'COMPLETED') to only get finished jobs that have a resultImageUrl.
  */

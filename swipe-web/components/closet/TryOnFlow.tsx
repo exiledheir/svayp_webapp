@@ -1,7 +1,7 @@
 import { needsUnoptimized } from '@/lib/img';
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { X, Sparkles, Loader2, RefreshCw, User, Camera, Check, ZoomIn, Share2 } from 'lucide-react';
+import { X, Sparkles, Loader2, RefreshCw, User, Camera, Check, ZoomIn, Share2, Star } from 'lucide-react';
 import type { ClosetItem } from '@/lib/closet-storage';
 import type { SavedCanvasLayout } from '@/lib/closet-types';
 import { useI18n } from '@/lib/i18n';
@@ -9,7 +9,7 @@ import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
 import { downloadWithWatermark, shareWatermarked } from '@/lib/canvas-snapshot';
 import ShareSheet from '@/components/ShareSheet';
-import { uploadModelPhoto } from '@/lib/wardrobe-api';
+import { uploadModelPhoto, submitTryOnFeedback } from '@/lib/wardrobe-api';
 import { compressImageForUpload } from '@/lib/image-utils';
 
 /**
@@ -526,10 +526,119 @@ function ExamplePhoto({ src, alt, onZoom }: { src: string; alt: string; onZoom: 
   );
 }
 
+// ─── Try-On Feedback Strip ───────────────────────────────────────────────────────
+// Встроенная полоска оценки результата примерки: 1..5 звёзд + опциональный
+// комментарий. Показывается только для завершённой примерки с реальным jobId.
+function TryOnFeedbackStrip({ jobId }: { jobId: string }) {
+  const { t } = useI18n();
+  const [rating, setRating] = useState(0);
+  const [hover, setHover] = useState(0);
+  const [note, setNote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState(false);
+
+  function pick(value: number) {
+    if (submitting || submitted) return;
+    setRating(value);
+    setError(false);
+    logAnalyticsEvent(Events.TRYON_FEEDBACK_RATED, { [Params.RATING]: value });
+  }
+
+  async function submit() {
+    if (rating < 1 || submitting) return;
+    setSubmitting(true);
+    setError(false);
+    try {
+      await submitTryOnFeedback(jobId, { rating, note });
+      logAnalyticsEvent(Events.TRYON_FEEDBACK_SUBMITTED, {
+        [Params.RATING]: rating,
+        [Params.HAS_COMMENT]: note.trim().length > 0,
+      });
+      setSubmitted(true);
+    } catch {
+      setError(true);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (submitted) {
+    return (
+      <div className="px-5 pt-4 border-t border-gray-100 flex items-center justify-center gap-2">
+        <span className="w-6 h-6 rounded-full bg-[#F370A7]/12 flex items-center justify-center">
+          <Check size={14} className="text-[#F370A7]" />
+        </span>
+        <p className="text-[13px] font-semibold text-gray-900">{t.tryOnRateThanks}</p>
+      </div>
+    );
+  }
+
+  const active = hover || rating;
+
+  return (
+    <div className="px-5 pt-4 border-t border-gray-100">
+      <p className="text-center text-[13px] font-semibold text-gray-900 mb-2.5">
+        {t.tryOnRateTitle}
+      </p>
+      <div className="flex items-center justify-center gap-1.5" onMouseLeave={() => setHover(0)}>
+        {[1, 2, 3, 4, 5].map((v) => {
+          const filled = v <= active;
+          return (
+            <button
+              key={v}
+              type="button"
+              onClick={() => pick(v)}
+              onMouseEnter={() => setHover(v)}
+              disabled={submitting}
+              aria-label={`${v}`}
+              className="p-1 transition-transform active:scale-90"
+            >
+              <Star
+                size={28}
+                className="transition-colors"
+                style={{
+                  fill: filled ? '#F370A7' : 'transparent',
+                  color: filled ? '#F370A7' : '#d1d5db',
+                }}
+              />
+            </button>
+          );
+        })}
+      </div>
+
+      {rating > 0 && (
+        <div className="mt-3">
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={t.tryOnRateCommentPlaceholder}
+            rows={2}
+            maxLength={2000}
+            disabled={submitting}
+            className="w-full resize-none rounded-2xl bg-gray-50 border border-gray-200 px-3.5 py-2.5 text-[13px] text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-[#F370A7]"
+          />
+          {error && (
+            <p className="text-[11px] text-red-500 mt-1.5 text-center">{t.tryOnRateError}</p>
+          )}
+          <button
+            onClick={submit}
+            disabled={submitting}
+            className="mt-2 w-full h-11 rounded-full bg-[#F370A7] text-white text-[13px] font-semibold flex items-center justify-center gap-1.5 disabled:opacity-60"
+          >
+            {submitting ? <Loader2 size={15} className="animate-spin" /> : t.tryOnRateSubmit}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Try-On Modal ───────────────────────────────────────────────────────────────
 export function TryOnModal({
   status,
   resultUrl,
+  jobId,
   failureReason,
   previewImages,
   onClose,
@@ -538,6 +647,7 @@ export function TryOnModal({
 }: {
   status: 'loading' | 'processing' | 'completed' | 'failed';
   resultUrl?: string;
+  jobId?: string;
   failureReason?: string;
   previewImages?: string[];
   onClose: () => void;
@@ -806,6 +916,11 @@ export function TryOnModal({
             </div>
           )}
         </div>
+
+        {/* Rate & comment strip — только для реального завершённого результата */}
+        {status === 'completed' && resultUrl && jobId && (
+          <TryOnFeedbackStrip jobId={jobId} />
+        )}
 
         {/* Bottom actions */}
         <div className="px-5 pb-6 pt-4 flex gap-3">
