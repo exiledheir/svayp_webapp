@@ -1672,7 +1672,10 @@ export default function ClosetPage() {
       if (coinsApply) {
         if (coins < coinCosts.createOutfit) { setShowPremiumGate('generation'); return; }
       } else if (!canGenerate) {
-        if (plansEnabled) { setShowPremiumGate('generation'); return; }
+        // Квота регенераций исчерпана. Премиум/про доплачивают монетами — пускаем
+        // запрос (сервер спишет), гейт только если монет не хватает.
+        const canFallbackToCoins = plan !== 'free' && coins >= coinCosts.createOutfit;
+        if (plansEnabled && !canFallbackToCoins) { setShowPremiumGate('generation'); return; }
       }
     }
 
@@ -1847,9 +1850,18 @@ export default function ClosetPage() {
   // Persisted in a ref so a Retry re-runs the same mode.
   const tryOnPersonKeyRef = useRef<string | undefined>(undefined);
 
+  // Премиум/про с исчерпанной квотой доплачивают монетами (фолбэк, зеркалит
+  // CoinGateService). Не блокируем такой запрос — сервер спишет монеты; гейт
+  // показываем только когда монет реально не хватает.
+  function tryOnGateBlocked(): boolean {
+    if (coinsApply) return coins < coinCosts.tryOn;
+    if (!plansEnabled || canTryOn) return false;
+    const canFallbackToCoins = plan !== 'free' && coins >= coinCosts.tryOn;
+    return !canFallbackToCoins;
+  }
+
   function handleTryItOnFromItems(calItems: ClosetItem[]) {
-    if (coinsApply) { if (coins < coinCosts.tryOn) { setShowPremiumGate('tryOn'); return; } }
-    else if (plansEnabled && !canTryOn) { setShowPremiumGate('tryOn'); return; }
+    if (tryOnGateBlocked()) { setShowPremiumGate('tryOn'); return; }
     const itemIds = calItems.map((i) => i.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
     if (itemIds.length === 0) return;
 
@@ -1983,12 +1995,7 @@ export default function ClosetPage() {
   }
 
   function handleTryItOn(canvasIdx = 0) {
-    if (coinsApply) {
-      if (coins < coinCosts.tryOn) { setShowPremiumGate('tryOn'); return; }
-    } else if (plansEnabled && !canTryOn) {
-      setShowPremiumGate('tryOn');
-      return;
-    }
+    if (tryOnGateBlocked()) { setShowPremiumGate('tryOn'); return; }
     const targetCanvas = displayCanvases[canvasIdx];
     const itemIds = (targetCanvas?.layout ?? []).map((e) => e.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
     if (itemIds.length === 0) return;
