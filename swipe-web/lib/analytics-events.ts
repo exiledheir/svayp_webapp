@@ -54,6 +54,8 @@ export const Events = {
   TRYON_RESULT_SAVED: 'tryon_result_saved',
   TRYON_RESULT_DISMISSED: 'tryon_result_dismissed',
   TRYON_HISTORY_VIEWED: 'tryon_history_viewed',
+  TRYON_FEEDBACK_RATED: 'tryon_feedback_rated',
+  TRYON_FEEDBACK_SUBMITTED: 'tryon_feedback_submitted',
 
   // ── Wardrobe milestones & abandonment ──────────────────────────────────────
   WARDROBE_MILESTONE: 'wardrobe_milestone',
@@ -166,4 +168,6 @@ export const Params = {
   PRICE: 'price',
   CHOICE: 'choice',
   FIELD: 'field',
+  RATING: 'rating',
+  HAS_COMMENT: 'has_comment',
 } as const;

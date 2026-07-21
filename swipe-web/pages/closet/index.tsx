@@ -512,7 +512,7 @@ export default function ClosetPage() {
     : canvases;
 
   const [editItem, setEditItem] = useState<ClosetItem | null>(null);
-  const [tryOnState, setTryOnState] = useState<{ status: 'loading' | 'processing' | 'completed' | 'failed'; resultUrl?: string; failureReason?: string; previewImages?: string[] } | null>(null);
+  const [tryOnState, setTryOnState] = useState<{ status: 'loading' | 'processing' | 'completed' | 'failed'; resultUrl?: string; jobId?: string; failureReason?: string; previewImages?: string[] } | null>(null);
 
   // Close the canvas overlay (X button AND hardware Back). Removes a brand-new
   // empty canvas entry so cancelling creation doesn't leave a blank board.
@@ -1500,7 +1500,7 @@ export default function ClosetPage() {
         if (cancelled) return;
         if (job.status === 'COMPLETED' && job.resultImageUrl) {
           clearActiveTryOnJob();
-          setTryOnState({ status: 'completed', resultUrl: job.resultImageUrl });
+          setTryOnState({ status: 'completed', resultUrl: job.resultImageUrl, jobId: job.id });
           saveTryOnResult(job.resultImageUrl);
           return;
         }
@@ -1521,7 +1521,7 @@ export default function ClosetPage() {
             clearActiveTryOnJob();
             if (cancelled) return;
             if (result.status === 'COMPLETED' && result.resultImageUrl) {
-              setTryOnState({ status: 'completed', resultUrl: result.resultImageUrl });
+              setTryOnState({ status: 'completed', resultUrl: result.resultImageUrl, jobId: result.id });
               saveTryOnResult(result.resultImageUrl);
             } else {
               setTryOnState({ status: 'failed', failureReason: result.failureReason ?? 'Try-on failed.' });
@@ -1948,7 +1948,7 @@ export default function ClosetPage() {
               const durationMs = tryOnStartTimeRef.current ? Date.now() - tryOnStartTimeRef.current : 0;
               logAnalyticsEvent(Events.TRYON_COMPLETED, { [Params.DURATION_MS]: durationMs });
               tryOnStartTimeRef.current = null;
-              setTryOnState({ status: 'completed', resultUrl: result.resultImageUrl });
+              setTryOnState({ status: 'completed', resultUrl: result.resultImageUrl, jobId: result.id });
               saveTryOnResult(result.resultImageUrl);
               refreshCoins(); // примерка платная — обновляем баланс (возврат при FAILED учтён на бэке)
             } else {
@@ -2517,6 +2517,7 @@ export default function ClosetPage() {
         <TryOnModal
           status={tryOnState.status}
           resultUrl={tryOnState.resultUrl}
+          jobId={tryOnState.jobId}
           failureReason={tryOnState.failureReason}
           previewImages={tryOnState.previewImages}
           onClose={() => setTryOnState(null)}

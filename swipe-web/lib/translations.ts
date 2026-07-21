@@ -549,6 +549,11 @@ export interface Translations {
   tryOnFailedTimeout: string;
   tryOnFailedGeneric: string;
   tryOnFailedBusy: string;
+  tryOnRateTitle: string;
+  tryOnRateCommentPlaceholder: string;
+  tryOnRateSubmit: string;
+  tryOnRateThanks: string;
+  tryOnRateError: string;
   close: string;
   retry: string;
   loadMore: string;
@@ -1394,6 +1399,11 @@ const en: Translations = {
     'This is taking longer than expected. Please try again in a moment.',
   tryOnFailedGeneric: "We couldn't create your try-on. Please try again.",
   tryOnFailedBusy: 'Our AI is busy right now. Please wait a moment and try again.',
+  tryOnRateTitle: 'How did the try-on turn out?',
+  tryOnRateCommentPlaceholder: 'Tell us what worked or what to improve (optional)',
+  tryOnRateSubmit: 'Submit',
+  tryOnRateThanks: 'Thanks for your feedback!',
+  tryOnRateError: "Couldn't save your feedback. Please try again.",
   close: 'Close',
   retry: 'Retry',
   loadMore: 'Load more',
@@ -2184,6 +2194,11 @@ const ru: Translations = {
     'Не удалось создать примерку. Пожалуйста, попробуйте ещё раз.',
   tryOnFailedBusy:
     'Наш ИИ сейчас перегружен. Пожалуйста, подождите немного и попробуйте ещё раз.',
+  tryOnRateTitle: 'Как вам результат примерки?',
+  tryOnRateCommentPlaceholder: 'Расскажите, что понравилось или что улучшить (необязательно)',
+  tryOnRateSubmit: 'Отправить',
+  tryOnRateThanks: 'Спасибо за отзыв!',
+  tryOnRateError: 'Не удалось сохранить отзыв. Попробуйте ещё раз.',
   close: 'Закрыть',
   retry: 'Повторить',
   loadMore: 'Показать ещё',
@@ -2972,6 +2987,11 @@ const uz: Translations = {
     "Kiyib ko'rishni yaratib bo'lmadi. Iltimos, qayta urinib ko'ring.",
   tryOnFailedBusy:
     "AI hozir band. Iltimos, biroz kuting va qayta urinib ko'ring.",
+  tryOnRateTitle: "Kiyib ko'rish natijasi qanday chiqdi?",
+  tryOnRateCommentPlaceholder: "Nima yoqdi yoki nimani yaxshilash kerakligini yozing (ixtiyoriy)",
+  tryOnRateSubmit: 'Yuborish',
+  tryOnRateThanks: 'Fikringiz uchun rahmat!',
+  tryOnRateError: "Fikr saqlanmadi. Qayta urinib ko'ring.",
   close: 'Yopish',
   retry: 'Qayta urinish',
   loadMore: 'Yana koʻrsatish',
