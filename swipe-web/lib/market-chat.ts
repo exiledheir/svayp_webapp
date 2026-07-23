@@ -4,6 +4,7 @@
 // powers /market/chat/[id]. Replace with a real C2C chat backend later.
 
 import type { MarketListing, MarketSeller } from '@/types/market';
+import { isInFlutterWebView } from '@/lib/flutter-bridge';
 
 const CHATS_KEY = 'market_chats';
 
@@ -99,16 +100,19 @@ export function sendMarketMessage(threadId: string, text: string): void {
 // ── Telegram deep link ───────────────────────────────────────────────────────
 // KNOWN LIMITATION (mock): a listing carries a phone, not a Telegram username,
 // and there is no reliable phone→profile deep link. So:
-//  1. if the seller has a username → open their profile (telegram.me/<username>)
+//  1. if the seller has a username → open their profile (t.me/<username>)
 //  2. otherwise → open a share dialog prefilled with the listing + the seller's
 //     phone as plain text the buyer can use to add the contact manually.
 // Replace with a real Telegram-username field when the backend lands.
+// Use the t.me host (not telegram.me) — the native WebView's navigation
+// delegate reliably intercepts t.me and opens the external Telegram app
+// (same reasoning as CoinsSheet/support-chat).
 export function buildTelegramLink(seller: MarketSeller, listing: MarketListing, listingUrl: string): string {
   if (seller.telegramUsername) {
-    return `https://telegram.me/${seller.telegramUsername.replace(/^@/, '')}`;
+    return `https://t.me/${seller.telegramUsername.replace(/^@/, '')}`;
   }
   const text = `${listing.title}\n${listingUrl}${seller.phone ? `\n☎ ${seller.phone}` : ''}`;
-  return `https://telegram.me/share/url?url=${encodeURIComponent(listingUrl)}&text=${encodeURIComponent(text)}`;
+  return `https://t.me/share/url?url=${encodeURIComponent(listingUrl)}&text=${encodeURIComponent(text)}`;
 }
 
 /** Opens a Telegram link, preferring the in-WebView API when available. */
@@ -116,6 +120,18 @@ export function openTelegramLink(url: string): void {
   const tg = (window as unknown as {
     Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } };
   }).Telegram?.WebApp;
-  if (tg?.openTelegramLink) tg.openTelegramLink(url);
-  else window.open(url, '_blank');
+  if (tg?.openTelegramLink) {
+    tg.openTelegramLink(url);
+    return;
+  }
+  // Inside the Flutter WebView (esp. iOS WKWebView) window.open('_blank') is a
+  // no-op — the tap appears to do nothing. A real top-frame navigation instead
+  // fires the native navigation delegate, which intercepts the t.me link and
+  // launches the Telegram app externally (the page itself never loads).
+  // Same fix as CoinsSheet.buy() / support-chat.openSupportChat().
+  if (isInFlutterWebView()) {
+    window.location.href = url;
+  } else {
+    window.open(url, '_blank');
+  }
 }
