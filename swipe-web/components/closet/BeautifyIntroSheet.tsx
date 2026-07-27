@@ -18,12 +18,21 @@ export default function BeautifyIntroSheet({
   from,
   onBeautify,
   onSkip,
+  photos,
+  picked,
+  onTogglePhoto,
 }: {
   dark: boolean;
   /** 'wardrobe' — тап ✨ на карточке гардероба; текст skip-кнопки как у 'beautify'. */
-  from: 'beautify' | 'add' | 'wardrobe';
+  from: 'beautify' | 'add' | 'wardrobe' | 'auto';
   onBeautify: () => void;
   onSkip: () => void;
+  /** Превью фото батча — показываем, какие именно снимки будут улучшены. */
+  photos?: { id: string; src: string }[];
+  /** id отмеченных на улучшение (цена = 2 × размер набора). */
+  picked?: Set<string>;
+  /** Тап по превью — включить/выключить фото из улучшения. */
+  onTogglePhoto?: (id: string) => void;
 }) {
   const { t } = useI18n();
   const [never, setNever] = useState(false);
@@ -31,6 +40,9 @@ export default function BeautifyIntroSheet({
   const sub = dark ? '#9a9aa0' : '#8a7f88';
   const surface = dark ? '#1c1c1e' : '#fff';
   const stageBg = dark ? '#141014' : '#f6f2f7';
+  // Сколько фото улучшаем: при батче — отмеченные превью, иначе одно фото.
+  const pickedCount = photos && photos.length > 1 ? (picked?.size ?? 0) : 1;
+  const totalCost = BEAUTIFY_COST * pickedCount;
 
   // Persist "don't show again" before running the chosen action.
   function persistNever() {
@@ -81,18 +93,54 @@ export default function BeautifyIntroSheet({
             <span className="text-[13px]" style={{ color: sub }}>· {t.cv_bt_per_photo}</span>
           </div>
         </div>
+
+        {/* Какие фото будут улучшены — только при батче из нескольких снимков.
+            Тап по превью убирает фото из улучшения (цена на кнопке пересчитывается). */}
+        {photos && photos.length > 1 && (
+          <div className="px-5 pt-3">
+            <p className="text-[12.5px] font-semibold mb-2" style={{ color: sub }}>
+              {t.cv_bt_intro_which.replace('{n}', String(pickedCount))}
+            </p>
+            <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+              {photos.map((p) => {
+                const on = !!picked?.has(p.id);
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => onTogglePhoto?.(p.id)}
+                    className="relative w-16 h-20 rounded-2xl flex-none overflow-hidden active:scale-[0.96] transition-transform"
+                    style={{
+                      background: stageBg,
+                      boxShadow: on ? 'inset 0 0 0 2px #F370A7' : `inset 0 0 0 1.5px ${dark ? '#3a3a3c' : '#e6e2e8'}`,
+                      opacity: on ? 1 : 0.45,
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.src} alt="" className="w-full h-full object-cover" />
+                    {on && (
+                      <span className="absolute bottom-1 right-1 rounded-full flex items-center justify-center" style={{ width: 18, height: 18, background: '#F370A7' }}>
+                        <Check size={11} strokeWidth={3} color="#fff" />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
         </div>{/* /скроллируемая часть */}
 
         {/* Actions — вне скролла, всегда видны вместе с чекбоксом */}
         <div className="flex flex-col gap-2 px-5 pt-3 pb-6 flex-none">
           <button
             onClick={handleBeautify}
-            className="h-14 rounded-2xl text-white text-[16px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+            disabled={pickedCount === 0}
+            className="h-14 rounded-2xl text-white text-[16px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40 disabled:active:scale-100"
             style={{ background: '#F370A7' }}
           >
             {t.cv_bt_intro_do}
             <span className="flex items-center gap-0.5 pl-2 ml-0.5" style={{ borderLeft: '1px solid rgba(255,255,255,0.4)' }}>
-              <Diamond size={15} />{BEAUTIFY_COST}
+              <Diamond size={15} />{totalCost}
             </span>
           </button>
           <button

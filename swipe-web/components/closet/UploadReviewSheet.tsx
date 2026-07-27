@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, Pencil, ChevronLeft, Loader2, AlertCircle } from 'lucide-react';
+import { Check, Pencil, ChevronLeft, Loader2, AlertCircle, Sparkles } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { taxLabel, sectionForSubcategory, localToSubcategory } from '@/lib/wardrobe-taxonomy';
 import ItemOptionsPicker, { isSelectionComplete, type ItemOptionsSelection } from '@/components/closet/ItemOptionsPicker';
@@ -21,6 +21,32 @@ const SECTION_EMOJI: Record<WardrobeSection, string> = {
   ACCESSORIES: '👜',
 };
 
+/**
+ * Розовый beautify-оверлей поверх миниатюры строки (как на карточке гардероба).
+ * Прогресс = max(реальный процент джобы, локальный тик) с капом 95% — бэкенд
+ * присылает проценты редко, а бар не должен стоять на нуле.
+ */
+function BeautifyThumbOverlay({ progress, label }: { progress: number; label: string }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setElapsed((s) => Math.min(s + 1, 60)), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const sim = Math.min(Math.round((elapsed / 60) * 95), 95);
+  const pct = Math.min(Math.max(progress, sim), 95);
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/35 backdrop-blur-[2px]">
+      <div className="w-7 h-7 mb-1 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#F9A9CB,#F370A7)' }}>
+        <Sparkles size={13} className="text-white" />
+      </div>
+      <span className="text-[8.5px] font-semibold text-white text-center px-1 leading-tight">{label}</span>
+      <div className="w-[70%] h-1 mt-1 rounded-full bg-white/20 overflow-hidden">
+        <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${pct}%`, background: '#F370A7' }} />
+      </div>
+    </div>
+  );
+}
+
 function seedSelection(item: ClosetItem): ItemOptionsSelection {
   // Keep subcategory empty when the item has none so the user must pick one;
   // only the section is seeded (for the picker's starting tab).
@@ -29,19 +55,26 @@ function seedSelection(item: ClosetItem): ItemOptionsSelection {
   return { section, subcategory: sub, itemType: item.itemType ?? null, length: item.length ?? null, fitType: item.fitType ?? null };
 }
 
+/** Состояние Beautify для строки ревью — улучшение идёт в этом же окне. */
+export type ReviewBeautifyState = { phase: 'working' | 'done' | 'failed'; progress: number };
+
 /**
  * Closet v2 — post-upload review window (Acloset-style, full-screen). The parent
  * passes the freshly-added items (already saved to the wardrobe, carrying the
  * AI-detected taxonomy) plus edit callbacks. Each row shows the structured
  * taxonomy (section · type · subtype · fit · length) with an edit affordance;
  * checkboxes drive bulk Delete; "Add to Closet" confirms everything still listed.
+ *
+ * Beautify стартует СРАЗУ по тапу (или из авто-попапа) и крутится прямо здесь:
+ * строка показывает прогресс, а «Добавить в гардероб» остаётся доступной — можно
+ * добавить вещь не дожидаясь конца улучшения, оно доживёт в фоне.
  */
 export default function UploadReviewSheet({
   items,
   onClose,
   onConfirm,
   onBeautify,
-  beautifyMarked,
+  beautifyState,
   onEditCategory,
   onDelete,
   beautifyEnabled,
@@ -55,10 +88,10 @@ export default function UploadReviewSheet({
   /** Подтверждение добавления: в гардероб попадают ТОЛЬКО выбранные id. */
   onConfirm: (selectedIds: string[]) => void;
   onTryOn: (items: ClosetItem[]) => void;
-  /** Toggle отметки Beautify на строке: улучшение стартует после «Добавить в гардероб». */
+  /** Тап Beautify на строке — запускает улучшение немедленно (или открывает попап). */
   onBeautify: (item: ClosetItem) => void;
-  /** id строк, отмеченных на Beautify (кнопка в состоянии «нажата»). */
-  beautifyMarked?: Set<string>;
+  /** id строки → статус улучшения (работает / готово / ошибка). */
+  beautifyState?: Map<string, ReviewBeautifyState>;
   onRename: (id: string, name: string) => void;
   onEditCategory: (id: string, sel: ItemOptionsSelection) => void;
   onDelete: (id: string) => void;
@@ -222,6 +255,7 @@ export default function UploadReviewSheet({
           const checked = selected.has(item.id);
           const detecting = !!detectingIds?.has(item.id);
           const incomplete = !detecting && requireComplete && !itemComplete(item);
+          const bt = beautifyState?.get(item.id);
           return (
             <div key={item.id} className="flex items-center gap-3 px-4 py-3.5" style={{ borderBottom: `1px solid ${line}` }}>
               {/* select */}
@@ -231,16 +265,18 @@ export default function UploadReviewSheet({
                 </span>
               </button>
 
-              {/* thumbnail — тап открывает фото на весь экран */}
+              {/* thumbnail — тап открывает фото на весь экран (во время улучшения
+                  зум не открываем, чтобы не перекрывать прогресс) */}
               <button
-                onClick={() => item.imageData && setZoomSrc(item.imageData)}
-                className="w-[74px] h-[74px] rounded-2xl flex-none overflow-hidden flex items-center justify-center active:scale-[0.96] transition-transform"
+                onClick={() => { if (bt?.phase === 'working') return; if (item.imageData) setZoomSrc(item.imageData); }}
+                className="relative w-[74px] h-[74px] rounded-2xl flex-none overflow-hidden flex items-center justify-center active:scale-[0.96] transition-transform"
                 style={{ background: dark ? '#2a2a2c' : '#f5f2f5', border: `1px solid ${line}` }}
               >
                 {item.imageData ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={item.imageData} alt="" className="w-full h-full object-cover" />
                 ) : null}
+                {bt?.phase === 'working' && <BeautifyThumbOverlay progress={bt.progress} label={t.cv_bt_working} />}
               </button>
 
               {/* structured taxonomy */}
@@ -263,23 +299,34 @@ export default function UploadReviewSheet({
                 )}
                 </>
                 )}
-                {beautifyEnabled && !detecting && (() => {
-                  const marked = !!beautifyMarked?.has(item.id);
-                  return (
-                    <button
-                      onClick={() => onBeautify(item)}
-                      disabled={marked}
-                      className="inline-flex items-center gap-1.5 mt-2 h-7 pl-3 pr-2.5 rounded-full text-white text-[12px] font-bold active:scale-[0.96] transition-all disabled:active:scale-100"
-                      style={{ background: marked ? '#141014' : '#F370A7', boxShadow: marked ? 'inset 0 0 0 1.5px #F370A7' : 'none' }}
-                    >
-                      {marked && <Check size={13} strokeWidth={3} />}
-                      {t.cv_bt_button}
-                      <span className="flex items-center gap-0.5 pl-1.5 ml-0.5" style={{ borderLeft: '1px solid rgba(255,255,255,0.35)' }}>
-                        <Diamond size={12} />{BEAUTIFY_COST}
-                      </span>
-                    </button>
-                  );
-                })()}
+                {/* Beautify: идёт / готово / ошибка (повтор) / не запускался */}
+                {beautifyEnabled && !detecting && (
+                  bt?.phase === 'working' ? (
+                    <span className="inline-flex items-center gap-1.5 mt-2 text-[12.5px] font-semibold" style={{ color: '#F370A7' }}>
+                      <Sparkles size={13} className="animate-pulse" />{t.cv_bt_working}
+                    </span>
+                  ) : bt?.phase === 'done' ? (
+                    <span className="inline-flex items-center gap-1.5 mt-2 h-7 px-2.5 rounded-full text-[12px] font-bold" style={{ background: dark ? 'rgba(243,112,167,0.18)' : '#fdeef5', color: '#E0559A' }}>
+                      <Sparkles size={13} />{t.cv_bt_beautified}
+                    </span>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => onBeautify(item)}
+                        className="inline-flex items-center gap-1.5 mt-2 h-7 pl-3 pr-2.5 rounded-full text-white text-[12px] font-bold active:scale-[0.96] transition-all"
+                        style={{ background: '#F370A7' }}
+                      >
+                        {t.cv_bt_button}
+                        <span className="flex items-center gap-0.5 pl-1.5 ml-0.5" style={{ borderLeft: '1px solid rgba(255,255,255,0.35)' }}>
+                          <Diamond size={12} />{BEAUTIFY_COST}
+                        </span>
+                      </button>
+                      {bt?.phase === 'failed' && (
+                        <p className="text-[11.5px] mt-1 leading-snug" style={{ color: '#E0559A' }}>{t.cv_bt_failed}</p>
+                      )}
+                    </>
+                  )
+                )}
               </div>
 
               {/* edit taxonomy */}
