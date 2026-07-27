@@ -29,7 +29,7 @@ import { shareImageBlob, fetchImageBlob } from '@/lib/share-image';
 import ShareSheet from '@/components/ShareSheet';
 import GetStartedCard from '@/components/closet/GetStartedCard';
 import AddItemSheet from '@/components/closet/AddItemSheet';
-import UploadReviewSheet from '@/components/closet/UploadReviewSheet';
+import UploadReviewSheet, { type ReviewBeautifyState } from '@/components/closet/UploadReviewSheet';
 import AddProcessingSheet, { type BatchJob } from '@/components/closet/AddProcessingSheet';
 import BeautifyCompareSheet from '@/components/closet/BeautifyCompareSheet';
 import BeautifyIntroSheet from '@/components/closet/BeautifyIntroSheet';
@@ -593,9 +593,16 @@ export default function ClosetPage() {
     }
   }
   // Closet v2: "Introducing Beautify" educational popup (predefined before/after
-  // demo). Auto-opens once every batch item has a complete category ("final
-  // step"). Handlers live in the batch section below (they read batchReview).
-  const [beautifyIntroFor, setBeautifyIntroFor] = useState<{ localId: string | null; from: 'beautify' | 'add' | 'wardrobe' } | null>(null);
+  // demo). Всплывает САМ, как только фото обработались (фон убран + категория
+  // определена) — см. эффект авто-показа в batch-секции ниже.
+  // localIds — строки ревью, itemId — вещь из гардероба (тап ✨ на карточке).
+  const [beautifyIntroFor, setBeautifyIntroFor] = useState<{
+    from: 'beautify' | 'add' | 'wardrobe' | 'auto';
+    localIds?: string[];
+    itemId?: string;
+  } | null>(null);
+  // Какие фото отмечены в попапе (при батче их можно снимать — цена пересчитывается).
+  const [introPicked, setIntroPicked] = useState<Set<string>>(new Set());
   const beautifyIntroShownRef = useRef(false);
   // Closet v2: Beautify requested in the add step → auto-open compare once the
   // item finishes uploading; plus the first-run explainer.
@@ -917,6 +924,8 @@ export default function ClosetPage() {
       selection: defaultSelectionForSection('TOPS'),
     }));
     beautifyIntroShownRef.current = false;
+    setReviewBeautify(new Map());
+    reviewBeautifyRunRef.current = new Set();
     setBatchReview(reviewItems);
     setBatchAdd(null);
     setBatchReviewOpen(true);
@@ -971,40 +980,96 @@ export default function ClosetPage() {
       }
       logAnalyticsEvent(Events.ADD_ITEM_SAVED, { [Params.HAS_BG_REMOVED]: false, [Params.FLOW]: 'closet' });
       logWardrobeMilestone();
-      // Отмеченные кнопкой Beautify (и выбранные галочкой) начинают улучшаться
-      // сразу после добавления — в гардеробе на них розовый лоадер «Улучшаем…».
-      for (const ri of batchReview) {
-        if (!keep.has(ri.localId) || !reviewBeautifyMarks.has(ri.localId)) continue;
-        const rec = tracker.get(ri.localId);
-        if (rec?.realId) {
-          startBeautifyBackground({
-            id: rec.realId,
-            imageData: ri.previewImage,
-            category: ri.selection.subcategory ? subcategoryToLocal(ri.selection.subcategory) : 'tops',
-            createdAt: new Date().toISOString(),
-          });
-        }
-      }
+      // Beautify здесь НЕ запускаем: он стартует сразу в окне ревью и доживает в
+      // фоне после закрытия — лоадер «Улучшаем…» переезжает на карточку гардероба.
       await load();
       fetchPlan();
     } finally {
       setFinalizingBatch(false);
       setBatchReviewOpen(false);
       setBatchReview([]);
-      setReviewBeautifyMarks(new Set());
+      // reviewBeautify/reviewBeautifyRunRef НЕ чистим: джобы могут ещё крутиться,
+      // сброс — при старте следующего батча (handleBatchFiles).
       userEditedLocalIdsRef.current = new Set();
       uploadTrackerRef.current = new Map();
     }
   }
 
-  // Beautify a batch item — await its background upload for the real id, then open
-  // the compare sheet on the user's own photo.
-  // Отметки Beautify в ревью: тап по кнопке помечает строку ОДИН раз (one-shot,
-  // откатить/перенажать нельзя); реальное улучшение стартует после
-  // «Добавить в гардероб» (finalizeBatch).
-  const [reviewBeautifyMarks, setReviewBeautifyMarks] = useState<Set<string>>(new Set());
-  function markReviewBeautify(localId: string) {
-    setReviewBeautifyMarks((prev) => new Set(prev).add(localId));
+  // ── Beautify прямо в окне ревью ─────────────────────────────────────────────
+  // Улучшение стартует СРАЗУ (по тапу пилюли или из авто-попапа) и крутится в том
+  // же окне: строка показывает прогресс. «Добавить в гардероб» доступна всё это
+  // время — если её нажать (или закрыть ревью), джоба доживает в фоне, а лоадер
+  // переезжает на карточку в гардеробе (beautifyingIds).
+  const [reviewBeautify, setReviewBeautify] = useState<Map<string, ReviewBeautifyState>>(new Map());
+  // Гард от повторного старта, независимый от рендера (state обновляется асинхронно).
+  const reviewBeautifyRunRef = useRef<Set<string>>(new Set());
+  function setReviewBeautifyPhase(localId: string, patch: ReviewBeautifyState) {
+    setReviewBeautify((prev) => new Map(prev).set(localId, patch));
+  }
+
+  async function startReviewBeautify(localId: string) {
+    if (reviewBeautifyRunRef.current.has(localId)) return;
+    reviewBeautifyRunRef.current.add(localId);
+    const unguard = () => reviewBeautifyRunRef.current.delete(localId);
+    setReviewBeautifyPhase(localId, { phase: 'working', progress: 0 });
+
+    const rec = uploadTrackerRef.current.get(localId);
+    if (!rec) { setReviewBeautifyPhase(localId, { phase: 'failed', progress: 0 }); unguard(); return; }
+    // Ждём аплоад, если реального id ещё нет: бэкенд улучшает s3KeyProcessed
+    // (вырезку), а без неё взял бы исходник С ФОНОМ — WardrobeEnhanceService.create.
+    if (!rec.realId) { try { await rec.promise; } catch { /* обработано ниже */ } }
+    const realId = rec.realId;
+    if (!realId) { setReviewBeautifyPhase(localId, { phase: 'failed', progress: 0 }); unguard(); return; }
+
+    setBeautifyingIds((prev) => new Set(prev).add(realId));
+    const clearBusy = () => setBeautifyingIds((prev) => { const n = new Set(prev); n.delete(realId); return n; });
+    try {
+      logAnalyticsEvent(Events.BEAUTIFY_STARTED, { [Params.FLOW]: 'review' });
+      const job = await createBeautifyJob(realId);
+      const done = await watchBeautifyUntilDone(realId, job.beautifyJobId, (j) => {
+        setReviewBeautifyPhase(localId, { phase: 'working', progress: j.progressPercent ?? 0 });
+      });
+      if (done.status === 'COMPLETED' && done.beautifiedUrl) {
+        // Без окна сравнения — сразу применяем улучшенный вариант.
+        try { await commitBeautify(realId, job.beautifyJobId, 'BEAUTIFIED'); } catch { /* best-effort */ }
+        const url = done.beautifiedUrl;
+        // Держим прогресс, пока НОВАЯ картинка не докачается → свап мгновенный.
+        await new Promise<void>((resolve) => {
+          const im = new window.Image();
+          const finish = () => resolve();
+          im.onload = finish; im.onerror = finish;
+          setTimeout(finish, 7000); // страховка от вечного ожидания
+          im.src = url;
+        });
+        setBatchReview((prev) => prev.map((ri) => (ri.localId === localId ? { ...ri, previewImage: url } : ri)));
+        setItems((prev) => prev.map((i) => (i.id === realId ? { ...i, imageData: url, fullImage: url, beautified: true } : i)));
+        setReviewBeautifyPhase(localId, { phase: 'done', progress: 100 });
+        clearBusy();
+        try { localStorage.setItem('svayp_has_beautified', '1'); } catch { /* private mode */ }
+        logAnalyticsEvent(Events.BEAUTIFY_COMPLETED, { [Params.FLOW]: 'review' });
+        refreshCoins(); // Beautify платный — обновляем баланс
+        load();
+      } else {
+        clearBusy();
+        setReviewBeautifyPhase(localId, { phase: 'failed', progress: 0 });
+        unguard(); // даём перезапустить тапом по пилюле
+        logAnalyticsEvent(Events.BEAUTIFY_FAILED, { [Params.FLOW]: 'review' });
+        setOutfitToastMsg(t.cv_bt_failed);
+        setTimeout(() => setOutfitToastMsg(null), 2500);
+      }
+    } catch (err) {
+      clearBusy();
+      setReviewBeautifyPhase(localId, { phase: 'failed', progress: 0 });
+      unguard();
+      if (isInsufficientCoins(err)) {
+        logAnalyticsEvent(Events.BEAUTIFY_FAILED, { code: 'INSUFFICIENT_COINS' });
+        setShowPremiumGate('beautify');
+        return;
+      }
+      logAnalyticsEvent(Events.BEAUTIFY_FAILED, { [Params.FLOW]: 'review' });
+      setOutfitToastMsg(t.cv_bt_failed);
+      setTimeout(() => setOutfitToastMsg(null), 2500);
+    }
   }
 
   // Review "Beautify" pill → always show the educational popup first (unless the
@@ -1012,36 +1077,41 @@ export default function ClosetPage() {
   function beautifyIntroNever(): boolean {
     try { return localStorage.getItem('svayp_beautify_intro_never') === '1'; } catch { return false; }
   }
-  // Тап Beautify в ревью: intro-попап (первый раз) → отметка. One-shot: уже
-  // отмеченная строка повторные тапы игнорирует (кнопка задизейблена).
-  // Улучшение стартует после «Добавить в гардероб» (finalizeBatch).
+  // Тап Beautify в ревью: первый раз — intro-попап на эту фотку, дальше сразу старт.
   function handleReviewBeautify(item: ClosetItem) {
-    if (reviewBeautifyMarks.has(item.id)) return;
+    if (reviewBeautifyRunRef.current.has(item.id)) return;
     if (!beautifyIntroNever()) {
-      setBeautifyIntroFor({ localId: item.id, from: 'beautify' });
+      setIntroPicked(new Set([item.id]));
+      setBeautifyIntroFor({ from: 'beautify', localIds: [item.id] });
       return;
     }
-    markReviewBeautify(item.id);
+    startReviewBeautify(item.id);
   }
   // Тап ✨ на карточке гардероба: тот же intro-гейт, затем фоновый beautify.
   function handleWardrobeBeautify(item: ClosetItem) {
     if (beautifyIntroNever()) { startBeautifyBackground(item); return; }
-    setBeautifyIntroFor({ localId: item.id, from: 'wardrobe' });
+    setIntroPicked(new Set());
+    setBeautifyIntroFor({ from: 'wardrobe', itemId: item.id });
   }
   // Beautify intro popup actions.
   function openBeautifyFromIntro() {
     const intro = beautifyIntroFor;
+    const picked = introPicked;
     setBeautifyIntroFor(null);
-    if (!intro?.localId) return;
+    if (!intro) return;
     if (intro.from === 'wardrobe') {
-      const it = items.find((i) => i.id === intro.localId);
+      const it = items.find((i) => i.id === intro.itemId);
       if (it) startBeautifyBackground(it);
-    } else {
-      // Ревью: intro лишь отмечает кнопку — улучшение стартует при добавлении.
-      markReviewBeautify(intro.localId);
+      return;
     }
+    // Ревью: запускаем улучшение немедленно для всех отмеченных фото.
+    const targets = intro.localIds ?? [];
+    targets.filter((id) => picked.has(id)).forEach((id) => startReviewBeautify(id));
   }
   function skipBeautifyIntro() { setBeautifyIntroFor(null); }
+  function toggleIntroPicked(localId: string) {
+    setIntroPicked((prev) => { const n = new Set(prev); if (n.has(localId)) n.delete(localId); else n.add(localId); return n; });
+  }
 
   // Local review items adapted to ClosetItem shape for the review sheet.
   const batchReviewItems: ClosetItem[] = batchReview.map((ri) => ({
@@ -1055,9 +1125,26 @@ export default function ClosetPage() {
     createdAt: '',
   }));
 
-  // Intro-попап Beautify больше НЕ всплывает автоматически после анализа —
-  // beautify запускается напрямую значком ✨ на карточке (фоновый, авто-сохранение).
-  // (авто-показ отключён по просьбе продукта — «пусть не выходит».)
+  // Авто-показ попапа Beautify: всплывает САМ, как только фото обработались —
+  // фон убран и категория определена (batchDetecting опустел). Один попап на весь
+  // батч: в нём видно, какие снимки будут улучшены, галочки можно снимать.
+  // Ждём и полноты категорий: в этот же момент ревью авто-открывает редактор
+  // категории для неопознанной вещи, и два оверлея наложились бы друг на друга.
+  useEffect(() => {
+    if (!closetV2 || !FEATURES.beautifyEnabled) return;
+    if (!batchReviewOpen || beautifyIntroShownRef.current) return;
+    if (batchDetecting.size > 0 || batchReview.length === 0) return;
+    if (!batchReview.every((ri) => isSelectionComplete(ri.selection))) return;
+    if (beautifyIntroNever()) return; // юзер отписался от попапа — молча ничего не делаем
+    // Улучшать можно только то, что реально доехало до бэка (аплоад мог упасть).
+    const ready = batchReview
+      .map((ri) => ri.localId)
+      .filter((id) => uploadTrackerRef.current.get(id)?.realId && !reviewBeautifyRunRef.current.has(id));
+    if (ready.length === 0) return;
+    beautifyIntroShownRef.current = true;
+    setIntroPicked(new Set(ready));
+    setBeautifyIntroFor({ from: 'auto', localIds: ready });
+  }, [closetV2, batchReviewOpen, batchDetecting, batchReview]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Header for the batch processing screen, driven by the imitated timeline.
   const batchHeaderLabel = batchPhase === 'identifying' ? t.cv_proc_identifying : t.cv_proc_removing;
@@ -2391,11 +2478,18 @@ export default function ClosetPage() {
           requireComplete
           detectingIds={batchDetecting}
           finalizing={finalizingBatch}
-          onClose={() => { if (!finalizingBatch) { setBatchReviewOpen(false); setBatchReview([]); } }}
+          onClose={() => {
+            if (finalizingBatch) return;
+            setBatchReviewOpen(false);
+            setBatchReview([]);
+            // Улучшение продолжается в фоне — подтягиваем гардероб, чтобы лоадер
+            // «Улучшаем…» был виден на карточках этих вещей.
+            if ([...reviewBeautify.values()].some((s) => s.phase === 'working')) load();
+          }}
           onConfirm={finalizeBatch}
           onTryOn={() => { /* try-on happens after the item is in the closet */ }}
           onBeautify={handleReviewBeautify}
-          beautifyMarked={reviewBeautifyMarks}
+          beautifyState={reviewBeautify}
           onRename={() => { /* naming is not part of the taxonomy review */ }}
           onEditCategory={editBatchCategory}
           onDelete={deleteBatchItem}
@@ -2432,6 +2526,13 @@ export default function ClosetPage() {
           from={beautifyIntroFor.from}
           onBeautify={openBeautifyFromIntro}
           onSkip={skipBeautifyIntro}
+          // Показываем, какие именно фото улучшим (ряд превью с галочками).
+          photos={(beautifyIntroFor.localIds ?? []).map((id) => ({
+            id,
+            src: batchReview.find((ri) => ri.localId === id)?.previewImage ?? '',
+          }))}
+          picked={introPicked}
+          onTogglePhoto={toggleIntroPicked}
         />
       )}
 

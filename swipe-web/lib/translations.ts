@@ -468,6 +468,7 @@ export interface Translations {
   cv_bt_auto_kicker: string;
   cv_bt_auto_headline: string;
   cv_bt_intro_caption: string;
+  cv_bt_intro_which: string;
   cv_bt_intro_do: string;
   cv_bt_intro_skip: string;
   cv_bt_intro_skip_add: string;
@@ -1266,6 +1267,7 @@ const en: Translations = {
   cv_bt_auto_kicker: 'Introducing Beautify',
   cv_bt_auto_headline: "We'll clean up your photos automatically",
   cv_bt_intro_caption: 'Beautify removes the background and turns your photo into a clean product shot.',
+  cv_bt_intro_which: 'These photos will be beautified — {n} selected',
   cv_bt_intro_do: 'Beautify my photo',
   cv_bt_intro_skip: 'Maybe later',
   cv_bt_intro_skip_add: 'Add without beautifying',
@@ -2059,6 +2061,7 @@ const ru: Translations = {
   cv_bt_auto_kicker: 'Знакомьтесь — Beautify',
   cv_bt_auto_headline: 'Мы автоматически улучшим ваши фото',
   cv_bt_intro_caption: 'Beautify убирает фон и превращает фото в аккуратный продуктовый снимок.',
+  cv_bt_intro_which: 'Улучшим эти фото — выбрано {n}',
   cv_bt_intro_do: 'Улучшить моё фото',
   cv_bt_intro_skip: 'Позже',
   cv_bt_intro_skip_add: 'Добавить без улучшения',
@@ -2852,6 +2855,7 @@ const uz: Translations = {
   cv_bt_auto_kicker: 'Beautify bilan tanishing',
   cv_bt_auto_headline: 'Suratlaringizni avtomatik tozalaymiz',
   cv_bt_intro_caption: "Beautify fonni olib tashlaydi va suratni toza mahsulot ko'rinishiga aylantiradi.",
+  cv_bt_intro_which: 'Bu suratlar yaxshilanadi — {n} ta tanlandi',
   cv_bt_intro_do: 'Suratimni yaxshilash',
   cv_bt_intro_skip: 'Keyinroq',
   cv_bt_intro_skip_add: "Yaxshilamasdan qo'shish",
