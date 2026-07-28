@@ -522,10 +522,18 @@ export function CatalogScreen({
         {items.map((item) => {
           const on = selected.includes(item.id);
           return (
-            <button
+            <div
               key={item.id}
               className={`card ${on ? 'sel' : ''}`}
+              role="button"
+              tabIndex={0}
               onClick={() => onToggle(item.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onToggle(item.id);
+                }
+              }}
               aria-pressed={on}
             >
               <div className="ph">
@@ -536,7 +544,7 @@ export function CatalogScreen({
                 <div className="name">{item.title}</div>
                 <div className="price">{item.price ? kioskMoney(item.price, lang) : ''}</div>
               </div>
-            </button>
+            </div>
           );
         })}
         {!loading && items.length === 0 && <p className="empty">{t('catalogEmpty')}</p>}
@@ -580,6 +588,12 @@ export function CatalogScreen({
           padding-bottom: 24px;
         }
         .card {
+          /* Высота фиксирована намеренно: грид считал строку по 32px и карточка
+             схлопывалась в полоску. Заодно сетка получается ровной — на витрине
+             это правильнее, чем карточки разной высоты из-за длины названия. */
+          height: 470px;
+          display: flex;
+          flex-direction: column;
           border-radius: 30px;
           overflow: hidden;
           background: #fff;
@@ -588,12 +602,14 @@ export function CatalogScreen({
           cursor: pointer;
           text-align: left;
           padding: 0;
+          font-family: inherit;
         }
         .card.sel {
           border-color: var(--pink);
         }
         .ph {
           position: relative;
+          flex: none;
           height: 330px;
           background: var(--card);
         }

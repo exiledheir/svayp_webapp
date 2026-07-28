@@ -13,13 +13,31 @@ import type { KioskCatalogItem, KioskFinish, KioskLook, KioskLookItem, KioskSess
 
 const DEMO_STORAGE = 'kiosk_demo_mode';
 
-/** Включить демо принудительно — когда бэкенд киоска недоступен. */
+/** Включить демо — когда бэкенд киоска недоступен. */
 export function enableDemo(): void {
   try {
     sessionStorage.setItem(DEMO_STORAGE, '1');
   } catch {
     /* приватный режим — режим доживёт до перезагрузки */
   }
+}
+
+/**
+ * Выключить демо. Вызывается, как только бэкенд ответил: иначе один сбой сети
+ * запирал бы планшет в имитации до перезапуска браузера.
+ */
+export function disableDemo(): void {
+  try {
+    sessionStorage.removeItem(DEMO_STORAGE);
+  } catch {
+    /* игнорируем */
+  }
+}
+
+/** Демо запрошено явно через адрес — тогда бэкенд не трогаем вообще. */
+export function isDemoForced(): boolean {
+  if (typeof window === 'undefined') return false;
+  return new URLSearchParams(window.location.search).get('demo') === '1';
 }
 
 export function isDemoMode(): boolean {

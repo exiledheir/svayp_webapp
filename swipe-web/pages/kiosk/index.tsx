@@ -13,7 +13,7 @@ import {
   StyleScreen,
 } from '@/components/kiosk/KioskScreens';
 import { kioskText, type KioskLang } from '@/lib/kiosk-i18n';
-import { enableDemo, isDemoMode } from '@/lib/kiosk-demo';
+import { disableDemo, enableDemo, isDemoForced, isDemoMode } from '@/lib/kiosk-demo';
 import {
   createLook,
   fetchWholeCatalog,
@@ -106,6 +106,8 @@ export default function KioskPage() {
 
   // ── киоск-режим: ни зума, ни контекстного меню, ни выделения ──────────────
   useEffect(() => {
+    // Залипший флаг с прошлой сессии сбрасываем: живой бэкенд важнее прошлого сбоя.
+    if (!isDemoForced()) disableDemo();
     setDemo(isDemoMode());
 
     const block = (e: Event) => e.preventDefault();
@@ -203,6 +205,11 @@ export default function KioskPage() {
       let session;
       try {
         session = await startSession(lang, nextPath);
+        // Бэкенд ответил — значит имитация больше не нужна.
+        if (!isDemoForced()) {
+          disableDemo();
+          setDemo(false);
+        }
       } catch (err) {
         // Бэкенд киоска ещё не раскатан (или планшет не подключён к магазину) —
         // переходим в демо вместо экрана «нет связи»: показ важнее.
