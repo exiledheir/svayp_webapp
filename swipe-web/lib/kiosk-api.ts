@@ -6,6 +6,16 @@
  * увёл бы киоск на экран входа по телефону — в торговом зале это выглядело бы дико.
  */
 import axios from 'axios';
+import {
+  DEMO_GENERATION_MS,
+  demoCatalog,
+  demoFinish,
+  demoLastLook,
+  demoLook,
+  demoSession,
+  isDemoMode,
+  rememberPhoto,
+} from './kiosk-demo';
 
 const KEY_STORAGE = 'kiosk_device_key';
 
@@ -99,6 +109,7 @@ function unwrap<T>(payload: any): T {
 }
 
 export async function startSession(lang: string, path: 'create' | 'catalog'): Promise<KioskSession> {
+  if (isDemoMode()) return demoSession();
   const res = await kioskApi.post('/kiosk/session', null, { params: { lang, path } });
   return unwrap<KioskSession>(res.data);
 }
@@ -112,11 +123,41 @@ export async function fetchCatalog(
 }
 
 /**
+ * Весь каталог зала, а не первая страница: на витрине обрезанный список читается
+ * как пустой магазин. Первая страница отдаётся сразу, остальные догружаются следом.
+ */
+export async function fetchWholeCatalog(
+  onPage: (items: KioskCatalogItem[]) => void,
+): Promise<void> {
+  if (isDemoMode()) {
+    await demoCatalog(onPage);
+    return;
+  }
+
+  const PAGE = 60; // потолок бэкенда на размер страницы
+  const collected: KioskCatalogItem[] = [];
+  let page = 0;
+  let total = Infinity;
+
+  while (collected.length < total) {
+    const chunk = await fetchCatalog({ page, size: PAGE });
+    if (!chunk.items.length) break;
+    total = chunk.total || chunk.items.length;
+    collected.push(...chunk.items);
+    onPage([...collected]);
+    page += 1;
+  }
+}
+
+/**
  * Кадр уходит прямо в хранилище по временной ссылке, минуя наш бэкенд (тот же путь,
  * что у загрузки вещей в гардероб). PUT идёт через локальный прокси — Azure не
  * отдаёт CORS-заголовки браузеру.
  */
 export async function uploadPhoto(sessionId: string, blob: Blob): Promise<string> {
+  // В демо кадр никуда не уходит: он остаётся в браузере и служит превью результата.
+  if (isDemoMode()) return rememberPhoto(blob);
+
   const contentType = blob.type || 'image/jpeg';
   const res = await kioskApi.post(`/kiosk/sessions/${sessionId}/photo-url`, null, {
     params: { contentType },
@@ -131,6 +172,9 @@ export async function uploadPhoto(sessionId: string, blob: Blob): Promise<string
 }
 
 export async function confirmPhoto(sessionId: string, blobKey: string): Promise<KioskPhotoValidation> {
+  if (isDemoMode()) {
+    return { faceFound: true, faceCount: 1, faceRatio: 0.3, tooDark: false, hint: null };
+  }
   const res = await kioskApi.post('/kiosk/photo/confirm', { sessionId, blobKey });
   return unwrap<KioskPhotoValidation>(res.data);
 }
@@ -141,22 +185,30 @@ export async function createLook(payload: {
   bodyShape: string;
   styles?: string[];
   productIds?: string[];
+  attempt?: number;
 }): Promise<KioskLook> {
+  if (isDemoMode()) return demoLook(payload.productIds ?? [], payload.attempt ?? 0);
   const res = await kioskApi.post('/kiosk/looks', payload);
   return unwrap<KioskLook>(res.data);
 }
 
 export async function getLook(lookId: string): Promise<KioskLook> {
+  if (isDemoMode()) {
+    const look = demoLastLook();
+    if (look) return look;
+  }
   const res = await kioskApi.get(`/kiosk/looks/${lookId}`);
   return unwrap<KioskLook>(res.data);
 }
 
 export async function finishSession(sessionId: string): Promise<KioskFinish> {
+  if (isDemoMode()) return demoFinish();
   const res = await kioskApi.post(`/kiosk/sessions/${sessionId}/finish`);
   return unwrap<KioskFinish>(res.data);
 }
 
 export async function resetSession(sessionId: string): Promise<void> {
+  if (isDemoMode()) return;
   await kioskApi.post(`/kiosk/sessions/${sessionId}/reset`);
 }
 
@@ -214,6 +266,14 @@ export function watchLook(
         pollTimer = setTimeout(poll, 3000);
       });
   };
+
+  if (isDemoMode()) {
+    const timer = setTimeout(() => {
+      if (closed) return;
+      getLook(lookId).then(handlers.onDone).catch(() => {});
+    }, DEMO_GENERATION_MS);
+    return { close: () => clearTimeout(timer) };
+  }
 
   const key = getDeviceKey();
   if (typeof EventSource !== 'undefined' && key) {
