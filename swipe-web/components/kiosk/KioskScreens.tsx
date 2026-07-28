@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import {
+  KIOSK_CATEGORIES,
   KIOSK_SHAPES,
   KIOSK_STYLES,
   kioskMoney,
@@ -502,6 +503,8 @@ export function CatalogScreen({
   items,
   selected,
   loading,
+  category,
+  onCategory,
   onToggle,
   onNext,
 }: {
@@ -510,6 +513,8 @@ export function CatalogScreen({
   items: KioskCatalogItem[];
   selected: string[];
   loading: boolean;
+  category: string | null;
+  onCategory: (code: string | null) => void;
   onToggle: (id: string) => void;
   onNext: () => void;
 }) {
@@ -517,6 +522,20 @@ export function CatalogScreen({
     <div className="body">
       <h2>{t('catalogTitle')}</h2>
       <p className="sub">{t('catalogSubtitle')}</p>
+
+      {/* Фильтр по разделам: в зале человек ищет «низ» или «обувь», а не листает
+          весь каталог подряд. Отмеченное при смене фильтра не сбрасывается. */}
+      <div className="filters">
+        {KIOSK_CATEGORIES.map((cat) => (
+          <button
+            key={cat.code ?? 'all'}
+            className={`chip ${category === cat.code ? 'sel' : ''}`}
+            onClick={() => onCategory(cat.code)}
+          >
+            {cat.label[lang === 'uz' ? 1 : 0]}
+          </button>
+        ))}
+      </div>
 
       <div className="grid">
         {items.map((item) => {
@@ -577,6 +596,30 @@ export function CatalogScreen({
           color: var(--mute);
           margin-top: 14px;
         }
+        .filters {
+          display: flex;
+          gap: 12px;
+          overflow-x: auto;
+          padding: 30px 0 8px;
+          flex: none;
+        }
+        .chip {
+          white-space: nowrap;
+          font-size: 27px;
+          font-weight: 600;
+          font-family: inherit;
+          padding: 22px 32px;
+          border: 0;
+          border-radius: 100px;
+          background: var(--lav);
+          color: var(--ink);
+          cursor: pointer;
+        }
+        .chip.sel {
+          background: var(--dark);
+          color: #fff;
+          font-weight: 700;
+        }
         .grid {
           flex: 1;
           overflow-y: auto;
@@ -584,7 +627,7 @@ export function CatalogScreen({
           grid-template-columns: 1fr 1fr;
           gap: 22px;
           align-content: start;
-          margin-top: 30px;
+          margin-top: 18px;
           padding-bottom: 24px;
         }
         .card {

@@ -153,6 +153,22 @@ export const KIOSK_STYLES: ReadonlyArray<{ code: string; label: Pair }> = [
   { code: 'SPORTY', label: ['Спорт-шик', 'Sport-shik'] },
 ];
 
+/**
+ * Фильтры каталога. `code: null` — «Все»; остальные значения совпадают с enum
+ * Category на бэкенде. Бельё и домашнее сюда не выносим: в образ они всё равно
+ * не идут, показывать их на витрине незачем.
+ */
+export const KIOSK_CATEGORIES: ReadonlyArray<{ code: string | null; label: Pair }> = [
+  { code: null, label: ['Все', 'Hammasi'] },
+  { code: 'TOPWEAR', label: ['Верх', 'Yuqori'] },
+  { code: 'BOTTOMWEAR', label: ['Низ', 'Pastki'] },
+  { code: 'DRESSES', label: ['Платья', 'Koʻylaklar'] },
+  { code: 'TWO_PIECE_SET', label: ['Комплекты', 'Toʻplamlar'] },
+  { code: 'OUTERWEAR', label: ['Верхняя', 'Ustki kiyim'] },
+  { code: 'FOOTWEAR', label: ['Обувь', 'Poyabzal'] },
+  { code: 'ACCESSORIES', label: ['Аксессуары', 'Aksessuarlar'] },
+];
+
 /** Типы фигуры. Набор зависит от пола, вариант «не знаю» есть всегда. */
 export const KIOSK_SHAPES: Record<'FEMALE' | 'MALE', ReadonlyArray<{ code: string; label: Pair }>> = {
   FEMALE: [

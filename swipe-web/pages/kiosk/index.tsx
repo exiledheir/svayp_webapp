@@ -69,6 +69,7 @@ export default function KioskPage() {
 
   const [catalog, setCatalog] = useState<KioskCatalogItem[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
+  const [category, setCategory] = useState<string | null>(null);
 
   const [look, setLook] = useState<KioskLook | null>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -154,6 +155,7 @@ export default function KioskPage() {
       setShape(null);
       setStyles([]);
       setPicked([]);
+      setCategory(null);
       setLook(null);
       setCode(null);
       setShareUrl(null);
@@ -233,12 +235,13 @@ export default function KioskPage() {
     }
   };
 
-  const loadCatalog = async () => {
+  const loadCatalog = async (cat: string | null = null) => {
     setCatalogLoading(true);
+    setCatalog([]);
     try {
       // Показываем первую порцию сразу, остальные страницы дотекают следом —
       // в зале человек не должен ждать, пока догрузится весь каталог.
-      await fetchWholeCatalog((items) => setCatalog(items));
+      await fetchWholeCatalog((items) => setCatalog(items), cat);
     } catch {
       setOffline(true);
     } finally {
@@ -451,6 +454,11 @@ export default function KioskPage() {
               items={catalog}
               selected={picked}
               loading={catalogLoading}
+              category={category}
+              onCategory={(code) => {
+                setCategory(code);
+                loadCatalog(code);
+              }}
               onToggle={(id) => setPicked((list) => toggle(list, id))}
               onNext={() => {
                 track('kiosk_catalog_items_selected', { count: picked.length, ids: picked });

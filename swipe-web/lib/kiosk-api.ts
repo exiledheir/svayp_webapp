@@ -128,9 +128,10 @@ export async function fetchCatalog(
  */
 export async function fetchWholeCatalog(
   onPage: (items: KioskCatalogItem[]) => void,
+  category?: string | null,
 ): Promise<void> {
   if (isDemoMode()) {
-    await demoCatalog(onPage);
+    await demoCatalog(onPage, category);
     return;
   }
 
@@ -140,7 +141,7 @@ export async function fetchWholeCatalog(
   let total = Infinity;
 
   while (collected.length < total) {
-    const chunk = await fetchCatalog({ page, size: PAGE });
+    const chunk = await fetchCatalog({ page, size: PAGE, category: category ?? undefined });
     if (!chunk.items.length) break;
     total = chunk.total || chunk.items.length;
     collected.push(...chunk.items);

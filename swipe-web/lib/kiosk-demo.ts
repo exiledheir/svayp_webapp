@@ -96,10 +96,14 @@ const PAGE_SIZE = 100;
  */
 export async function demoCatalog(
   onPage?: (items: KioskCatalogItem[]) => void,
+  category?: string | null,
 ): Promise<{ items: KioskCatalogItem[]; total: number }> {
+  const filtered = (list: KioskCatalogItem[]) =>
+    category ? list.filter((i) => i.category === category) : list;
+
   if (catalogCache.length) {
-    onPage?.(catalogCache);
-    return { items: catalogCache, total: catalogCache.length };
+    onPage?.(filtered(catalogCache));
+    return { items: filtered(catalogCache), total: filtered(catalogCache).length };
   }
 
   const collected: KioskCatalogItem[] = [];
@@ -129,11 +133,11 @@ export async function demoCatalog(
     );
 
     catalogCache = collected;
-    onPage?.([...collected]);
+    onPage?.(filtered([...collected]));
     page += 1;
   }
 
-  return { items: catalogCache, total: catalogCache.length };
+  return { items: filtered(catalogCache), total: filtered(catalogCache).length };
 }
 
 /** Слот товара — та же логика, что на бэкенде, но огрублённая до категорий. */
