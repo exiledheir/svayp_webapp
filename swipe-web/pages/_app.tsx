@@ -16,7 +16,9 @@ import 'react-image-crop/dist/ReactCrop.css';
 // Pages that do not require authentication
 // Market browsing + posting funnel are public; posting enforces auth in-page
 // at the wizard's phone step (so the browse→post funnel stays open).
-const PUBLIC_PATHS = new Set(['/auth/phone', '/auth/otp', '/auth/verify-method', '/auth/basic-info', '/auth/telegram/callback', '/auth/partner', '/market', '/market/[id]', '/market/onboarding', '/market/create', '/market/mine', '/market/liked', '/market/chat/[id]', '/feed', '/feed/[username]', '/feed/p/[id]']);
+// Киоск и его QR-страница живут без пользователя: планшет в зале авторизуется
+// ключом устройства, а по QR образ открывает покупатель, у которого аккаунта ещё нет.
+const PUBLIC_PATHS = new Set(['/auth/phone', '/auth/otp', '/auth/verify-method', '/auth/basic-info', '/auth/telegram/callback', '/auth/partner', '/market', '/market/[id]', '/market/onboarding', '/market/create', '/market/mine', '/market/liked', '/market/chat/[id]', '/feed', '/feed/[username]', '/feed/p/[id]', '/kiosk', '/k/[code]']);
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
