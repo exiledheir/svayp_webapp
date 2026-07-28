@@ -85,6 +85,8 @@ export default function KioskPage() {
   const watchRef = useRef<{ close: () => void } | null>(null);
   /** Номер попытки: с ним пересборка даёт другой образ. */
   const attemptRef = useRef(0);
+  /** Номер загрузки каталога: ответы прошлого фильтра не должны перетирать текущий. */
+  const catalogRequestRef = useRef(0);
   const scaleRef = useRef<HTMLDivElement | null>(null);
 
   const t = useCallback((key: Parameters<typeof kioskText>[0]) => kioskText(key, lang), [lang]);
@@ -236,16 +238,25 @@ export default function KioskPage() {
   };
 
   const loadCatalog = async (cat: string | null = null) => {
+    const requestId = ++catalogRequestRef.current;
+    const isCurrent = () => catalogRequestRef.current === requestId;
+
     setCatalogLoading(true);
     setCatalog([]);
     try {
       // Показываем первую порцию сразу, остальные страницы дотекают следом —
       // в зале человек не должен ждать, пока догрузится весь каталог.
-      await fetchWholeCatalog((items) => setCatalog(items), cat);
+      await fetchWholeCatalog(
+        (items) => {
+          if (isCurrent()) setCatalog(items);
+        },
+        cat,
+        isCurrent,
+      );
     } catch {
-      setOffline(true);
+      if (isCurrent()) setOffline(true);
     } finally {
-      setCatalogLoading(false);
+      if (isCurrent()) setCatalogLoading(false);
     }
   };
 
