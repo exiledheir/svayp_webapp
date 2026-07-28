@@ -12,7 +12,7 @@ type Pair = readonly [string, string];
 
 export const KIOSK_TEXT = {
   // Заставка
-  idleEyebrow: ['AI-стилист этого магазина', 'Bu doʻkonning AI-stilisti'],
+  idleEyebrow: ['AI-стилист LIBAS', 'LIBAS AI-stilisti'],
   idleTitle: ['Примерьте образ', 'Uslubni kiyib koʻring'],
   idleTitleAccent: ['за 30 секунд', '30 soniyada'],
   ctaCreate: ['Создать образ', 'Uslub yaratish'],
@@ -27,7 +27,7 @@ export const KIOSK_TEXT = {
   step2Title: ['Ответьте на два вопроса', 'Ikki savolga javob bering'],
   step2Text: ['Пол и тип фигуры', 'Jins va tana tuzilishi'],
   step3Title: ['Смотрите образ', 'Uslubni koʻring'],
-  step3Text: ['Только из вещей этого магазина', 'Faqat shu doʻkon kiyimlaridan'],
+  step3Text: ['Из вещей, которые есть в наличии', 'Mavjud kiyimlardan'],
   introCta: ['Начать', 'Boshlash'],
   privacyLong: [
     'Фото лица хранится 15 минут и удаляется автоматически. Лицо на картинке мы не показываем, продавцы фото не видят.',
@@ -75,7 +75,7 @@ export const KIOSK_TEXT = {
   ],
   catalogNext: ['Далее', 'Keyingisi'],
   picked: ['Выбрано', 'Tanlandi'],
-  catalogEmpty: ['В этом магазине пока нет товаров с фото', 'Bu doʻkonda hozircha suratli mahsulot yoʻq'],
+  catalogEmpty: ['Пока нет товаров с фото', 'Hozircha suratli mahsulot yoʻq'],
 
   // Генерация
   genTitle: ['Собираем образ', 'Uslub yigʻilmoqda'],
@@ -89,8 +89,8 @@ export const KIOSK_TEXT = {
   genContinueInApp: ['Или продолжите в приложении по QR', 'Yoki QR orqali ilovada davom eting'],
   cancel: ['Отмена', 'Bekor qilish'],
   lookUnavailable: [
-    'Из наличия этого магазина сейчас не собрать полный образ',
-    'Hozir bu doʻkon mahsulotlaridan toʻliq uslub yigʻib boʻlmaydi',
+    'Из того, что сейчас в наличии, полный образ не собрать',
+    'Hozir mavjud mahsulotlardan toʻliq uslub yigʻib boʻlmaydi',
   ],
 
   // Результат
@@ -113,10 +113,7 @@ export const KIOSK_TEXT = {
 
   // Состав образа
   buyTitle: ['Что на вас', 'Sizdagi kiyimlar'],
-  buySubtitle: [
-    'Все вещи есть в этом зале прямо сейчас.',
-    'Barcha kiyimlar hozir shu zalda mavjud.',
-  ],
+  buySubtitle: ['Все вещи есть в наличии прямо сейчас.', 'Barcha kiyimlar hozir mavjud.'],
   total: ['Итого', 'Jami'],
   sizeLabel: ['Размер', 'Oʻlcham'],
   inStock: ['в наличии', 'mavjud'],
@@ -134,9 +131,9 @@ export const KIOSK_TEXT = {
   imHere: ['Я здесь', 'Men shu yerdaman'],
   offlineTitle: ['Нет связи', 'Aloqa yoʻq'],
   offlineHint: ['Позовите, пожалуйста, продавца', 'Iltimos, sotuvchini chaqiring'],
-  notConfigured: [
-    'Планшет не настроен: нет ключа устройства',
-    'Planshet sozlanmagan: qurilma kaliti yoʻq',
+  demoBadge: [
+    'Демо-режим · каталог настоящий, примерка имитирована',
+    'Demo rejimi · katalog haqiqiy, kiyib koʻrish taqlid qilinadi',
   ],
 } as const satisfies Record<string, Pair>;
 

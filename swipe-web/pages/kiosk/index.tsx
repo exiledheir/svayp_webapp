@@ -13,11 +13,11 @@ import {
   StyleScreen,
 } from '@/components/kiosk/KioskScreens';
 import { kioskText, type KioskLang } from '@/lib/kiosk-i18n';
+import { enableDemo, isDemoMode } from '@/lib/kiosk-demo';
 import {
   createLook,
-  fetchCatalog,
+  fetchWholeCatalog,
   finishSession,
-  getDeviceKey,
   kioskErrorCode,
   resetSession,
   startSession,
@@ -60,7 +60,7 @@ export default function KioskPage() {
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [storeLabel, setStoreLabel] = useState<string | null>(null);
-  const [deviceKeyMissing, setDeviceKeyMissing] = useState(false);
+  const [demo, setDemo] = useState(false);
 
   const [gender, setGender] = useState<'FEMALE' | 'MALE' | null>(null);
   const [shape, setShape] = useState<string | null>(null);
@@ -81,6 +81,8 @@ export default function KioskPage() {
   const [idleLeft, setIdleLeft] = useState(IDLE_GRACE_S);
 
   const watchRef = useRef<{ close: () => void } | null>(null);
+  /** Номер попытки: с ним пересборка даёт другой образ. */
+  const attemptRef = useRef(0);
   const scaleRef = useRef<HTMLDivElement | null>(null);
 
   const t = useCallback((key: Parameters<typeof kioskText>[0]) => kioskText(key, lang), [lang]);
@@ -104,7 +106,7 @@ export default function KioskPage() {
 
   // ── киоск-режим: ни зума, ни контекстного меню, ни выделения ──────────────
   useEffect(() => {
-    setDeviceKeyMissing(!getDeviceKey());
+    setDemo(isDemoMode());
 
     const block = (e: Event) => e.preventDefault();
     document.addEventListener('contextmenu', block);
@@ -143,6 +145,7 @@ export default function KioskPage() {
         resetSession(sessionId).catch(() => {});
       }
       setSessionId(null);
+      attemptRef.current = 0;
       setStoreLabel((label) => label); // подпись магазина переживает сброс
       setGender(null);
       setShape(null);
@@ -197,10 +200,19 @@ export default function KioskPage() {
   const begin = async (nextPath: 'create' | 'catalog') => {
     setPath(nextPath);
     try {
-      const session = await startSession(lang, nextPath);
+      let session;
+      try {
+        session = await startSession(lang, nextPath);
+      } catch (err) {
+        // Бэкенд киоска ещё не раскатан (или планшет не подключён к магазину) —
+        // переходим в демо вместо экрана «нет связи»: показ важнее.
+        enableDemo();
+        setDemo(true);
+        session = await startSession(lang, nextPath);
+      }
       setSessionId(session.sessionId);
       setStoreLabel(session.storeLabel);
-      trackKiosk('kiosk_session_start', session.sessionId, { storeLabel: session.storeLabel });
+      trackKiosk('kiosk_session_start', session.sessionId, { storeLabel: session.storeLabel, demo: isDemoMode() });
       trackKiosk('kiosk_path_selected', session.sessionId, { path: nextPath });
       if (nextPath === 'create') {
         setScreen('intro');
@@ -216,8 +228,9 @@ export default function KioskPage() {
   const loadCatalog = async () => {
     setCatalogLoading(true);
     try {
-      const page = await fetchCatalog({ page: 0, size: 40 });
-      setCatalog(page.items);
+      // Показываем первую порцию сразу, остальные страницы дотекают следом —
+      // в зале человек не должен ждать, пока догрузится весь каталог.
+      await fetchWholeCatalog((items) => setCatalog(items));
     } catch {
       setOffline(true);
     } finally {
@@ -240,6 +253,7 @@ export default function KioskPage() {
         bodyShape: shape,
         styles,
         productIds: picked,
+        attempt: attemptRef.current,
       });
       setLook(created);
 
@@ -298,7 +312,8 @@ export default function KioskPage() {
   }, [screen, sessionId, shareUrl]);
 
   const regenerate = () => {
-    track('kiosk_regenerate');
+    attemptRef.current += 1;
+    track('kiosk_regenerate', { attempt: attemptRef.current });
     startGeneration();
   };
 
@@ -327,9 +342,7 @@ export default function KioskPage() {
       <div className="stage">
         <div className="device" ref={scaleRef}>
           {offline && <OfflineScreen lang={lang} />}
-          {deviceKeyMissing && !offline && (
-            <div className="notConfigured">{t('notConfigured')}</div>
-          )}
+          {demo && !offline && <div className="demoBadge">{t('demoBadge')}</div>}
 
           {showChrome && (
             <KioskBar
@@ -597,17 +610,17 @@ export default function KioskPage() {
           background: var(--dark);
           color: #fff;
         }
-        .notConfigured {
+        .demoBadge {
           position: absolute;
           top: 0;
           left: 0;
           right: 0;
           z-index: 80;
-          background: #16161f;
+          background: rgba(22, 22, 31, 0.86);
           color: #fff;
-          font-size: 24px;
+          font-size: 22px;
           text-align: center;
-          padding: 18px;
+          padding: 14px;
         }
         @media (prefers-reduced-motion: reduce) {
           * {
