@@ -129,9 +129,11 @@ export async function fetchCatalog(
 export async function fetchWholeCatalog(
   onPage: (items: KioskCatalogItem[]) => void,
   category?: string | null,
+  /** Пока возвращает true — качаем дальше. Даёт отменить загрузку при смене фильтра. */
+  isCurrent: () => boolean = () => true,
 ): Promise<void> {
   if (isDemoMode()) {
-    await demoCatalog(onPage, category);
+    await demoCatalog(onPage, category, isCurrent);
     return;
   }
 
@@ -141,7 +143,11 @@ export async function fetchWholeCatalog(
   let total = Infinity;
 
   while (collected.length < total) {
+    // Переключили фильтр — прежняя выдача больше не нужна: и дописывать её в
+    // список нельзя (перетрёт отфильтрованное), и качать оставшиеся страницы незачем.
+    if (!isCurrent()) return;
     const chunk = await fetchCatalog({ page, size: PAGE, category: category ?? undefined });
+    if (!isCurrent()) return;
     if (!chunk.items.length) break;
     total = chunk.total || chunk.items.length;
     collected.push(...chunk.items);
