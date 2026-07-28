@@ -73,6 +73,7 @@ export default function KioskPage() {
   const [look, setLook] = useState<KioskLook | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [genFailed, setGenFailed] = useState(false);
+  const [genReason, setGenReason] = useState<string | null>(null);
   const [code, setCode] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
 
@@ -250,6 +251,7 @@ export default function KioskPage() {
     if (!sessionId || !gender || !shape) return;
     setScreen('generating');
     setGenFailed(false);
+    setGenReason(null);
     setElapsed(0);
     track('kiosk_generation_started', { path, styles, picked: picked.length });
 
@@ -274,14 +276,19 @@ export default function KioskPage() {
             track('kiosk_result_viewed');
           } else {
             track('kiosk_generation_failed', { reason: finished.failureReason });
+            setGenReason(finished.failureReason ?? 'GENERATION_FAILED');
             setGenFailed(true);
           }
         },
-        onError: () => setGenFailed(true),
+        onError: (err) => {
+          setGenReason(err?.message ?? 'STREAM_ERROR');
+          setGenFailed(true);
+        },
       });
     } catch (err) {
       const errorCode = kioskErrorCode(err);
       track('kiosk_generation_failed', { reason: errorCode ?? 'REQUEST_FAILED' });
+      setGenReason(errorCode ?? 'REQUEST_FAILED');
       setGenFailed(true);
     }
   }, [gender, path, picked, sessionId, shape, styles, track]);
@@ -457,6 +464,7 @@ export default function KioskPage() {
               t={t}
               elapsed={elapsed}
               failed={genFailed}
+              reason={genReason}
               onCancel={() => {
                 watchRef.current?.close();
                 track('kiosk_generation_cancelled', { elapsed });

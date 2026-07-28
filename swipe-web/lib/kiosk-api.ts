@@ -188,7 +188,11 @@ export async function createLook(payload: {
   attempt?: number;
 }): Promise<KioskLook> {
   if (isDemoMode()) return demoLook(payload.productIds ?? [], payload.attempt ?? 0);
-  const res = await kioskApi.post('/kiosk/looks', payload);
+
+  // attempt нужен только демо-режиму: бэкенд отклоняет неизвестные поля тела
+  // (INVALID_REQUEST_BODY), поэтому наружу уходит ровно контракт LookRequest.
+  const { attempt, ...body } = payload;
+  const res = await kioskApi.post('/kiosk/looks', body);
   return unwrap<KioskLook>(res.data);
 }
 

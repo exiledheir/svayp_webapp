@@ -671,12 +671,15 @@ export function GeneratingScreen({
   t,
   elapsed,
   failed,
+  reason,
   onCancel,
   onRetry,
 }: {
   t: T;
   elapsed: number;
   failed: boolean;
+  /** Техническая причина: без неё сбой у стенда невозможно разобрать потом. */
+  reason?: string | null;
   onCancel: () => void;
   onRetry: () => void;
 }) {
@@ -694,6 +697,7 @@ export function GeneratingScreen({
         <div className="progress">
           <i style={{ width: `${progress}%` }} />
         </div>
+        {failed && reason && <div className="reason">{reason}</div>}
       </div>
       <div className="foot">
         {failed ? (
@@ -746,6 +750,12 @@ export function GeneratingScreen({
           height: 100%;
           background: var(--pink);
           transition: width 0.9s linear;
+        }
+        .reason {
+          margin-top: 28px;
+          font-size: 20px;
+          color: var(--mute);
+          font-family: ui-monospace, monospace;
         }
         .foot {
           display: flex;
