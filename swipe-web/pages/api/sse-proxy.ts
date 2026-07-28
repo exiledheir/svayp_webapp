@@ -11,6 +11,9 @@ export const config = {
 const ALLOWED_PATH_PREFIXES = [
   '/wardrobe/uploads/',
   '/outfits/try-on/',
+  // Киоск в зале магазина: у него нет пользователя и JWT — устройство
+  // авторизуется ключом (см. kioskKey ниже).
+  '/kiosk/looks/',
 ];
 
 const backendOrigin = process.env.NEXT_PUBLIC_API_ORIGIN || 'https://app.svaypai.com';
@@ -20,17 +23,21 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { path, token } = req.query;
+  const { path, token, kioskKey } = req.query;
 
   const backendPath = typeof path === 'string' ? path : '';
   const accessToken = typeof token === 'string' ? token : '';
+  // EventSource не умеет слать заголовки, поэтому ключ киоска приходит параметром
+  // и превращается в X-Kiosk-Key уже здесь, на сервере.
+  const deviceKey = typeof kioskKey === 'string' ? kioskKey : '';
 
   const isAllowed = ALLOWED_PATH_PREFIXES.some((prefix) => backendPath.startsWith(prefix));
   if (!isAllowed) {
     return res.status(403).json({ error: 'Forbidden path' });
   }
 
-  if (!accessToken) {
+  const isKiosk = backendPath.startsWith('/kiosk/');
+  if (!accessToken && !(isKiosk && deviceKey)) {
     return res.status(401).json({ error: 'Missing token' });
   }
 
@@ -51,7 +58,8 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     path: `/api/v1${backendPath}`,
     method: 'GET',
     headers: {
-      'Authorization': `Bearer ${accessToken}`,
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      ...(isKiosk && deviceKey ? { 'X-Kiosk-Key': deviceKey } : {}),
       'Accept': 'text/event-stream',
       'Cache-Control': 'no-cache',
     },
