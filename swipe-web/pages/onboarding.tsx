@@ -49,6 +49,10 @@ export default function OnboardingPage() {
   const [reveal, setReveal] = useState<{ before: string; afterPromise: Promise<string | null> } | null>(null);
   const revealRef = useRef<{ before: string; afterPromise: Promise<string | null> } | null>(null);
   const didStart = useRef(false);
+  // Для события «бросил онбординг»: последний увиденный шаг и признак осознанного выхода
+  // (завершил или нажал «пропустить») — такой уход отказом не считается.
+  const lastStepRef = useRef<string | null>(null);
+  const exitedRef = useRef(false);
   // Holds promises for background uploads started in AddItemStep.
   const pendingUploadsRef = useRef<Promise<unknown>[]>([]);
 
@@ -98,7 +102,20 @@ export default function OnboardingPage() {
     }
     setOnboardingStep(step);
     logAnalyticsEvent(Events.ONBOARDING_STEP_VIEWED, { [Params.OB_STEP]: STEP_NAMES[step] });
+    lastStepRef.current = STEP_NAMES[step];
   }, [step, ready]);
+
+  // Уход из онбординга без завершения и без явного «пропустить»: до этого молчаливый
+  // отвал был не виден, и казалось, что онбординг бросают только те, кто нажал «пропустить».
+  useEffect(() => {
+    return () => {
+      if (didStart.current && !exitedRef.current) {
+        logAnalyticsEvent(Events.ONBOARDING_ABANDONED, {
+          [Params.OB_STEP]: lastStepRef.current ?? STEP_NAMES[WELCOME],
+        });
+      }
+    };
+  }, []);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -122,6 +139,7 @@ export default function OnboardingPage() {
   }
 
   function finish() {
+    exitedRef.current = true; // осознанный выход — не отказ
     logAnalyticsEvent(Events.ONBOARDING_COMPLETED);
     setOnboardingComplete();
     clearOnboardingStep();
@@ -133,6 +151,7 @@ export default function OnboardingPage() {
   }
 
   function skip() {
+    exitedRef.current = true; // явный «пропустить» уже фиксируется своим событием
     logAnalyticsEvent(Events.ONBOARDING_SKIPPED, { [Params.OB_STEP]: STEP_NAMES[step] });
     setOnboardingComplete();
     clearOnboardingStep();

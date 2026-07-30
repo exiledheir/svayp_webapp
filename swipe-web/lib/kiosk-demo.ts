@@ -97,6 +97,7 @@ const PAGE_SIZE = 100;
 export async function demoCatalog(
   onPage?: (items: KioskCatalogItem[]) => void,
   category?: string | null,
+  isCurrent: () => boolean = () => true,
 ): Promise<{ items: KioskCatalogItem[]; total: number }> {
   const filtered = (list: KioskCatalogItem[]) =>
     category ? list.filter((i) => i.category === category) : list;
@@ -111,7 +112,9 @@ export async function demoCatalog(
   let total = Infinity;
 
   while (collected.length < total) {
+    if (!isCurrent()) return { items: [], total: 0 };
     const res = await axios.get('/proxy/products/all', { params: { page, size: PAGE_SIZE } });
+    if (!isCurrent()) return { items: [], total: 0 };
     const payload = res.data?.data ?? {};
     const products: any[] = payload.data ?? [];
     total = payload.pagination?.total ?? products.length;

@@ -18,7 +18,7 @@ import MarketGuard from '@/components/market/MarketGuard';
 import { formatPrice } from '@/lib/cart-storage';
 import { useI18n } from '@/lib/i18n';
 import { logAnalyticsEvent } from '@/lib/analytics';
-import { Events } from '@/lib/analytics-events';
+import { Events, Params } from '@/lib/analytics-events';
 
 function ListingDetailPageInner() {
   const router = useRouter();
@@ -86,6 +86,11 @@ function ListingDetailPageInner() {
     try {
       if (next) await addFavorite(listing.id);
       else await removeFavorite(listing.id);
+      // Сохранение в избранное — одно из действий Second Hand в отчётах о возвратах.
+      logAnalyticsEvent(Events.MARKET_FAVORITE_TOGGLED, {
+        [Params.LISTING_ID]: listing.id,
+        [Params.CHOICE]: next ? 'added' : 'removed',
+      });
     } catch {
       setLiked(!next); // revert on failure
     }
