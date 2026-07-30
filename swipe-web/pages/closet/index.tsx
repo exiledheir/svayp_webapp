@@ -33,11 +33,12 @@ import UploadReviewSheet, { type ReviewBeautifyState } from '@/components/closet
 import AddProcessingSheet, { type BatchJob } from '@/components/closet/AddProcessingSheet';
 import BeautifyCompareSheet from '@/components/closet/BeautifyCompareSheet';
 import BeautifyIntroSheet from '@/components/closet/BeautifyIntroSheet';
-import ClosetGateShowcase from '@/components/closet/ClosetGateShowcase';
+import { DEMO_ITEM_IDS, DEMO_ITEMS, DEMO_CANVAS_LAYOUT } from '@/lib/closet-demo';
+import { isSetupDone, isSetupSatisfied, wasSetupEntered } from '@/lib/closet-setup';
 import CoinsSheet from '@/components/closet/CoinsSheet';
 import Diamond from '@/components/closet/Diamond';
 import { ACTION_COST, actionCosts, fetchCoinBalance, fetchCoinPricing, type CoinPricing } from '@/lib/coins';
-import { isInsufficientCoins } from '@/lib/api';
+import { isInsufficientCoins, describeApiError } from '@/lib/api';
 import ItemDetailSheet from '@/components/closet/ItemDetailSheet';
 import ClosetSectionTabs from '@/components/ClosetSectionTabs';
 import { saveUploadPreview, getUploadPreview, clearUploadPreview } from '@/lib/upload-previews';
@@ -100,29 +101,6 @@ function getCroppedImage(imageSrc: string, crop: PixelCrop, displayWidth: number
     img.src = imageSrc;
   });
 }
-
-// ── Demo items shown to new users with empty wardrobes ───────────────────────
-// IDs are the real backend UUIDs so that try-on and other API features work.
-const DEMO_ITEM_IDS = new Set([
-  '0d1b6b18-bd57-4a3e-a4c4-5aac9ca5fa5e',
-  'd101c8a6-35fa-4cba-9a7c-e7288947f3b2',
-  'da66eb48-1cd7-4087-8a1f-16a011bcae3e',
-  'fb18130c-1192-4d32-aa84-0d5a837a3bcd',
-]);
-
-const DEMO_ITEMS: ClosetItem[] = [
-  { id: '0d1b6b18-bd57-4a3e-a4c4-5aac9ca5fa5e', category: 'tops',   imageData: 'https://libasimages.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2F4f7dbf50-c725-418c-b9ca-4a7f14eef80a.thumb.png',  createdAt: '2024-01-01T00:00:00Z' },
-  { id: 'd101c8a6-35fa-4cba-9a7c-e7288947f3b2', category: 'skirts', imageData: 'https://libasimages.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2Fd44bec44-ad12-41ad-a08c-ce90b863d0f3.thumb.png', createdAt: '2024-01-01T00:00:00Z' },
-  { id: 'da66eb48-1cd7-4087-8a1f-16a011bcae3e', category: 'shoes',  imageData: 'https://libasimages.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2F8d912326-ee36-41bf-988f-0cde9bbedce3.thumb.png',  createdAt: '2024-01-01T00:00:00Z' },
-  { id: 'fb18130c-1192-4d32-aa84-0d5a837a3bcd', category: 'bags',   imageData: 'https://libasimages.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2F32150c11-a5f4-4b32-98b1-49c8ed2a952a.thumb.png',  createdAt: '2024-01-01T00:00:00Z' },
-];
-
-const DEMO_CANVAS_LAYOUT: SavedCanvasLayout = [
-  { id: '0d1b6b18-bd57-4a3e-a4c4-5aac9ca5fa5e', x: 32, y: 17, scale: 1,    zIndex: 1, group: 'upper' },
-  { id: 'd101c8a6-35fa-4cba-9a7c-e7288947f3b2', x: 32, y: 39, scale: 1,    zIndex: 2, group: 'lower' },
-  { id: 'da66eb48-1cd7-4087-8a1f-16a011bcae3e', x: 32, y: 58, scale: 0.72, zIndex: 3, group: 'shoes' },
-  { id: 'fb18130c-1192-4d32-aa84-0d5a837a3bcd', x: 63, y: 17, scale: 0.6,  zIndex: 4, group: 'acc'   },
-];
 
 // Item target for the "Add N items to unlock" get-started card (= free-plan limit).
 const GET_STARTED_TARGET = 5;
@@ -275,35 +253,23 @@ export default function ClosetPage() {
     }
   }, [gsHidden, realItemCount]);
   const showGetStarted = !gsHidden && realItemCount < GET_STARTED_TARGET;
-  // ── Build-your-closet gate (closet v2) ────────────────────────────────────
-  // The closet unlocks once it can form an outfit: a top + a bottom, OR a
-  // dress/set + footwear. Demo items don't count. Until then we show only the
-  // hero + a forced progress loader. The loader shows whichever pair the user is
-  // working toward (top/bottom by default, dress/footwear if they started that).
+  // ── First-run setup gate ──────────────────────────────────────────────────
+  // Getting the first two garments in is the job of the dedicated /closet/setup
+  // screen — the old in-page gate (education carousel + docked progress loader)
+  // is gone, because users read the carousel as something to swipe and never
+  // found the add action underneath it.
+  //
+  // `firstLoadDone` gates the redirect so existing users never bounce before
+  // their items arrive.
   const realItems = useMemo(() => items.filter((i) => !DEMO_ITEM_IDS.has(i.id)), [items]);
-  const hasTopReal = realItems.some((i) => UPPER_CATS.includes(i.category) && !FULL_BODY_CATS.includes(i.category));
-  const hasBottomReal = realItems.some((i) => LOWER_CATS.includes(i.category));
-  const hasDressReal = realItems.some((i) => FULL_BODY_CATS.includes(i.category));
-  const hasFootwearReal = realItems.some((i) => SHOES_CATS.includes(i.category));
-  const closetUnlocked = (hasTopReal && hasBottomReal) || (hasDressReal && hasFootwearReal);
-  // Show the dress+footwear path only when they started that way (a dress/footwear
-  // and no top/bottom yet); otherwise default to top+bottom.
-  const gateDressPath = !hasTopReal && !hasBottomReal && (hasDressReal || hasFootwearReal);
-  // `firstLoadDone` gates the state so existing users never flash the gate before
-  // their items arrive; once latched it stays true across reloads (no reflicker).
   const [firstLoadDone, setFirstLoadDone] = useState(false);
-  const buildMode = closetV2 && !closetUnlocked && firstLoadDone;
-  // Milestones for the gate progress loader (adapts to the active outfit path).
-  const gateMilestones = gateDressPath
-    ? [
-        { img: '/images/onboarding/closet_items/dress.png', label: t.cv_build_dress, done: hasDressReal },
-        { img: '/images/closet/add_shoes_onboarding.webp', label: t.cv_build_shoes, done: hasFootwearReal },
-      ]
-    : [
-        { img: '/images/onboarding/closet_items/top.png', label: t.cv_build_top, done: hasTopReal },
-        { img: '/images/onboarding/closet_items/skirt.png', label: t.cv_build_bottom, done: hasBottomReal },
-      ];
-  const gateDoneCount = gateMilestones.filter((m) => m.done).length;
+  useEffect(() => {
+    if (!firstLoadDone || isSetupSatisfied(realItems) || isSetupDone()) return;
+    // An empty closet is always a first run. One item + the "setup started"
+    // marker means they were killed mid-setup and should resume; one item
+    // WITHOUT it is a legacy account, which we never drag into setup.
+    if (realItems.length === 0 || wasSetupEntered()) router.replace('/closet/setup');
+  }, [firstLoadDone, realItems, router]);
   // Selected "Type" chip per section (null = All).
   const [sectionFilter, setSectionFilter] = useState<Partial<Record<WardrobeSection, WardrobeSubcategory | null>>>({});
   const [viewAll, setViewAll] = useState<{ title: string; items: ClosetItem[] } | null>(null);
@@ -344,6 +310,21 @@ export default function ClosetPage() {
     const q = router.query.tab;
     if (q === 'boards' || q === 'outfits' || q === 'calendar') setClosetTab(q);
   }, [router.query.tab]);
+  // Arriving from first-run setup via "Generate my first outfit": re-arm the
+  // auto-generation guard so Boards shows a real board instead of an empty tab,
+  // then strip the flag so a reload doesn't generate again.
+  const forcedFirstOutfitRef = useRef(false);
+  // `?tryOn=1` (setup's "Try it on"): open the try-on once that first board
+  // actually exists — setup can't run the flow itself, it needs the outfit.
+  const pendingSetupTryOnRef = useRef(false);
+  useEffect(() => {
+    if (router.query.firstOutfit !== '1' || forcedFirstOutfitRef.current) return;
+    forcedFirstOutfitRef.current = true;
+    pendingSetupTryOnRef.current = router.query.tryOn === '1';
+    setAutoGenDone(false);
+    setClosetTab('boards');
+    router.replace('/closet?tab=boards', undefined, { shallow: true });
+  }, [router.query.firstOutfit]); // eslint-disable-line react-hooks/exhaustive-deps
   // Try-on history (Outfits tab) — loaded lazily on first visit, paginated.
   const [tryOnJobs, setTryOnJobs] = useState<TryOnJobResponse[]>([]);
   const [tryOnLoading, setTryOnLoading] = useState(false);
@@ -535,6 +516,12 @@ export default function ClosetPage() {
   useOverlayBackClose(viewAll !== null, () => setViewAll(null));
   const [showTryOnConfirm, setShowTryOnConfirm] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
+  /** Canvas ids already re-created after a 404 — one attempt each. */
+  const recreatedCanvasIdsRef = useRef<Set<string>>(new Set());
+  /** A 5xx recreate is allowed ONCE per session: a backend that fails every PUT
+   *  hands back a fresh id each time, so a per-id budget would quietly turn
+   *  every autosave into another duplicate board. */
+  const recreatedAfterServerErrorRef = useRef(false);
   const [tryOnDeleteFailed, setTryOnDeleteFailed] = useState(false);
   const [outfitToastMsg, setOutfitToastMsg] = useState<string | null>(null);
   // Closet v2: shop-catalog instant-add progress (per product id)
@@ -1861,6 +1848,24 @@ export default function ClosetPage() {
     const persisted = await saveCanvasToBackend(layout, canvasIdx);
     if (persisted) markFirstOutfitDone();
     fetchPlan();
+
+    // Setup asked for a try-on: the board exists now, so hand over. Uses the
+    // layout we just built rather than `displayCanvases`, which is still the
+    // pre-generation value inside this closure.
+    if (pendingSetupTryOnRef.current) {
+      pendingSetupTryOnRef.current = false;
+      const itemIds = layout.map((e) => e.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
+      if (itemIds.length > 0) {
+        if (tryOnGateBlocked()) { setShowPremiumGate('tryOn'); return; }
+        logAnalyticsEvent(Events.TRYON_INITIATED, {
+          [Params.OUTFIT_ITEM_COUNT]: itemIds.length,
+          [Params.SOURCE]: 'first_run_setup',
+        });
+        tryOnCanvasIdxRef.current = canvasIdx;
+        tryOnOverrideRef.current = { itemIds, layout };
+        setShowTryOnConfirm(true);
+      }
+    }
   }
 
   // Возвращает true, если доска реально создана/обновлена на бэке. Вызывающий
@@ -1884,9 +1889,9 @@ export default function ClosetPage() {
     if (apiItems.length < 1) return false;
 
     const existingId = canvases[canvasIdx]?.id ?? null;
+    const canvasName = `Outfit ${canvasIdx + 1}`;
 
     const doCreate = async () => {
-      const canvasName = `Outfit ${canvasIdx + 1}`;
       const canvas = await createOutfitCanvas({ name: canvasName, items: apiItems });
       logAnalyticsEvent(Events.OUTFIT_BOARD_SAVED, {
         [Params.ITEM_COUNT]: apiItems.length,
@@ -1901,11 +1906,20 @@ export default function ClosetPage() {
     try {
       if (existingId) {
         try {
-          await updateOutfitCanvas(existingId, { items: apiItems });
+          await updateOutfitCanvas(existingId, { name: canvasName, items: apiItems });
         } catch (updateErr: unknown) {
           const status = (updateErr as { response?: { status?: number } })?.response?.status;
-          if (status === 404) {
-            // Canvas was deleted on backend — create a new one
+          // 404: deleted on the backend — recreate, once per id. 5xx: that row
+          // can't be written to; the board is real and the user expects it
+          // saved, so recreate that too — but only once per session (see the
+          // ref), or a permanently failing PUT becomes a duplicate-board loop.
+          const serverError = status !== undefined && status >= 500;
+          const canRecreate = status === 404
+            ? !recreatedCanvasIdsRef.current.has(existingId)
+            : serverError && !recreatedAfterServerErrorRef.current;
+          if (canRecreate) {
+            if (serverError) recreatedAfterServerErrorRef.current = true;
+            recreatedCanvasIdsRef.current.add(existingId);
             setCanvases((prev) => {
               const updated = [...prev];
               if (updated[canvasIdx]) updated[canvasIdx] = { ...updated[canvasIdx], id: null };
@@ -1924,7 +1938,11 @@ export default function ClosetPage() {
       // Больше НЕ глотаем ошибки молча (в т.ч. INVALID_OUTFIT_COMPOSITION):
       // раньше доска показывалась локально, но молча не сохранялась и пропадала
       // после перезахода. Показываем пользователю, что сохранить не удалось.
-      console.error('Failed to save canvas to backend:', err);
+      //
+      // console.warn, а НЕ console.error: dev-оверлей Next.js поднимает всё,
+      // залогированное через console.error, в полноэкранную runtime-ошибку —
+      // хотя сбой автосохранения уже обработан и показан баннером.
+      console.warn('Failed to save canvas to backend:', describeApiError(err));
       setSaveFailed(true);
       setTimeout(() => setSaveFailed(false), 4000);
       return false;
@@ -2257,22 +2275,6 @@ export default function ClosetPage() {
             }}
           />
         </div>
-        {/* ── Build your closet hero (v2 gate: until a top + bottom exist) ── */}
-        {buildMode && (
-          <div
-            className="mx-4 mt-3 rounded-3xl overflow-hidden"
-            style={{
-              background: theme === 'dark' ? 'linear-gradient(180deg,#241823,#191319)' : 'linear-gradient(180deg,#faf7fb,#f1ecf3)',
-              border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : '#efe7ef'}`,
-            }}
-          >
-            <div className="px-5 pt-5 pb-1">
-              <h2 className="text-[22px] font-extrabold tracking-[-0.5px] text-black dark:text-white">{t.cv_hero_title}</h2>
-              <p className="text-[13.5px] mt-1 leading-snug" style={{ color: theme === 'dark' ? '#b7a6b3' : '#8a7f88' }}>{t.cv_hero_subtitle}</p>
-            </div>
-            <ClosetGateShowcase dark={theme === 'dark'} />
-          </div>
-        )}
         {/* ── Get-started nudge (legacy top card; v2 docks it at the bottom) ── */}
         {showGetStarted && !closetV2 && (
           <GetStartedCard
@@ -2289,8 +2291,7 @@ export default function ClosetPage() {
             }}
           />
         )}
-        {/* ── My Outfits (hidden until the closet is unlocked: top + bottom) ── */}
-        {!buildMode && (
+        {/* ── My Outfits ── */}
         <OutfitSection
           activeTab={closetTab}
           onTabChange={setClosetTab}
@@ -2353,10 +2354,9 @@ export default function ClosetPage() {
           onDeleteCanvas={handleDeleteCanvas}
           onAddItem={(cat) => openAdd(localCatToSection(cat))}
         />
-        )}
 
-        {/* ── Sections (new taxonomy: Tops · Bottoms · Dresses & Sets · Outerwear · Footwear · Accessories) — hidden during the build-your-closet gate ── */}
-        {!buildMode && SECTION_ORDER.map((section) => {
+        {/* ── Sections (new taxonomy: Tops · Bottoms · Dresses & Sets · Outerwear · Footwear · Accessories) ── */}
+        {SECTION_ORDER.map((section) => {
           const filter = sectionFilter[section] ?? null;
           return (
             <div key={section} id={`closet-section-${section}`} style={{ scrollMarginTop: 8 }}>
@@ -2634,69 +2634,7 @@ export default function ClosetPage() {
         />
       )}
 
-      {/* ── Docked "add a top + a bottom to unlock" loader (v2 gate) ── */}
-      {buildMode && (
-        <div className="absolute left-0 right-0 z-40" style={{ bottom: 0 }}>
-          <div
-            className="mx-3 mb-3 rounded-2xl px-4 pt-4 pb-4"
-            style={{
-              background: theme === 'dark' ? '#1c1620' : '#ffffff',
-              border: `1px solid ${theme === 'dark' ? 'rgba(243,112,167,0.28)' : '#F8D3E4'}`,
-              boxShadow: '0 -6px 24px -12px rgba(20,10,20,0.22)',
-            }}
-          >
-            {/* Title */}
-            <p className="text-[13.5px] font-bold leading-snug" style={{ color: theme === 'dark' ? '#F5EAF0' : '#141118' }}>
-              {t.cv_build_subtitle}
-            </p>
-
-            {/* Progress with item thumbnails (top/bottom or dress/footwear) */}
-            <div className="flex items-center gap-1 mt-4 px-1">
-              {gateMilestones.map((m, i) => (
-                <React.Fragment key={m.label}>
-                  {i > 0 && (
-                    <div className="flex-1 h-1.5 rounded-full overflow-hidden -mt-4" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(243,112,167,0.14)' }}>
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(gateDoneCount / 2) * 100}%`, background: 'linear-gradient(90deg,#F9A9CB,#F370A7)' }} />
-                    </div>
-                  )}
-                  <div className="flex flex-col items-center gap-1.5 flex-none">
-                    <div className="relative w-14 h-14 rounded-full flex items-center justify-center overflow-hidden" style={{ background: theme === 'dark' ? '#241823' : '#faf3f7', border: `2px solid ${m.done ? '#2FB27A' : (theme === 'dark' ? 'rgba(255,255,255,0.10)' : '#F1D9E6')}`, opacity: m.done ? 1 : 0.5 }}>
-                      <Image src={m.img} alt="" width={48} height={48} className="object-contain" unoptimized={needsUnoptimized(m.img)} />
-                      {m.done && (
-                        <span className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center" style={{ width: 18, height: 18, background: '#2FB27A', border: `2px solid ${theme === 'dark' ? '#1c1620' : '#fff'}` }}>
-                          <Check size={9} strokeWidth={3.5} color="#fff" />
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[11.5px] font-bold" style={{ color: m.done ? '#2FB27A' : (theme === 'dark' ? '#B79AAC' : '#B03A72') }}>{m.label}</span>
-                  </div>
-                </React.Fragment>
-              ))}
-            </div>
-
-            {/* CTA (or in-flight spinner) */}
-            {pendingUploads.size > 0 ? (
-              <div className="mt-3 h-12 rounded-2xl flex items-center justify-center gap-2 text-[14px] font-bold" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.06)' : '#faf0f5', color: theme === 'dark' ? '#F5EAF0' : '#B03A72' }}>
-                <Loader2 size={17} className="animate-spin" />
-                {t.cv_build_adding}
-              </div>
-            ) : (
-              <button
-                onClick={() => openAdd('TOPS')}
-                className="mt-3 w-full h-12 rounded-2xl flex items-center justify-center gap-2 text-white text-[15px] font-bold active:scale-[0.98] transition-transform"
-                style={{ background: '#F370A7' }}
-                aria-label={t.cv_add_item}
-              >
-                <Plus size={20} strokeWidth={2.6} color="white" />
-                {t.cv_add_item}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── Floating Add Button (hidden during the gate — the loader carries the add CTA) ── */}
-      {!buildMode && (
+      {/* ── Floating Add Button ── */}
       <div className="absolute right-5 z-50" style={{ bottom: '20px' }}>
         {closetV2 ? (
           <button
@@ -2719,7 +2657,6 @@ export default function ClosetPage() {
           </button>
         )}
       </div>
-      )}
 
       {/* ── How-to-use guide ── */}
       <ClosetGuide open={showGuide} onClose={() => setShowGuide(false)} />

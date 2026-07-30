@@ -14,6 +14,10 @@ export interface Product {
   rating?: number;
   sellerId?: string;
   isNew?: boolean;
+  /** Shop taxonomy, e.g. TOPWEAR / BOTTOMWEAR / DRESSES / FOOTWEAR. */
+  category?: string;
+  /** Shop subcategories, e.g. ['MAXI_DRESS']. A product can carry several. */
+  subcategory?: string[];
   titleLocalized?: Record<string, string>;
   descriptionLocalized?: Record<string, string>;
 }

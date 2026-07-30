@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import Diamond from '@/components/closet/Diamond';
-import { coinsPrice, coinPackages, actionCosts, type CoinPricing } from '@/lib/coins';
+import { coinsPrice, coinPackages, type CoinPricing } from '@/lib/coins';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events } from '@/lib/analytics-events';
 import { isInFlutterWebView } from '@/lib/flutter-bridge';
@@ -14,9 +14,13 @@ const TG_ADMIN = 'https://t.me/libasai_admin';
 
 /**
  * Buy-diamonds sheet (coins BRD, stage 1: manual Telegram top-up). Shows the
- * balance, the action price-list, ready packages with the 200+ discount, a
- * free-form amount with live totals, the non-refundable warning, and a "Buy"
- * button that opens Telegram with a prefilled message. No in-app payment yet.
+ * balance, ready packages with the 200+ discount, a free-form amount with live
+ * totals, the non-refundable warning, and a "Buy" button that opens Telegram
+ * with a prefilled message. No in-app payment yet.
+ *
+ * The per-action price list ("what you can do") was dropped on purpose: the
+ * sheet opens when someone wants diamonds, and every priced action already
+ * shows its own cost at the point of use.
  */
 export default function CoinsSheet({
   balance,
@@ -34,7 +38,6 @@ export default function CoinsSheet({
 }) {
   const { t } = useI18n();
   const packages = coinPackages(pricing);
-  const cost = actionCosts(pricing);
   const [qty, setQty] = useState<number>(packages[0]);
 
   // Swipe-down-to-close: only start the drag when the content is scrolled to top,
@@ -83,13 +86,6 @@ export default function CoinsSheet({
     }
   }
 
-  const actions = [
-    { label: t.cn_do_upload, cost: 0, free: true },
-    { label: t.cn_do_outfit, cost: cost.createOutfit, free: false },
-    { label: t.cn_do_beautify, cost: cost.beautify, free: false },
-    { label: t.cn_do_tryon, cost: cost.tryOn, free: false },
-  ];
-
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center" style={{ background: 'rgba(15,8,14,0.5)' }} onClick={onClose}>
       <div
@@ -115,23 +111,8 @@ export default function CoinsSheet({
             {needMore && <p className="text-[13px] mt-2" style={{ color: '#E0559A' }}>{t.cn_need_more}</p>}
           </div>
 
-          {/* Action price-list */}
-          <div className="rounded-2xl mt-4 overflow-hidden" style={{ background: rowBg, border: `1px solid ${line}` }}>
-            <p className="text-[12px] font-bold px-4 pt-3 pb-1 uppercase tracking-wide" style={{ color: sub }}>{t.cn_do_title}</p>
-            {actions.map((a, i) => (
-              <div key={a.label} className="flex items-center justify-between px-4 py-2.5" style={i > 0 ? { borderTop: `1px solid ${line}` } : undefined}>
-                <span className="text-[14px] font-semibold" style={{ color: ink }}>{a.label}</span>
-                {a.free ? (
-                  <span className="text-[13px] font-bold" style={{ color: '#2FB27A' }}>{t.cn_free}</span>
-                ) : (
-                  <span className="flex items-center gap-1 text-[14px] font-bold" style={{ color: ink }}><Diamond size={14} />{a.cost}</span>
-                )}
-              </div>
-            ))}
-          </div>
-
           {/* Packages */}
-          <p className="text-[15px] font-extrabold mt-5 mb-2.5" style={{ color: ink }}>{t.cn_pack_title}</p>
+          <p className="text-[15px] font-extrabold mt-4 mb-2.5" style={{ color: ink }}>{t.cn_pack_title}</p>
           <div className="grid grid-cols-3 gap-2.5">
             {packages.map((pkg) => {
               const p = coinsPrice(pkg, pricing);

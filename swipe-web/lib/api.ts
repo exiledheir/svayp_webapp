@@ -94,6 +94,18 @@ api.interceptors.response.use(
   }
 );
 
+/**
+ * One-line, loggable summary of a failed request: HTTP status plus the server's
+ * body. Pass the result to console.warn rather than logging the Error itself —
+ * Next's dev overlay promotes anything given to console.error into a
+ * full-screen runtime error, even when the caller has already handled it.
+ */
+export function describeApiError(err: unknown): string {
+  const e = err as { response?: { status?: number; data?: unknown }; message?: string };
+  if (e?.response) return `HTTP ${e.response.status} ${JSON.stringify(e.response.data)?.slice(0, 300)}`;
+  return e?.message ?? String(err);
+}
+
 // ── Helper: detect the 402 INSUFFICIENT_COINS paywall ─────────────────────────
 // Backend returns HTTP 402 with body { error: { code: "INSUFFICIENT_COINS",
 // details: [{field:"required", rejectedValue}, {field:"balance", rejectedValue}] } }
@@ -279,6 +291,8 @@ function mapProduct(raw: unknown): Product {
     rating: p.rating as number | undefined,
     sellerId: (p.seller_id ?? p.sellerId) as string | undefined,
     isNew: p.is_new as boolean | undefined,
+    category: p.category as string | undefined,
+    subcategory: (Array.isArray(p.subcategory) ? p.subcategory : undefined) as string[] | undefined,
     titleLocalized: p.title_localized as Record<string, string> | undefined,
     descriptionLocalized: p.description_localized as Record<string, string> | undefined,
   };

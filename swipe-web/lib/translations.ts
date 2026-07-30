@@ -362,36 +362,62 @@ export interface Translations {
   gs_cta: string;
   gs_dismiss: string;
   // ── Closet v2 (add & try-on redesign) ──────────────────────────────────────
-  cv_hero_title: string;
-  cv_hero_subtitle: string;
   cv_add_item: string;
   cv_add_title: string;
   cv_add_reassure: string;
-  // Build-your-closet gate (unlock once a top + a bottom exist)
-  cv_build_title: string;
-  cv_build_subtitle: string;
-  cv_build_top: string;
-  cv_build_bottom: string;
-  cv_build_dress: string;
-  cv_build_shoes: string;
-  cv_build_adding: string;
-  cv_show_bt_title: string;
-  cv_show_bt_cap: string;
-  cv_show_to_title: string;
-  cv_show_to_cap: string;
-  cv_show_to_mannequin: string;
-  cv_show_to_me: string;
-  cv_show_to_covered: string;
+  // ── First-run closet setup (blocking two-slot screen) ─────────────────────
+  su_title: string;
+  su_subtitle: string;
+  su_mode_pair: string;
+  su_mode_dress: string;
+  su_slot_top_title: string;
+  su_slot_bottom_title: string;
+  su_slot_dress_title: string;
+  su_slot_shoes_title: string;
+  su_slot_top_desc: string;
+  su_slot_bottom_desc: string;
+  su_slot_dress_desc: string;
+  su_slot_shoes_desc: string;
+  su_slug_top: string;
+  su_slug_bottom: string;
+  su_slug_dress: string;
+  su_slug_shoes: string;
+  su_photo: string;
+  su_tryon: string;
+  su_noun_top: string;
+  su_noun_bottom: string;
+  su_noun_dress: string;
+  su_noun_shoes: string;
+  su_more_to_go: string;
+  su_ready: string;
+  su_replace: string;
+  su_progress: string;
+  su_cutting: string;
+  su_polishing: string;
+  su_photo_failed: string;
+  su_try_again: string;
+  su_generate: string;
+  su_done_title: string;
+  su_done_body: string;
+  su_sheet_sub: string;
+  su_src_camera: string;
+  su_src_gallery: string;
+  su_shop_tops: string;
+  su_shop_bottoms: string;
+  su_shop_dresses: string;
+  su_shop_shoes: string;
+  su_toast_need_top: string;
+  su_toast_need_bottom: string;
+  su_toast_need_dress: string;
+  su_toast_need_shoes: string;
+  su_a11y_empty: string;
+  su_a11y_filled: string;
+  su_a11y_added_more: string;
+  su_a11y_added_done: string;
   // ── Diamonds (coins) ──────────────────────────────────────────────────────
   cn_title: string;
   cn_have: string;
   cn_need_more: string;
-  cn_do_title: string;
-  cn_do_upload: string;
-  cn_free: string;
-  cn_do_outfit: string;
-  cn_do_beautify: string;
-  cn_do_tryon: string;
   cn_pack_title: string;
   cn_off: string;
   cn_custom: string;
@@ -1164,34 +1190,61 @@ const en: Translations = {
   gs_cta: 'Add item',
   gs_dismiss: 'Dismiss',
   // ── Closet v2 ──
-  cv_hero_title: 'Build your closet',
-  cv_hero_subtitle: 'Snap a photo — we name it, cut it out, and file it. All by AI.',
   cv_add_item: 'Add item',
   cv_add_title: 'Add to closet',
   cv_add_reassure: "Any photo works. We clean it up, name it, and sort every item into your closet.",
-  cv_build_title: 'Add a top and a bottom',
-  cv_build_subtitle: 'Add a top and a bottom — or a dress and shoes — to unlock your personalized styling.',
-  cv_build_top: 'Top',
-  cv_build_bottom: 'Bottom',
-  cv_build_dress: 'Dress',
-  cv_build_shoes: 'Shoes',
-  cv_build_adding: 'Adding your items…',
-  cv_show_bt_title: 'Snap it, we clean it up',
-  cv_show_bt_cap: 'Photograph any item — AI cuts out the background and files it in your closet.',
-  cv_show_to_title: 'Try it on',
-  cv_show_to_cap: 'See how it looks on you before you wear it.',
-  cv_show_to_mannequin: 'See any item on a mannequin',
-  cv_show_to_me: 'Or try it on your own photo',
-  cv_show_to_covered: 'Modest styling, fully covered',
+  // ── First-run closet setup ──
+  su_title: 'Add 2 things you already own',
+  su_subtitle: "That's all LIBAS needs to start styling you.",
+  su_mode_pair: 'Top + bottom',
+  su_mode_dress: 'Dress + shoes',
+  su_slot_top_title: 'Add a top',
+  su_slot_bottom_title: 'Add a bottom',
+  su_slot_dress_title: 'Add a dress',
+  su_slot_shoes_title: 'Add shoes',
+  su_slot_top_desc: 'T-shirt, blouse, sweater, jacket',
+  su_slot_bottom_desc: 'Jeans, skirt, trousers',
+  su_slot_dress_desc: 'Any dress or a two-piece set',
+  su_slot_shoes_desc: 'Sneakers, heels, boots',
+  su_slug_top: 'TOP',
+  su_slug_bottom: 'BOTTOM',
+  su_slug_dress: 'DRESS',
+  su_slug_shoes: 'SHOES',
+  su_photo: 'Photo',
+  su_tryon: 'Try it on',
+  su_noun_top: 'Top',
+  su_noun_bottom: 'Bottom',
+  su_noun_dress: 'Dress',
+  su_noun_shoes: 'Shoes',
+  su_more_to_go: '1 MORE TO GO',
+  su_ready: 'READY',
+  su_replace: 'Replace',
+  su_progress: '{n} of 2 added',
+  su_cutting: 'Cutting out the background…',
+  su_polishing: 'Making it studio-quality…',
+  su_photo_failed: "Couldn't read that photo. Try a clearer one.",
+  su_try_again: 'Try again',
+  su_generate: 'Generate my first outfit',
+  su_done_title: "Done — that's a closet.",
+  su_done_body: '2 items is enough for your first outfits. Add more any time.',
+  su_sheet_sub: 'Any photo works — hanging, on the floor, or worn.',
+  su_src_camera: 'Take a photo',
+  su_src_gallery: 'Choose from gallery',
+  su_shop_tops: 'Tops in the LIBAS shop',
+  su_shop_bottoms: 'Bottoms in the LIBAS shop',
+  su_shop_dresses: 'Dresses in the LIBAS shop',
+  su_shop_shoes: 'Shoes in the LIBAS shop',
+  su_toast_need_top: 'Added to your closet. You still need a top.',
+  su_toast_need_bottom: 'Added to your closet. You still need a bottom.',
+  su_toast_need_dress: 'Added to your closet. You still need a dress.',
+  su_toast_need_shoes: 'Added to your closet. You still need shoes.',
+  su_a11y_empty: '{title}, empty, double-tap to choose a photo',
+  su_a11y_filled: '{name} added, double-tap to replace',
+  su_a11y_added_more: '{name} added. One more item to go.',
+  su_a11y_added_done: '{name} added. Both items ready.',
   cn_title: 'Diamonds',
   cn_have: 'You have {n}',
   cn_need_more: 'Not enough diamonds — top up to continue.',
-  cn_do_title: 'What you can do',
-  cn_do_upload: 'Add clothing',
-  cn_free: 'Free',
-  cn_do_outfit: 'Create an outfit',
-  cn_do_beautify: 'Beautify',
-  cn_do_tryon: 'Try it on',
   cn_pack_title: 'Buy diamonds',
   cn_off: '−{n}%',
   cn_custom: 'Or enter your own amount',
@@ -1958,33 +2011,62 @@ const ru: Translations = {
   gs_cta: 'Добавить',
   gs_dismiss: 'Скрыть',
   // ── Closet v2 ──
-  cv_hero_title: 'Соберите гардероб',
-  cv_hero_subtitle: 'Сфотографируйте — мы назовём, вырежем фон и разложим. Всё за счёт ИИ.',
   cv_add_item: 'Добавить',
   cv_add_title: 'Добавить в гардероб',
-  cv_build_title: 'Добавьте верх и низ',
-  cv_build_subtitle: 'Добавьте верх и низ — или платье и обувь — чтобы открыть персональный стиль.',
-  cv_build_top: 'Верх',
-  cv_build_bottom: 'Низ',
-  cv_build_dress: 'Платье',
-  cv_build_shoes: 'Обувь',
-  cv_build_adding: 'Добавляем вещи…',
-  cv_show_bt_title: 'Сфотографируйте — мы очистим',
-  cv_show_bt_cap: 'Снимите любую вещь — ИИ уберёт фон и добавит её в гардероб.',
-  cv_show_to_title: 'Примерка',
-  cv_show_to_cap: 'Посмотрите, как вещь смотрится на вас, до того как наденете.',
-  cv_show_to_mannequin: 'Примерьте на манекене',
-  cv_show_to_me: 'Или на своём фото',
-  cv_show_to_covered: 'Скромный образ, полностью закрыто',
+  // ── First-run closet setup ──
+  su_title: 'Добавьте 2 вещи, которые у вас есть',
+  su_subtitle: 'Этого достаточно, чтобы LIBAS начал подбирать образы.',
+  su_mode_pair: 'Верх + низ',
+  su_mode_dress: 'Платье + обувь',
+  su_slot_top_title: 'Добавить верх',
+  su_slot_bottom_title: 'Добавить низ',
+  su_slot_dress_title: 'Добавить платье',
+  su_slot_shoes_title: 'Добавить обувь',
+  su_slot_top_desc: 'Футболка, блузка, свитер, куртка',
+  su_slot_bottom_desc: 'Джинсы, юбка, брюки',
+  su_slot_dress_desc: 'Любое платье или костюм-двойка',
+  su_slot_shoes_desc: 'Кроссовки, туфли, сапоги',
+  su_slug_top: 'ВЕРХ',
+  su_slug_bottom: 'НИЗ',
+  su_slug_dress: 'ПЛАТЬЕ',
+  su_slug_shoes: 'ОБУВЬ',
+  su_photo: 'Фото',
+  su_tryon: 'Примерить',
+  su_noun_top: 'Верх',
+  su_noun_bottom: 'Низ',
+  su_noun_dress: 'Платье',
+  su_noun_shoes: 'Обувь',
+  su_more_to_go: 'ОСТАЛАСЬ ЕЩЁ 1',
+  su_ready: 'ГОТОВО',
+  su_replace: 'Заменить',
+  su_progress: 'Добавлено {n} из 2',
+  su_cutting: 'Убираем фон…',
+  su_polishing: 'Доводим до студийного вида…',
+  su_photo_failed: 'Не удалось распознать фото. Попробуйте другое.',
+  su_try_again: 'Ещё раз',
+  su_generate: 'Создать первый образ',
+  su_done_title: 'Готово — гардероб создан.',
+  su_done_body: 'Двух вещей достаточно для первых образов. Остальное добавите позже.',
+  su_sheet_sub: 'Подойдёт любое фото — на вешалке, на полу или на себе.',
+  su_src_camera: 'Сделать фото',
+  su_src_gallery: 'Выбрать из галереи',
+  su_shop_tops: 'Верх в магазине LIBAS',
+  su_shop_bottoms: 'Низ в магазине LIBAS',
+  su_shop_dresses: 'Платья в магазине LIBAS',
+  su_shop_shoes: 'Обувь в магазине LIBAS',
+  su_toast_need_top: 'Добавлено в гардероб. Не хватает верха.',
+  su_toast_need_bottom: 'Добавлено в гардероб. Не хватает низа.',
+  su_toast_need_dress: 'Добавлено в гардероб. Не хватает платья.',
+  su_toast_need_shoes: 'Добавлено в гардероб. Не хватает обуви.',
+  su_a11y_empty: '{title}, пусто, нажмите дважды, чтобы выбрать фото',
+  // «Добавлено: {name}» — {name} подставляется из названия вещи, поэтому род
+  // заранее неизвестен; такая формулировка согласуется с любым словом.
+  su_a11y_filled: 'Добавлено: {name}. Нажмите дважды, чтобы заменить',
+  su_a11y_added_more: 'Добавлено: {name}. Осталась ещё одна вещь.',
+  su_a11y_added_done: 'Добавлено: {name}. Обе вещи готовы.',
   cn_title: 'Монеты',
   cn_have: 'У вас {n}',
   cn_need_more: 'Недостаточно монет — пополните, чтобы продолжить.',
-  cn_do_title: 'Что можно делать',
-  cn_do_upload: 'Добавить одежду',
-  cn_free: 'Бесплатно',
-  cn_do_outfit: 'Создать образ',
-  cn_do_beautify: 'Beautify',
-  cn_do_tryon: 'Примерить',
   cn_pack_title: 'Купить монеты',
   cn_off: '−{n}%',
   cn_custom: 'Или введите своё количество',
@@ -2752,33 +2834,60 @@ const uz: Translations = {
   gs_cta: "Qo'shish",
   gs_dismiss: 'Yopish',
   // ── Closet v2 ──
-  cv_hero_title: "Garderobingizni yig'ing",
-  cv_hero_subtitle: "Suratga oling — biz nomlaymiz, fonini olib tashlaymiz va joylashtiramiz. Hammasi AI bilan.",
   cv_add_item: "Qo'shish",
   cv_add_title: "Garderobga qo'shish",
-  cv_build_title: "Yuqori va pastki kiyim qo'shing",
-  cv_build_subtitle: "Yuqori va pastki — yoki libos va poyabzal qo'shib, shaxsiy uslubni oching.",
-  cv_build_top: 'Yuqori',
-  cv_build_bottom: 'Pastki',
-  cv_build_dress: 'Libos',
-  cv_build_shoes: 'Poyabzal',
-  cv_build_adding: "Buyumlaringiz qo'shilmoqda…",
-  cv_show_bt_title: 'Suratga oling — tozalaymiz',
-  cv_show_bt_cap: 'Har qanday buyumni suratga oling — AI fonni olib tashlab, garderobga joylaydi.',
-  cv_show_to_title: 'Kiyib ko‘rish',
-  cv_show_to_cap: 'Kiyishdan oldin buyum sizga qanday yarashishini ko‘ring.',
-  cv_show_to_mannequin: 'Manekenda ko‘ring',
-  cv_show_to_me: 'Yoki o‘z suratingizda',
-  cv_show_to_covered: 'Yopiq, hijobli uslub',
+  // ── First-run closet setup ──
+  su_title: "Oʻzingizda bor 2 buyumni qoʻshing",
+  su_subtitle: 'LIBAS obraz yaratishni boshlashi uchun shu yetarli.',
+  su_mode_pair: 'Ustki + ostki',
+  su_mode_dress: "Koʻylak + poyabzal",
+  su_slot_top_title: "Ustki kiyim qoʻshing",
+  su_slot_bottom_title: "Ostki kiyim qoʻshing",
+  su_slot_dress_title: "Koʻylak qoʻshing",
+  su_slot_shoes_title: "Poyabzal qoʻshing",
+  su_slot_top_desc: 'Futbolka, bluzka, sviter, kurtka',
+  su_slot_bottom_desc: 'Jinsi, yubka, shim',
+  su_slot_dress_desc: "Har qanday koʻylak yoki ikki qismli set",
+  su_slot_shoes_desc: 'Krossovka, tufli, etik',
+  su_slug_top: 'USTKI',
+  su_slug_bottom: 'OSTKI',
+  su_slug_dress: "KOʻYLAK",
+  su_slug_shoes: 'POYABZAL',
+  su_photo: 'Surat',
+  su_tryon: "Kiyib koʻring",
+  su_noun_top: 'Ustki kiyim',
+  su_noun_bottom: 'Ostki kiyim',
+  su_noun_dress: "Koʻylak",
+  su_noun_shoes: 'Poyabzal',
+  su_more_to_go: 'YANA 1 TA QOLDI',
+  su_ready: 'TAYYOR',
+  su_replace: 'Almashtirish',
+  su_progress: "2 dan {n} ta qoʻshildi",
+  su_cutting: 'Fonni olib tashlayapmiz…',
+  su_polishing: 'Studiya sifatiga yetkazyapmiz…',
+  su_photo_failed: "Suratni oʻqiy olmadik. Aniqroq surat yuboring.",
+  su_try_again: 'Qayta urinish',
+  su_generate: 'Birinchi obrazimni yarating',
+  su_done_title: 'Tayyor — garderob yaratildi.',
+  su_done_body: "Birinchi obrazlar uchun 2 ta buyum yetarli. Keyin yana qoʻshasiz.",
+  su_sheet_sub: "Har qanday surat boʻladi — ilingan, yotgan yoki kiyilgan holatda.",
+  su_src_camera: 'Suratga oling',
+  su_src_gallery: 'Galereyadan tanlang',
+  su_shop_tops: "LIBAS doʻkonidagi ustki kiyimlar",
+  su_shop_bottoms: "LIBAS doʻkonidagi ostki kiyimlar",
+  su_shop_dresses: "LIBAS doʻkonidagi koʻylaklar",
+  su_shop_shoes: "LIBAS doʻkonidagi poyabzallar",
+  su_toast_need_top: "Garderobga qoʻshildi. Ustki kiyim yetishmayapti.",
+  su_toast_need_bottom: "Garderobga qoʻshildi. Ostki kiyim yetishmayapti.",
+  su_toast_need_dress: "Garderobga qoʻshildi. Koʻylak yetishmayapti.",
+  su_toast_need_shoes: "Garderobga qoʻshildi. Poyabzal yetishmayapti.",
+  su_a11y_empty: '{title}, boʻsh, surat tanlash uchun ikki marta bosing',
+  su_a11y_filled: "{name} qoʻshildi, almashtirish uchun ikki marta bosing",
+  su_a11y_added_more: "{name} qoʻshildi. Yana bitta buyum qoldi.",
+  su_a11y_added_done: "{name} qoʻshildi. Ikkala buyum tayyor.",
   cn_title: 'Tangalar',
   cn_have: 'Sizda {n} ta',
   cn_need_more: 'Tangalar yetarli emas — davom etish uchun to‘ldiring.',
-  cn_do_title: 'Nima qila olasiz',
-  cn_do_upload: 'Kiyim qo‘shish',
-  cn_free: 'Bepul',
-  cn_do_outfit: 'Obraz yaratish',
-  cn_do_beautify: 'Beautify',
-  cn_do_tryon: 'Kiyib ko‘rish',
   cn_pack_title: 'Tanga sotib olish',
   cn_off: '−{n}%',
   cn_custom: 'Yoki o‘z miqdoringizni kiriting',
