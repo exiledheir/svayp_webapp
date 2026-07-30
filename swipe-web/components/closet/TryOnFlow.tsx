@@ -165,17 +165,6 @@ export function TryOnConfirmModal({
     };
   }, []);
 
-  // На открытии прокручиваем шторку вниз, чтобы сразу была видна кнопка загрузки.
-  useEffect(() => {
-    const el = sheetRef.current;
-    if (!el) return;
-    const id = requestAnimationFrame(() => {
-      el.scrollTo({ top: el.scrollHeight });
-    });
-    return () => cancelAnimationFrame(id);
-    // Пересчитываем при переключении режима (в «self» контент выше).
-  }, [target]);
-
   // Тач-жест: скроллим контент как обычно, но у самого верха «оттягивание» вниз
   // тянет всю шторку и за порогом закрывает её.
   useEffect(() => {
@@ -286,7 +275,7 @@ export function TryOnConfirmModal({
         {/* Outfit preview */}
         <div
           className="mx-5 rounded-2xl overflow-hidden bg-white flex items-center justify-center"
-          style={{ height: 220, border: '1px solid #f3f4f6' }}
+          style={{ height: 168, border: '1px solid #f3f4f6' }}
         >
           <div className="relative h-full" style={{ aspectRatio: '3 / 4', maxWidth: '100%' }}>
             {displayEntries.map((entry, idx) => (
@@ -311,77 +300,38 @@ export function TryOnConfirmModal({
         </div>
 
         {/* Title */}
-        <div className="px-5 pt-4 pb-2 text-center">
-          <h3 className="text-[16px] font-bold text-gray-900">{t.tryOnConfirmTitle}</h3>
-          <p className="text-[13px] text-gray-400 mt-1">{t.tryOnConfirmBody}</p>
+        <div className="px-5 pt-3.5 pb-1 text-center">
+          <h3 className="text-[17px] font-bold text-gray-900">{t.tryOnConfirmTitle}</h3>
         </div>
 
-        {/* Target selector — two option cards: mannequin vs your own photo */}
-        <div className="px-5 pt-1 pb-1 grid grid-cols-2 gap-3 items-stretch">
-          {/* Card: on a mannequin */}
-          <button
-            onClick={() => setTarget('mannequin')}
-            className="relative flex flex-col items-center text-center gap-2 rounded-2xl border p-3.5 transition-all"
-            style={{
-              borderColor: target === 'mannequin' ? '#F370A7' : '#eee',
-              borderWidth: target === 'mannequin' ? 2 : 1,
-              background: target === 'mannequin' ? 'rgba(243,112,167,0.06)' : '#fff',
-              boxShadow: target === 'mannequin' ? '0 4px 16px rgba(243,112,167,0.14)' : 'none',
-            }}
-          >
-            <SelectBadge active={target === 'mannequin'} />
-            <span className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'rgba(243,112,167,0.10)' }}>
-              <User size={22} className="text-[#F370A7]" />
-            </span>
-            <span className="block text-[13px] font-semibold text-gray-900 leading-tight">{t.tryOnTargetMannequin}</span>
-            <span className="block text-[11px] text-gray-400 leading-snug">{t.tryOnTargetMannequinHint}</span>
-          </button>
-
-          {/* Card: on my photo */}
-          <button
-            onClick={() => setTarget('self')}
-            className="relative flex flex-col items-center text-center gap-2 rounded-2xl border p-3.5 transition-all"
-            style={{
-              borderColor: target === 'self' ? '#F370A7' : '#eee',
-              borderWidth: target === 'self' ? 2 : 1,
-              background: target === 'self' ? 'rgba(243,112,167,0.06)' : '#fff',
-              boxShadow: target === 'self' ? '0 4px 16px rgba(243,112,167,0.14)' : 'none',
-            }}
-          >
-            <SelectBadge active={target === 'self'} />
-            <span className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center" style={{ background: 'rgba(243,112,167,0.10)' }}>
-              {photoPreview ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={photoPreview} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <Camera size={22} className="text-[#F370A7]" />
-              )}
-            </span>
-            <span className="block text-[13px] font-semibold text-gray-900 leading-tight">{t.tryOnTargetSelf}</span>
-            <span className="block text-[11px] text-gray-400 leading-snug">{t.tryOnTargetSelfHint}</span>
-          </button>
+        {/* Target selector. A two-state choice does not need two description
+            cards — a segmented control says the same thing in one line. */}
+        <div className="mx-5 mt-3 flex gap-1.5 rounded-full p-1" style={{ background: '#F4F4F7' }}>
+          {(['mannequin', 'self'] as const).map((opt) => {
+            const on = target === opt;
+            return (
+              <button
+                key={opt}
+                onClick={() => setTarget(opt)}
+                className="flex-1 h-10 rounded-full flex items-center justify-center gap-1.5 text-[13.5px] font-bold transition-colors"
+                style={{
+                  background: on ? '#fff' : 'transparent',
+                  color: on ? '#101014' : '#6E6E78',
+                  boxShadow: on ? '0 1px 3px rgba(0,0,0,0.1)' : undefined,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {opt === 'mannequin' ? <User size={15} /> : <Camera size={15} />}
+                {opt === 'mannequin' ? t.tryOnTargetMannequin : t.tryOnTargetSelf}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Photo upload area + example photos — only in "self" mode */}
+        {/* Photo picker — only in "self" mode. One example thumbnail carries the
+            guidance that used to take a paragraph and a three-photo grid. */}
         {target === 'self' && (
-          <div className="px-5 pt-3">
-            {/* Guidance: what photo to upload */}
-            <div className="rounded-2xl p-3.5 mb-3" style={{ background: 'rgba(243,112,167,0.05)' }}>
-              <p className="text-[13px] font-bold text-gray-900">{t.tryOnPhotoWhatTitle}</p>
-              <p className="text-[12px] text-gray-500 leading-relaxed mt-1">{t.tryOnPhotoWhatBody}</p>
-            </div>
-
-            {/* Example photos — tap to view larger */}
-            <div className="grid grid-cols-3 gap-2 mb-3">
-              {[
-                '/images/closet/tryon/example-1.webp',
-                '/images/closet/tryon/example-2.webp',
-                '/images/closet/tryon/example-3.webp',
-              ].map((src, i) => (
-                <ExamplePhoto key={src} src={src} alt={`${t.tryOnPhotoWhatTitle} ${i + 1}`} onZoom={() => setZoomSrc(src)} />
-              ))}
-            </div>
-
+          <div className="px-5 pt-3.5">
             <input
               ref={fileInputRef}
               type="file"
@@ -389,62 +339,81 @@ export function TryOnConfirmModal({
               className="hidden"
               onChange={handlePhotoPick}
             />
-            {personKey && !uploading ? (
-              // Фото уже выбрано — кнопка становится тихой второстепенной.
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full h-11 rounded-2xl border flex items-center justify-center gap-2 text-[13px] font-semibold text-gray-700"
-                style={{ borderColor: '#e5e7eb', background: '#fff' }}
-              >
-                <Check size={15} className="text-[#16a34a]" /> {t.tryOnChangePhoto}
-              </button>
-            ) : (
-              // Ещё нет фото — это главный следующий шаг, выделяем его.
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                className="w-full h-12 rounded-2xl flex items-center justify-center gap-2 text-[14px] font-bold text-white disabled:opacity-80"
+                className="relative flex-none rounded-2xl overflow-hidden flex items-center justify-center"
                 style={{
-                  background: 'linear-gradient(135deg, #F370A7 0%, #e0409a 50%, #F370A7 100%)',
-                  backgroundSize: '200% auto',
-                  boxShadow: '0 6px 22px rgba(243,112,167,0.5)',
+                  width: 74, height: 96,
+                  border: `1.5px ${photoPreview ? 'solid' : 'dashed'} ${photoPreview ? '#F370A7' : '#E7E7EC'}`,
+                  background: photoPreview ? '#fff' : '#FAFAFC',
                 }}
+                aria-label={t.tryOnUploadPhoto}
               >
-                {uploading ? (
-                  <><Loader2 size={16} className="animate-spin" /> {t.tryOnUploading}</>
+                {photoPreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photoPreview} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  <><Camera size={17} /> {t.tryOnUploadPhoto}</>
+                  <Camera size={22} className="text-[#F370A7]" />
+                )}
+                {uploading && (
+                  <span className="absolute inset-0 flex items-center justify-center bg-white/70">
+                    <Loader2 size={18} className="animate-spin text-[#F370A7]" />
+                  </span>
+                )}
+                {personKey && !uploading && (
+                  <span className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-[#16a34a] flex items-center justify-center">
+                    <Check size={12} className="text-white" strokeWidth={3} />
+                  </span>
                 )}
               </button>
-            )}
-            {photoError && (
-              <p className="text-[11px] text-center mt-1.5" style={{ color: '#ef4444' }}>
-                {t.tryOnPhotoFailed}
-              </p>
-            )}
+
+              <div className="flex-1 min-w-0">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="text-left text-[14px] font-bold text-gray-900"
+                >
+                  {personKey && !uploading ? t.tryOnChangePhoto : t.tryOnUploadPhoto}
+                </button>
+                <p className="text-[12px] text-gray-400 leading-snug mt-1">{t.tryOnPhotoHint}</p>
+                {photoError && (
+                  <p className="text-[11.5px] mt-1" style={{ color: '#ef4444' }}>{t.tryOnPhotoFailed}</p>
+                )}
+              </div>
+
+              <ExamplePhoto
+                src="/images/closet/tryon/example-1.webp"
+                alt={t.tryOnPhotoHint}
+                onZoom={() => setZoomSrc('/images/closet/tryon/example-1.webp')}
+              />
+            </div>
           </div>
         )}
 
         {/* Buttons */}
-        <div className="flex gap-3 px-5 pt-3 pb-8">
-          <button
-            onClick={requestClose}
-            className="flex-1 h-12 rounded-full bg-gray-100 text-gray-700 text-[13px] font-semibold"
-          >
-            {t.tryOnCancel}
-          </button>
+        <div className="px-5 pt-4 pb-7">
           <button
             onClick={handleConfirm}
             disabled={confirmDisabled}
-            className="flex-1 h-12 rounded-full text-white text-[13px] font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50"
+            className="w-full h-13 rounded-full text-white text-[15.5px] font-bold flex items-center justify-center gap-2 disabled:opacity-50"
             style={{
+              height: 52,
               background: 'linear-gradient(135deg, #F370A7 0%, #e0409a 50%, #F370A7 100%)',
               backgroundSize: '200% auto',
-              boxShadow: '0 4px 18px rgba(243,112,167,0.45)',
+              boxShadow: '0 6px 20px rgba(243,112,167,0.42)',
             }}
           >
-            {uploading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+            {uploading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
             {t.tryOnConfirm}
+          </button>
+          <button
+            onClick={requestClose}
+            className="w-full text-center text-[13.5px] font-semibold text-gray-400"
+            style={{ minHeight: 44, marginTop: 4 }}
+          >
+            {t.tryOnCancel}
           </button>
         </div>
       </div>
@@ -476,21 +445,6 @@ export function TryOnConfirmModal({
   );
 }
 
-/** Top-right selection indicator for an option card — filled check when active. */
-function SelectBadge({ active }: { active: boolean }) {
-  return (
-    <span
-      className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full flex items-center justify-center border-2 transition-colors"
-      style={{
-        borderColor: active ? '#F370A7' : '#d1d5db',
-        background: active ? '#F370A7' : 'transparent',
-      }}
-    >
-      {active && <Check size={12} className="text-white" strokeWidth={3} />}
-    </span>
-  );
-}
-
 /**
  * One example photo showing how to shoot for a good try-on result. Tapping it
  * opens the enlarged viewer. Falls back to a neutral silhouette placeholder if
@@ -498,30 +452,25 @@ function SelectBadge({ active }: { active: boolean }) {
  */
 function ExamplePhoto({ src, alt, onZoom }: { src: string; alt: string; onZoom: () => void }) {
   const [ok, setOk] = useState(true);
+  if (!ok) return null; // Nothing to teach without the image — don't hold space.
   return (
     <button
       type="button"
       onClick={ok ? onZoom : undefined}
-      className="group relative rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center"
-      style={{ aspectRatio: '2 / 3', cursor: ok ? 'zoom-in' : 'default' }}
+      className="group relative flex-none rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center"
+      style={{ width: 60, height: 90, cursor: ok ? 'zoom-in' : 'default' }}
     >
-      {ok ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={src}
-          alt={alt}
-          onError={() => setOk(false)}
-          loading="lazy"
-          className="w-full h-full object-cover"
-        />
-      ) : (
-        <User size={26} className="text-gray-300" />
-      )}
-      {ok && (
-        <span className="absolute bottom-1.5 right-1.5 w-6 h-6 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center">
-          <ZoomIn size={13} className="text-white" />
-        </span>
-      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        onError={() => setOk(false)}
+        loading="lazy"
+        className="w-full h-full object-cover"
+      />
+      <span className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center">
+        <ZoomIn size={11} className="text-white" />
+      </span>
     </button>
   );
 }
