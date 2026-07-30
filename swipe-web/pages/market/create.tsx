@@ -110,6 +110,9 @@ function MarketCreatePageInner() {
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState('');
   const didStart = useRef(false);
+  // Для события «бросил объявление»: последний увиденный шаг и факт публикации.
+  const lastStepRef = useRef<string | null>(null);
+  const publishedRef = useRef(false);
 
   // ── Mount: gate + resume ────────────────────────────────────────────────────
   useEffect(() => {
@@ -169,8 +172,21 @@ function MarketCreatePageInner() {
     if (step <= CONTACTS) {
       if (!editingId) setMarketWizardStep(step); // don't disturb create-flow resume while editing
       logAnalyticsEvent(Events.MARKET_LISTING_STEP_VIEWED, { [Params.MK_STEP]: STEP_NAMES[step] });
+      lastStepRef.current = STEP_NAMES[step];
     }
   }, [step, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Уход из мастера без публикации. Без этого события видно только тех, кто дошёл до конца,
+  // и не видно, на каком из шести шагов люди бросают объявление.
+  useEffect(() => {
+    return () => {
+      if (didStart.current && !publishedRef.current) {
+        logAnalyticsEvent(Events.MARKET_LISTING_ABANDONED, {
+          [Params.MK_STEP]: lastStepRef.current ?? STEP_NAMES[PHOTOS],
+        });
+      }
+    };
+  }, []);
 
   function patch(p: Partial<MarketDraft>) {
     setForm((f) => ({ ...f, ...p }));
@@ -237,6 +253,7 @@ function MarketCreatePageInner() {
           [Params.MK_DEAL_TYPE]: created.dealType,
         });
       }
+      publishedRef.current = true; // мастер доведён до конца — уход больше не считается отказом
       setStep(PUBLISHED);
     } catch {
       setPublishError(t.mk_publish_error);

@@ -65,6 +65,8 @@ function CreateFeedPost() {
   const [usernameGate, setUsernameGate] = React.useState<FeedProfile | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [published, setPublished] = React.useState<FeedPost | null>(null);
+  // Ref, а не state: cleanup эффекта замкнулся бы на значение с момента монтирования.
+  const publishedRef = React.useRef(false);
   const pickerRef = React.useRef<SourcePickerHandle>(null);
 
   // Auth gate (FeedGuard handles the feature flag; this handles sign-in).
@@ -171,6 +173,16 @@ function CreateFeedPost() {
     }
     buildAndSet({ applySeed: true });
   }, [buildAndSet]);
+
+  // Уход из редактора без публикации. Раньше фиксировались только явные ошибки публикации,
+  // поэтому молчаливый отказ был не виден вовсе.
+  React.useEffect(() => {
+    return () => {
+      if (!publishedRef.current) {
+        logAnalyticsEvent(Events.FEED_POST_ABANDONED);
+      }
+    };
+  }, []);
 
   function refresh() {
     if (loading) return;
@@ -287,6 +299,7 @@ function CreateFeedPost() {
         [Params.FEED_IMAGE_COUNT]: selected.length,
         [Params.FEED_HAS_REAL_PHOTO]: selected.some((s) => s.sourceType === 'tryon'),
       });
+      publishedRef.current = true; // пост создан — уход больше не считается отказом
       setPublished(post);
       setStep(PUBLISHED);
     } catch (e) {

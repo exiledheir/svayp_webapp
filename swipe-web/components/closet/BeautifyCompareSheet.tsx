@@ -5,7 +5,7 @@ import { createBeautifyJob, watchBeautifyUntilDone, commitBeautify } from '@/lib
 import { isInsufficientCoins } from '@/lib/api';
 import type { ClosetItem } from '@/lib/closet-storage';
 import { logAnalyticsEvent } from '@/lib/analytics';
-import { Events } from '@/lib/analytics-events';
+import { Events, Params } from '@/lib/analytics-events';
 
 type Phase = 'working' | 'compare' | 'failed' | 'soon';
 
@@ -75,7 +75,8 @@ export default function BeautifyCompareSheet({
         if (!alive) return;
         // Нехватка монет (402) → экран покупки, а не "coming soon".
         if (isInsufficientCoins(err)) {
-          logAnalyticsEvent(Events.BEAUTIFY_FAILED, { code: 'INSUFFICIENT_COINS' });
+          // Ключ error_code — общий для всех событий отказа; своё имя ломает единый разбор причин.
+          logAnalyticsEvent(Events.BEAUTIFY_FAILED, { [Params.ERROR_CODE]: 'INSUFFICIENT_COINS' });
           onClose();
           onNeedCoins?.();
           return;
