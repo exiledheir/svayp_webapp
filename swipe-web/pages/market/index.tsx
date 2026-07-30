@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { Plus, User, Search, Camera, Heart, MessageCircle } from 'lucide-react';
+import { Plus, User, Search, Heart, MessageCircle } from 'lucide-react';
 import MarketFeedCard from '@/components/market/MarketFeedCard';
 import { isMarketOnboardingComplete } from '@/lib/market-storage';
 import { getFeed as apiGetFeed, type ListingCard } from '@/lib/market-api';
@@ -261,7 +261,7 @@ export default function MarketFeedPage() {
           </div>
         </header>
 
-        {/* ── Search bar + visual search ── */}
+        {/* ── Search bar ── */}
         <div className="shrink-0 px-4 pt-1 pb-2.5">
           <div className="flex items-center gap-2.5">
             <div
@@ -276,16 +276,6 @@ export default function MarketFeedPage() {
                 className="flex-1 min-w-0 bg-transparent text-[14px] text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40 outline-none"
               />
             </div>
-            <button
-              aria-label={t.mk_visual_search}
-              className="shrink-0 w-11 h-11 flex items-center justify-center vs-pulse active:opacity-90"
-              style={{
-                borderRadius: 14,
-                background: 'linear-gradient(135deg, #f093fb 0%, #F5576c 100%)',
-              }}
-            >
-              <Camera size={19} strokeWidth={2} color="#fff" />
-            </button>
           </div>
         </div>
 

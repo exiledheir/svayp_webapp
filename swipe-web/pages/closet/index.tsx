@@ -356,6 +356,14 @@ export default function ClosetPage() {
       loadTryOns(0);
     }
   }, [closetTab, tryOnLoaded, tryOnLoading, loadTryOns]);
+
+  // Календарь живёт вкладкой внутри /closet, поэтому по смене роута его не видно —
+  // без этого события его использование не попадает в аналитику вообще.
+  useEffect(() => {
+    if (closetTab === 'calendar') {
+      logAnalyticsEvent(Events.CLOSET_CALENDAR_VIEWED);
+    }
+  }, [closetTab]);
   // Warm the image cache for try-on results (Outfits tab) so re-opening the tab
   // doesn't refetch them.
   useEffect(() => {
@@ -1049,7 +1057,8 @@ export default function ClosetPage() {
       setReviewBeautifyPhase(localId, { phase: 'failed', progress: 0 });
       unguard();
       if (isInsufficientCoins(err)) {
-        logAnalyticsEvent(Events.BEAUTIFY_FAILED, { code: 'INSUFFICIENT_COINS' });
+        // Ключ error_code — общий для всех событий отказа; своё имя ломает единый разбор причин.
+        logAnalyticsEvent(Events.BEAUTIFY_FAILED, { [Params.ERROR_CODE]: 'INSUFFICIENT_COINS' });
         setShowPremiumGate('beautify');
         return;
       }
