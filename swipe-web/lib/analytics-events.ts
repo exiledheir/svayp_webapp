@@ -5,6 +5,10 @@ export const Events = {
   // ── Closet Screen ──────────────────────────────────────────────────────────
   CLOSET_SCREEN_VIEWED: 'closet_screen_viewed',
   CLOSET_ITEM_DELETED: 'closet_item_deleted',
+  // Календарь — вкладка внутри /closet, а не отдельный роут, поэтому по screen_view
+  // он неотличим от досок и образов. Без собственного события его использование
+  // не измеряется вовсе.
+  CLOSET_CALENDAR_VIEWED: 'closet_calendar_viewed',
   CLOSET_GUIDE_OPENED: 'closet_guide_opened',
   CLOSET_GUIDE_VIDEO_PLAYED: 'closet_guide_video_played',
   CLOSET_FEEDBACK_CTA_TAPPED: 'closet_feedback_cta_tapped',
@@ -62,6 +66,13 @@ export const Events = {
   ADD_ITEM_ABANDONED: 'add_item_abandoned',
   TRYON_ABANDONED: 'tryon_abandoned',
 
+  // ── Визуальный поиск ───────────────────────────────────────────────────────
+  // Использованием считается показ результатов, а не открытие камеры: открыл и
+  // передумал — это не поиск.
+  VISUAL_SEARCH_OPENED: 'visual_search_opened',
+  VISUAL_SEARCH_RESULTS: 'visual_search_results',
+  VISUAL_SEARCH_FAILED: 'visual_search_failed',
+
   // ── Discover (веб-свайп) — имена совпадают с мобилкой для кросс-платформы ──
   DISCOVER_VIEWED: 'discover_viewed',
   PRODUCT_IMPRESSION: 'product_impression',
@@ -81,6 +92,8 @@ export const Events = {
   ONBOARDING_SLIDE_VIEWED: 'onboarding_slide_viewed',
   ONBOARDING_COMPLETED: 'onboarding_completed',
   ONBOARDING_SKIPPED: 'onboarding_skipped',
+  // Уход из онбординга без явного «пропустить» — иначе половина отвала невидима
+  ONBOARDING_ABANDONED: 'onboarding_abandoned',
   ONBOARDING_STEP_VIEWED: 'onboarding_step_viewed',
   ONBOARDING_STEP_COMPLETED: 'onboarding_step_completed',
   BEAUTIFY_REVEAL_VIEWED: 'beautify_reveal_viewed',
@@ -112,6 +125,8 @@ export const Events = {
   FEED_COMPOSE_VIEWED: 'feed_compose_viewed',
   FEED_POST_PUBLISHED: 'feed_post_published',
   FEED_POST_PUBLISH_FAILED: 'feed_post_publish_failed',
+  // Молчаливый уход из редактора поста — без него видно только явные ошибки публикации
+  FEED_POST_ABANDONED: 'feed_post_abandoned',
   FEED_POST_DELETED: 'feed_post_deleted',
   FEED_LIKE_TOGGLED: 'feed_like_toggled',
   FEED_PROFILE_VIEWED: 'feed_profile_viewed',

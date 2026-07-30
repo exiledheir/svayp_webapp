@@ -95,7 +95,10 @@ export default function App({ Component, pageProps }: AppProps) {
     const logPageView = (url: string) => {
       if (url === lastLoggedPath) return;
       lastLoggedPath = url;
-      setAppEventsScreen(url);
+      // В колонку screen кладём ШАБЛОН роута (/feed/p/[id]), а не фактический путь:
+      // иначе каждый пост и товар создаёт отдельное значение, и «топ страниц»
+      // рассыпается на тысячи строк с одним просмотром.
+      setAppEventsScreen(router.pathname);
       logPageViewEvent(url);
     };
     logPageView(router.asPath);
