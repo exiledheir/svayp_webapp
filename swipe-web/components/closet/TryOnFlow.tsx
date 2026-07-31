@@ -1,7 +1,7 @@
 import { needsUnoptimized } from '@/lib/img';
 import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { X, Sparkles, Loader2, RefreshCw, User, Camera, Check, ZoomIn, Share2, Star } from 'lucide-react';
+import { X, Sparkles, Loader2, RefreshCw, User, Camera, Check, ZoomIn, Share2, Send, Star } from 'lucide-react';
 import type { ClosetItem } from '@/lib/closet-storage';
 import type { SavedCanvasLayout } from '@/lib/closet-types';
 import { useI18n } from '@/lib/i18n';
@@ -62,7 +62,7 @@ export function TryOnConfirmModal({
 }: {
   savedLayout: SavedCanvasLayout | null;
   items: ClosetItem[];
-  onConfirm: (opts: { personImageKey?: string }) => void;
+  onConfirm: (opts: { personImageKey?: string; personPreview?: string }) => void;
   onCancel: () => void;
 }) {
   const { t } = useI18n();
@@ -113,7 +113,11 @@ export function TryOnConfirmModal({
   const confirmDisabled = target === 'self' && (!personKey || uploading);
 
   function handleConfirm() {
-    onConfirm({ personImageKey: target === 'self' ? personKey ?? undefined : undefined });
+    // Превью отдаём наверх: во время генерации показываем именно это фото.
+    onConfirm({
+      personImageKey: target === 'self' ? personKey ?? undefined : undefined,
+      personPreview: target === 'self' ? photoPreview ?? undefined : undefined,
+    });
   }
 
   // Закрытие с анимацией: доводим шторку вниз и гасим фон, затем размонтируем.
@@ -590,6 +594,7 @@ export function TryOnModal({
   jobId,
   failureReason,
   previewImages,
+  personImage,
   onClose,
   onRetry,
   onCancel,
@@ -599,6 +604,8 @@ export function TryOnModal({
   jobId?: string;
   failureReason?: string;
   previewImages?: string[];
+  /** Фото пользователя, на которое примеряем (нет — примерка на манекен). */
+  personImage?: string;
   onClose: () => void;
   onRetry: () => void;
   onCancel: () => void;
@@ -677,6 +684,9 @@ export function TryOnModal({
   function handleClose() {
     if (isProcessing) {
       logAnalyticsEvent(Events.TRYON_ABANDONED, { [Params.STEP]: 'processing' });
+    } else if (status === 'completed') {
+      // Отдельной кнопки «Закрыть» больше нет — событие снимаем здесь.
+      logAnalyticsEvent(Events.TRYON_RESULT_DISMISSED);
     }
     onClose();
   }
@@ -710,17 +720,61 @@ export function TryOnModal({
       className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={handleClose}
     >
+      <div className="relative w-[90%] max-w-[380px]" onClick={(e) => e.stopPropagation()}>
+      {/* Крестик — вне прокручиваемой карточки, чтобы держаться её правого
+          верхнего угла и не уезжать вместе с содержимым. */}
+      {status === 'completed' && resultUrl && (
+        <button
+          onClick={handleClose}
+          className="absolute z-20 w-8 h-8 rounded-full flex items-center justify-center active:scale-[0.94] transition-transform"
+          style={{ top: 12, right: 12, background: 'rgba(255,255,255,0.92)', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }}
+          aria-label={t.close}
+          title={t.close}
+        >
+          <X size={15} strokeWidth={2.6} color="#141014" />
+        </button>
+      )}
       <div
-        className="w-[90%] max-w-[380px] rounded-3xl bg-white overflow-hidden shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        className="w-full rounded-3xl bg-white overflow-hidden shadow-2xl"
+        // Фото пользователя выше прежней ленты вещей — на низких экранах даём
+        // карточке прокрутку вместо обрезки кнопок.
+        style={{ maxHeight: '92dvh', overflowY: 'auto' }}
       >
         {/* Result area */}
         <div className="relative w-full" style={{ minHeight: status === 'completed' ? 420 : 300 }}>
           {isProcessing && (
             <div className="w-full flex flex-col items-center justify-center gap-4 px-5 pt-8 pb-6">
 
-              {/* ── AI Scanning item strip ── */}
-              {previewImages && previewImages.length > 0 && (
+              {/* ── Сканируем фото пользователя ──
+                  Ждём именно свой результат, поэтому в ожидании показываем своё
+                  фото, а не вещи: так понятно, на кого примеряем. */}
+              {personImage ? (
+                <div
+                  className="relative overflow-hidden rounded-2xl shrink-0"
+                  style={{
+                    width: 140,
+                    aspectRatio: '3 / 4',
+                    background: '#f3f4f6',
+                    animation: 'tryOnPhotoGlow 2.6s ease-in-out infinite',
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={personImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                  {/* Луч сканирования идёт сверху вниз */}
+                  <div
+                    className="absolute left-0 right-0 top-0 pointer-events-none"
+                    style={{
+                      height: '24%',
+                      background: 'linear-gradient(180deg, rgba(243,112,167,0) 0%, rgba(243,112,167,0.42) 50%, rgba(243,112,167,0) 100%)',
+                      animation: 'tryOnPhotoScan 2.8s ease-in-out infinite',
+                    }}
+                  />
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.12), rgba(243,112,167,0.07))' }}
+                  />
+                </div>
+              ) : previewImages && previewImages.length > 0 ? (
                 <div className="relative w-full flex justify-center">
                   <div
                     className="relative flex gap-2.5 items-center justify-center px-3 py-3 rounded-2xl overflow-hidden"
@@ -767,7 +821,7 @@ export function TryOnModal({
                     })}
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* ── Spinner ── */}
               <div className="relative">
@@ -838,7 +892,7 @@ export function TryOnModal({
             <div className="relative w-full h-[420px]">
               <Image src={resultUrl} alt="Try-on result" fill className="object-contain" unoptimized={needsUnoptimized(resultUrl)} />
               {/* Logo watermark — visible on screenshots */}
-              <div className="absolute top-7 left-3 z-10 pointer-events-none">
+              <div className="absolute top-[15px] left-4 z-10 pointer-events-none">
                 <p className="text-[13px] font-bold tracking-[0.5px]" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.18)' }}>
                   <span className="text-black">LIB</span><span style={{ color: '#F370A7' }}>Λ</span><span className="text-black">S</span>
                 </p>
@@ -876,29 +930,23 @@ export function TryOnModal({
           {status === 'completed' && (
             <>
               <button
-                onClick={() => {
-                  logAnalyticsEvent(Events.TRYON_RESULT_DISMISSED);
-                  onClose();
-                }}
-                className="flex-1 h-12 rounded-full bg-gray-100 text-gray-700 text-[13px] font-semibold"
-              >
-                {t.close}
-              </button>
-              <button
                 onClick={() => setShowShareSheet(true)}
                 disabled={isSharing}
-                aria-label={t.share}
-                title={t.share}
-                className="shrink-0 w-12 h-12 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center disabled:opacity-50"
+                className="flex-1 h-12 rounded-full bg-gray-100 text-gray-800 text-[13px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
                 {isSharing ? (
-                  <Loader2 size={16} className="animate-spin" />
+                  <Loader2 size={15} className="animate-spin" />
                 ) : (
-                  <Share2 size={16} />
+                  <Send size={15} strokeWidth={2.4} />
                 )}
+                {t.share}
               </button>
               {showShareSheet && (
-                <ShareSheet onClose={() => setShowShareSheet(false)} onExternal={shareResult} />
+                <ShareSheet
+                  onClose={() => setShowShareSheet(false)}
+                  onExternal={shareResult}
+                  feedSeed={jobId ? `tryon:${jobId}` : undefined}
+                />
               )}
               <button
                 onClick={() => {
@@ -943,6 +991,7 @@ export function TryOnModal({
             </button>
           )}
         </div>
+      </div>
       </div>
     </div>
   );
