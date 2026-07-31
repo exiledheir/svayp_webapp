@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, Pencil, ChevronLeft, Loader2, AlertCircle, Sparkles } from 'lucide-react';
+import { Check, Pencil, ChevronLeft, Loader2, AlertCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { taxLabel, sectionForSubcategory, localToSubcategory } from '@/lib/wardrobe-taxonomy';
 import ItemOptionsPicker, { isSelectionComplete, type ItemOptionsSelection } from '@/components/closet/ItemOptionsPicker';
@@ -11,6 +11,10 @@ import { Events, Params } from '@/lib/analytics-events';
 
 // Beautify costs 2 diamonds per photo.
 const BEAUTIFY_COST = 2;
+
+// Пример «до/после» для витрины Beautify (те же кадры, что в обучающем попапе).
+const DEMO_ORIGINAL = '/images/onboarding/beautify/original.png';
+const DEMO_BEAUTIFIED = '/images/onboarding/beautify/beautifed.jpeg';
 
 const SECTION_EMOJI: Record<WardrobeSection, string> = {
   TOPS: '👕',
@@ -74,6 +78,8 @@ export default function UploadReviewSheet({
   onClose,
   onConfirm,
   onBeautify,
+  onBeautifyAll,
+  beautifyReadyIds,
   beautifyState,
   onEditCategory,
   onDelete,
@@ -90,6 +96,10 @@ export default function UploadReviewSheet({
   onTryOn: (items: ClosetItem[]) => void;
   /** Тап Beautify на строке — запускает улучшение немедленно (или открывает попап). */
   onBeautify: (item: ClosetItem) => void;
+  /** «Улучшить все» из витрины наверху списка. */
+  onBeautifyAll?: () => void;
+  /** id вещей, которые реально можно улучшить сейчас (загрузились, ещё не улучшены). */
+  beautifyReadyIds?: string[];
   /** id строки → статус улучшения (работает / готово / ошибка). */
   beautifyState?: Map<string, ReviewBeautifyState>;
   onRename: (id: string, name: string) => void;
@@ -227,11 +237,15 @@ export default function UploadReviewSheet({
   return (
     <>
     <div className="fixed inset-0 z-[62] flex flex-col" style={{ background: surface }}>
-      {/* Header */}
-      <div className="flex items-center px-3 pt-4 pb-2.5">
-        <button onClick={onClose} aria-label={t.close} className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.9] transition-transform" style={{ color: ink }}>
+      {/* Header — с заголовком: раньше экран начинался с одинокой стрелки и было
+          непонятно, что это за список и чего от него ждут. */}
+      <div className="flex items-center gap-1 px-3 pt-4 pb-2.5">
+        <button onClick={onClose} aria-label={t.close} className="w-9 h-9 flex-none rounded-full flex items-center justify-center active:scale-[0.9] transition-transform" style={{ color: ink }}>
           <ChevronLeft size={24} strokeWidth={2} />
         </button>
+        <h2 className="text-[17px] font-extrabold leading-tight truncate min-w-0" style={{ color: ink }}>
+          {t.cv_rv_new_items.replace('{n}', String(items.length))}
+        </h2>
       </div>
 
       {/* Select all · Delete */}
@@ -249,6 +263,74 @@ export default function UploadReviewSheet({
 
       {/* Rows */}
       <div className="flex-1 overflow-y-auto">
+        {/* ── Витрина Beautify ────────────────────────────────────────────────
+            Улучшение платное, автоматически его не запускают. Объяснять словами
+            бесполезно — показываем ДВА КАДРА рядом, «Оригинал» и «Улучшенное»,
+            в том же размере и с теми же подписями, что в окне выбора после
+            улучшения. Одна картинка вместо абзаца текста. */}
+        {beautifyEnabled && onBeautifyAll && (beautifyReadyIds?.length ?? 0) > 0 && (
+          <div className="px-4 pt-3.5 pb-1">
+            <div
+              className="rounded-2xl p-3"
+              style={{
+                background: dark ? 'rgba(243,112,167,0.10)' : '#FFF3F8',
+                border: `1px solid ${dark ? 'rgba(243,112,167,0.28)' : '#FADCEA'}`,
+              }}
+            >
+              <div className="flex items-center gap-1.5">
+                {([
+                  { url: DEMO_ORIGINAL, label: t.cv_bt_original, on: false },
+                  { url: DEMO_BEAUTIFIED, label: t.cv_bt_beautified, on: true },
+                ]).map((card, i) => (
+                  <React.Fragment key={card.label}>
+                    {/* Стрелка «из этого → в это»: связывает два кадра в одно
+                        утверждение, без неё они читались как два разных товара. */}
+                    {i === 1 && (
+                      <span className="flex-none w-6 h-6 rounded-full flex items-center justify-center" style={{ background: '#F370A7' }}>
+                        <ArrowRight size={14} strokeWidth={3} color="#fff" />
+                      </span>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div
+                        className="relative w-full rounded-xl overflow-hidden"
+                        style={{
+                          height: 132,
+                          background: dark ? '#141014' : '#fff',
+                          border: `1.5px solid ${card.on ? '#F370A7' : dark ? '#2f2b31' : '#f0e3ea'}`,
+                        }}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={card.url} alt="" className="absolute inset-0 w-full h-full object-contain" style={{ padding: 6 }} />
+                        <span
+                          className="absolute text-[10px] font-extrabold px-2 py-0.5 rounded-full whitespace-nowrap"
+                          style={{
+                            top: 6, left: 6,
+                            background: card.on ? '#F370A7' : dark ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.94)',
+                            color: card.on ? '#fff' : ink,
+                          }}
+                        >
+                          {card.label}
+                        </span>
+                      </div>
+                    </div>
+                  </React.Fragment>
+                ))}
+              </div>
+
+              <button
+                onClick={onBeautifyAll}
+                className="w-full h-11 mt-2.5 rounded-full text-white text-[14px] font-bold flex items-center justify-center active:scale-[0.98] transition-transform"
+                style={{ background: '#F370A7' }}
+              >
+                {(beautifyReadyIds?.length ?? 0) > 1 ? t.cv_bt_offer_all : t.cv_bt_intro_do}
+                <span className="flex items-center gap-0.5 pl-2 ml-2" style={{ borderLeft: '1px solid rgba(255,255,255,0.4)' }}>
+                  <Diamond size={14} />{BEAUTIFY_COST * (beautifyReadyIds?.length ?? 0)}
+                </span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {items.map((item) => {
           const section = sectionOf(item);
           const attrs = attrsOf(item);
@@ -340,14 +422,13 @@ export default function UploadReviewSheet({
 
       {/* Add to Closet */}
       <div className="px-4 pt-3 pb-8" style={{ borderTop: `1px solid ${line}` }}>
-        {requireComplete && !allComplete && (
-          <p className="text-[12px] text-center mb-2" style={{ color: sub }}>{t.cv_rv_complete_hint}</p>
-        )}
         <button
           onClick={() => { if (confirmDisabled) return; logAnalyticsEvent(Events.REVIEW_CONFIRMED, { [Params.ITEM_COUNT]: selected.size }); onConfirm([...selected]); }}
           disabled={confirmDisabled}
-          className="w-full h-14 rounded-2xl text-white text-[16px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40 disabled:active:scale-100"
-          style={{ background: '#F370A7' }}
+          className="w-full h-14 rounded-2xl text-[16px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40 disabled:active:scale-100"
+          // Розовый оставлен за Beautify (витрина выше) — подтверждение чёрное,
+          // иначе на экране две розовые кнопки и непонятно, какая главная.
+          style={{ background: dark ? '#fff' : '#141014', color: dark ? '#141014' : '#fff' }}
         >
           {finalizing ? <><Loader2 size={18} className="animate-spin" />{t.cv_rv_add_to_closet}</> : t.cv_rv_add_to_closet}
         </button>

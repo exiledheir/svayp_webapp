@@ -431,6 +431,10 @@ export interface Translations {
   cn_currency: string;
   cn_tg_msg: string;
   // Batch add — processing screen + "fix category" sheet
+  cv_bt_offer_all: string;
+  cl_items_n: string;
+  cl_sort_recent: string;
+  cl_sort_oldest: string;
   cv_proc_removing: string;
   cv_proc_identifying: string;
   cv_fix_title: string;
@@ -487,6 +491,7 @@ export interface Translations {
   cv_dt_worn_never: string;
   cv_dt_mark_worn: string;
   cv_dt_tryon: string;
+  cv_dt_edit: string;
   cv_dt_name_placeholder: string;
   cv_bt_intro_title: string;
   cv_bt_intro_body: string;
@@ -509,6 +514,11 @@ export interface Translations {
   cv_ce_next: string;
   cv_ce_done: string;
   cv_ce_all: string;
+  cv_ce_my_closet: string;
+  cv_ce_shop_section: string;
+  cv_ce_shop_sub: string;
+  cv_ce_closet_empty: string;
+  cv_ce_on_canvas: string;
   ob_welcome_title: string;
   ob_welcome_body: string;
   ob_welcome_cta: string;
@@ -1257,6 +1267,10 @@ const en: Translations = {
   cn_note: 'Diamonds are credited after we verify your payment — usually within a few minutes. We’ll confirm in Telegram.',
   cn_currency: 'UZS',
   cn_tg_msg: 'I want to buy {n} diamonds ({price}). My phone: ',
+  cv_bt_offer_all: 'Beautify all',
+  cl_items_n: '{n} items',
+  cl_sort_recent: 'Recently added',
+  cl_sort_oldest: 'Oldest first',
   cv_proc_removing: 'Removing background… ✂️',
   cv_proc_identifying: 'Identifying category… 🏷️',
   cv_fix_title: 'Help us identify these items',
@@ -1313,6 +1327,7 @@ const en: Translations = {
   cv_dt_worn_never: 'Not worn yet',
   cv_dt_mark_worn: 'Mark worn',
   cv_dt_tryon: 'Try on',
+  cv_dt_edit: 'Edit',
   cv_dt_name_placeholder: 'Name this item',
   cv_bt_intro_title: 'Meet Beautify',
   cv_bt_intro_body: "Beautify turns your photo into a clean studio product shot. We'll create an enhanced version — you choose whether to keep it.",
@@ -1335,6 +1350,11 @@ const en: Translations = {
   cv_ce_next: 'Next',
   cv_ce_done: 'Got it',
   cv_ce_all: 'All',
+  cv_ce_my_closet: 'My closet',
+  cv_ce_shop_section: 'LIBAS shop',
+  cv_ce_shop_sub: 'one tap · no photo',
+  cv_ce_closet_empty: 'Nothing here yet',
+  cv_ce_on_canvas: 'Already in the look',
   ob_welcome_title: 'Welcome to Libas AI',
   ob_welcome_body: "Let's create your first outfit in just a minute. Follow along — we'll guide you through every step.",
   ob_welcome_cta: 'Get started',
@@ -2079,6 +2099,10 @@ const ru: Translations = {
   cn_note: 'Монеты зачислим сразу после проверки платежа — обычно за несколько минут. Подтвердим в Telegram.',
   cn_currency: 'сум',
   cn_tg_msg: 'Хочу купить {n} монет ({price}). Мой номер: ',
+  cv_bt_offer_all: 'Улучшить все',
+  cl_items_n: '{n} вещей',
+  cl_sort_recent: 'Сначала новые',
+  cl_sort_oldest: 'Сначала старые',
   cv_proc_removing: 'Удаление фона… ✂️',
   cv_proc_identifying: 'Определяем категорию… 🏷️',
   cv_fix_title: 'Помогите определить эти вещи',
@@ -2136,6 +2160,7 @@ const ru: Translations = {
   cv_dt_worn_never: 'Ещё не носили',
   cv_dt_mark_worn: 'Отметить',
   cv_dt_tryon: 'Примерить',
+  cv_dt_edit: 'Изменить',
   cv_dt_name_placeholder: 'Название вещи',
   cv_bt_intro_title: 'Знакомьтесь — Beautify',
   cv_bt_intro_body: 'Beautify превращает фото в аккуратный студийный снимок. Мы сделаем улучшенную версию — вы решаете, оставить её или нет.',
@@ -2158,6 +2183,11 @@ const ru: Translations = {
   cv_ce_next: 'Далее',
   cv_ce_done: 'Понятно',
   cv_ce_all: 'Все',
+  cv_ce_my_closet: 'Мой гардероб',
+  cv_ce_shop_section: 'Магазин LIBAS',
+  cv_ce_shop_sub: 'в один тап · без фото',
+  cv_ce_closet_empty: 'Здесь пока пусто',
+  cv_ce_on_canvas: 'Уже в образе',
   ob_welcome_title: 'Добро пожаловать в Libas AI',
   ob_welcome_body: 'Соберём ваш первый образ всего за минуту. Просто следуйте подсказкам — покажем каждый шаг.',
   ob_welcome_cta: 'Начать',
@@ -2900,6 +2930,10 @@ const uz: Translations = {
   cn_note: 'Tangalar to‘lov tekshirilgach zudlik bilan — odatda bir necha daqiqada — qo‘shiladi. Telegramda tasdiqlaymiz.',
   cn_currency: 'so‘m',
   cn_tg_msg: '{n} ta tanga sotib olmoqchiman ({price}). Raqamim: ',
+  cv_bt_offer_all: 'Hammasini yaxshilash',
+  cl_items_n: "{n} ta buyum",
+  cl_sort_recent: "Avval yangilari",
+  cl_sort_oldest: "Avval eskilari",
   cv_proc_removing: "Fon o'chirilmoqda… ✂️",
   cv_proc_identifying: 'Kategoriya aniqlanmoqda… 🏷️',
   cv_fix_title: 'Ushbu buyumlarni aniqlashga yordam bering',
@@ -2957,6 +2991,7 @@ const uz: Translations = {
   cv_dt_worn_never: 'Hali kiyilmagan',
   cv_dt_mark_worn: 'Belgilash',
   cv_dt_tryon: "Kiyib ko'rish",
+  cv_dt_edit: "O'zgartirish",
   cv_dt_name_placeholder: 'Kiyim nomi',
   cv_bt_intro_title: 'Beautify bilan tanishing',
   cv_bt_intro_body: "Beautify suratingizni toza studiya ko'rinishiga aylantiradi. Biz yaxshilangan variantni tayyorlaymiz — saqlashni o'zingiz hal qilasiz.",
@@ -2979,6 +3014,11 @@ const uz: Translations = {
   cv_ce_next: 'Keyingi',
   cv_ce_done: 'Tushunarli',
   cv_ce_all: 'Hammasi',
+  cv_ce_my_closet: 'Mening garderobim',
+  cv_ce_shop_section: "LIBAS do'kon",
+  cv_ce_shop_sub: 'bir teginish · surat shart emas',
+  cv_ce_closet_empty: "Bu yerda hozircha bo'sh",
+  cv_ce_on_canvas: 'Obrazda bor',
   ob_welcome_title: "Libas AI'ga xush kelibsiz",
   ob_welcome_body: "Birinchi uslubingizni atigi bir daqiqada yig'amiz. Ko'rsatmalarga amal qiling — har bir qadamni ko'rsatamiz.",
   ob_welcome_cta: 'Boshlash',

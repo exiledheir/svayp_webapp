@@ -400,9 +400,9 @@ export function TryOnConfirmModal({
             className="w-full h-13 rounded-full text-white text-[15.5px] font-bold flex items-center justify-center gap-2 disabled:opacity-50"
             style={{
               height: 52,
-              background: 'linear-gradient(135deg, #F370A7 0%, #e0409a 50%, #F370A7 100%)',
+              background: 'linear-gradient(135deg, #141014 0%, #332c33 50%, #141014 100%)',
               backgroundSize: '200% auto',
-              boxShadow: '0 6px 20px rgba(243,112,167,0.42)',
+              boxShadow: '0 6px 20px rgba(20,16,20,0.32)',
             }}
           >
             {uploading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
