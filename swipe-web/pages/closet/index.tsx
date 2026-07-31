@@ -2,7 +2,7 @@ import { needsUnoptimized } from '@/lib/img';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2, ArrowUpRight, BookOpen, Share2, Check, ChevronDown } from 'lucide-react';
+import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2, ArrowUpRight, BookOpen, Share2, Check, ChevronDown, Send } from 'lucide-react';
 import { getUser, clearTokens } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags-context';
 import { FEATURES } from '@/lib/feature-flags';
@@ -40,6 +40,7 @@ import { ACTION_COST, actionCosts, fetchCoinBalance, fetchCoinPricing, type Coin
 import { isInsufficientCoins, describeApiError } from '@/lib/api';
 import ItemDetailSheet from '@/components/closet/ItemDetailSheet';
 import ClosetSectionTabs from '@/components/ClosetSectionTabs';
+import { getMyPosts } from '@/lib/feed-api';
 import { saveUploadPreview, getUploadPreview, clearUploadPreview } from '@/lib/upload-previews';
 import { compressImageForUpload } from '@/lib/image-utils';
 import {
@@ -184,7 +185,6 @@ function usePlan() {
     canGenerate: usage.regenerationsUsed < limits.regenerations,
     canTryOn: usage.tryItOnsUsed < limits.tryItOns,
     canAddItem: totalItems < limits.wardrobeItems,
-    calendarDays: limits.calendarDays,
     totalItems,
   };
 }
@@ -380,7 +380,7 @@ export default function ClosetPage() {
   }, [items]);
   // 'browse' = opened from the header diamond chip (no "not enough" prompt).
   const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | 'tryOn' | 'canvas' | 'browse' | 'beautify' | null>(null);
-  const { plan, limits, usage, fetchPlan, canGenerate, canTryOn, calendarDays } = usePlan();
+  const { plan, limits, usage, fetchPlan, canGenerate, canTryOn } = usePlan();
   // Diamond/coin balance — реальный баланс с бэка (/me/coins). Рефетчим после
   // каждого платного действия (см. refreshCoins) и при открытии CoinsSheet.
   const [coins, setCoinsState] = useState(0);
@@ -734,6 +734,10 @@ export default function ClosetPage() {
   // прокручиваем к началу сетки, где она стоит первой.
   useEffect(() => {
     if (!scrollTargetSection) return;
+    // На «Образах» и «Календаре» гардероба на странице нет — сначала возвращаемся
+    // к доскам (эффект повторится, когда сетка смонтируется), иначе вещь молча
+    // «уедет» в скрытый блок.
+    if (closetTab === 'outfits' || closetTab === 'calendar') { setClosetTab('boards'); return; }
     setGridSection('ALL');
     setGridType(null);
     setGridSort('recent');
@@ -744,7 +748,7 @@ export default function ClosetPage() {
       container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
     }
     setScrollTargetSection(null);
-  }, [scrollTargetSection, pendingUploads, items]);
+  }, [scrollTargetSection, pendingUploads, items, closetTab]);
 
   function openAdd(section: WardrobeSection = 'TOPS') {
     if (plansEnabled && !canAddItem()) {
@@ -2275,8 +2279,6 @@ export default function ClosetPage() {
           onRetryTryOns={() => loadTryOns(0)}
           onLoadMoreTryOns={() => loadTryOns(tryOnPageRef.current + 1)}
           onDeleteTryOn={handleDeleteTryOn}
-          calendarDays={calendarDays}
-          canTryOn={canTryOn}
           onTryItOnItems={handleTryItOnFromItems}
           allItems={items}
           canvases={displayCanvases}
@@ -2328,7 +2330,10 @@ export default function ClosetPage() {
           onAddItem={(cat) => openAdd(localCatToSection(cat))}
         />
 
-        {/* ── Гардероб: одна сетка 3×N + фильтры (раздел · тип · сортировка) ── */}
+        {/* ── Гардероб: одна сетка 3×N + фильтры (раздел · тип · сортировка) ──
+             На «Образах» и «Календаре» гардероб скрыт: там витрина собранных
+             образов, а список вещей только уводил бы от неё. */}
+        {closetTab !== 'outfits' && closetTab !== 'calendar' && (
         <div id="closet-grid" className="mt-8" style={{ scrollMarginTop: 8 }}>
           {/* Счётчик + сортировка */}
           <div className="flex items-center justify-between px-4 mb-2.5">
@@ -2423,8 +2428,11 @@ export default function ClosetPage() {
             </div>
           )}
         </div>
+        )}
 
-        <div className="h-12" />
+        {/* Плавающая кнопка «Добавить вещь» перекрывает низ: на «Образах» под
+            ней стоит «В ленту», на «Календаре» — «Примерить», запас больше. */}
+        <div className={closetTab === 'outfits' || closetTab === 'calendar' ? 'h-24' : 'h-12'} />
       </main>
 
       {/* ── Interactive Outfit Canvas ──────────────────────────── */}
@@ -2950,7 +2958,7 @@ export default function ClosetPage() {
 }
 
 // ─── My Outfits ─────────────────────────────────────────────────────────────────
-function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnError, tryOnHasMore, onRetryTryOns, onLoadMoreTryOns, onDeleteTryOn, calendarDays, canTryOn, onTryItOnItems, allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem, allowAutoGenerate, autoGenDone, onAutoGenerate, plansEnabled }: {
+function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnError, tryOnHasMore, onRetryTryOns, onLoadMoreTryOns, onDeleteTryOn, onTryItOnItems, allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem, allowAutoGenerate, autoGenDone, onAutoGenerate, plansEnabled }: {
   activeTab: 'boards' | 'outfits' | 'dressme' | 'calendar';
   onTabChange: (tab: 'boards' | 'outfits' | 'dressme' | 'calendar') => void;
   tryOnJobs: TryOnJobResponse[];
@@ -2960,8 +2968,6 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
   onRetryTryOns: () => void;
   onLoadMoreTryOns: () => void;
   onDeleteTryOn: (id: string) => void;
-  calendarDays: number;
-  canTryOn: boolean;
   onTryItOnItems: (items: ClosetItem[]) => void;
   allItems: ClosetItem[];
   canvases: { id: string | null; layout: SavedCanvasLayout }[];
@@ -3086,29 +3092,24 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
           onRetry={onRetryTryOns}
           onLoadMore={onLoadMoreTryOns}
           onDelete={onDeleteTryOn}
+          onCreate={() => onTabChange('boards')}
         />
       )}
 
       {activeTab === 'dressme' && <DressMeReels allItems={allItems} />}
 
       {activeTab === 'calendar' && (
-        <CalendarTab
-          allItems={allItems}
-          calendarDays={calendarDays}
-          plansEnabled={plansEnabled}
-          onShowPlans={onShowPlans}
-          onTryItOn={onTryItOnItems}
-          canTryOn={canTryOn}
-          tryOnCount={tryOnCount}
-          tryOnLimit={limits.tryItOns}
-        />
+        <CalendarTab allItems={allItems} onTryItOn={onTryItOnItems} />
       )}
     </div>
   );
 }
 
 // ── Outfits tab: gallery of completed virtual try-on results ────────────────────
-function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDelete }: {
+// Витрина сгенерированных образов: сетка 2×N на всю вкладку (список вещей на ней
+// не показываем) и у каждого образа — явная кнопка «В ленту»: публикация и есть
+// главный сценарий этой вкладки.
+function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDelete, onCreate }: {
   jobs: TryOnJobResponse[];
   loading: boolean;
   error: boolean;
@@ -3116,14 +3117,40 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
   onRetry: () => void;
   onLoadMore: () => void;
   onDelete: (id: string) => void;
+  onCreate: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { theme } = useTheme();
+  const router = useRouter();
   const [viewingJob, setViewingJob] = useState<TryOnJobResponse | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  // Какие образы уже опубликованы — считаем по provenance (sourceRefId) своих
+  // постов, чтобы не предлагать выложить то, что уже в ленте.
+  const [sharedIds, setSharedIds] = useState<Set<string>>(() => new Set());
   // Hardware Back closes the full-screen look viewer instead of leaving the page.
   useOverlayBackClose(viewingJob !== null, () => setViewingJob(null));
+
+  useEffect(() => {
+    let cancelled = false;
+    getMyPosts(0, 60)
+      .then((page) => {
+        if (cancelled) return;
+        const ids = new Set<string>();
+        page.content.forEach((p) => p.images.forEach((img) => {
+          if (img.sourceType === 'tryon' && img.sourceRefId) ids.add(img.sourceRefId);
+        }));
+        setSharedIds(ids);
+      })
+      .catch(() => { /* лента недоступна — просто не помечаем образы */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Публикация: ?seed=tryon:<id> на /feed/create сразу открывает подпись с этим
+  // образом — без прохода по выбору источника.
+  function shareToFeed(job: TryOnJobResponse) {
+    router.push(`/feed/create?seed=tryon:${job.id}`);
+  }
 
   function confirmDelete() {
     if (!confirmDeleteId) return;
@@ -3133,7 +3160,10 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
     setConfirmDeleteId(null);
   }
   // Newest generated first (createdAt desc). ISO strings compare lexically.
-  const sortedJobs = [...jobs].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+  // Без картинки образа нет — такие задания не занимают плитку в витрине.
+  const sortedJobs = jobs
+    .filter((j) => !!j.resultImageUrl)
+    .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
 
   async function handleDownload(url: string) {
     if (isDownloading) return;
@@ -3170,7 +3200,7 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
     );
   }
 
-  if (jobs.length === 0) {
+  if (sortedJobs.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
         <div
@@ -3181,61 +3211,95 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
         </div>
         <p className="text-[15px] font-bold mb-1" style={{ color: theme === 'dark' ? '#f0f0f0' : '#1f2937' }}>{t.noTryOnsYet}</p>
         <p className="text-[13px]" style={{ color: theme === 'dark' ? '#888' : '#9ca3af' }}>{t.noTryOnsHint}</p>
+        {/* Примерка начинается с доски — уводим туда, а не в пустоту. */}
+        <button
+          onClick={onCreate}
+          className="mt-5 h-11 px-6 rounded-full text-[14px] font-bold active:scale-[0.97] transition-transform"
+          style={{ background: theme === 'dark' ? '#fff' : '#141014', color: theme === 'dark' ? '#141014' : '#fff' }}
+        >
+          {t.cl_looks_empty_cta}
+        </button>
       </div>
     );
   }
 
   return (
     <>
-      <div
-        className="flex gap-3 hide-scrollbar py-2 overflow-x-auto pl-4"
-        style={{ overscrollBehaviorX: 'contain', contain: 'layout paint' }}
-      >
-        {sortedJobs.map((job) => (
-          <div
-            key={job.id}
-            role="button"
-            onClick={() => setViewingJob(job)}
-            className="relative shrink-0 overflow-hidden rounded-[28px] active:scale-[0.98] transition-transform cursor-pointer"
-            style={{
-              width: 'min(82vw, 340px)',
-              height: 440,
-              background: theme === 'dark' ? '#1a1a1a' : '#F3F4F6',
-              boxShadow: theme === 'dark' ? '0 2px 12px rgba(0,0,0,0.3)' : '0 2px 12px rgba(0,0,0,0.06)',
-            }}
-          >
-            {job.resultImageUrl && (
-              <Image src={job.resultImageUrl} alt="Try-on result" fill className="object-cover" unoptimized={needsUnoptimized(job.resultImageUrl)} />
-            )}
-            <button
-              onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(job.id); }}
-              className="absolute top-3.5 left-3.5 z-10 w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
-              style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}
-              title={t.delete}
-              aria-label={t.delete}
-            >
-              <Trash2 size={15} strokeWidth={2.2} className="text-white" />
-            </button>
-          </div>
-        ))}
-        {hasMore && (
+      <div className="px-4 pt-1">
+        <h2 className="text-[17px] font-bold text-gray-900 dark:text-white tracking-tight">
+          {t.cl_looks_n.replace('{n}', String(sortedJobs.length))}
+        </h2>
+        <p className="text-[12.5px] mt-0.5" style={{ color: theme === 'dark' ? '#8a8a8a' : '#9ca3af' }}>{t.cl_share_all_hint}</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-3 gap-y-4 px-4 mt-3">
+        {sortedJobs.map((job) => {
+          const shared = sharedIds.has(job.id);
+          return (
+            <div key={job.id}>
+              <div
+                role="button"
+                onClick={() => setViewingJob(job)}
+                className="relative w-full overflow-hidden rounded-[20px] active:scale-[0.98] transition-transform cursor-pointer"
+                style={{
+                  aspectRatio: '3 / 4',
+                  background: theme === 'dark' ? '#1a1a1a' : '#F3F4F6',
+                  boxShadow: theme === 'dark' ? '0 2px 10px rgba(0,0,0,0.3)' : '0 2px 10px rgba(0,0,0,0.06)',
+                }}
+              >
+                {job.resultImageUrl && (
+                  <Image src={job.resultImageUrl} alt="Try-on result" fill sizes="50vw" className="object-cover" unoptimized={needsUnoptimized(job.resultImageUrl)} />
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(job.id); }}
+                  className="absolute top-2 right-2 z-10 w-8 h-8 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
+                  style={{ background: 'rgba(0,0,0,0.42)', backdropFilter: 'blur(4px)' }}
+                  title={t.delete}
+                  aria-label={t.delete}
+                >
+                  <Trash2 size={14} strokeWidth={2.2} className="text-white" />
+                </button>
+                {job.createdAt && (
+                  <span
+                    className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-full text-[10.5px] font-semibold text-white"
+                    style={{ background: 'rgba(0,0,0,0.42)', backdropFilter: 'blur(4px)' }}
+                  >
+                    {new Date(job.createdAt).toLocaleDateString(locale)}
+                  </span>
+                )}
+              </div>
+              {/* Публикация — главное действие вкладки, поэтому кнопка видна на
+                  каждой карточке, а не спрятана внутри просмотра. */}
+              <button
+                onClick={() => (shared ? router.push('/feed/me') : shareToFeed(job))}
+                className="w-full h-9 mt-2 px-1.5 rounded-full flex items-center justify-center gap-1.5 text-[12.5px] font-bold whitespace-nowrap active:scale-[0.97] transition-transform"
+                style={shared
+                  ? { background: theme === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(20,16,20,0.06)', color: theme === 'dark' ? '#cfcfcf' : '#4b5563' }
+                  : { background: theme === 'dark' ? '#fff' : '#141014', color: theme === 'dark' ? '#141014' : '#fff' }}
+              >
+                {shared ? <Check size={13} strokeWidth={3} className="shrink-0" /> : <Send size={13} strokeWidth={2.4} className="shrink-0" />}
+                <span className="truncate">{shared ? t.cl_in_feed : t.cl_share_feed}</span>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {hasMore && (
+        <div className="px-4 mt-4">
           <button
             onClick={onLoadMore}
             disabled={loading}
-            className="shrink-0 rounded-[28px] flex items-center justify-center text-[14px] font-semibold active:scale-95 transition-transform disabled:opacity-60"
+            className="w-full h-11 rounded-full flex items-center justify-center text-[14px] font-semibold active:scale-[0.98] transition-transform disabled:opacity-60"
             style={{
-              width: 'min(40vw, 160px)',
-              height: 440,
-              background: theme === 'dark' ? '#2a2a2a' : '#FFFFFF',
-              color: '#F370A7',
-              boxShadow: theme === 'dark' ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)',
+              background: theme === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(20,16,20,0.06)',
+              color: theme === 'dark' ? '#f0f0f0' : '#141014',
             }}
           >
             {loading ? <Loader2 size={18} className="animate-spin" /> : t.loadMore}
           </button>
-        )}
-        <div className="w-6 shrink-0" />
-      </div>
+        </div>
+      )}
 
       {/* Full-screen viewer with download */}
       {viewingJob?.resultImageUrl && (
@@ -3271,18 +3335,27 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
               </div>
             </div>
           </div>
+          {/* «В ленту» — основное действие; сохранение в галерею ушло в иконку. */}
           <div className="shrink-0 px-5 pb-10 pt-4 flex gap-2.5">
+            <button
+              onClick={() => (sharedIds.has(viewingJob.id) ? router.push('/feed/me') : shareToFeed(viewingJob))}
+              className="flex-1 h-12 rounded-full bg-white text-black text-[14px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+            >
+              {sharedIds.has(viewingJob.id) ? <Check size={15} strokeWidth={3} /> : <Send size={15} strokeWidth={2.4} />}
+              {sharedIds.has(viewingJob.id) ? t.cl_in_feed : t.cl_share_feed}
+            </button>
             <button
               onClick={() => handleDownload(viewingJob.resultImageUrl!)}
               disabled={isDownloading}
-              className="flex-1 h-12 rounded-full bg-white text-black text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-12 h-12 shrink-0 rounded-full bg-white/15 text-white flex items-center justify-center disabled:opacity-50 active:scale-[0.95] transition-transform"
+              title={t.myLooksSaveLook}
+              aria-label={t.myLooksSaveLook}
             >
               {isDownloading ? (
-                <Loader2 size={14} className="animate-spin" />
+                <Loader2 size={16} className="animate-spin" />
               ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               )}
-              {t.myLooksSaveLook}
             </button>
           </div>
         </div>
@@ -3856,34 +3929,32 @@ function ClothingItemCard({ item, onTap, isProcessing, startedAt, onRemove, beau
 
 // ─── Outfit Days Sheet ──────────────────────────────────────────────────────────
 
-function pickItem(items: ClosetItem[], day: Date): ClosetItem | null {
+// Вещь дня: детерминированный выбор по дате, сдвинутый на `offset` — так кнопка
+// «другой образ» перебирает варианты, а сам день остаётся стабильным.
+function pickItem(items: ClosetItem[], day: Date, offset = 0): ClosetItem | null {
   if (!items.length) return null;
-  const dayIndex = Math.floor(day.getTime() / 86400000);
-  return items[dayIndex % items.length];
+  const dayIndex = Math.floor(day.getTime() / 86400000) + offset;
+  return items[((dayIndex % items.length) + items.length) % items.length];
 }
 
 // ── Calendar tab: next-7-days outfit suggestions, window-sized cards ────────────
+// Вся неделя открыта всем (июль 2026): планов и замков на днях больше нет.
 function CalendarTab({
   allItems,
-  calendarDays,
-  onShowPlans,
-  plansEnabled,
   onTryItOn,
-  tryOnCount,
-  tryOnLimit,
 }: {
   allItems: ClosetItem[];
-  calendarDays: number;
-  onShowPlans: () => void;
-  plansEnabled: boolean;
   onTryItOn: (items: ClosetItem[]) => void;
-  canTryOn: boolean;
-  tryOnCount: number;
-  tryOnLimit: number;
 }) {
   const { t } = useI18n();
   const { theme } = useTheme();
+  const dark = theme === 'dark';
   const [selectedDayIdx, setSelectedDayIdx] = useState(0);
+  // Сдвиг подбора — свой у каждого дня, чтобы «другой образ» не сбрасывался при
+  // переключении дат.
+  const [shuffleByDay, setShuffleByDay] = useState<Record<number, number>>({});
+  // Свайп по карточке листает дни — так же, как тап по строке недели.
+  const swipeXRef = useRef<number | null>(null);
   const days = useMemo(() => {
     const now = new Date();
     return Array.from({ length: 7 }, (_, i) => {
@@ -3905,114 +3976,160 @@ function CalendarTab({
         </div>
       ) : (() => {
         const selDay = days[selectedDayIdx];
-        const upper = pickItem(upperItems, selDay);
+        // Разные множители сдвига — иначе «другой образ» листал бы все категории
+        // синхронно и на коротких списках менял бы вид не всегда.
+        const shuffle = shuffleByDay[selectedDayIdx] ?? 0;
+        const upper = pickItem(upperItems, selDay, shuffle);
         // A dress/jumpsuit is a complete outfit on its own — never pair it with a
         // separate bottom (hard rule H1: no "dress + skirt/pants").
         const upperIsFullBody = !!upper && FULL_BODY_CATS.includes(upper.category);
-        const lower = upperIsFullBody ? null : pickItem(lowerItems, selDay);
-        const shoe = pickItem(shoeItems, selDay);
-        const shawl = pickItem(shawlItems, selDay);
-        const sideAcc = pickItem(sideAccItems, selDay);
+        const lower = upperIsFullBody ? null : pickItem(lowerItems, selDay, shuffle * 3);
+        const shoe = pickItem(shoeItems, selDay, shuffle * 5);
+        const shawl = pickItem(shawlItems, selDay, shuffle * 7);
+        const sideAcc = pickItem(sideAccItems, selDay, shuffle * 11);
         const selIsToday = selectedDayIdx === 0 && new Date().toDateString() === selDay.toDateString();
-        const selUnlocked = !plansEnabled || selectedDayIdx < calendarDays;
         const headerLabel = `${t.dayNames[selDay.getDay()]}, ${selDay.getDate()} ${t.monthNames[selDay.getMonth()]}`;
+        // Главная колонка тянется на всю карточку, поэтому пустые слоты не
+        // резервируем: два предмета заполняют её так же, как четыре.
+        const mainPieces = ([
+          upper ? { item: upper, grow: 1.15 } : null,
+          lower ? { item: lower, grow: 1 } : null,
+          shoe ? { item: shoe, grow: 0.5 } : null,
+        ].filter(Boolean) as { item: ClosetItem; grow: number }[]);
+        const accPieces = [shawl, sideAcc].filter(Boolean) as ClosetItem[];
+        const dayItems = [shawl, upper, lower, shoe, sideAcc].filter(Boolean) as ClosetItem[];
         return (
           <>
-            {/* Week day selector — makes it read clearly as a calendar */}
-            <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-3">
+            {/* Неделя целиком, без горизонтальной прокрутки: семь равных ячеек
+                читаются как строка календаря, а не как лента чипов. */}
+            <div className="flex gap-1.5 pb-3">
               {days.map((day, i) => {
-                const isUnlocked = !plansEnabled || i < calendarDays;
                 const isToday = i === 0 && new Date().toDateString() === day.toDateString();
                 const selected = i === selectedDayIdx;
                 return (
                   <button
                     key={i}
                     onClick={() => setSelectedDayIdx(i)}
-                    className="shrink-0 flex flex-col items-center justify-center rounded-2xl active:scale-95 transition-transform"
+                    className="flex-1 min-w-0 flex flex-col items-center justify-center rounded-2xl active:scale-95 transition-transform"
                     style={{
-                      width: 52,
-                      height: 64,
+                      height: 62,
+                      // Выбранный день — чёрный, как активный фильтр в гардеробе:
+                      // розовый в закладке оставлен за «добавить вещь».
                       background: selected
-                        ? 'linear-gradient(135deg, #F370A7, #e0559a)'
-                        : (theme === 'dark' ? '#1f1f1f' : '#f3f4f6'),
-                      opacity: isUnlocked ? 1 : 0.55,
+                        ? (dark ? '#ffffff' : '#141014')
+                        : (dark ? '#1f1f1f' : '#f3f4f6'),
                     }}
                   >
                     <span
                       className="text-[10px] font-semibold leading-none mb-1"
-                      style={{ color: selected ? 'rgba(255,255,255,0.85)' : (theme === 'dark' ? '#9ca3af' : '#6b7280') }}
+                      style={{ color: selected ? (dark ? 'rgba(20,16,20,0.55)' : 'rgba(255,255,255,0.7)') : (dark ? '#9ca3af' : '#6b7280') }}
                     >
-                      {isToday ? t.today : t.dayNames[day.getDay()]}
+                      {t.dayNames[day.getDay()]}
                     </span>
                     <span
-                      className="text-[17px] font-bold leading-none"
-                      style={{ color: selected ? '#fff' : (theme === 'dark' ? '#e5e7eb' : '#1f2937') }}
+                      className="text-[16px] font-bold leading-none"
+                      style={{ color: selected ? (dark ? '#141014' : '#fff') : (dark ? '#e5e7eb' : '#1f2937') }}
                     >
                       {day.getDate()}
                     </span>
-                    {!isUnlocked && <Crown size={9} strokeWidth={2} color={selected ? '#FFD700' : '#B8860B'} className="mt-0.5" />}
+                    {/* Точка = сегодня: подпись «Today» не влезает в узкую ячейку */}
+                    <span
+                      className="w-1 h-1 rounded-full mt-1"
+                      style={{
+                        background: isToday
+                          ? (selected ? (dark ? '#141014' : '#fff') : (dark ? '#e5e7eb' : '#141014'))
+                          : 'transparent',
+                      }}
+                    />
                   </button>
                 );
               })}
             </div>
 
-            {/* Selected day's outfit — same 440px footprint as Boards / Outfits */}
+            {/* Образ дня. Дата и «другой образ» лежат поверх карточки, а вещи
+                тянутся на всю её высоту — раньше пустые слоты под недостающие
+                категории оставляли половину карточки белой. */}
             <div
               className="relative rounded-[28px] overflow-hidden flex flex-col"
               style={{
-                height: 440,
-                background: theme === 'dark' ? '#1a1a1a' : '#FFFFFF',
-                boxShadow: theme === 'dark' ? '0 2px 12px rgba(0,0,0,0.3)' : '0 2px 12px rgba(0,0,0,0.06)',
+                height: 420,
+                background: dark ? '#1a1a1a' : '#FFFFFF',
+                boxShadow: dark ? '0 2px 12px rgba(0,0,0,0.3)' : '0 2px 12px rgba(0,0,0,0.06)',
+              }}
+              onTouchStart={(e) => { swipeXRef.current = e.touches[0].clientX; }}
+              onTouchEnd={(e) => {
+                const start = swipeXRef.current;
+                swipeXRef.current = null;
+                // Порог в 48px: вертикальную прокрутку страницы не трогаем.
+                if (start === null) return;
+                const dx = e.changedTouches[0].clientX - start;
+                if (Math.abs(dx) < 48) return;
+                setSelectedDayIdx((i) => Math.min(days.length - 1, Math.max(0, i + (dx < 0 ? 1 : -1))));
               }}
             >
-              {/* Date header band */}
-              <div
-                className="flex items-center gap-2 px-4 py-3 shrink-0"
-                style={{ background: selIsToday ? 'linear-gradient(135deg, #F370A7, #e0559a)' : (theme === 'dark' ? '#222222' : '#fafafa') }}
-              >
-                <CalendarDays size={18} strokeWidth={2} color={selIsToday ? '#fff' : '#F370A7'} />
-                <span className="text-[14px] font-bold" style={{ color: selIsToday ? '#fff' : (theme === 'dark' ? '#e5e7eb' : '#1f2937') }}>
+              <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-between gap-2">
+                <span
+                  className="h-8 px-3 rounded-full flex items-center gap-1.5 text-[12.5px] font-bold whitespace-nowrap"
+                  style={{
+                    background: dark ? 'rgba(255,255,255,0.10)' : 'rgba(20,16,20,0.06)',
+                    color: dark ? '#f0f0f0' : '#141014',
+                  }}
+                >
+                  <CalendarDays size={13} strokeWidth={2.4} />
                   {selIsToday ? t.today : headerLabel}
                 </span>
-              </div>
-              {/* Outfit stack */}
-              <div className="relative flex-1 flex flex-col">
-                <MiniOutfitSlot item={shawl} flex />
-                <MiniOutfitSlot item={upper} flex />
-                <MiniOutfitSlot item={lower} flex />
-                <MiniOutfitSlot item={shoe} flex />
-                <MiniOutfitSlot item={sideAcc} flex />
-
-                {/* Blur overlay for locked days — only when plans feature is enabled */}
-                {!selUnlocked && (
-                  <div
-                    className="absolute inset-0 flex items-center justify-center cursor-pointer active:scale-[0.99] transition-transform"
+                {dayItems.length > 0 && (
+                  <button
+                    onClick={() => setShuffleByDay((prev) => ({ ...prev, [selectedDayIdx]: (prev[selectedDayIdx] ?? 0) + 1 }))}
+                    className="h-8 px-3 rounded-full flex items-center gap-1.5 text-[12px] font-bold whitespace-nowrap active:scale-[0.95] transition-transform"
                     style={{
-                      backdropFilter: 'blur(8px)',
-                      WebkitBackdropFilter: 'blur(8px)',
-                      background: 'rgba(255,255,255,0.25)',
+                      background: dark ? 'rgba(255,255,255,0.10)' : 'rgba(20,16,20,0.06)',
+                      color: dark ? '#f0f0f0' : '#141014',
                     }}
-                    onClick={onShowPlans}
                   >
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg"
-                      style={{ background: 'linear-gradient(135deg, #B8860B 0%, #8B6914 100%)' }}
-                    >
-                      <Crown size={22} strokeWidth={1.5} color="#FFD700" />
-                    </div>
-                  </div>
+                    <RefreshCw size={12} strokeWidth={2.6} />
+                    {t.cl_cal_shuffle}
+                  </button>
                 )}
               </div>
+
+              {/* Вещи дня: главная колонка + рейл аксессуаров справа */}
+              {dayItems.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center px-8 text-center">
+                  <p className="text-[13px] font-medium" style={{ color: dark ? '#888' : '#9ca3af' }}>{t.addItemsFirst}</p>
+                </div>
+              ) : (
+                <div className="flex-1 flex items-stretch gap-2 px-4 pt-14 pb-4 min-h-0">
+                  <div className="flex-1 flex flex-col items-center justify-center min-h-0">
+                    {mainPieces.map((p) => (
+                      <div key={p.item.id} className="relative w-full min-h-0" style={{ flex: `${p.grow} 1 0` }}>
+                        <Image src={p.item.imageData} alt={p.item.category} fill className="object-contain" unoptimized={needsUnoptimized(p.item.imageData)} />
+                      </div>
+                    ))}
+                  </div>
+                  {accPieces.length > 0 && (
+                    <div className="w-16 shrink-0 flex flex-col justify-center gap-2">
+                      {accPieces.map((a) => (
+                        <div
+                          key={a.id}
+                          className="relative w-16 h-16 rounded-2xl overflow-hidden"
+                          style={{ background: dark ? 'rgba(255,255,255,0.06)' : '#F6F6F7' }}
+                        >
+                          <Image src={a.imageData} alt={a.category} fill className="object-contain p-1.5" unoptimized={needsUnoptimized(a.imageData)} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
 
             {/* Try it on */}
             <button
-              onClick={() => {
-                if (!selUnlocked) { onShowPlans(); return; }
-                const dayItems = [shawl, upper, lower, shoe, sideAcc].filter(Boolean) as ClosetItem[];
-                onTryItOn(dayItems);
-              }}
-              className="w-full h-11 mt-3 rounded-full flex items-center justify-center gap-1.5 text-[13px] font-bold text-white active:scale-[0.97] transition-transform"
+              onClick={() => onTryItOn(dayItems)}
+              disabled={dayItems.length === 0}
+              className="w-full h-11 mt-3 rounded-full flex items-center justify-center gap-1.5 text-[13px] font-bold text-white active:scale-[0.97] transition-transform disabled:opacity-40"
               style={{ background: 'linear-gradient(135deg, #141014 0%, #332c33 50%, #141014 100%)', backgroundSize: '200% auto', animation: 'tryOnShimmer 2.4s linear infinite', boxShadow: '0 4px 18px rgba(20,16,20,0.32)' }}
             >
               <Sparkles size={13} />
@@ -4025,15 +4142,6 @@ function CalendarTab({
           </>
         );
       })()}
-    </div>
-  );
-}
-
-function MiniOutfitSlot({ item, flex }: { item: ClosetItem | null; flex?: boolean }) {
-  if (!item) return flex ? <div className="flex-1 bg-gray-50" /> : null;
-  return (
-    <div className={`relative w-full overflow-hidden bg-gray-50 ${flex ? 'flex-1' : 'h-10 shrink-0'}`}>
-      <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized={needsUnoptimized(item.imageData)} />
     </div>
   );
 }

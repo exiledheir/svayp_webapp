@@ -735,7 +735,8 @@ export default function InteractiveCanvas({
             onClick={handleSave}
             disabled={canvasItems.length === 0}
             className="h-9 px-5 rounded-full text-white text-[14px] font-bold disabled:opacity-40 active:scale-[0.95] transition-transform"
-            style={{ background: '#F370A7' }}
+            // Розовый в гардеробе — только «добавить вещь» и Beautify.
+            style={{ background: '#141014' }}
           >
             {t.save}
           </button>
@@ -757,26 +758,42 @@ export default function InteractiveCanvas({
       >
         {/* Inner canvas with fixed aspect ratio — matches preview card. Uses container-query units so 3:4 is always maintained on all viewport sizes. */}
         <div ref={containerRef} className="relative" style={{ aspectRatio: '3 / 4', width: 'min(75cqh, 100cqw)' }}>
-        {/* ── Empty-canvas tutorial hint ─────────────────────────── */}
+        {/* ── Empty-canvas tutorial hint ───────────────────────────
+            Обычный редактор: кнопки «+» тут нет — гардероб уже раскрыт снизу,
+            вещь добавляют тапом по нему. Круг с плюсом и подпись «нажмите +»
+            остались от старого макета и отправляли искать несуществующую
+            кнопку. Плюс показываем только в онбординге: там она реально есть
+            (вертикальный тулбар справа). */}
         {canvasItems.length === 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10 gap-3 px-8">
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center"
-              style={{ background: 'rgba(243,112,167,0.12)', border: '2px dashed rgba(243,112,167,0.5)' }}
-            >
-              <Plus size={28} strokeWidth={2} color="#F370A7" />
-            </div>
-            <p className="text-[14px] font-semibold text-gray-500 text-center leading-snug">
-              {t.canvasEmptyHint}
-            </p>
-            {/* Arrow points to the Add button — right during onboarding, down to
-                the bottom toolbar in normal editing. */}
-            <div className="flex items-center gap-1 mt-1">
-              <span className="text-[12px] text-gray-400 font-medium">{t.addToCloset}</span>
-              <svg width="20" height="12" viewBox="0 0 20 12" fill="none" style={{ transform: alwaysShowHint ? undefined : 'rotate(90deg)' }}>
-                <path d="M1 6h16M13 1l5 5-5 5" stroke="#F370A7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
+            {alwaysShowHint ? (
+              <>
+                <div
+                  className="w-16 h-16 rounded-full flex items-center justify-center"
+                  style={{ background: 'rgba(243,112,167,0.12)', border: '2px dashed rgba(243,112,167,0.5)' }}
+                >
+                  <Plus size={28} strokeWidth={2} color="#F370A7" />
+                </div>
+                <p className="text-[14px] font-semibold text-gray-500 text-center leading-snug">
+                  {t.canvasEmptyHint}
+                </p>
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-[12px] text-gray-400 font-medium">{t.addToCloset}</span>
+                  <svg width="20" height="12" viewBox="0 0 20 12" fill="none">
+                    <path d="M1 6h16M13 1l5 5-5 5" stroke="#F370A7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-[14px] font-semibold text-gray-500 text-center leading-snug">
+                  {t.canvasEmptyPick}
+                </p>
+                <svg width="14" height="22" viewBox="0 0 14 22" fill="none" className="animate-bounce">
+                  <path d="M7 1v18M1 14l6 6 6-6" stroke="#F370A7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </>
+            )}
           </div>
         )}
 
@@ -992,28 +1009,11 @@ export default function InteractiveCanvas({
             const closetItems = pickerTab === 'all' ? getAllItems() : getGroupItems(pickerTab);
             const shopItems = pickerTab === 'all' ? shopProducts : shopProducts.filter((p) => productGroup(p) === pickerTab);
 
-            const sourcePill = (key: 'closet' | 'shop', label: string, count: number, icon: React.ReactNode) => {
-              const on = pickerSource === key;
-              return (
-                <button
-                  key={key}
-                  onClick={() => scrollToSection(key)}
-                  className="shrink-0 h-7 pl-2 pr-2.5 rounded-full flex items-center gap-1.5 text-[12px] font-bold transition-colors active:scale-95"
-                  style={{
-                    background: on ? 'rgba(243,112,167,0.13)' : '#f5f3f6',
-                    color: on ? '#F370A7' : '#8b8590',
-                  }}
-                >
-                  {icon}
-                  <span>{label}</span>
-                  {count > 0 && <span style={{ opacity: 0.65 }}>{count}</span>}
-                </button>
-              );
-            };
-
             return (
               <div className="h-full flex flex-col">
-                {/* Drag handle + source pills + category chips */}
+                {/* Drag handle + category chips. Пилюль-источников тут нет:
+                    гардероб и магазин идут одним скроллом под своими
+                    заголовками, а переключают их кнопки в тулбаре. */}
                 <div className="flex-none">
                   <div
                     className="pt-2.5 pb-1 touch-none cursor-grab active:cursor-grabbing"
@@ -1023,18 +1023,6 @@ export default function InteractiveCanvas({
                   >
                     <div className="w-10 h-1.5 rounded-full bg-gray-200 mx-auto" />
                   </div>
-                  {/* Источники видны всегда — сразу понятно, что кроме гардероба
-                      в этом же списке есть магазин (кнопка-сумка вела «в никуда»). */}
-                  {shopVisible && (
-                    <div className="flex gap-2 px-4 pt-1 pb-0.5">
-                      {sourcePill('closet', t.cv_ce_my_closet, allItems.length, (
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="1.7"/><line x1="12" y1="3.5" x2="12" y2="20.5"/></svg>
-                      ))}
-                      {sourcePill('shop', t.cv_ce_shop_section, shopProducts.length, (
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-                      ))}
-                    </div>
-                  )}
                   <div className="flex gap-2 overflow-x-auto hide-scrollbar px-4 py-1.5">
                     {tabs.map((tab) => {
                       const on = pickerTab === tab.key;

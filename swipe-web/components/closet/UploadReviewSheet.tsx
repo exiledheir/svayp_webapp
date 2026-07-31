@@ -227,7 +227,8 @@ export default function UploadReviewSheet({
             <ItemOptionsPicker value={editSel} onChange={setEditSel} dark={dark} />
           </div>
           <div className="px-5 pt-2 pb-8" style={{ borderTop: `1px solid ${line}` }}>
-            <button onClick={saveCategory} disabled={!isSelectionComplete(editSel)} className="w-full h-13 rounded-2xl text-white text-[15px] font-bold disabled:opacity-40" style={{ background: '#F370A7', height: 52 }}>{t.save}</button>
+            {/* Чёрная, как «Добавить в гардероб» под ней: розовый оставлен за Beautify. */}
+            <button onClick={saveCategory} disabled={!isSelectionComplete(editSel)} className="w-full h-13 rounded-2xl text-[15px] font-bold disabled:opacity-40" style={{ background: dark ? '#fff' : '#141014', color: dark ? '#141014' : '#fff', height: 52 }}>{t.save}</button>
           </div>
         </div>
       </div>
