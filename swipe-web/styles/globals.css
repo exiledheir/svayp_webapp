@@ -144,9 +144,11 @@ body.app-no-select [contenteditable]:not([contenteditable='false']) {
   from { opacity: 0; transform: translate(-50%, 12px); }
   to   { opacity: 1; transform: translate(-50%, 0); }
 }
+/* Кольцо у «Примерить» — нейтральное: розовый в гардеробе оставлен только за
+   добавлением вещи и Beautify. */
 @keyframes tryOnPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(243,112,167,0.55); }
-  50%       { box-shadow: 0 0 0 8px rgba(243,112,167,0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(20,16,20,0.42); }
+  50%       { box-shadow: 0 0 0 8px rgba(20,16,20,0); }
 }
 @keyframes tryOnShimmer {
   0%   { background-position: -200% center; }
@@ -167,6 +169,13 @@ body.app-no-select [contenteditable]:not([contenteditable='false']) {
 @keyframes demoTextPop {
   0%   { transform: translateY(8px) scale(0.96); opacity: 0; }
   100% { transform: translateY(0)   scale(1);    opacity: 1; }
+}
+/* Вещь, только что положенная на канву, «впрыгивает» — мгновенный отклик на тап
+   по пикеру, чтобы не казалось, что добавление не сработало. */
+@keyframes canvasItemPop {
+  0%   { transform: scale(0.72); opacity: 0; }
+  55%  { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1);    opacity: 1; }
 }
 @keyframes dragHint {
   0%   { transform: translate(0, 0);    opacity: 0; }

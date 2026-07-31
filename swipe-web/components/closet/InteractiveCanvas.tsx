@@ -11,12 +11,71 @@ import { getCatalogReadyProducts } from '@/lib/api';
 import type { Product } from '@/types';
 
 interface CanvasItem {
+  /** Стабильный id записи на канве: не зависит от индекса, поэтому удаление
+   *  соседа не перемонтирует картинку (и та не мигает/не грузится заново). */
+  uid: string;
   item: ClosetItem;
   x: number;
   y: number;
   scale: number;
   zIndex: number;
   group: CanvasGroup;
+}
+
+/** Картинка вещи на канве.
+ *
+ *  Раньше канва сразу просила `fullImage` (полноразмерный imageUrl), тогда как в
+ *  пикере показывается `imageData` (400px-миниатюра). Это РАЗНЫЙ url: после тапа
+ *  вещь добавлялась, но её место оставалось пустым, пока по мобильной сети
+ *  качался оригинал. Пользователь не видел отклика и жал ещё раз — так на доске
+ *  появлялись дубликаты.
+ *
+ *  Теперь мгновенно рисуем миниатюру (она уже в кэше браузера — её только что
+ *  показывали в пикере) и подменяем на полноразмерную, когда та догрузится. */
+function CanvasItemImage({ item, alt }: { item: ClosetItem; alt: string }) {
+  const thumb = item.imageData || item.fullImage || '';
+  const full = item.fullImage || thumb;
+  const [src, setSrc] = useState(thumb);
+
+  useEffect(() => {
+    setSrc(thumb);
+    if (!full || full === thumb) return;
+    let cancelled = false;
+    const pre = new window.Image();
+    pre.onload = () => { if (!cancelled) setSrc(full); };
+    pre.src = full;
+    if (pre.complete && pre.naturalWidth > 0) setSrc(full); // уже в кэше
+    return () => { cancelled = true; };
+  }, [thumb, full]);
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      className="absolute inset-0 w-full h-full object-contain"
+      decoding="sync"
+      draggable={false}
+      style={{ pointerEvents: 'none', WebkitUserDrag: 'none' } as any}
+    />
+  );
+}
+
+/** Категория товара магазина → группа канвы (для общих фильтр-чипов пикера).
+ *  null — категория незнакомая: такой товар показываем только во вкладке «Все». */
+function productGroup(p: Product): CanvasGroup | null {
+  switch ((p.category ?? '').toUpperCase()) {
+    case 'TOPWEAR':
+    case 'OUTERWEAR':
+    case 'DRESSES':
+    case 'ONE_PIECE':
+    case 'TWO_PIECE_SET':
+      return 'upper';
+    case 'BOTTOMWEAR': return 'lower';
+    case 'FOOTWEAR': return 'shoes';
+    case 'ACCESSORIES': return 'acc';
+    default: return null;
+  }
 }
 
 // Bottom-toolbar button — either a picker source (closet/shop) or an edit action.
@@ -72,31 +131,64 @@ export default function InteractiveCanvas({
   // One-time Acloset-style gesture tutorial (normal edit mode only).
   const [showEditOnboarding, setShowEditOnboarding] = useState(false);
 
-  // ── Docked closet/shop picker — a bottom panel that shrinks the canvas
-  // (not an overlay). Its height is drag-controlled so it can be swiped down
-  // and closed with the finger. ────────────────────────────────────────────
+  // ── Docked picker — a bottom panel that shrinks the canvas (not an overlay).
+  // Its height is drag-controlled so it can be swiped down and closed with the
+  // finger. Гардероб и магазин живут в ОДНОМ скролле двумя подписанными
+  // секциями: раньше магазин был вторым «режимом» панели, и пользователи просто
+  // не понимали, что кнопка-сумка вообще что-то переключает. ────────────────
   const vh = () => (typeof window !== 'undefined' ? window.innerHeight : 800);
+  // Какая секция сейчас в фокусе — подсвечивает кнопку в тулбаре и таб-пилюлю.
   const [pickerSource, setPickerSource] = useState<'closet' | 'shop'>('closet');
   const [pickerH, setPickerH] = useState(0); // panel height in px; 0 = closed
   const [pickerDragging, setPickerDragging] = useState(false);
   const pickerDragRef = useRef<{ startY: number; startH: number } | null>(null);
+  const pickerScrollRef = useRef<HTMLDivElement>(null);
+  const shopHeadRef = useRef<HTMLDivElement>(null);
 
-  // Shop catalog (lazy-loaded on first shop open) + per-product import state.
+  // Shop catalog (lazy-loaded when the picker opens) + per-product import state.
   const [shopProducts, setShopProducts] = useState<Product[]>([]);
   const [shopLoading, setShopLoading] = useState(false);
+  // Каталог загрузился и оказался пустым — прячем и секцию, и кнопку в тулбаре,
+  // чтобы «магазин» не вёл в пустоту.
+  const [shopEmpty, setShopEmpty] = useState(false);
   const shopLoadedRef = useRef(false);
   const [shopAdding, setShopAdding] = useState<Set<string>>(new Set());
+  const shopAvailable = !!onAddProduct && !shopEmpty;
 
 
-  const DEFAULT_FRAC = 0.4;
+  const DEFAULT_FRAC = 0.44;
   function openPicker(source: 'closet' | 'shop') {
     setPickerSource(source);
     setPickerH(Math.round(vh() * DEFAULT_FRAC));
-    if (source === 'shop') loadShop();
+    loadShop(); // обе секции нужны сразу — магазин больше не «второй режим»
+    // Контент монтируется только при pickerH > 0, а панель ещё разъезжается —
+    // прокручиваем после анимации (заодно видно, что магазин лежит под гардеробом).
+    if (source === 'shop') setTimeout(() => scrollToSection('shop'), 320);
   }
+
+  function scrollToSection(source: 'closet' | 'shop') {
+    setPickerSource(source);
+    const sc = pickerScrollRef.current;
+    if (!sc) return;
+    if (source === 'closet') { sc.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    const head = shopHeadRef.current;
+    if (head) sc.scrollTo({ top: Math.max(0, head.offsetTop - 6), behavior: 'smooth' });
+  }
+
   function togglePicker(source: 'closet' | 'shop') {
-    if (pickerH > 0 && pickerSource === source) { setPickerH(0); return; }
-    openPicker(source);
+    if (pickerH === 0) { openPicker(source); return; }
+    // Повторный тап по активной секции закрывает панель; иначе — прокрутка к ней.
+    if (pickerSource === source) { setPickerH(0); return; }
+    scrollToSection(source);
+  }
+
+  // Scroll-spy: подсвечиваем ту секцию, которая сейчас видна.
+  function handlePickerScroll() {
+    const sc = pickerScrollRef.current;
+    const head = shopHeadRef.current;
+    if (!sc || !head) return;
+    const next = head.offsetTop - sc.scrollTop <= 44 ? 'shop' : 'closet';
+    setPickerSource((cur) => (cur === next ? cur : next));
   }
 
   async function loadShop() {
@@ -112,6 +204,7 @@ export default function InteractiveCanvas({
       const merged: Product[] = [];
       for (const p of r.products) { if (!seen.has(p.id)) { seen.add(p.id); merged.push(p); } }
       setShopProducts(merged);
+      setShopEmpty(merged.length === 0);
     } finally {
       setShopLoading(false);
     }
@@ -119,6 +212,9 @@ export default function InteractiveCanvas({
 
   function addShopProduct(product: Product) {
     if (!onAddProduct || shopAdding.has(product.id)) return;
+    // Товар уже лежит на канве — показываем его, а не добавляем второй раз.
+    const onCanvas = canvasItemsRef.current.find((ci) => ci.item.sourceProductId === product.id);
+    if (onCanvas) { revealOnCanvas(onCanvas.uid); return; }
     setShopAdding((prev) => new Set(prev).add(product.id));
     // onAddProduct возвращает добавленную (или уже существующую — from-catalog
     // идемпотентен) вещь. Кладём её на канву НАПРЯМУЮ, а не ждём нового id в
@@ -159,6 +255,10 @@ export default function InteractiveCanvas({
     });
   }
 
+  // Счётчики: uid новых записей канвы и номер «каскада» для их раскладки.
+  const uidRef = useRef(0);
+  const placedRef = useRef(0);
+
   // Build initial canvas items
   const buildInitialItems = useCallback((): CanvasItem[] => {
     // If we have a saved layout, restore from it (deduplicate by ID)
@@ -170,11 +270,12 @@ export default function InteractiveCanvas({
         seen.add(entry.id);
         const item = allItems.find((i) => i.id === entry.id);
         if (item) {
-          result.push({ item, x: entry.x, y: entry.y, scale: entry.scale, zIndex: entry.zIndex, group: entry.group });
+          result.push({ uid: `c${uidRef.current++}`, item, x: entry.x, y: entry.y, scale: entry.scale, zIndex: entry.zIndex, group: entry.group });
         }
       }
       if (result.length > 0) {
         nextZ.current = Math.max(...result.map((r) => r.zIndex)) + 5;
+        placedRef.current = result.length;
         return result;
       }
     }
@@ -183,6 +284,14 @@ export default function InteractiveCanvas({
   }, [initialLayout, allItems]);
 
   const [canvasItems, setCanvasItems] = useState<CanvasItem[]>(buildInitialItems);
+  // Зеркало состава канвы, актуальное синхронно: addItem вызывается и из
+  // асинхронного колбэка магазина, где замыкание на canvasItems уже устарело.
+  const canvasItemsRef = useRef<CanvasItem[]>(canvasItems);
+  canvasItemsRef.current = canvasItems;
+  // Вещь, которую только что положили, — играет pop-анимацию при появлении.
+  const [lastAddedUid, setLastAddedUid] = useState<string | null>(null);
+  // Выделяем добавленную вещь по uid: индекс на момент вызова может «уехать».
+  const [pendingSelectUid, setPendingSelectUid] = useState<string | null>(null);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number; itemX: number; itemY: number }>({ x: 0, y: 0, itemX: 0, itemY: 0 });
@@ -228,13 +337,23 @@ export default function InteractiveCanvas({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Open the closet picker docked at 40% on entering the editor, so the canvas
-  // starts shrunk with items ready to place (normal edit mode only).
+  // Open the picker docked on entering the editor, so the canvas starts shrunk
+  // with items ready to place (normal edit mode only). Магазин подгружаем сразу:
+  // его секция должна быть видна в том же списке, а не «за кнопкой».
   useEffect(() => {
     if (alwaysShowHint) return;
     setPickerH(Math.round(vh() * DEFAULT_FRAC));
+    loadShop();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Выделяем только что добавленную вещь, когда она реально оказалась в state.
+  useEffect(() => {
+    if (!pendingSelectUid) return;
+    const i = canvasItems.findIndex((c) => c.uid === pendingSelectUid);
+    if (i !== -1) setSelectedIdx(i);
+    setPendingSelectUid(null);
+  }, [pendingSelectUid, canvasItems]);
 
   // ── One-time "move" demo (onboarding) ──────────────────────────────────────
   // New users don't realize the canvas is editable, so when `alwaysShowHint` is
@@ -498,15 +617,39 @@ export default function InteractiveCanvas({
     setSelectedIdx(null);
   }
 
+  /** Вещь уже на канве → не плодим копию, а выделяем существующую, чтобы стало
+   *  видно, куда она легла (и её сразу можно двигать/удалить). */
+  function revealOnCanvas(uid: string) {
+    setPendingSelectUid(uid);
+  }
+
   function addItem(item: ClosetItem) {
-    const group = getItemGroup(item);
-    setCanvasItems((prev) => {
-      // Cascade newly-added items slightly so they don't stack in one spot.
-      const n = prev.length;
-      const x = 20 + (n % 4) * 11;
-      const y = 16 + (n % 4) * 11;
-      return [...prev, { item, x, y, scale: 1, zIndex: nextZ.current++, group }];
-    });
+    // Дубликаты канва всё равно не сохраняет (handleSave дедуплицирует по id),
+    // поэтому повторный тап — это всегда «покажи мне ту, что уже стоит».
+    const existing = canvasItemsRef.current.find((ci) => ci.item.id === item.id);
+    if (existing) {
+      revealOnCanvas(existing.uid);
+      setAddPicker(false);
+      return;
+    }
+
+    // Cascade newly-added items so they don't stack in one spot. Счётчик
+    // монотонный (а не prev.length): после удаления вещи следующая добавленная
+    // не ложится ровно под предыдущую.
+    const n = placedRef.current++;
+    const entry: CanvasItem = {
+      uid: `c${uidRef.current++}`,
+      item,
+      x: 14 + (n % 6) * 8,
+      y: 10 + (n % 6) * 9,
+      scale: 1,
+      zIndex: nextZ.current++,
+      group: getItemGroup(item),
+    };
+    canvasItemsRef.current = [...canvasItemsRef.current, entry];
+    setCanvasItems((prev) => (prev.some((ci) => ci.item.id === item.id) ? prev : [...prev, entry]));
+    setLastAddedUid(entry.uid);
+    setPendingSelectUid(entry.uid);
     setAddPicker(false); // closes the onboarding overlay; docked picker stays open
   }
 
@@ -644,7 +787,7 @@ export default function InteractiveCanvas({
           const liftScale = demo.moving && isDemoMover ? 1.08 : 1;
           return (
           <div
-            key={`${ci.group}-${idx}-${ci.item.id}`}
+            key={ci.uid}
             className={`absolute origin-center ${selectedIdx === idx ? 'ring-2 ring-[#F370A7] ring-offset-2 rounded-xl' : ''}`}
             style={{
               left: `${ci.x}%`,
@@ -672,14 +815,16 @@ export default function InteractiveCanvas({
               style={
                 isDemoMover
                   ? { filter: demo.moving ? 'drop-shadow(0 14px 22px rgba(0,0,0,0.20))' : 'none', transition: 'filter 0.4s ease' }
-                  : (!demoEligible && showDragHint && idx === 0 && !isDragging
-                      ? { animation: 'itemNudge 1.8s ease-in-out 0.4s 2 both' }
-                      : undefined)
+                  : ci.uid === lastAddedUid
+                    // Только что добавленная вещь «впрыгивает» — видимый отклик на тап.
+                    ? { animation: 'canvasItemPop 0.42s cubic-bezier(0.22,1,0.36,1) both' }
+                    : (!demoEligible && showDragHint && idx === 0 && !isDragging
+                        ? { animation: 'itemNudge 1.8s ease-in-out 0.4s 2 both' }
+                        : undefined)
               }
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              {/* На канве вещь крупная — полноразмерная картинка вместо 400px-миниатюры. */}
-              <img src={ci.item.fullImage ?? ci.item.imageData} alt={ci.item.category} className="absolute inset-0 w-full h-full object-contain" decoding="sync" draggable={false} style={{ pointerEvents: 'none', WebkitUserDrag: 'none' } as any} />
+              {/* Миниатюра рисуется мгновенно, полноразмерная подменяется по загрузке. */}
+              <CanvasItemImage item={ci.item} alt={ci.item.category} />
             </div>
           </div>
           );
@@ -777,7 +922,7 @@ export default function InteractiveCanvas({
             {([
               { key: 'closet', label: t.addToCloset, kind: 'source' as const, source: 'closet' as const,
                 icon: (<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="1.7"/><line x1="12" y1="3.5" x2="12" y2="20.5"/><line x1="9.4" y1="11" x2="9.4" y2="13"/><line x1="14.6" y1="11" x2="14.6" y2="13"/></svg>) },
-              ...(onAddProduct ? [{ key: 'shop', label: t.cv_shop_title, kind: 'source' as const, source: 'shop' as const,
+              ...(shopAvailable ? [{ key: 'shop', label: t.cv_ce_shop_section, kind: 'source' as const, source: 'shop' as const,
                 icon: (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>) }] : []),
               { key: 'swap', label: 'Swap', kind: 'action' as const, needsSelection: true,
                 action: () => { if (selectedIdx !== null) setSwapTarget(selectedIdx); },
@@ -834,82 +979,140 @@ export default function InteractiveCanvas({
           }}
         >
           {pickerH > 0 && (() => {
-            const groupsPresent = (['upper', 'lower', 'shoes', 'acc'] as CanvasGroup[]).filter((g) => getGroupItems(g).length > 0);
+            // Фильтр-чипы строим по ОБОИМ источникам: обувь из магазина должна
+            // давать вкладку «Обувь», даже если своей обуви в гардеробе нет.
+            const shopVisible = shopAvailable;
+            const groupsPresent = (['upper', 'lower', 'shoes', 'acc'] as CanvasGroup[]).filter(
+              (g) => getGroupItems(g).length > 0 || (shopVisible && shopProducts.some((p) => productGroup(p) === g)),
+            );
             const tabs: { key: 'all' | CanvasGroup; label: string }[] = [
               { key: 'all', label: t.cv_ce_all },
               ...groupsPresent.map((g) => ({ key: g, label: getGroupLabel(g) })),
             ];
             const closetItems = pickerTab === 'all' ? getAllItems() : getGroupItems(pickerTab);
+            const shopItems = pickerTab === 'all' ? shopProducts : shopProducts.filter((p) => productGroup(p) === pickerTab);
+
+            const sourcePill = (key: 'closet' | 'shop', label: string, count: number, icon: React.ReactNode) => {
+              const on = pickerSource === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => scrollToSection(key)}
+                  className="shrink-0 h-7 pl-2 pr-2.5 rounded-full flex items-center gap-1.5 text-[12px] font-bold transition-colors active:scale-95"
+                  style={{
+                    background: on ? 'rgba(243,112,167,0.13)' : '#f5f3f6',
+                    color: on ? '#F370A7' : '#8b8590',
+                  }}
+                >
+                  {icon}
+                  <span>{label}</span>
+                  {count > 0 && <span style={{ opacity: 0.65 }}>{count}</span>}
+                </button>
+              );
+            };
+
             return (
               <div className="h-full flex flex-col">
-                {/* Drag handle + source/category row */}
+                {/* Drag handle + source pills + category chips */}
                 <div className="flex-none">
                   <div
-                    className="pt-2.5 pb-1.5 touch-none cursor-grab active:cursor-grabbing"
+                    className="pt-2.5 pb-1 touch-none cursor-grab active:cursor-grabbing"
                     onTouchStart={pickerTouchStart}
                     onTouchMove={pickerTouchMove}
                     onTouchEnd={pickerTouchEnd}
                   >
                     <div className="w-10 h-1.5 rounded-full bg-gray-200 mx-auto" />
                   </div>
-                  {pickerSource === 'closet' ? (
-                    <div className="flex gap-2 overflow-x-auto hide-scrollbar px-4 py-2">
-                      {tabs.map((tab) => {
-                        const on = pickerTab === tab.key;
-                        return (
-                          <button key={tab.key} onClick={() => setPickerTab(tab.key)}
-                            className="shrink-0 h-8 px-3.5 rounded-full text-[13px] font-semibold transition-colors active:scale-95"
-                            style={{ background: on ? '#141118' : '#f3f1f5', color: on ? '#fff' : '#6b6570' }}>
-                            {tab.label}
-                          </button>
-                        );
-                      })}
+                  {/* Источники видны всегда — сразу понятно, что кроме гардероба
+                      в этом же списке есть магазин (кнопка-сумка вела «в никуда»). */}
+                  {shopVisible && (
+                    <div className="flex gap-2 px-4 pt-1 pb-0.5">
+                      {sourcePill('closet', t.cv_ce_my_closet, allItems.length, (
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="1.7"/><line x1="12" y1="3.5" x2="12" y2="20.5"/></svg>
+                      ))}
+                      {sourcePill('shop', t.cv_ce_shop_section, shopProducts.length, (
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                      ))}
                     </div>
-                  ) : (
-                    <p className="text-[14px] font-bold text-gray-900 text-center py-2">{t.cv_shop_title}</p>
                   )}
+                  <div className="flex gap-2 overflow-x-auto hide-scrollbar px-4 py-1.5">
+                    {tabs.map((tab) => {
+                      const on = pickerTab === tab.key;
+                      return (
+                        <button key={tab.key} onClick={() => setPickerTab(tab.key)}
+                          className="shrink-0 h-8 px-3.5 rounded-full text-[13px] font-semibold transition-colors active:scale-95"
+                          style={{ background: on ? '#141118' : '#f3f1f5', color: on ? '#fff' : '#6b6570' }}>
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* Items */}
-                <div className="flex-1 overflow-y-auto px-4 pb-5">
-                  {pickerSource === 'closet' ? (
-                    closetItems.length === 0 ? (
-                      <p className="text-center text-[13px] text-gray-400 py-10">{t.cv_shop_empty}</p>
-                    ) : (
-                      <div className="grid grid-cols-3 gap-2.5">
-                        {closetItems.map((item) => (
-                          <button key={item.id} onClick={() => addItem(item)} className="relative aspect-[3/4] rounded-xl overflow-hidden border border-gray-100 active:scale-[0.96] transition-transform">
-                            <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized={needsUnoptimized(item.imageData)} />
-                          </button>
-                        ))}
-                      </div>
-                    )
-                  ) : shopLoading && shopProducts.length === 0 ? (
-                    <div className="flex items-center justify-center py-10 text-gray-400"><Loader2 size={20} className="animate-spin" /></div>
-                  ) : shopProducts.length === 0 ? (
-                    <p className="text-center text-[13px] text-gray-400 py-10">{t.cv_shop_empty}</p>
+                {/* Один скролл: гардероб, затем магазин — обе секции подписаны. */}
+                <div ref={pickerScrollRef} onScroll={handlePickerScroll} className="relative flex-1 overflow-y-auto px-4 pb-5">
+                  <h4 className="text-[12px] font-bold uppercase tracking-wide text-gray-400 pt-0.5 pb-2">{t.cv_ce_my_closet}</h4>
+                  {closetItems.length === 0 ? (
+                    <p className="text-[13px] text-gray-400 pb-2">{t.cv_ce_closet_empty}</p>
                   ) : (
                     <div className="grid grid-cols-3 gap-2.5">
-                      {shopProducts.map((p) => {
-                        const adding = shopAdding.has(p.id);
-                        // «Добавлено» = вещь этого товара сейчас НА КАНВЕ. Удалили с
-                        // канвы → галка снимается, товар снова можно добавить.
-                        const added = canvasItems.some((ci) => ci.item.sourceProductId === p.id);
+                      {closetItems.map((item) => {
+                        // Вещь уже на канве — вместо второй копии тап её подсветит.
+                        const onCanvas = canvasItems.some((ci) => ci.item.id === item.id);
                         return (
-                          <button key={p.id} onClick={() => addShopProduct(p)} disabled={adding || added}
+                          <button
+                            key={item.id}
+                            onClick={() => addItem(item)}
+                            aria-label={onCanvas ? t.cv_ce_on_canvas : t.addToCloset}
                             className="relative aspect-[3/4] rounded-xl overflow-hidden border active:scale-[0.96] transition-transform"
-                            style={{ borderColor: added ? '#2FB27A' : '#eee' }}>
-                            {p.images?.[0] ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={p.images[0]} alt="" className="w-full h-full object-cover" loading="lazy" />
-                            ) : <div className="w-full h-full bg-gray-100" />}
+                            style={{ borderColor: onCanvas ? '#2FB27A' : '#f1f0f2' }}
+                          >
+                            <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized={needsUnoptimized(item.imageData)} />
                             <span className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-white"
-                              style={{ background: added ? '#2FB27A' : adding ? '#F370A7' : 'rgba(15,8,14,0.35)' }}>
-                              {adding ? <Loader2 size={13} className="animate-spin" /> : added ? <Check size={13} strokeWidth={3} /> : <Plus size={14} strokeWidth={2.6} />}
+                              style={{ background: onCanvas ? '#2FB27A' : 'rgba(15,8,14,0.32)' }}>
+                              {onCanvas ? <Check size={13} strokeWidth={3} /> : <Plus size={14} strokeWidth={2.6} />}
                             </span>
                           </button>
                         );
                       })}
+                    </div>
+                  )}
+
+                  {shopVisible && (
+                    <div ref={shopHeadRef} className="pt-4">
+                      <div className="flex items-baseline gap-2 pb-2">
+                        <h4 className="text-[12px] font-bold uppercase tracking-wide" style={{ color: '#F370A7' }}>{t.cv_ce_shop_section}</h4>
+                        <span className="text-[11px] text-gray-400 truncate">{t.cv_ce_shop_sub}</span>
+                      </div>
+                      {shopLoading && shopProducts.length === 0 ? (
+                        <div className="flex items-center justify-center py-8 text-gray-400"><Loader2 size={20} className="animate-spin" /></div>
+                      ) : shopItems.length === 0 ? (
+                        <p className="text-[13px] text-gray-400 pb-2">{t.cv_shop_empty}</p>
+                      ) : (
+                        <div className="grid grid-cols-3 gap-2.5">
+                          {shopItems.map((p) => {
+                            const adding = shopAdding.has(p.id);
+                            // «Добавлено» = вещь этого товара сейчас НА КАНВЕ. Удалили с
+                            // канвы → галка снимается, товар снова можно добавить.
+                            const added = canvasItems.some((ci) => ci.item.sourceProductId === p.id);
+                            return (
+                              <button key={p.id} onClick={() => addShopProduct(p)} disabled={adding}
+                                aria-label={added ? t.cv_ce_on_canvas : t.cv_shop_title}
+                                className="relative aspect-[3/4] rounded-xl overflow-hidden border active:scale-[0.96] transition-transform"
+                                style={{ borderColor: added ? '#2FB27A' : '#eee' }}>
+                                {p.images?.[0] ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={p.images[0]} alt="" className="w-full h-full object-cover" loading="lazy" />
+                                ) : <div className="w-full h-full bg-gray-100" />}
+                                <span className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-white"
+                                  style={{ background: added ? '#2FB27A' : adding ? '#F370A7' : 'rgba(15,8,14,0.35)' }}>
+                                  {adding ? <Loader2 size={13} className="animate-spin" /> : added ? <Check size={13} strokeWidth={3} /> : <Plus size={14} strokeWidth={2.6} />}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -953,11 +1156,22 @@ export default function InteractiveCanvas({
                   <p className="text-center text-[13px] text-gray-400 py-12">{t.cv_shop_empty}</p>
                 ) : (
                   <div className="grid grid-cols-3 gap-2.5">
-                    {pickerItems.map((item) => (
-                      <button key={item.id} onClick={() => addItem(item)} className="relative aspect-[3/4] rounded-xl overflow-hidden border border-gray-100 active:scale-[0.97] transition-transform">
-                        <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized={needsUnoptimized(item.imageData)} />
-                      </button>
-                    ))}
+                    {pickerItems.map((item) => {
+                      const onCanvas = canvasItems.some((ci) => ci.item.id === item.id);
+                      return (
+                        <button key={item.id} onClick={() => addItem(item)}
+                          aria-label={onCanvas ? t.cv_ce_on_canvas : t.addToCloset}
+                          className="relative aspect-[3/4] rounded-xl overflow-hidden border active:scale-[0.97] transition-transform"
+                          style={{ borderColor: onCanvas ? '#2FB27A' : '#f1f0f2' }}>
+                          <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized={needsUnoptimized(item.imageData)} />
+                          {onCanvas && (
+                            <span className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-white" style={{ background: '#2FB27A' }}>
+                              <Check size={13} strokeWidth={3} />
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
