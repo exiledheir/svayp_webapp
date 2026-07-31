@@ -2,7 +2,7 @@ import { needsUnoptimized } from '@/lib/img';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2, ArrowUpRight, BookOpen, Share2, Check, ChevronDown, Send } from 'lucide-react';
+import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2, ArrowUpRight, BookOpen, Share2, Check, ChevronDown, Send, Pencil } from 'lucide-react';
 import { getUser, clearTokens } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags-context';
 import { FEATURES } from '@/lib/feature-flags';
@@ -48,7 +48,7 @@ import {
   type SavedCanvasEntry, type SavedCanvasLayout,
   generateRandomOutfit, buildLayoutFromIds,
 } from '@/lib/closet-types';
-import { captureCanvasSnapshot, downloadWithWatermark } from '@/lib/canvas-snapshot';
+import { captureCanvasSnapshot, downloadWithWatermark, shareWatermarked } from '@/lib/canvas-snapshot';
 import InteractiveCanvas from '@/components/closet/InteractiveCanvas';
 import { TryOnConfirmModal, TryOnModal } from '@/components/closet/TryOnFlow';
 import WizardHeader from '@/components/market/WizardHeader';
@@ -505,7 +505,7 @@ export default function ClosetPage() {
     : canvases;
 
   const [editItem, setEditItem] = useState<ClosetItem | null>(null);
-  const [tryOnState, setTryOnState] = useState<{ status: 'loading' | 'processing' | 'completed' | 'failed'; resultUrl?: string; jobId?: string; failureReason?: string; previewImages?: string[] } | null>(null);
+  const [tryOnState, setTryOnState] = useState<{ status: 'loading' | 'processing' | 'completed' | 'failed'; resultUrl?: string; jobId?: string; failureReason?: string; previewImages?: string[]; personImage?: string } | null>(null);
 
   // Close the canvas overlay (X button AND hardware Back). Removes a brand-new
   // empty canvas entry so cancelling creation doesn't leave a blank board.
@@ -1929,6 +1929,8 @@ export default function ClosetPage() {
   // Blob key of the user's own uploaded photo when примерка идёт "на своё фото".
   // Persisted in a ref so a Retry re-runs the same mode.
   const tryOnPersonKeyRef = useRef<string | undefined>(undefined);
+  // Превью выбранного фото — показываем его в модалке ожидания.
+  const tryOnPersonPreviewRef = useRef<string | undefined>(undefined);
 
   // Премиум/про с исчерпанной квотой доплачивают монетами (фолбэк, зеркалит
   // CoinGateService). Не блокируем такой запрос — сервер спишет монеты; гейт
@@ -2003,7 +2005,7 @@ export default function ClosetPage() {
       .map((id) => items.find((i) => i.id === id)?.imageData)
       .filter(Boolean) as string[];
 
-    setTryOnState({ status: 'loading', previewImages });
+    setTryOnState({ status: 'loading', previewImages, personImage: tryOnPersonPreviewRef.current });
 
     const buildJob = async () => {
       let snapshotBlob: Blob | undefined;
@@ -2023,13 +2025,13 @@ export default function ClosetPage() {
         saveActiveTryOnJob(job.id);
         tryOnStartTimeRef.current = Date.now();
         logAnalyticsEvent(Events.TRYON_PROCESSING_STARTED);
-        setTryOnState((prev) => ({ status: 'processing', previewImages: prev?.previewImages }));
+        setTryOnState((prev) => ({ status: 'processing', previewImages: prev?.previewImages, personImage: prev?.personImage }));
         fetchPlan();
         activeTryOnHandleRef.current = watchTryOnUntilDone(
           job.id,
           (progress) => {
             if (!tryOnCancelRef.current && progress.status === 'PROCESSING') {
-              setTryOnState((prev) => ({ status: 'processing', previewImages: prev?.previewImages }));
+              setTryOnState((prev) => ({ status: 'processing', previewImages: prev?.previewImages, personImage: prev?.personImage }));
             }
           },
           (result) => {
@@ -2646,7 +2648,7 @@ export default function ClosetPage() {
         <TryOnConfirmModal
           savedLayout={tryOnOverrideRef.current?.layout ?? displayCanvases[tryOnCanvasIdxRef.current]?.layout ?? null}
           items={items}
-          onConfirm={(opts) => { setShowTryOnConfirm(false); tryOnPersonKeyRef.current = opts.personImageKey; startTryOn(); }}
+          onConfirm={(opts) => { setShowTryOnConfirm(false); tryOnPersonKeyRef.current = opts.personImageKey; tryOnPersonPreviewRef.current = opts.personPreview; startTryOn(); }}
           onCancel={() => setShowTryOnConfirm(false)}
         />
       )}
@@ -2659,6 +2661,7 @@ export default function ClosetPage() {
           jobId={tryOnState.jobId}
           failureReason={tryOnState.failureReason}
           previewImages={tryOnState.previewImages}
+          personImage={tryOnState.personImage}
           onClose={() => setTryOnState(null)}
           onRetry={startTryOn}
           onCancel={handleCancelTryOn}
@@ -2994,6 +2997,20 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
   const { theme } = useTheme();
   const isEmpty = allItems.length === 0;
 
+  // Публикация доски: ?seed=board:<canvasId> открывает подпись с этой доской.
+  // Несохранённой канвы (id === null) в композере нет — делиться нечем.
+  // Выбор «в ленту / во внешние приложения» — общая шторка, как у примерок.
+  const [shareBoard, setShareBoard] = useState<{ id: string; layout: SavedCanvasLayout } | null>(null);
+
+  async function shareBoardExternally(layout: SavedCanvasLayout) {
+    try {
+      const blob = await captureCanvasSnapshot(layout, allItems);
+      await shareImageBlob(blob, 'libas-outfit.png');
+    } catch {
+      /* отмена шаринга или сбой рендера — молча выходим */
+    }
+  }
+
   return (
     <div className="mt-4">
       {/* ── Tabs: Boards · Outfits · Calendar · Feed ───────────────── */}
@@ -3024,6 +3041,7 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
             tryOnCount={tryOnCount}
             tryOnLimit={limits.tryItOns}
             onDelete={idx > 0 ? () => onDeleteCanvas(idx) : undefined}
+            onShare={canvas.id ? () => setShareBoard({ id: canvas.id as string, layout: canvas.layout }) : undefined}
             onAddItem={onAddItem}
             allowAutoGenerate={allowAutoGenerate}
             autoGenDone={autoGenDone}
@@ -3101,6 +3119,15 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
       {activeTab === 'calendar' && (
         <CalendarTab allItems={allItems} onTryItOn={onTryItOnItems} />
       )}
+
+      {/* Куда делиться доской: в ленту или во внешние приложения */}
+      {shareBoard && (
+        <ShareSheet
+          onClose={() => setShareBoard(null)}
+          onExternal={() => shareBoardExternally(shareBoard.layout)}
+          feedSeed={`board:${shareBoard.id}`}
+        />
+      )}
     </div>
   );
 }
@@ -3146,11 +3173,9 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
     return () => { cancelled = true; };
   }, []);
 
-  // Публикация: ?seed=tryon:<id> на /feed/create сразу открывает подпись с этим
-  // образом — без прохода по выбору источника.
-  function shareToFeed(job: TryOnJobResponse) {
-    router.push(`/feed/create?seed=tryon:${job.id}`);
-  }
+  // Куда делиться образом — общая шторка: в ленту (?seed=tryon:<id> открывает
+  // подпись сразу с этим образом) или во внешние приложения.
+  const [sharingJob, setSharingJob] = useState<TryOnJobResponse | null>(null);
 
   function confirmDelete() {
     if (!confirmDeleteId) return;
@@ -3271,7 +3296,7 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
               {/* Публикация — главное действие вкладки, поэтому кнопка видна на
                   каждой карточке, а не спрятана внутри просмотра. */}
               <button
-                onClick={() => (shared ? router.push('/feed/me') : shareToFeed(job))}
+                onClick={() => (shared ? router.push('/feed/me') : setSharingJob(job))}
                 className="w-full h-9 mt-2 px-1.5 rounded-full flex items-center justify-center gap-1.5 text-[12.5px] font-bold whitespace-nowrap active:scale-[0.97] transition-transform"
                 style={shared
                   ? { background: theme === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(20,16,20,0.06)', color: theme === 'dark' ? '#cfcfcf' : '#4b5563' }
@@ -3338,7 +3363,7 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
           {/* «В ленту» — основное действие; сохранение в галерею ушло в иконку. */}
           <div className="shrink-0 px-5 pb-10 pt-4 flex gap-2.5">
             <button
-              onClick={() => (sharedIds.has(viewingJob.id) ? router.push('/feed/me') : shareToFeed(viewingJob))}
+              onClick={() => (sharedIds.has(viewingJob.id) ? router.push('/feed/me') : setSharingJob(viewingJob))}
               className="flex-1 h-12 rounded-full bg-white text-black text-[14px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
             >
               {sharedIds.has(viewingJob.id) ? <Check size={15} strokeWidth={3} /> : <Send size={15} strokeWidth={2.4} />}
@@ -3359,6 +3384,14 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
             </button>
           </div>
         </div>
+      )}
+
+      {sharingJob && (
+        <ShareSheet
+          onClose={() => setSharingJob(null)}
+          onExternal={() => { if (sharingJob.resultImageUrl) void shareWatermarked(sharingJob.resultImageUrl); }}
+          feedSeed={`tryon:${sharingJob.id}`}
+        />
       )}
 
       {/* Delete confirmation */}
@@ -3492,6 +3525,7 @@ function OutfitCard({
   tryOnCount,
   tryOnLimit,
   onDelete,
+  onShare,
   onAddItem,
   allowAutoGenerate,
   autoGenDone,
@@ -3512,6 +3546,8 @@ function OutfitCard({
   tryOnCount: number;
   tryOnLimit: number;
   onDelete?: () => void | Promise<void>;
+  /** Публикация доски в ленту. Нет id у канвы (ещё не сохранена) → нет и кнопки. */
+  onShare?: () => void;
   onAddItem?: (cat: ClosetCategory) => void;
   allowAutoGenerate: boolean;
   autoGenDone: boolean;
@@ -3572,17 +3608,30 @@ function OutfitCard({
         boxShadow: theme === 'dark' ? '0 2px 12px rgba(0,0,0,0.3)' : '0 2px 12px rgba(0,0,0,0.06)',
       }}
     >
-      {/* Top-left delete button */}
-      {onDelete && (
-        <button
-          onClick={onDelete}
-          className="absolute top-3.5 left-3.5 z-10 w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
-          style={{ background: theme === 'dark' ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.08)' }}
-          title="Delete"
-        >
-          <Trash2 size={14} strokeWidth={2.2} className="text-red-400" />
-        </button>
-      )}
+      {/* Top-left: удалить + «в ленту» (иконкой, как на карточках образов) */}
+      <div className="absolute top-3.5 left-3.5 z-10 flex items-center gap-2">
+        {onDelete && (
+          <button
+            onClick={onDelete}
+            className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
+            style={{ background: theme === 'dark' ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.08)' }}
+            title="Delete"
+          >
+            <Trash2 size={14} strokeWidth={2.2} className="text-red-400" />
+          </button>
+        )}
+        {onShare && displayEntries.length > 0 && (
+          <button
+            onClick={onShare}
+            className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
+            style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(20,16,20,0.06)' }}
+            title={t.cl_share_feed}
+            aria-label={t.cl_share_feed}
+          >
+            <Send size={14} strokeWidth={2.3} style={{ color: theme === 'dark' ? '#f0f0f0' : '#141014' }} />
+          </button>
+        )}
+      </div>
 
       {/* Top-right: Generate-outfit pill with its diamond cost */}
       {(canGenerateOutfit || isEmpty) && onRegenerate && (
@@ -3736,24 +3785,26 @@ function OutfitCard({
         )}
       </div>
 
-      {/* Bottom action bar — shown when there's a saved layout, outfit can be generated, or closet is empty */}
+      {/* Bottom action bar — shown when there's a saved layout, outfit can be generated, or closet is empty.
+          Публикация тут только иконкой сверху: подпись «в ленту» живёт в календаре. */}
       {(displayEntries.length > 0 || canGenerateOutfit || isEmpty) && (
       <div className="flex gap-2.5 px-5 pb-5">
         <button
           onClick={onViewItems}
-          className="flex-1 h-[44px] rounded-full flex items-center justify-center text-[12px] font-semibold tracking-wide"
+          className="flex-1 h-[44px] rounded-full flex items-center justify-center gap-1.5 text-[12px] font-semibold tracking-wide active:scale-[0.97] transition-transform"
           style={{
             background: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
             color: theme === 'dark' ? '#aaa' : '#666'
           }}
         >
+          <Pencil size={14} strokeWidth={2.2} />
           {t.viewItems}
         </button>
         {onTryItOn && (displayEntries.length > 0 || canGenerateOutfit || isEmpty) && (
         <button
           onClick={isEmpty ? undefined : onTryItOn}
           disabled={isEmpty}
-          className="flex-1 h-[44px] rounded-full flex items-center justify-center gap-1.5 text-[12px] font-bold text-white tracking-wide active:scale-[0.97] transition-transform"
+          className="flex-1 h-[44px] rounded-full flex items-center justify-center gap-1.5 text-[12px] font-bold text-white tracking-wide whitespace-nowrap active:scale-[0.97] transition-transform"
           style={{
             background: 'linear-gradient(135deg, #141014 0%, #332c33 50%, #141014 100%)',
             backgroundSize: '200% auto',
@@ -3955,6 +4006,17 @@ function CalendarTab({
   const [shuffleByDay, setShuffleByDay] = useState<Record<number, number>>({});
   // Свайп по карточке листает дни — так же, как тап по строке недели.
   const swipeXRef = useRef<number | null>(null);
+  // Куда делиться образом дня: в ленту или во внешние приложения.
+  const [sharingDay, setSharingDay] = useState<ClosetItem[] | null>(null);
+
+  async function shareDayExternally(dayItems: ClosetItem[]) {
+    try {
+      const blob = await captureCanvasSnapshot(buildLayoutFromIds(dayItems.map((i) => i.id), allItems), allItems);
+      await shareImageBlob(blob, 'libas-outfit.png');
+    } catch {
+      /* отмена шаринга или сбой рендера — молча выходим */
+    }
+  }
   const days = useMemo(() => {
     const now = new Date();
     return Array.from({ length: 7 }, (_, i) => {
@@ -4125,23 +4187,47 @@ function CalendarTab({
 
             </div>
 
-            {/* Try it on */}
-            <button
-              onClick={() => onTryItOn(dayItems)}
-              disabled={dayItems.length === 0}
-              className="w-full h-11 mt-3 rounded-full flex items-center justify-center gap-1.5 text-[13px] font-bold text-white active:scale-[0.97] transition-transform disabled:opacity-40"
-              style={{ background: 'linear-gradient(135deg, #141014 0%, #332c33 50%, #141014 100%)', backgroundSize: '200% auto', animation: 'tryOnShimmer 2.4s linear infinite', boxShadow: '0 4px 18px rgba(20,16,20,0.32)' }}
-            >
-              <Sparkles size={13} />
-              <span>{t.tryItOn}</span>
-              <span className="flex items-center gap-0.5 h-[18px] pl-1 pr-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.24)' }}>
-                <Diamond size={11} />
-                <span className="text-[10px] font-extrabold leading-none">{ACTION_COST.tryOn}</span>
-              </span>
-            </button>
+            {/* В ленту + примерка. Образ дня нигде не сохранён, поэтому в
+                композер уходит список вещей — он соберёт из него раскладку. */}
+            <div className="flex gap-2 mt-3">
+              {dayItems.length > 0 && (
+                <button
+                  onClick={() => setSharingDay(dayItems)}
+                  className="shrink-0 h-11 px-4 rounded-full flex items-center justify-center gap-1.5 text-[12.5px] font-bold whitespace-nowrap active:scale-[0.96] transition-transform"
+                  style={{
+                    background: dark ? 'rgba(255,255,255,0.10)' : 'rgba(20,16,20,0.06)',
+                    color: dark ? '#f0f0f0' : '#141014',
+                  }}
+                >
+                  <Send size={13} strokeWidth={2.4} />
+                  {t.cl_share_feed}
+                </button>
+              )}
+              <button
+                onClick={() => onTryItOn(dayItems)}
+                disabled={dayItems.length === 0}
+                className="flex-1 h-11 rounded-full flex items-center justify-center gap-1.5 text-[13px] font-bold text-white whitespace-nowrap active:scale-[0.97] transition-transform disabled:opacity-40"
+                style={{ background: 'linear-gradient(135deg, #141014 0%, #332c33 50%, #141014 100%)', backgroundSize: '200% auto', animation: 'tryOnShimmer 2.4s linear infinite', boxShadow: '0 4px 18px rgba(20,16,20,0.32)' }}
+              >
+                <Sparkles size={13} />
+                <span>{t.tryItOn}</span>
+                <span className="flex items-center gap-0.5 h-[18px] pl-1 pr-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.24)' }}>
+                  <Diamond size={11} />
+                  <span className="text-[10px] font-extrabold leading-none">{ACTION_COST.tryOn}</span>
+                </span>
+              </button>
+            </div>
           </>
         );
       })()}
+
+      {sharingDay && (
+        <ShareSheet
+          onClose={() => setSharingDay(null)}
+          onExternal={() => shareDayExternally(sharingDay)}
+          feedSeed={`calendar:${sharingDay.map((i) => i.id).join(',')}`}
+        />
+      )}
     </div>
   );
 }
@@ -4246,7 +4332,7 @@ function ItemEditSheet({
             title={t.share}
             className="shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-[#2a2a2a] disabled:opacity-50"
           >
-            {isSharing ? <Loader2 size={16} className="animate-spin" /> : <Share2 size={16} />}
+            {isSharing ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} strokeWidth={2.3} />}
           </button>
           {showShareSheet && (
             <ShareSheet onClose={() => setShowShareSheet(false)} onExternal={handleShare} />

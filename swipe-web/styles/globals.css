@@ -133,6 +133,19 @@ body.app-no-select [contenteditable]:not([contenteditable='false']) {
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
 }
+/* Ожидание примерки: «сканируем» фото пользователя — луч сверху вниз плюс
+   мягкое свечение рамки. Высота луча 24% кадра, поэтому 430% его собственной
+   высоты = чуть больше полного прохода. */
+@keyframes tryOnPhotoScan {
+  0%   { transform: translateY(-130%); opacity: 0; }
+  12%  { opacity: 1; }
+  88%  { opacity: 1; }
+  100% { transform: translateY(430%); opacity: 0; }
+}
+@keyframes tryOnPhotoGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(243,112,167,0.28), 0 8px 24px rgba(243,112,167,0.16); }
+  50%      { box-shadow: 0 0 0 6px rgba(243,112,167,0.10), 0 10px 30px rgba(243,112,167,0.28); }
+}
 
 /* ── Shared closet/onboarding animations (used by extracted InteractiveCanvas
       and TryOn components, and the onboarding wizard) ────────────────────── */
