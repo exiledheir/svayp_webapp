@@ -435,6 +435,13 @@ export interface Translations {
   cl_items_n: string;
   cl_sort_recent: string;
   cl_sort_oldest: string;
+  // Outfits tab — gallery of generated looks + share-to-feed
+  cl_looks_n: string;
+  cl_share_feed: string;
+  cl_in_feed: string;
+  cl_looks_empty_cta: string;
+  cl_cal_shuffle: string;
+  cl_share_all_hint: string;
   cv_proc_removing: string;
   cv_proc_identifying: string;
   cv_fix_title: string;
@@ -628,6 +635,7 @@ export interface Translations {
   saveNeedsTopItem: string;
   // ── Canvas hints ────────────────────────────────────────────────
   canvasEmptyHint: string;
+  canvasEmptyPick: string;
   canvasHintDrag: string;
   canvasHintPinch: string;
   canvasHintSwap: string;
@@ -1271,6 +1279,12 @@ const en: Translations = {
   cl_items_n: '{n} items',
   cl_sort_recent: 'Recently added',
   cl_sort_oldest: 'Oldest first',
+  cl_looks_n: '{n} looks',
+  cl_share_feed: 'Share to feed',
+  cl_in_feed: 'In feed',
+  cl_looks_empty_cta: 'Create a look',
+  cl_cal_shuffle: 'Another look',
+  cl_share_all_hint: 'Tap a look to view it, or share it to the feed',
   cv_proc_removing: 'Removing background… ✂️',
   cv_proc_identifying: 'Identifying category… 🏷️',
   cv_fix_title: 'Help us identify these items',
@@ -1516,6 +1530,7 @@ const en: Translations = {
   saveNeedsTopItem: 'Please add at least one top item to save your outfit.',
   // ── Canvas hints ────────────────────────────────────────────────
   canvasEmptyHint: 'Tap + to add your first item',
+  canvasEmptyPick: 'Add items from your closet below',
   canvasHintDrag: 'Drag to move',
   canvasHintPinch: 'Pinch to resize',
   canvasHintSwap: 'Tap item → Swap',
@@ -2103,6 +2118,12 @@ const ru: Translations = {
   cl_items_n: '{n} вещей',
   cl_sort_recent: 'Сначала новые',
   cl_sort_oldest: 'Сначала старые',
+  cl_looks_n: '{n} образов',
+  cl_share_feed: 'Выложить в ленту',
+  cl_in_feed: 'Уже в ленте',
+  cl_looks_empty_cta: 'Создать образ',
+  cl_cal_shuffle: 'Другой образ',
+  cl_share_all_hint: 'Нажмите на образ, чтобы открыть, или выложите его в ленту',
   cv_proc_removing: 'Удаление фона… ✂️',
   cv_proc_identifying: 'Определяем категорию… 🏷️',
   cv_fix_title: 'Помогите определить эти вещи',
@@ -2351,6 +2372,7 @@ const ru: Translations = {
   saveNeedsTopItem: 'Пожалуйста, добавьте хотя бы один верх, чтобы сохранить образ.',
   // ── Canvas hints ────────────────────────────────────────────────
   canvasEmptyHint: 'Нажмите + чтобы добавить первую вещь',
+  canvasEmptyPick: 'Добавьте вещи из гардероба снизу',
   canvasHintDrag: 'Перетащите',
   canvasHintPinch: 'Сведите пальцы для масштаба',
   canvasHintSwap: 'Нажмите → Замена',
@@ -2934,6 +2956,12 @@ const uz: Translations = {
   cl_items_n: "{n} ta buyum",
   cl_sort_recent: "Avval yangilari",
   cl_sort_oldest: "Avval eskilari",
+  cl_looks_n: "{n} ta obraz",
+  cl_share_feed: 'Lentaga joylash',
+  cl_in_feed: 'Lentada joylandi',
+  cl_looks_empty_cta: 'Obraz yaratish',
+  cl_cal_shuffle: 'Boshqa obraz',
+  cl_share_all_hint: "Obrazni ochish uchun bosing yoki lentaga joylang",
   cv_proc_removing: "Fon o'chirilmoqda… ✂️",
   cv_proc_identifying: 'Kategoriya aniqlanmoqda… 🏷️',
   cv_fix_title: 'Ushbu buyumlarni aniqlashga yordam bering',
@@ -3182,6 +3210,7 @@ const uz: Translations = {
   saveNeedsTopItem: "Obrazni saqlash uchun kamida bitta ustki kiyim qo'shing.",
   // ── Canvas hints ────────────────────────────────────────────────
   canvasEmptyHint: "Birinchi kiyimni qo'shish uchun + bosing",
+  canvasEmptyPick: "Pastdagi garderobdan kiyim qo'shing",
   canvasHintDrag: "Ko'chirish uchun torting",
   canvasHintPinch: "O'lcham uchun qistiring",
   canvasHintSwap: "Bosing → Almashtirish",
