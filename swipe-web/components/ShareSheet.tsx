@@ -39,10 +39,11 @@ export default function ShareSheet({ onExternal, onClose, feedSeed }: Props) {
     >
       <div
         className="w-full max-w-[430px] rounded-t-[28px] bg-white dark:bg-[#1c1c1e] px-4 pt-2.5"
-        // Clear the Flutter app's floating bottom navbar (~64px + safe-area) so
-        // the rows aren't hidden behind it. Меньше прежних 96px: те оставляли под
-        // кнопками пустую полосу почти в треть шторки.
-        style={{ paddingBottom: 'calc(76px + env(safe-area-inset-bottom, 0px))' }}
+        // Обычный отступ шторки (как у остальных: PhotoSourceSheet, OptionSheet).
+        // Раньше здесь резервировалось 76px под плавающий навбар Flutter, но
+        // WebView заканчивается ВЫШЕ навбара — отступ давал только пустую белую
+        // полосу под кнопкой «Отмена».
+        style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 1.5rem))' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="w-10 h-1 rounded-full bg-black/15 dark:bg-white/20 mx-auto mb-3" />
