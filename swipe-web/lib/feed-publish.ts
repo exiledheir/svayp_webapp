@@ -18,7 +18,8 @@ export interface SelectedSource {
   /** Stable selection key, e.g. `board:<id>`, `tryon:<id>`, `calendar:<id>`. */
   key: string;
   sourceType: FeedSourceType;
-  sourceRefId: string;
+  /** Provenance id. Отсутствует у образа дня из календаря — он нигде не сохранён. */
+  sourceRefId?: string;
   /** Preview thumbnail for picker/compose; null → render from layout on demand. */
   previewUrl: string | null;
   /** Present for board/calendar — drives the flat-lay snapshot. */
@@ -65,7 +66,7 @@ export async function publishPost(
         sourceType: 'tryon',
         position: i,
         imageUrl: s.resultImageUrl,
-        sourceRefId: s.sourceRefId,
+        sourceRefId: s.sourceRefId || undefined,
       });
     } else if (s.sourceType === 'library') {
       // Own photo: upload the ORIGINAL file through the same pipeline as boards
@@ -90,7 +91,7 @@ export async function publishPost(
         sourceType: 'library',
         position: i,
         imageId: up.feedImageId,
-        sourceRefId: s.sourceRefId,
+        sourceRefId: s.sourceRefId || undefined,
       });
     } else {
       // board | calendar → flat-lay PNG snapshot, uploaded through the pipeline
@@ -115,7 +116,7 @@ export async function publishPost(
         sourceType: s.sourceType,
         position: i,
         imageId: up.feedImageId,
-        sourceRefId: s.sourceRefId,
+        sourceRefId: s.sourceRefId || undefined,
       });
     }
 

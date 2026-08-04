@@ -568,8 +568,12 @@ export async function createOutfitCanvas(data: {
     const res = await api.post('/outfits/canvases', payload);
     return unwrapData<OutfitCanvasResponse>(res);
   } catch (err: unknown) {
-    const axErr = err as { response?: { data?: unknown } };
-    console.error('createOutfitCanvas failed — payload:', JSON.stringify(payload, null, 2), 'response:', axErr?.response?.data);
+    const axErr = err as { response?: { status?: number; data?: unknown } };
+    // console.warn on purpose — see updateOutfitCanvas below.
+    console.warn(
+      `createOutfitCanvas failed (HTTP ${axErr?.response?.status}) — payload:`,
+      JSON.stringify(payload), 'response:', axErr?.response?.data,
+    );
     throw err;
   }
 }
@@ -583,8 +587,29 @@ export async function updateOutfitCanvas(
     items: OutfitCanvasItemRequest[];
   },
 ): Promise<OutfitCanvasResponse> {
-  const res = await api.put(`/outfits/canvases/${id}`, data);
-  return unwrapData<OutfitCanvasResponse>(res);
+  // Same payload shape as create — `name` included and defaulted. Sending the
+  // caller's object verbatim meant an autosave (which only ever passes `items`)
+  // arrived without a name and the backend answered 500.
+  const payload = {
+    name: data.name || 'My Outfit',
+    items: data.items,
+    ...(data.occasion ? { occasion: data.occasion } : {}),
+    ...(data.thumbnailUrl ? { thumbnailUrl: data.thumbnailUrl } : {}),
+  };
+  try {
+    const res = await api.put(`/outfits/canvases/${id}`, payload);
+    return unwrapData<OutfitCanvasResponse>(res);
+  } catch (err: unknown) {
+    const axErr = err as { response?: { status?: number; data?: unknown } };
+    // console.warn, not console.error: Next's dev overlay promotes anything
+    // logged with console.error to a full-screen runtime error, and a failed
+    // autosave is already handled by the caller.
+    console.warn(
+      `updateOutfitCanvas ${id} failed (HTTP ${axErr?.response?.status}) — payload:`,
+      JSON.stringify(payload), 'response:', axErr?.response?.data,
+    );
+    throw err;
+  }
 }
 
 export async function deleteOutfitCanvas(id: string): Promise<void> {

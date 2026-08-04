@@ -18,6 +18,27 @@ export const Events = {
   GET_STARTED_CARD_DISMISSED: 'get_started_card_dismissed',
   GET_STARTED_CARD_COMPLETED: 'get_started_card_completed',
 
+  // ── First-run closet setup (blocking two-slot screen) ─────────────────────
+  // Primary metric: % of registrations reaching SETUP_COMPLETED. Watch the gap
+  // between SETUP_FIRST_ITEM_ADDED and SETUP_COMPLETED — that's where the old
+  // empty-closet screen lost people.
+  SETUP_SHOWN: 'setup_shown',
+  SETUP_MODE_SWITCHED: 'setup_mode_switched',
+  SETUP_SLOT_TAPPED: 'setup_slot_tapped',
+  SETUP_PICKER_OPENED: 'setup_picker_opened',
+  SETUP_PICKER_SOURCE_CHOSEN: 'setup_picker_source_chosen',
+  SETUP_ITEM_PROCESSING_STARTED: 'setup_item_processing_started',
+  SETUP_ITEM_ADDED: 'setup_item_added',
+  SETUP_ITEM_FAILED: 'setup_item_failed',
+  SETUP_BEAUTIFY_STARTED: 'setup_beautify_started',
+  SETUP_BEAUTIFY_COMPLETED: 'setup_beautify_completed',
+  SETUP_BEAUTIFY_FAILED: 'setup_beautify_failed',
+  SETUP_BEAUTIFY_COMMITTED: 'setup_beautify_committed',
+  SETUP_TRYON_TAPPED: 'setup_tryon_tapped',
+  SETUP_FIRST_ITEM_ADDED: 'setup_first_item_added',
+  SETUP_COMPLETED: 'setup_completed',
+  SETUP_FIRST_OUTFIT_GENERATED: 'setup_first_outfit_generated',
+
   // ── Add Item Funnel ────────────────────────────────────────────────────────
   ADD_ITEM_STARTED: 'add_item_started',
   ADD_ITEM_PHOTO_SELECTED: 'add_item_photo_selected',
@@ -158,6 +179,11 @@ export const Params = {
   ITEM_COUNT_IN_WARDROBE: 'item_count_in_wardrobe',
   AT_SLIDE_INDEX: 'at_slide_index',
   OB_STEP: 'ob_step',
+  // First-run closet setup
+  MODE: 'mode',
+  SLOT: 'slot',
+  REASON: 'reason',
+  MS_SINCE_SHOWN: 'ms_since_shown',
   MK_STEP: 'mk_step',
   MK_CATEGORY: 'mk_category',
   MK_DEAL_TYPE: 'mk_deal_type',
