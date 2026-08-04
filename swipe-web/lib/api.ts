@@ -127,6 +127,19 @@ export function isInsufficientCoins(err: unknown): { required: number; balance: 
   return { required: pick('required'), balance: pick('balance') };
 }
 
+/**
+ * Код ошибки из тела ответа бэкенда (`{ error: { code } }` или `{ code }`).
+ * Нужен, чтобы отличать «этот способ оплаты не подключён» от «шлюз лежит»:
+ * в первом случае повтор не поможет никогда, и пользователю надо предложить другой способ.
+ */
+export function apiErrorCode(err: unknown): string | null {
+  const e = err as { response?: { data?: unknown } };
+  const data = e?.response?.data as Record<string, unknown> | undefined;
+  const error = (data?.error ?? data) as Record<string, unknown> | undefined;
+  const code = error?.code;
+  return typeof code === 'string' ? code : null;
+}
+
 // ── Helper: unwrap the nested data structures the backend uses ────────────────
 
 function unwrapList(d: unknown): unknown[] {

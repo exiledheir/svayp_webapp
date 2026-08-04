@@ -433,6 +433,7 @@ export interface Translations {
   // Онлайн-оплата (WLCM: Payme/Click/Paylov/Uzum)
   cn_pay_method: string;
   cn_pay_error: string;
+  cn_pay_provider_down: string;
   cn_pay_redirecting: string;
   pay_checking_title: string;
   pay_checking_sub: string;
@@ -446,6 +447,8 @@ export interface Translations {
   pay_failed_sub: string;
   pay_failed_mismatch: string;
   pay_back: string;
+  pay_unknown_title: string;
+  pay_unknown_sub: string;
   // Batch add — processing screen + "fix category" sheet
   cv_bt_offer_all: string;
   cl_items_n: string;
@@ -1293,6 +1296,7 @@ const en: Translations = {
   cn_tg_msg: 'I want to buy {n} diamonds ({price}). My phone: ',
   cn_pay_method: 'Payment method',
   cn_pay_error: 'Could not start the payment. Please try again.',
+  cn_pay_provider_down: 'This payment method is unavailable right now. Please pick another one.',
   cn_pay_redirecting: 'Opening payment…',
   pay_checking_title: 'Confirming your payment',
   pay_checking_sub: 'This usually takes a few seconds. You can safely stay on this screen.',
@@ -1306,6 +1310,8 @@ const en: Translations = {
   pay_failed_sub: 'No money was taken. You can try paying again.',
   pay_failed_mismatch: 'The paid amount does not match the order. Our team is looking into it — please contact support.',
   pay_back: 'Back',
+  pay_unknown_title: 'We couldn’t find this payment',
+  pay_unknown_sub: 'If money was taken, the diamonds are credited automatically — check your balance in a minute or contact support.',
   cv_bt_offer_all: 'Beautify all',
   cl_items_n: '{n} items',
   cl_sort_recent: 'Recently added',
@@ -2147,6 +2153,7 @@ const ru: Translations = {
   cn_tg_msg: 'Хочу купить {n} монет ({price}). Мой номер: ',
   cn_pay_method: 'Способ оплаты',
   cn_pay_error: 'Не удалось начать оплату. Попробуйте ещё раз.',
+  cn_pay_provider_down: 'Этот способ оплаты сейчас недоступен. Выберите другой.',
   cn_pay_redirecting: 'Открываем оплату…',
   pay_checking_title: 'Подтверждаем оплату',
   pay_checking_sub: 'Обычно это занимает несколько секунд. Можно оставаться на этом экране.',
@@ -2160,6 +2167,8 @@ const ru: Translations = {
   pay_failed_sub: 'Деньги не списаны. Можно попробовать оплатить снова.',
   pay_failed_mismatch: 'Оплаченная сумма не совпала с заказом. Мы уже разбираемся — напишите в поддержку.',
   pay_back: 'Назад',
+  pay_unknown_title: 'Не нашли этот платёж',
+  pay_unknown_sub: 'Если деньги списались, бриллианты начислятся автоматически — проверьте баланс через минуту или напишите в поддержку.',
   cv_bt_offer_all: 'Улучшить все',
   cl_items_n: '{n} вещей',
   cl_sort_recent: 'Сначала новые',
@@ -3000,6 +3009,7 @@ const uz: Translations = {
   cn_tg_msg: '{n} ta tanga sotib olmoqchiman ({price}). Raqamim: ',
   cn_pay_method: 'To\'lov usuli',
   cn_pay_error: 'To\'lovni boshlab bo\'lmadi. Qayta urinib ko\'ring.',
+  cn_pay_provider_down: 'Bu to\'lov usuli hozir ishlamayapti. Boshqasini tanlang.',
   cn_pay_redirecting: 'To\'lov ochilmoqda…',
   pay_checking_title: 'To\'lov tasdiqlanmoqda',
   pay_checking_sub: 'Odatda bu bir necha soniya oladi. Shu ekranda qolishingiz mumkin.',
@@ -3013,6 +3023,8 @@ const uz: Translations = {
   pay_failed_sub: 'Pul yechilmadi. Qayta to\'lashga urinib ko\'rishingiz mumkin.',
   pay_failed_mismatch: 'To\'langan summa buyurtmaga mos kelmadi. Biz tekshiryapmiz — qo\'llab-quvvatlashga yozing.',
   pay_back: 'Orqaga',
+  pay_unknown_title: 'Bu to‘lovni topa olmadik',
+  pay_unknown_sub: 'Agar pul yechilgan bo‘lsa, brilliantlar avtomatik qo‘shiladi — bir daqiqadan so‘ng balansni tekshiring yoki qo‘llab-quvvatlashga yozing.',
   cv_bt_offer_all: 'Hammasini yaxshilash',
   cl_items_n: "{n} ta buyum",
   cl_sort_recent: "Avval yangilari",

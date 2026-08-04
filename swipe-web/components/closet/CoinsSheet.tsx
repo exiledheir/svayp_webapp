@@ -1,11 +1,12 @@
-import React, { useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { X, Loader2 } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import Diamond from '@/components/closet/Diamond';
-import { coinsPrice, coinPackages, quoteCoins, type CoinPricing } from '@/lib/coins';
+import { coinsPrice, coinPackages, type CoinPricing } from '@/lib/coins';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events } from '@/lib/analytics-events';
 import { isInFlutterWebView } from '@/lib/flutter-bridge';
+import { apiErrorCode } from '@/lib/api';
 import {
   createCoinPayment,
   goToCheckout,
@@ -66,6 +67,17 @@ export default function CoinsSheet({
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState('');
 
+  // Кнопка «назад» со страницы шлюза восстанавливает страницу из bfcache вместе с
+  // состоянием React. Без сброса кнопка навсегда осталась бы в «Открываем оплату…»,
+  // и повторно заплатить было бы нечем.
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted) setPaying(false);
+    };
+    window.addEventListener('pageshow', onShow);
+    return () => window.removeEventListener('pageshow', onShow);
+  }, []);
+
   // Swipe-down-to-close: only start the drag when the content is scrolled to top,
   // so it doesn't fight the scrollable list.
   const [dragY, setDragY] = useState(0);
@@ -114,21 +126,27 @@ export default function CoinsSheet({
     setPaying(true);
     setPayError('');
     try {
-      // Сумму всё равно посчитает сервер; серверный quote запрашиваем, чтобы не увести
-      // пользователя на оплату с ценой, отличной от показанной.
-      await quoteCoins(qty).catch(() => null);
+      // Отдельный запрос quote отсюда убран: его результат нигде не использовался,
+      // а лишний круг к серверу удлинял паузу между нажатием и переходом на оплату.
+      // Сумму всё равно считает сервер внутри createCoinPayment — она и уходит в шлюз.
       const payment = await createCoinPayment(qty, provider);
       if (!payment.checkoutUrl) {
         setPayError(t.cn_pay_error);
+        setPaying(false);
         return;
       }
       // Пользователь может не вернуться по return_url (провайдер уводит в своё приложение) —
       // сохраняем id, чтобы страница возврата нашла платёж и без query-параметров.
       rememberPendingPayment(payment.paymentId);
+      // Блокировку НЕ снимаем: дальше идёт переход на страницу шлюза, и он занимает
+      // ещё секунду-другую. Если вернуть кнопку в обычный вид прямо здесь, экран
+      // выглядит так, будто нажатие не сработало, и человек жмёт второй раз.
       goToCheckout(payment.checkoutUrl);
-    } catch {
-      setPayError(t.cn_pay_error);
-    } finally {
+    } catch (err) {
+      // «Способ не подключён» — не временный сбой: повтор с тем же провайдером
+      // не сработает никогда, поэтому текст прямо предлагает выбрать другой.
+      const code = apiErrorCode(err);
+      setPayError(code === 'PAYMENT_PROVIDER_UNAVAILABLE' ? t.cn_pay_provider_down : t.cn_pay_error);
       setPaying(false);
     }
   }
@@ -254,7 +272,10 @@ export default function CoinsSheet({
             style={{ background: '#F370A7' }}
           >
             {paying ? (
-              t.cn_pay_redirecting
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                {t.cn_pay_redirecting}
+              </>
             ) : (
               <>
                 <Diamond size={18} />
