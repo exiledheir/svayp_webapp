@@ -8,9 +8,14 @@ const PAGE_SIZE = 20;
 
 /**
  * Closet v2 add sheet — replaces PhotoSourceSheet in the closet.
- * Two photo sources (Gallery / Camera) plus a shop catalog. The sheet starts as
- * a peek and expands to (near) full-screen once the user scrolls, loading the
- * catalog page by page. Swipe down (from the top) to dismiss.
+ *
+ * Намеренно повторяет вёрстку первого запуска (`SetupAddSheet`): заголовок с
+ * подзаголовком, тёмная карточка «Камера» и розовая «Галерея», ниже — товары
+ * магазина. Раньше это был совсем другой лист (иконка + две строки текста), и
+ * пользователь, прошедший first-run, не узнавал экран добавления.
+ *
+ * Отличия от setup-версии: тема (тёмная/светлая), пагинация каталога и
+ * состояния «добавляется / уже в гардеробе» — их в setup нет.
  */
 export default function AddItemSheet({
   onClose,
@@ -35,7 +40,6 @@ export default function AddItemSheet({
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [expanded, setExpanded] = useState(false);
   const pageRef = useRef(0);
   const hasMoreRef = useRef(true);
   const idsRef = useRef<Set<string>>(new Set());
@@ -87,10 +91,10 @@ export default function AddItemSheet({
     }
   }
 
-  function onScroll(e: React.UIEvent<HTMLDivElement>) {
+  // Пагинация каталога — по горизонтальной прокрутке ленты.
+  function onRowScroll(e: React.UIEvent<HTMLDivElement>) {
     const el = e.currentTarget;
-    if (el.scrollTop > 8 && !expanded) setExpanded(true);
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 340) loadMore();
+    if (el.scrollWidth - el.scrollLeft - el.clientWidth < 260) loadMore();
   }
 
   // Один тап по товару = добавить и сразу выйти из шита. Уже добавленную в
@@ -124,13 +128,15 @@ export default function AddItemSheet({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center" style={{ background: 'rgba(15,8,14,0.42)' }} onClick={onClose}>
+      {/* Лист по высоте контента (как в first-run), а не на 68% экрана: каталог
+          теперь горизонтальная лента, тянуть лист на весь экран больше незачем. */}
       <div
         className="w-full max-w-[460px] rounded-t-3xl flex flex-col"
         style={{
           background: dark ? '#1c1c1e' : '#fff',
-          height: expanded ? '95%' : '68%',
+          maxHeight: '92%',
           transform: dragY ? `translateY(${dragY}px)` : undefined,
-          transition: dragStartRef.current == null ? 'height 0.3s ease, transform 0.25s ease' : 'height 0.3s ease',
+          transition: dragStartRef.current == null ? 'transform 0.25s ease' : undefined,
         }}
         onClick={(e) => e.stopPropagation()}
         onTouchStart={onTouchStart}
@@ -141,74 +147,93 @@ export default function AddItemSheet({
           <div className="w-9 h-1 rounded-full" style={{ background: dark ? '#3a3a3c' : '#e2dbe1' }} />
         </div>
 
-        <div ref={scrollRef} onScroll={onScroll} className="px-5 pb-8 overflow-y-auto flex-1 min-h-0">
-          <h3 className="text-[17px] font-bold text-center mb-3" style={{ color: ink }}>{t.cv_add_title}</h3>
+        <div ref={scrollRef} className="px-5 pb-8 overflow-y-auto min-h-0">
+          <h3 className="text-[20px] font-extrabold text-center" style={{ color: ink }}>{t.cv_add_title}</h3>
+          <p className="text-[13.5px] leading-snug text-center mt-1.5" style={{ color: sub }}>{t.su_sheet_sub}</p>
 
-          {/* Source rows */}
-          <button onClick={() => onGallery()} className="w-full flex items-center gap-4 rounded-2xl px-3 py-2.5 mb-1.5 active:scale-[0.99] transition-transform">
-            <span className="w-[52px] h-[52px] rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg,#f093fb,#F5576c)' }}>
-              <Images size={23} color="#fff" strokeWidth={1.9} />
-            </span>
-            <span className="text-left">
-              <span className="block text-[16px] font-extrabold tracking-[-0.2px]" style={{ color: ink }}>{t.cv_src_gallery}</span>
-              <span className="block text-[12.5px]" style={{ color: sub }}>{t.cv_src_gallery_sub}</span>
-            </span>
-          </button>
-          <button onClick={() => onCamera()} className="w-full flex items-center gap-4 rounded-2xl px-3 py-2.5 active:scale-[0.99] transition-transform">
-            <span className="w-[52px] h-[52px] rounded-full flex items-center justify-center flex-shrink-0" style={{ background: dark ? '#000' : '#141014' }}>
-              <Camera size={22} color="#fff" strokeWidth={1.9} />
-            </span>
-            <span className="text-left">
-              <span className="block text-[16px] font-extrabold tracking-[-0.2px]" style={{ color: ink }}>{t.cv_src_camera}</span>
-              <span className="block text-[12.5px]" style={{ color: sub }}>{t.cv_src_camera_sub}</span>
-            </span>
-          </button>
+          {/* Источники — как в first-run: камера тёмной карточкой, галерея розовой. */}
+          <div className="flex flex-col gap-2.5 mt-4">
+            <button
+              onClick={() => onCamera()}
+              className="flex items-center gap-3.5 w-full text-left active:scale-[0.99] transition-transform"
+              style={{ padding: 14, borderRadius: 18, background: dark ? '#000' : '#141014' }}
+            >
+              <span className="flex items-center justify-center flex-none" style={{ width: 44, height: 44, borderRadius: 14, background: 'rgba(255,255,255,0.14)' }}>
+                <Camera size={20} color="#fff" strokeWidth={2} />
+              </span>
+              <span className="flex-1 min-w-0 text-[16px] font-bold text-white">{t.cv_src_camera}</span>
+            </button>
 
-          {/* Shop catalog — vertical grid, paginated */}
+            <button
+              onClick={() => onGallery()}
+              className="flex items-center gap-3.5 w-full text-left active:scale-[0.99] transition-transform"
+              style={{
+                padding: 14, borderRadius: 18,
+                background: dark ? 'rgba(243,112,167,0.14)' : '#FFF3F8',
+                border: `1px solid ${dark ? 'rgba(243,112,167,0.32)' : '#FADCEA'}`,
+              }}
+            >
+              <span className="flex items-center justify-center flex-none" style={{ width: 44, height: 44, borderRadius: 14, background: '#F370A7' }}>
+                <Images size={20} color="#fff" strokeWidth={2} />
+              </span>
+              <span className="flex-1 min-w-0 text-[16px] font-bold" style={{ color: ink }}>{t.cv_src_gallery}</span>
+            </button>
+          </div>
+
+          {/* Shop catalog — горизонтальная лента, как в first-run: каталог не
+              должен превращать лист добавления в бесконечную вертикальную
+              простыню, из-за которой не видно источников фото. */}
           {showShop && (
-            <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${dark ? '#2a2a2c' : '#ececed'}` }}>
-              <span className="block text-[15px] font-extrabold mb-2.5" style={{ color: ink }}>{t.cv_shop_title}</span>
+            <div className="mt-5 pt-4" style={{ borderTop: `1px solid ${dark ? '#2a2a2c' : '#ececed'}` }}>
+              <span className="block text-[15px] font-bold mb-3" style={{ color: ink }}>{t.cv_shop_title}</span>
 
-              {loading && products.length === 0 && (
-                <div className="flex items-center justify-center py-10" style={{ color: sub }}><Loader2 size={20} className="animate-spin" /></div>
-              )}
-              {!loading && products.length === 0 && (
-                <div className="text-center py-10 text-[13px]" style={{ color: sub }}>{t.cv_shop_empty}</div>
-              )}
-
-              <div className="grid grid-cols-2 gap-2.5">
-                {products.map((p) => {
-                  const adding = addingProductIds.has(p.id);
-                  const added = addedProductIds.has(p.id);
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => pickProduct(p)}
-                      disabled={adding || added}
-                      className="relative rounded-2xl p-2.5 text-left active:scale-[0.98] transition-transform"
-                      style={{ background: dark ? '#141014' : '#fff', border: `1.5px solid ${added ? '#2FB27A' : dark ? '#2a2a2c' : '#ececed'}`, opacity: added ? 0.6 : 1 }}
-                    >
-                      <div className="rounded-xl mb-2 overflow-hidden" style={{ aspectRatio: '4 / 5', background: idleRow }}>
-                        {p.images?.[0] ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={p.images[0]} alt="" className="w-full h-full object-cover" loading="lazy" />
-                        ) : null}
-                      </div>
-                      <span className="block text-[12.5px] font-bold leading-tight truncate" style={{ color: ink }}>{titleOf(p)}</span>
-                      <span className="block text-[11px] mt-0.5 truncate" style={{ color: sub }}>{p.brand}</span>
-                      <span
-                        className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-white"
-                        style={{ background: added ? '#2FB27A' : adding ? '#F370A7' : 'rgba(15,8,14,0.35)' }}
-                      >
-                        {adding ? <Loader2 size={15} className="animate-spin" /> : added ? <Check size={15} strokeWidth={3} /> : <Plus size={16} strokeWidth={2.6} />}
+              {loading && products.length === 0 ? (
+                <div className="flex items-center justify-center" style={{ height: 128, color: sub }}><Loader2 size={20} className="animate-spin" /></div>
+              ) : products.length === 0 ? (
+                <div className="text-center py-8 text-[13px]" style={{ color: sub }}>{t.cv_shop_empty}</div>
+              ) : (
+                <div className="relative">
+                  <div onScroll={onRowScroll} className="flex gap-2.5 overflow-x-auto hide-scrollbar" style={{ paddingBottom: 2 }}>
+                    {products.map((p) => {
+                      const adding = addingProductIds.has(p.id);
+                      const added = addedProductIds.has(p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => pickProduct(p)}
+                          disabled={adding || added}
+                          className="text-left flex-none active:scale-[0.97] transition-transform"
+                          style={{ width: 106, opacity: added ? 0.6 : 1 }}
+                        >
+                          <div className="relative w-full overflow-hidden" style={{ aspectRatio: '106 / 128', borderRadius: 14, background: idleRow }}>
+                            {p.images?.[0] ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={p.images[0]} alt="" className="w-full h-full object-cover" loading="lazy" />
+                            ) : null}
+                            <span
+                              className="absolute flex items-center justify-center text-white"
+                              style={{ top: 6, right: 6, width: 24, height: 24, borderRadius: 999, background: added ? '#2FB27A' : '#F370A7' }}
+                            >
+                              {adding ? <Loader2 size={13} className="animate-spin" /> : added ? <Check size={13} strokeWidth={3} /> : <Plus size={15} strokeWidth={3} />}
+                            </span>
+                          </div>
+                          <span className="block text-[12px] font-semibold leading-tight truncate mt-1.5" style={{ color: ink }}>{titleOf(p)}</span>
+                          <span className="block text-[11px] leading-tight truncate mt-0.5" style={{ color: sub }}>{p.brand}</span>
+                        </button>
+                      );
+                    })}
+                    {loadingMore && (
+                      <span className="flex-none flex items-center justify-center" style={{ width: 44, height: 128, color: sub }}>
+                        <Loader2 size={18} className="animate-spin" />
                       </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {loadingMore && (
-                <div className="flex items-center justify-center py-4" style={{ color: sub }}><Loader2 size={18} className="animate-spin" /></div>
+                    )}
+                  </div>
+                  {/* Затухание у правого края — подсказка, что лента прокручивается. */}
+                  <div
+                    className="absolute top-0 right-0 pointer-events-none"
+                    style={{ width: 34, height: 128, background: `linear-gradient(90deg,${dark ? 'rgba(28,28,30,0)' : 'rgba(255,255,255,0)'} 0,${dark ? '#1c1c1e' : '#fff'} 80%)` }}
+                  />
+                </div>
               )}
             </div>
           )}

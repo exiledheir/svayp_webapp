@@ -6,7 +6,7 @@ import { useI18n } from '@/lib/i18n';
 import { isAuthenticated } from '@/lib/auth';
 import { fetchClosetItems, type ClosetItem } from '@/lib/closet-storage';
 import { getOutfitCanvases, getTryOnJobHistory } from '@/lib/wardrobe-api';
-import { type CanvasGroup, type SavedCanvasLayout } from '@/lib/closet-types';
+import { buildLayoutFromIds, type CanvasGroup, type SavedCanvasLayout } from '@/lib/closet-types';
 import { publishPost, FeedPublishError, type SelectedSource } from '@/lib/feed-publish';
 import { getMyProfile as getFeedProfile, fileToCompressedDataUrl } from '@/lib/feed-api';
 import { loadCached, clearCache } from '@/lib/feed-cache';
@@ -147,7 +147,21 @@ function CreateFeedPost() {
         // Seed from a closet deep-link (?seed=board:<id> etc.) → pre-select + COMPOSE.
         if (opts.applySeed) {
           const seed = typeof router.query.seed === 'string' ? router.query.seed : null;
-          if (seed) {
+          if (seed && seed.startsWith('calendar:')) {
+            // Образ дня нигде не хранится — приходит списком id вещей, раскладку
+            // собираем на месте (та же геометрия, что и у доски).
+            const ids = seed.slice('calendar:'.length).split(',').filter((id) => wardrobeById.has(id));
+            if (ids.length) {
+              setSelected([{
+                key: seed,
+                sourceType: 'calendar',
+                previewUrl: null,
+                layout: buildLayoutFromIds(ids, items),
+                items,
+              }]);
+              setStep(COMPOSE);
+            }
+          } else if (seed) {
             const all = [...boardSources, ...tryonSources];
             const match = all.find((s) => s.key === seed);
             if (match) {
@@ -171,7 +185,11 @@ function CreateFeedPost() {
     } catch {
       /* ignore */
     }
-    buildAndSet({ applySeed: true });
+    // Со seed'ом (переход «поделиться» из гардероба) список источников тянем
+    // заново: только что сохранённой доски или примерки в 7-дневном кэше ещё
+    // нет, и предвыбор молча не сработал бы.
+    buildAndSet({ applySeed: true, force: !!router.query.seed });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buildAndSet]);
 
   // Уход из редактора без публикации. Раньше фиксировались только явные ошибки публикации,

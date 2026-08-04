@@ -2,7 +2,7 @@ import { needsUnoptimized } from '@/lib/img';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2, ArrowUpRight, BookOpen, Share2, Check } from 'lucide-react';
+import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2, ArrowUpRight, BookOpen, Share2, Check, ChevronDown, Send, Pencil } from 'lucide-react';
 import { getUser, clearTokens } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags-context';
 import { FEATURES } from '@/lib/feature-flags';
@@ -30,17 +30,18 @@ import ShareSheet from '@/components/ShareSheet';
 import GetStartedCard from '@/components/closet/GetStartedCard';
 import AddItemSheet from '@/components/closet/AddItemSheet';
 import UploadReviewSheet, { type ReviewBeautifyState } from '@/components/closet/UploadReviewSheet';
-import AddProcessingSheet, { type BatchJob } from '@/components/closet/AddProcessingSheet';
 import BeautifyCompareSheet from '@/components/closet/BeautifyCompareSheet';
 import BeautifyIntroSheet from '@/components/closet/BeautifyIntroSheet';
-import ClosetGateShowcase from '@/components/closet/ClosetGateShowcase';
+import { DEMO_ITEM_IDS, DEMO_ITEMS, DEMO_CANVAS_LAYOUT } from '@/lib/closet-demo';
+import { isSetupDone, isSetupSatisfied, wasSetupEntered } from '@/lib/closet-setup';
 import CoinsSheet from '@/components/closet/CoinsSheet';
 import Diamond from '@/components/closet/Diamond';
 import { ACTION_COST, actionCosts, fetchCoinBalance, fetchCoinPricing, type CoinPricing } from '@/lib/coins';
 import { fetchPaymentOptions, type PaymentOptions } from '@/lib/payments';
-import { isInsufficientCoins } from '@/lib/api';
+import { isInsufficientCoins, describeApiError } from '@/lib/api';
 import ItemDetailSheet from '@/components/closet/ItemDetailSheet';
 import ClosetSectionTabs from '@/components/ClosetSectionTabs';
+import { getMyPosts } from '@/lib/feed-api';
 import { saveUploadPreview, getUploadPreview, clearUploadPreview } from '@/lib/upload-previews';
 import { compressImageForUpload } from '@/lib/image-utils';
 import {
@@ -48,7 +49,7 @@ import {
   type SavedCanvasEntry, type SavedCanvasLayout,
   generateRandomOutfit, buildLayoutFromIds,
 } from '@/lib/closet-types';
-import { captureCanvasSnapshot, downloadWithWatermark } from '@/lib/canvas-snapshot';
+import { captureCanvasSnapshot, downloadWithWatermark, shareWatermarked } from '@/lib/canvas-snapshot';
 import InteractiveCanvas from '@/components/closet/InteractiveCanvas';
 import { TryOnConfirmModal, TryOnModal } from '@/components/closet/TryOnFlow';
 import WizardHeader from '@/components/market/WizardHeader';
@@ -101,29 +102,6 @@ function getCroppedImage(imageSrc: string, crop: PixelCrop, displayWidth: number
     img.src = imageSrc;
   });
 }
-
-// ── Demo items shown to new users with empty wardrobes ───────────────────────
-// IDs are the real backend UUIDs so that try-on and other API features work.
-const DEMO_ITEM_IDS = new Set([
-  '0d1b6b18-bd57-4a3e-a4c4-5aac9ca5fa5e',
-  'd101c8a6-35fa-4cba-9a7c-e7288947f3b2',
-  'da66eb48-1cd7-4087-8a1f-16a011bcae3e',
-  'fb18130c-1192-4d32-aa84-0d5a837a3bcd',
-]);
-
-const DEMO_ITEMS: ClosetItem[] = [
-  { id: '0d1b6b18-bd57-4a3e-a4c4-5aac9ca5fa5e', category: 'tops',   imageData: 'https://libasimages.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2F4f7dbf50-c725-418c-b9ca-4a7f14eef80a.thumb.png',  createdAt: '2024-01-01T00:00:00Z' },
-  { id: 'd101c8a6-35fa-4cba-9a7c-e7288947f3b2', category: 'skirts', imageData: 'https://libasimages.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2Fd44bec44-ad12-41ad-a08c-ce90b863d0f3.thumb.png', createdAt: '2024-01-01T00:00:00Z' },
-  { id: 'da66eb48-1cd7-4087-8a1f-16a011bcae3e', category: 'shoes',  imageData: 'https://libasimages.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2F8d912326-ee36-41bf-988f-0cde9bbedce3.thumb.png',  createdAt: '2024-01-01T00:00:00Z' },
-  { id: 'fb18130c-1192-4d32-aa84-0d5a837a3bcd', category: 'bags',   imageData: 'https://libasimages.blob.core.windows.net/product-images/wardrobe%2F07bbfdf7-504d-44f4-9880-6003831845cf%2F32150c11-a5f4-4b32-98b1-49c8ed2a952a.thumb.png',  createdAt: '2024-01-01T00:00:00Z' },
-];
-
-const DEMO_CANVAS_LAYOUT: SavedCanvasLayout = [
-  { id: '0d1b6b18-bd57-4a3e-a4c4-5aac9ca5fa5e', x: 32, y: 17, scale: 1,    zIndex: 1, group: 'upper' },
-  { id: 'd101c8a6-35fa-4cba-9a7c-e7288947f3b2', x: 32, y: 39, scale: 1,    zIndex: 2, group: 'lower' },
-  { id: 'da66eb48-1cd7-4087-8a1f-16a011bcae3e', x: 32, y: 58, scale: 0.72, zIndex: 3, group: 'shoes' },
-  { id: 'fb18130c-1192-4d32-aa84-0d5a837a3bcd', x: 63, y: 17, scale: 0.6,  zIndex: 4, group: 'acc'   },
-];
 
 // Item target for the "Add N items to unlock" get-started card (= free-plan limit).
 const GET_STARTED_TARGET = 5;
@@ -208,7 +186,6 @@ function usePlan() {
     canGenerate: usage.regenerationsUsed < limits.regenerations,
     canTryOn: usage.tryItOnsUsed < limits.tryItOns,
     canAddItem: totalItems < limits.wardrobeItems,
-    calendarDays: limits.calendarDays,
     totalItems,
   };
 }
@@ -276,38 +253,31 @@ export default function ClosetPage() {
     }
   }, [gsHidden, realItemCount]);
   const showGetStarted = !gsHidden && realItemCount < GET_STARTED_TARGET;
-  // ── Build-your-closet gate (closet v2) ────────────────────────────────────
-  // The closet unlocks once it can form an outfit: a top + a bottom, OR a
-  // dress/set + footwear. Demo items don't count. Until then we show only the
-  // hero + a forced progress loader. The loader shows whichever pair the user is
-  // working toward (top/bottom by default, dress/footwear if they started that).
+  // ── First-run setup gate ──────────────────────────────────────────────────
+  // Getting the first two garments in is the job of the dedicated /closet/setup
+  // screen — the old in-page gate (education carousel + docked progress loader)
+  // is gone, because users read the carousel as something to swipe and never
+  // found the add action underneath it.
+  //
+  // `firstLoadDone` gates the redirect so existing users never bounce before
+  // their items arrive.
   const realItems = useMemo(() => items.filter((i) => !DEMO_ITEM_IDS.has(i.id)), [items]);
-  const hasTopReal = realItems.some((i) => UPPER_CATS.includes(i.category) && !FULL_BODY_CATS.includes(i.category));
-  const hasBottomReal = realItems.some((i) => LOWER_CATS.includes(i.category));
-  const hasDressReal = realItems.some((i) => FULL_BODY_CATS.includes(i.category));
-  const hasFootwearReal = realItems.some((i) => SHOES_CATS.includes(i.category));
-  const closetUnlocked = (hasTopReal && hasBottomReal) || (hasDressReal && hasFootwearReal);
-  // Show the dress+footwear path only when they started that way (a dress/footwear
-  // and no top/bottom yet); otherwise default to top+bottom.
-  const gateDressPath = !hasTopReal && !hasBottomReal && (hasDressReal || hasFootwearReal);
-  // `firstLoadDone` gates the state so existing users never flash the gate before
-  // their items arrive; once latched it stays true across reloads (no reflicker).
   const [firstLoadDone, setFirstLoadDone] = useState(false);
-  const buildMode = closetV2 && !closetUnlocked && firstLoadDone;
-  // Milestones for the gate progress loader (adapts to the active outfit path).
-  const gateMilestones = gateDressPath
-    ? [
-        { img: '/images/onboarding/closet_items/dress.png', label: t.cv_build_dress, done: hasDressReal },
-        { img: '/images/closet/add_shoes_onboarding.webp', label: t.cv_build_shoes, done: hasFootwearReal },
-      ]
-    : [
-        { img: '/images/onboarding/closet_items/top.png', label: t.cv_build_top, done: hasTopReal },
-        { img: '/images/onboarding/closet_items/skirt.png', label: t.cv_build_bottom, done: hasBottomReal },
-      ];
-  const gateDoneCount = gateMilestones.filter((m) => m.done).length;
-  // Selected "Type" chip per section (null = All).
-  const [sectionFilter, setSectionFilter] = useState<Partial<Record<WardrobeSection, WardrobeSubcategory | null>>>({});
-  const [viewAll, setViewAll] = useState<{ title: string; items: ClosetItem[] } | null>(null);
+  useEffect(() => {
+    if (!firstLoadDone || isSetupSatisfied(realItems) || isSetupDone()) return;
+    // An empty closet is always a first run. One item + the "setup started"
+    // marker means they were killed mid-setup and should resume; one item
+    // WITHOUT it is a legacy account, which we never drag into setup.
+    if (realItems.length === 0 || wasSetupEntered()) router.replace('/closet/setup');
+  }, [firstLoadDone, realItems, router]);
+  // ── Гардероб = ОДНА сетка на 3 колонки с фильтрами ──────────────────────
+  // Раньше это были шесть горизонтальных лент по разделам: вещи было видно
+  // только «по три штуки в окошко», и до нижних разделов приходилось листать
+  // весь экран. Теперь всё в одном гриде, а раздел/тип — фильтры над ним.
+  const [gridSection, setGridSection] = useState<WardrobeSection | 'ALL'>('ALL');
+  const [gridType, setGridType] = useState<WardrobeSubcategory | null>(null);
+  const [gridSort, setGridSort] = useState<'recent' | 'oldest'>('recent');
+  const [sortMenu, setSortMenu] = useState(false);
   const [canvasData, setCanvasData] = useState<{ upper: ClosetItem[]; lower: ClosetItem[]; shoes: ClosetItem[]; acc: ClosetItem[] } | null>(null);
   // Multi-canvas state: each board has a backend id + layout
   const [canvases, setCanvases] = useState<{ id: string | null; layout: SavedCanvasLayout }[]>([]);
@@ -345,6 +315,21 @@ export default function ClosetPage() {
     const q = router.query.tab;
     if (q === 'boards' || q === 'outfits' || q === 'calendar') setClosetTab(q);
   }, [router.query.tab]);
+  // Arriving from first-run setup via "Generate my first outfit": re-arm the
+  // auto-generation guard so Boards shows a real board instead of an empty tab,
+  // then strip the flag so a reload doesn't generate again.
+  const forcedFirstOutfitRef = useRef(false);
+  // `?tryOn=1` (setup's "Try it on"): open the try-on once that first board
+  // actually exists — setup can't run the flow itself, it needs the outfit.
+  const pendingSetupTryOnRef = useRef(false);
+  useEffect(() => {
+    if (router.query.firstOutfit !== '1' || forcedFirstOutfitRef.current) return;
+    forcedFirstOutfitRef.current = true;
+    pendingSetupTryOnRef.current = router.query.tryOn === '1';
+    setAutoGenDone(false);
+    setClosetTab('boards');
+    router.replace('/closet?tab=boards', undefined, { shallow: true });
+  }, [router.query.firstOutfit]); // eslint-disable-line react-hooks/exhaustive-deps
   // Try-on history (Outfits tab) — loaded lazily on first visit, paginated.
   const [tryOnJobs, setTryOnJobs] = useState<TryOnJobResponse[]>([]);
   const [tryOnLoading, setTryOnLoading] = useState(false);
@@ -396,7 +381,7 @@ export default function ClosetPage() {
   }, [items]);
   // 'browse' = opened from the header diamond chip (no "not enough" prompt).
   const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | 'tryOn' | 'canvas' | 'browse' | 'beautify' | null>(null);
-  const { plan, limits, usage, fetchPlan, canGenerate, canTryOn, calendarDays } = usePlan();
+  const { plan, limits, usage, fetchPlan, canGenerate, canTryOn } = usePlan();
   // Diamond/coin balance — реальный баланс с бэка (/me/coins). Рефетчим после
   // каждого платного действия (см. refreshCoins) и при открытии CoinsSheet.
   const [coins, setCoinsState] = useState(0);
@@ -525,7 +510,7 @@ export default function ClosetPage() {
     : canvases;
 
   const [editItem, setEditItem] = useState<ClosetItem | null>(null);
-  const [tryOnState, setTryOnState] = useState<{ status: 'loading' | 'processing' | 'completed' | 'failed'; resultUrl?: string; jobId?: string; failureReason?: string; previewImages?: string[] } | null>(null);
+  const [tryOnState, setTryOnState] = useState<{ status: 'loading' | 'processing' | 'completed' | 'failed'; resultUrl?: string; jobId?: string; failureReason?: string; previewImages?: string[]; personImage?: string } | null>(null);
 
   // Close the canvas overlay (X button AND hardware Back). Removes a brand-new
   // empty canvas entry so cancelling creation doesn't leave a blank board.
@@ -541,13 +526,18 @@ export default function ClosetPage() {
   };
 
   // Hardware/gesture Back closes full-screen overlays (canvas, try-on, item
-  // editor, view-all) instead of navigating the WebView away to another tab.
+  // editor) instead of navigating the WebView away to another tab.
   useOverlayBackClose(canvasData !== null, closeCanvas);
   useOverlayBackClose(tryOnState !== null, () => setTryOnState(null));
   useOverlayBackClose(editItem !== null, () => setEditItem(null));
-  useOverlayBackClose(viewAll !== null, () => setViewAll(null));
   const [showTryOnConfirm, setShowTryOnConfirm] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
+  /** Canvas ids already re-created after a 404 — one attempt each. */
+  const recreatedCanvasIdsRef = useRef<Set<string>>(new Set());
+  /** A 5xx recreate is allowed ONCE per session: a backend that fails every PUT
+   *  hands back a fresh id each time, so a per-id budget would quietly turn
+   *  every autosave into another duplicate board. */
+  const recreatedAfterServerErrorRef = useRef(false);
   const [tryOnDeleteFailed, setTryOnDeleteFailed] = useState(false);
   const [outfitToastMsg, setOutfitToastMsg] = useState<string | null>(null);
   // Closet v2: shop-catalog instant-add progress (per product id)
@@ -616,7 +606,6 @@ export default function ClosetPage() {
   } | null>(null);
   // Какие фото отмечены в попапе (при батче их можно снимать — цена пересчитывается).
   const [introPicked, setIntroPicked] = useState<Set<string>>(new Set());
-  const beautifyIntroShownRef = useRef(false);
   // Closet v2: Beautify requested in the add step → auto-open compare once the
   // item finishes uploading; plus the first-run explainer.
   const [addBeautifyRequested, setAddBeautifyRequested] = useState(false);
@@ -669,19 +658,17 @@ export default function ClosetPage() {
   const cropImgRef = useRef<HTMLImageElement>(null);
   const addFileRef = useRef<File | null>(null);
   // ── Closet v2 — Acloset-style batch add (optimistic) ─────────────────────
-  // `batchAdd` drives the full-screen processing sheet (pure 1s+1s imitation —
-  // the real bg-removal backend isn't wired yet). Uploads run in the background
-  // while the user reviews local items; categories persist at "Add to Closet".
-  const [batchAdd, setBatchAdd] = useState<{ jobs: BatchJob[] } | null>(null);
-  const [batchPhase, setBatchPhase] = useState<'removing' | 'identifying'>('removing');
-  // Local review items shown after the imitation; edited in memory until finalize.
+  // Промежуточного экрана обработки НЕТ: после выбора фото сразу открывается
+  // ревью, а строки сами показывают «Определяем категорию…», пока идёт фоновый
+  // аплоад. Отдельный full-screen «Готовим вещь» дублировал ровно тот же текст
+  // и ощущался лишним шагом.
+  // Local review items; edited in memory until finalize.
   const [batchReview, setBatchReview] = useState<BatchReviewItem[]>([]);
   // localIds whose AI category detection (ANALYZE) is still in flight — the row
   // shows a "determining…" state until it resolves, then AI pre-fills the category.
   const [batchDetecting, setBatchDetecting] = useState<Set<string>>(new Set());
   const [batchReviewOpen, setBatchReviewOpen] = useState(false);
   const [finalizingBatch, setFinalizingBatch] = useState(false);
-  const batchCancelRef = useRef(false);
   // localId → background upload result (real wardrobe id once done).
   const uploadTrackerRef = useRef<Map<string, { promise: Promise<void>; realId: string | null; failed: boolean }>>(new Map());
   // localIds the USER explicitly edited in the review sheet (via editBatchCategory).
@@ -747,19 +734,26 @@ export default function ClosetPage() {
     return () => el.removeEventListener('touchmove', onMove);
   }, []);
 
-  // Scroll to the section of a just-added item once its card has rendered. Runs
-  // after the pending-upload / items state that adds the card commits, so the
-  // section has grown to include it before we measure and scroll.
+  // Показать только что добавленную вещь: сбрасываем фильтры (иначе новая
+  // карточка может не подходить под активный раздел/тип и «пропадёт») и
+  // прокручиваем к началу сетки, где она стоит первой.
   useEffect(() => {
     if (!scrollTargetSection) return;
+    // На «Образах» и «Календаре» гардероба на странице нет — сначала возвращаемся
+    // к доскам (эффект повторится, когда сетка смонтируется), иначе вещь молча
+    // «уедет» в скрытый блок.
+    if (closetTab === 'outfits' || closetTab === 'calendar') { setClosetTab('boards'); return; }
+    setGridSection('ALL');
+    setGridType(null);
+    setGridSort('recent');
     const container = mainScrollRef.current;
-    const el = document.getElementById(`closet-section-${scrollTargetSection}`);
+    const el = document.getElementById('closet-grid');
     if (container && el) {
       const top = container.scrollTop + (el.getBoundingClientRect().top - container.getBoundingClientRect().top) - 8;
       container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
     }
     setScrollTargetSection(null);
-  }, [scrollTargetSection, pendingUploads, items]);
+  }, [scrollTargetSection, pendingUploads, items, closetTab]);
 
   function openAdd(section: WardrobeSection = 'TOPS') {
     if (plansEnabled && !canAddItem()) {
@@ -823,57 +817,37 @@ export default function ClosetPage() {
   // it), showing a live processing screen. When all finish we route items the AI
   // couldn't classify to the "fix category" sheet, then everything to the review
   // list (per-item beautify + edit + "Add to Closet").
-  function updateBatchJob(localId: string, patch: Partial<BatchJob>) {
-    setBatchAdd((prev) => (prev ? { jobs: prev.jobs.map((j) => (j.localId === localId ? { ...j, ...patch } : j)) } : prev));
-  }
-
-  function cancelBatch() {
-    batchCancelRef.current = true;
-    setBatchAdd(null);
-  }
-
-  // Cancel-aware delay for the imitated processing stages: resolves early if the
-  // user backs out mid-flow.
-  function batchDelay(ms: number) {
-    return new Promise<void>((resolve) => {
-      const id = setTimeout(resolve, ms);
-      const started = Date.now();
-      const tick = () => {
-        if (batchCancelRef.current) { clearTimeout(id); resolve(); return; }
-        if (Date.now() - started < ms) setTimeout(tick, 120);
-      };
-      tick();
-    });
-  }
-
   async function handleBatchFiles(files: File[]) {
     if (plansEnabled && !canAddItem()) { setShowPremiumGate('items'); return; }
-    batchCancelRef.current = false;
     setShowAddPicker(false);
-    setBatchPhase('removing');
 
-    const jobs: BatchJob[] = files.map((_, i) => ({
-      localId: `batch_${Date.now()}_${i}`,
-      previewImage: '',
-      status: 'processing',
-    }));
-    setBatchAdd({ jobs });
+    const jobs = files.map((_, i) => ({ localId: `batch_${Date.now()}_${i}` }));
     // Все строки стартуют в состоянии "AI определяет категорию"; снимается по мере
     // готовности ANALYZE в фоновом аплоаде ниже.
     setBatchDetecting(new Set(jobs.map((j) => j.localId)));
 
-    // Read data-URL previews (shown in both the processing screen and the review).
+    // Read data-URL previews (shown in the review rows until the cutout arrives).
     const previews: Record<string, string> = {};
     await Promise.all(files.map((f, i) => new Promise<void>((resolve) => {
       const reader = new FileReader();
-      reader.onload = (ev) => { const url = (ev.target?.result as string) ?? ''; previews[jobs[i].localId] = url; updateBatchJob(jobs[i].localId, { previewImage: url }); resolve(); };
+      reader.onload = (ev) => { previews[jobs[i].localId] = (ev.target?.result as string) ?? ''; resolve(); };
       reader.onerror = () => resolve();
       reader.readAsDataURL(f);
     })));
 
+    // Ревью открывается СРАЗУ — до и независимо от бэкенда. Категории приедут в
+    // строки по мере готовности ANALYZE (batchDetecting).
+    setReviewBeautify(new Map());
+    reviewBeautifyRunRef.current = new Set();
+    setBatchReview(jobs.map((j) => ({
+      localId: j.localId,
+      previewImage: previews[j.localId] ?? '',
+      selection: defaultSelectionForSection('TOPS'),
+    })));
+    setBatchReviewOpen(true);
+
     // Start the real uploads in the BACKGROUND (concurrency-capped) and track each
-    // item's promise + resulting wardrobe id. The review opens on the fixed
-    // imitation timeline below, not on the backend — so it feels instant.
+    // item's promise + resulting wardrobe id.
     const tracker = new Map<string, { promise: Promise<void>; realId: string | null; failed: boolean }>();
     let active = 0;
     const waiters: (() => void)[] = [];
@@ -921,27 +895,6 @@ export default function ClosetPage() {
       tracker.set(j.localId, rec);
     });
     uploadTrackerRef.current = tracker;
-
-    // Pure 1s + 1s imitation (no backend dependency — bg-removal isn't wired yet).
-    await batchDelay(1000);
-    if (batchCancelRef.current) { setBatchAdd(null); return; }
-    setBatchPhase('identifying');
-    await batchDelay(1000);
-    if (batchCancelRef.current) { setBatchAdd(null); return; }
-
-    // Open the review with local items — categories start empty so the user must
-    // fill them (backend prefill will seed these later).
-    const reviewItems: BatchReviewItem[] = jobs.map((j) => ({
-      localId: j.localId,
-      previewImage: previews[j.localId] ?? '',
-      selection: defaultSelectionForSection('TOPS'),
-    }));
-    beautifyIntroShownRef.current = false;
-    setReviewBeautify(new Map());
-    reviewBeautifyRunRef.current = new Set();
-    setBatchReview(reviewItems);
-    setBatchAdd(null);
-    setBatchReviewOpen(true);
   }
 
   // Review edits (in-memory until finalize).
@@ -1086,19 +1039,14 @@ export default function ClosetPage() {
     }
   }
 
-  // Review "Beautify" pill → always show the educational popup first (unless the
-  // user ticked "Don't show again"), then run beautify from there.
   function beautifyIntroNever(): boolean {
     try { return localStorage.getItem('svayp_beautify_intro_never') === '1'; } catch { return false; }
   }
-  // Тап Beautify в ревью: первый раз — intro-попап на эту фотку, дальше сразу старт.
+  // Тап Beautify в ревью — СРАЗУ старт, без обучающего попапа: витрина над
+  // списком уже показывает «до/после» и цену, а попап поверх неё просто
+  // повторял то же самое ещё раз и уводил со экрана.
   function handleReviewBeautify(item: ClosetItem) {
     if (reviewBeautifyRunRef.current.has(item.id)) return;
-    if (!beautifyIntroNever()) {
-      setIntroPicked(new Set([item.id]));
-      setBeautifyIntroFor({ from: 'beautify', localIds: [item.id] });
-      return;
-    }
     startReviewBeautify(item.id);
   }
   // Тап ✨ на карточке гардероба: тот же intro-гейт, затем фоновый beautify.
@@ -1139,29 +1087,24 @@ export default function ClosetPage() {
     createdAt: '',
   }));
 
-  // Авто-показ попапа Beautify: всплывает САМ, как только фото обработались —
-  // фон убран и категория определена (batchDetecting опустел). Один попап на весь
-  // батч: в нём видно, какие снимки будут улучшены, галочки можно снимать.
-  // Ждём и полноты категорий: в этот же момент ревью авто-открывает редактор
-  // категории для неопознанной вещи, и два оверлея наложились бы друг на друга.
-  useEffect(() => {
-    if (!closetV2 || !FEATURES.beautifyEnabled) return;
-    if (!batchReviewOpen || beautifyIntroShownRef.current) return;
-    if (batchDetecting.size > 0 || batchReview.length === 0) return;
-    if (!batchReview.every((ri) => isSelectionComplete(ri.selection))) return;
-    if (beautifyIntroNever()) return; // юзер отписался от попапа — молча ничего не делаем
-    // Улучшать можно только то, что реально доехало до бэка (аплоад мог упасть).
-    const ready = batchReview
-      .map((ri) => ri.localId)
-      .filter((id) => uploadTrackerRef.current.get(id)?.realId && !reviewBeautifyRunRef.current.has(id));
-    if (ready.length === 0) return;
-    beautifyIntroShownRef.current = true;
-    setIntroPicked(new Set(ready));
-    setBeautifyIntroFor({ from: 'auto', localIds: ready });
-  }, [closetV2, batchReviewOpen, batchDetecting, batchReview]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Что реально можно улучшить прямо сейчас: фото доехало до бэка (аплоад мог
+  // упасть), категория определена и улучшение ещё не запускалось. Это и есть
+  // набор для витрины Beautify в окне ревью.
+  const beautifyReadyIds = !closetV2 || !FEATURES.beautifyEnabled || !batchReviewOpen || batchDetecting.size > 0
+    ? []
+    : batchReview
+        .map((ri) => ri.localId)
+        .filter((id) => uploadTrackerRef.current.get(id)?.realId
+          && !reviewBeautifyRunRef.current.has(id)
+          && reviewBeautify.get(id)?.phase !== 'done');
 
-  // Header for the batch processing screen, driven by the imitated timeline.
-  const batchHeaderLabel = batchPhase === 'identifying' ? t.cv_proc_identifying : t.cv_proc_removing;
+  // Beautify НЕ запускается сам: он платный, и списывать алмазы без спроса
+  // нельзя. Витрина над списком — и есть объяснение и подтверждение: тап по её
+  // кнопке сразу стартует улучшение (прогресс идёт в строках), сама витрина при
+  // этом исчезает, потому что улучшать больше нечего.
+  function handleBeautifyAll() {
+    beautifyReadyIds.forEach((id) => startReviewBeautify(id));
+  }
 
   // Closet v2 — Beautify tap in the add step. First time shows the explainer,
   // then requesting it auto-opens the compare sheet after the item uploads.
@@ -1717,20 +1660,34 @@ export default function ClosetPage() {
     }
   }
 
-  // Items in a section, optionally narrowed to a single "Type" chip.
-  function itemsForSection(section: WardrobeSection, filter: WardrobeSubcategory | null) {
-    return items.filter((i) => itemSection(i) === section && (filter === null || effectiveSubcategory(i) === filter));
-  }
-
   function countForSection(section: WardrobeSection) {
     return items.filter((i) => itemSection(i) === section).length;
   }
 
-  function pendingForSection(section: WardrobeSection) {
-    return Array.from(pendingUploads.entries())
-      .filter(([, p]) => localCatToSection(p.category) === section)
-      .map(([id, p]) => ({ id, ...p }));
-  }
+  // ── Сетка гардероба: разделы-чипы, типы-чипы и отсортированный список ─────
+  // Чипы строим только по НЕПУСТЫМ разделам: пустая вкладка «Обувь» у человека
+  // без обуви — это шум, а не навигация.
+  const gridSections = SECTION_ORDER.filter((s) => countForSection(s) > 0);
+  const gridTypes = gridSection === 'ALL'
+    ? []
+    : subcategoriesForSection(gridSection)
+        .filter((sub) => items.some((i) => itemSection(i) === gridSection && effectiveSubcategory(i) === sub));
+
+  const gridItems = items
+    .filter((i) => (gridSection === 'ALL' || itemSection(i) === gridSection)
+      && (gridType === null || effectiveSubcategory(i) === gridType))
+    .slice()
+    .sort((a, b) => {
+      const ta = Date.parse(a.createdAt || '') || 0;
+      const tb = Date.parse(b.createdAt || '') || 0;
+      return gridSort === 'recent' ? tb - ta : ta - tb;
+    });
+
+  // Загружающиеся вещи всегда сверху сетки — их ещё не на что фильтровать по
+  // типу, но раздел уже известен по подсказке категории.
+  const gridPending = Array.from(pendingUploads.entries())
+    .filter(([, p]) => gridSection === 'ALL' || localCatToSection(p.category) === gridSection)
+    .map(([id, p]) => ({ id, ...p }));
 
   function removePendingUpload(id: string) {
     setPendingUploads((prev) => { const next = new Map(prev); next.delete(id); return next; });
@@ -1740,10 +1697,6 @@ export default function ClosetPage() {
     try {
       localStorage.setItem('libas_dismissed_uploads', JSON.stringify([...dismissedUploadJobsRef.current]));
     } catch {}
-  }
-
-  function openViewAllSection(section: WardrobeSection) {
-    setViewAll({ title: taxLabel(section, locale), items: items.filter((i) => itemSection(i) === section) });
   }
 
   const [aiSuggestingIdx, setAiSuggestingIdx] = useState<number | null>(null);
@@ -1875,6 +1828,24 @@ export default function ClosetPage() {
     const persisted = await saveCanvasToBackend(layout, canvasIdx);
     if (persisted) markFirstOutfitDone();
     fetchPlan();
+
+    // Setup asked for a try-on: the board exists now, so hand over. Uses the
+    // layout we just built rather than `displayCanvases`, which is still the
+    // pre-generation value inside this closure.
+    if (pendingSetupTryOnRef.current) {
+      pendingSetupTryOnRef.current = false;
+      const itemIds = layout.map((e) => e.id).filter((id) => !id.startsWith('local_') && !id.startsWith('pending_'));
+      if (itemIds.length > 0) {
+        if (tryOnGateBlocked()) { setShowPremiumGate('tryOn'); return; }
+        logAnalyticsEvent(Events.TRYON_INITIATED, {
+          [Params.OUTFIT_ITEM_COUNT]: itemIds.length,
+          [Params.SOURCE]: 'first_run_setup',
+        });
+        tryOnCanvasIdxRef.current = canvasIdx;
+        tryOnOverrideRef.current = { itemIds, layout };
+        setShowTryOnConfirm(true);
+      }
+    }
   }
 
   // Возвращает true, если доска реально создана/обновлена на бэке. Вызывающий
@@ -1898,9 +1869,9 @@ export default function ClosetPage() {
     if (apiItems.length < 1) return false;
 
     const existingId = canvases[canvasIdx]?.id ?? null;
+    const canvasName = `Outfit ${canvasIdx + 1}`;
 
     const doCreate = async () => {
-      const canvasName = `Outfit ${canvasIdx + 1}`;
       const canvas = await createOutfitCanvas({ name: canvasName, items: apiItems });
       logAnalyticsEvent(Events.OUTFIT_BOARD_SAVED, {
         [Params.ITEM_COUNT]: apiItems.length,
@@ -1915,11 +1886,20 @@ export default function ClosetPage() {
     try {
       if (existingId) {
         try {
-          await updateOutfitCanvas(existingId, { items: apiItems });
+          await updateOutfitCanvas(existingId, { name: canvasName, items: apiItems });
         } catch (updateErr: unknown) {
           const status = (updateErr as { response?: { status?: number } })?.response?.status;
-          if (status === 404) {
-            // Canvas was deleted on backend — create a new one
+          // 404: deleted on the backend — recreate, once per id. 5xx: that row
+          // can't be written to; the board is real and the user expects it
+          // saved, so recreate that too — but only once per session (see the
+          // ref), or a permanently failing PUT becomes a duplicate-board loop.
+          const serverError = status !== undefined && status >= 500;
+          const canRecreate = status === 404
+            ? !recreatedCanvasIdsRef.current.has(existingId)
+            : serverError && !recreatedAfterServerErrorRef.current;
+          if (canRecreate) {
+            if (serverError) recreatedAfterServerErrorRef.current = true;
+            recreatedCanvasIdsRef.current.add(existingId);
             setCanvases((prev) => {
               const updated = [...prev];
               if (updated[canvasIdx]) updated[canvasIdx] = { ...updated[canvasIdx], id: null };
@@ -1938,7 +1918,11 @@ export default function ClosetPage() {
       // Больше НЕ глотаем ошибки молча (в т.ч. INVALID_OUTFIT_COMPOSITION):
       // раньше доска показывалась локально, но молча не сохранялась и пропадала
       // после перезахода. Показываем пользователю, что сохранить не удалось.
-      console.error('Failed to save canvas to backend:', err);
+      //
+      // console.warn, а НЕ console.error: dev-оверлей Next.js поднимает всё,
+      // залогированное через console.error, в полноэкранную runtime-ошибку —
+      // хотя сбой автосохранения уже обработан и показан баннером.
+      console.warn('Failed to save canvas to backend:', describeApiError(err));
       setSaveFailed(true);
       setTimeout(() => setSaveFailed(false), 4000);
       return false;
@@ -1950,6 +1934,8 @@ export default function ClosetPage() {
   // Blob key of the user's own uploaded photo when примерка идёт "на своё фото".
   // Persisted in a ref so a Retry re-runs the same mode.
   const tryOnPersonKeyRef = useRef<string | undefined>(undefined);
+  // Превью выбранного фото — показываем его в модалке ожидания.
+  const tryOnPersonPreviewRef = useRef<string | undefined>(undefined);
 
   // Премиум/про с исчерпанной квотой доплачивают монетами (фолбэк, зеркалит
   // CoinGateService). Не блокируем такой запрос — сервер спишет монеты; гейт
@@ -2024,7 +2010,7 @@ export default function ClosetPage() {
       .map((id) => items.find((i) => i.id === id)?.imageData)
       .filter(Boolean) as string[];
 
-    setTryOnState({ status: 'loading', previewImages });
+    setTryOnState({ status: 'loading', previewImages, personImage: tryOnPersonPreviewRef.current });
 
     const buildJob = async () => {
       let snapshotBlob: Blob | undefined;
@@ -2044,13 +2030,13 @@ export default function ClosetPage() {
         saveActiveTryOnJob(job.id);
         tryOnStartTimeRef.current = Date.now();
         logAnalyticsEvent(Events.TRYON_PROCESSING_STARTED);
-        setTryOnState((prev) => ({ status: 'processing', previewImages: prev?.previewImages }));
+        setTryOnState((prev) => ({ status: 'processing', previewImages: prev?.previewImages, personImage: prev?.personImage }));
         fetchPlan();
         activeTryOnHandleRef.current = watchTryOnUntilDone(
           job.id,
           (progress) => {
             if (!tryOnCancelRef.current && progress.status === 'PROCESSING') {
-              setTryOnState((prev) => ({ status: 'processing', previewImages: prev?.previewImages }));
+              setTryOnState((prev) => ({ status: 'processing', previewImages: prev?.previewImages, personImage: prev?.personImage }));
             }
           },
           (result) => {
@@ -2215,15 +2201,17 @@ export default function ClosetPage() {
             <button
               onClick={() => { setShowGuide(true); logAnalyticsEvent(Events.CLOSET_GUIDE_OPENED); }}
               className="relative shrink-0 flex items-center gap-1 pl-2 pr-2.5 h-8 rounded-full active:scale-[0.95] transition-transform shadow-sm"
-              style={{ background: 'linear-gradient(135deg, #F370A7 0%, #e0559a 100%)' }}
+              // Розовый в гардеробе оставлен только за «добавить вещь» и Beautify —
+              // остальные действия чёрные, иначе розовым подсвечено всё сразу.
+              style={{ background: '#141014' }}
               aria-label={getGuideStrings(locale).guide}
             >
               <BookOpen size={12} strokeWidth={2.4} color="#fff" />
               <span className="text-[11px] font-bold text-white whitespace-nowrap">{getGuideStrings(locale).guide}</span>
               {/* Pulsing dot to draw the eye on first visits */}
               <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#F370A7' }} />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 border-2 border-white" style={{ background: '#F370A7' }} />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#141014' }} />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 border-2 border-white" style={{ background: '#141014' }} />
               </span>
             </button>
           </div>
@@ -2235,8 +2223,8 @@ export default function ClosetPage() {
           to   { opacity: 1; transform: translate(-50%, 0); }
         }
         @keyframes tryOnPulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(243,112,167,0.55); }
-          50%       { box-shadow: 0 0 0 8px rgba(243,112,167,0); }
+          0%, 100% { box-shadow: 0 0 0 0 rgba(20,16,20,0.42); }
+          50%       { box-shadow: 0 0 0 8px rgba(20,16,20,0); }
         }
         @keyframes tryOnShimmer {
           0%   { background-position: -200% center; }
@@ -2271,22 +2259,6 @@ export default function ClosetPage() {
             }}
           />
         </div>
-        {/* ── Build your closet hero (v2 gate: until a top + bottom exist) ── */}
-        {buildMode && (
-          <div
-            className="mx-4 mt-3 rounded-3xl overflow-hidden"
-            style={{
-              background: theme === 'dark' ? 'linear-gradient(180deg,#241823,#191319)' : 'linear-gradient(180deg,#faf7fb,#f1ecf3)',
-              border: `1px solid ${theme === 'dark' ? 'rgba(255,255,255,0.06)' : '#efe7ef'}`,
-            }}
-          >
-            <div className="px-5 pt-5 pb-1">
-              <h2 className="text-[22px] font-extrabold tracking-[-0.5px] text-black dark:text-white">{t.cv_hero_title}</h2>
-              <p className="text-[13.5px] mt-1 leading-snug" style={{ color: theme === 'dark' ? '#b7a6b3' : '#8a7f88' }}>{t.cv_hero_subtitle}</p>
-            </div>
-            <ClosetGateShowcase dark={theme === 'dark'} />
-          </div>
-        )}
         {/* ── Get-started nudge (legacy top card; v2 docks it at the bottom) ── */}
         {showGetStarted && !closetV2 && (
           <GetStartedCard
@@ -2303,8 +2275,7 @@ export default function ClosetPage() {
             }}
           />
         )}
-        {/* ── My Outfits (hidden until the closet is unlocked: top + bottom) ── */}
-        {!buildMode && (
+        {/* ── My Outfits ── */}
         <OutfitSection
           activeTab={closetTab}
           onTabChange={setClosetTab}
@@ -2315,8 +2286,6 @@ export default function ClosetPage() {
           onRetryTryOns={() => loadTryOns(0)}
           onLoadMoreTryOns={() => loadTryOns(tryOnPageRef.current + 1)}
           onDeleteTryOn={handleDeleteTryOn}
-          calendarDays={calendarDays}
-          canTryOn={canTryOn}
           onTryItOnItems={handleTryItOnFromItems}
           allItems={items}
           canvases={displayCanvases}
@@ -2367,48 +2336,111 @@ export default function ClosetPage() {
           onDeleteCanvas={handleDeleteCanvas}
           onAddItem={(cat) => openAdd(localCatToSection(cat))}
         />
+
+        {/* ── Гардероб: одна сетка 3×N + фильтры (раздел · тип · сортировка) ──
+             На «Образах» и «Календаре» гардероб скрыт: там витрина собранных
+             образов, а список вещей только уводил бы от неё. */}
+        {closetTab !== 'outfits' && closetTab !== 'calendar' && (
+        <div id="closet-grid" className="mt-8" style={{ scrollMarginTop: 8 }}>
+          {/* Счётчик + сортировка */}
+          <div className="flex items-center justify-between px-4 mb-2.5">
+            <h2 className="text-[17px] font-bold text-gray-900 dark:text-white tracking-tight">
+              {t.cl_items_n.replace('{n}', String(gridItems.length + gridPending.length))}
+            </h2>
+            <div className="relative">
+              <button
+                onClick={() => setSortMenu((v) => !v)}
+                className="flex items-center gap-1 h-8 pl-3 pr-2.5 rounded-full text-[12px] font-semibold text-gray-600 dark:text-white/70 bg-gray-100 dark:bg-white/10 active:scale-[0.96] transition-transform"
+              >
+                {gridSort === 'recent' ? t.cl_sort_recent : t.cl_sort_oldest}
+                <ChevronDown size={14} strokeWidth={2.4} />
+              </button>
+              {sortMenu && (
+                <>
+                  <div className="fixed inset-0 z-[19]" onClick={() => setSortMenu(false)} />
+                  <div className="absolute right-0 top-9 z-20 w-[168px] rounded-2xl bg-white dark:bg-[#1c1c1e] py-1.5 shadow-lg border border-gray-100 dark:border-white/10">
+                    {(['recent', 'oldest'] as const).map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => { setGridSort(s); setSortMenu(false); }}
+                        className="w-full flex items-center justify-between px-3.5 py-2 text-[13px] font-semibold text-gray-800 dark:text-white active:bg-gray-50 dark:active:bg-white/5"
+                      >
+                        {s === 'recent' ? t.cl_sort_recent : t.cl_sort_oldest}
+                        {gridSort === s && <Check size={15} strokeWidth={3} className="text-gray-900 dark:text-white" />}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Разделы */}
+          <div className="flex gap-2 overflow-x-auto hide-scrollbar px-4 pb-1">
+            <FilterChip label={t.all} count={items.length} selected={gridSection === 'ALL'}
+              onClick={() => { setGridSection('ALL'); setGridType(null); }} />
+            {gridSections.map((s) => (
+              <FilterChip
+                key={s}
+                label={taxLabel(s, locale)}
+                count={countForSection(s)}
+                selected={gridSection === s}
+                onClick={() => { setGridSection(s); setGridType(null); }}
+              />
+            ))}
+          </div>
+
+          {/* Типы внутри выбранного раздела */}
+          {gridTypes.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto hide-scrollbar px-4 mt-2">
+              <FilterChip label={t.all} selected={gridType === null} onClick={() => setGridType(null)} subtle />
+              {gridTypes.map((sub) => (
+                <FilterChip key={sub} label={taxLabel(sub, locale)} selected={gridType === sub}
+                  onClick={() => setGridType(sub)} subtle />
+              ))}
+            </div>
+          )}
+
+          {/* Сетка */}
+          {gridItems.length === 0 && gridPending.length === 0 ? (
+            <div className="mx-4 mt-4 rounded-2xl border border-dashed border-gray-200 dark:border-white/15 flex flex-col items-center justify-center gap-2 py-10 px-4">
+              <p className="text-[13px] font-medium text-gray-400">{t.noItemsInSection}</p>
+              <button
+                onClick={() => openAdd(gridSection === 'ALL' ? 'TOPS' : gridSection)}
+                className="px-4 py-1.5 rounded-full text-[12px] font-semibold border active:scale-[0.97] transition-transform"
+                style={{ color: '#F370A7', borderColor: 'rgba(243,112,167,0.4)', background: 'rgba(243,112,167,0.06)' }}
+              >
+                {t.tapPlusToAdd}
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-x-2.5 gap-y-4 px-4 mt-3.5">
+              {gridPending.map((p) => (
+                <ClothingItemCard
+                  key={p.id}
+                  item={{ id: p.id, category: p.category, imageData: p.imageData, createdAt: '' }}
+                  onTap={() => {}}
+                  isProcessing
+                  processingStep={p.step}
+                  processingProgress={p.progress}
+                  startedAt={p.startedAt}
+                  onRemove={() => removePendingUpload(p.id)}
+                />
+              ))}
+              {gridItems.map((item) => (
+                <ClothingItemCard key={item.id} item={item} onTap={() => setEditItem(item)}
+                  isProcessing={beautifyingIds?.has(item.id)} beautifying
+                  onBeautify={FEATURES.beautifyEnabled && !item.beautified && !item.sourceProductId ? () => handleWardrobeBeautify(item) : undefined} />
+              ))}
+            </div>
+          )}
+        </div>
         )}
 
-        {/* ── Sections (new taxonomy: Tops · Bottoms · Dresses & Sets · Outerwear · Footwear · Accessories) — hidden during the build-your-closet gate ── */}
-        {!buildMode && SECTION_ORDER.map((section) => {
-          const filter = sectionFilter[section] ?? null;
-          return (
-            <div key={section} id={`closet-section-${section}`} style={{ scrollMarginTop: 8 }}>
-            <ClothingSection
-              title={taxLabel(section, locale)}
-              cats={subcategoriesForSection(section)}
-              filter={filter}
-              items={itemsForSection(section, filter)}
-              totalCount={countForSection(section)}
-              pendingItems={pendingForSection(section)}
-              onFilterChange={(c) => setSectionFilter((prev) => ({ ...prev, [section]: c }))}
-              onTapItem={setEditItem}
-              onViewAll={() => openViewAllSection(section)}
-              onRemovePending={removePendingUpload}
-              onAddItem={() => openAdd(section)}
-              beautifyingIds={beautifyingIds}
-              onBeautify={FEATURES.beautifyEnabled ? handleWardrobeBeautify : undefined}
-            />
-            </div>
-          );
-        })}
-
-        <div className="h-12" />
+        {/* Плавающая кнопка «Добавить вещь» перекрывает низ: на «Образах» под
+            ней стоит «В ленту», на «Календаре» — «Примерить», запас больше. */}
+        <div className={closetTab === 'outfits' || closetTab === 'calendar' ? 'h-24' : 'h-12'} />
       </main>
-
-      {/* ── View All Modal ─────────────────────────────────────── */}
-      {viewAll && (
-        <ViewAllModal
-          title={viewAll.title}
-          items={viewAll.items}
-          onClose={() => setViewAll(null)}
-          showDelete={false}
-          onDelete={(id) => {
-            handleDelete(id);
-            setViewAll((v) => v ? { ...v, items: v.items.filter((i) => i.id !== id) } : null);
-          }}
-        />
-      )}
 
       {/* ── Interactive Outfit Canvas ──────────────────────────── */}
       {canvasData && (
@@ -2473,16 +2505,6 @@ export default function ClosetPage() {
         )
       )}
 
-      {/* ── Batch processing screen (closet v2 Acloset-style add) ── */}
-      {closetV2 && batchAdd && (
-        <AddProcessingSheet
-          jobs={batchAdd.jobs}
-          headerLabel={batchHeaderLabel}
-          dark={theme === 'dark'}
-          onCancel={cancelBatch}
-        />
-      )}
-
       {/* ── Review window (closet v2 — optimistic local items) ── */}
       {closetV2 && batchReviewOpen && batchReviewItems.length > 0 && (
         <UploadReviewSheet
@@ -2503,6 +2525,8 @@ export default function ClosetPage() {
           onConfirm={finalizeBatch}
           onTryOn={() => { /* try-on happens after the item is in the closet */ }}
           onBeautify={handleReviewBeautify}
+          onBeautifyAll={handleBeautifyAll}
+          beautifyReadyIds={beautifyReadyIds}
           beautifyState={reviewBeautify}
           onRename={() => { /* naming is not part of the taxonomy review */ }}
           onEditCategory={editBatchCategory}
@@ -2630,7 +2654,7 @@ export default function ClosetPage() {
         <TryOnConfirmModal
           savedLayout={tryOnOverrideRef.current?.layout ?? displayCanvases[tryOnCanvasIdxRef.current]?.layout ?? null}
           items={items}
-          onConfirm={(opts) => { setShowTryOnConfirm(false); tryOnPersonKeyRef.current = opts.personImageKey; startTryOn(); }}
+          onConfirm={(opts) => { setShowTryOnConfirm(false); tryOnPersonKeyRef.current = opts.personImageKey; tryOnPersonPreviewRef.current = opts.personPreview; startTryOn(); }}
           onCancel={() => setShowTryOnConfirm(false)}
         />
       )}
@@ -2643,75 +2667,14 @@ export default function ClosetPage() {
           jobId={tryOnState.jobId}
           failureReason={tryOnState.failureReason}
           previewImages={tryOnState.previewImages}
+          personImage={tryOnState.personImage}
           onClose={() => setTryOnState(null)}
           onRetry={startTryOn}
           onCancel={handleCancelTryOn}
         />
       )}
 
-      {/* ── Docked "add a top + a bottom to unlock" loader (v2 gate) ── */}
-      {buildMode && (
-        <div className="absolute left-0 right-0 z-40" style={{ bottom: 0 }}>
-          <div
-            className="mx-3 mb-3 rounded-2xl px-4 pt-4 pb-4"
-            style={{
-              background: theme === 'dark' ? '#1c1620' : '#ffffff',
-              border: `1px solid ${theme === 'dark' ? 'rgba(243,112,167,0.28)' : '#F8D3E4'}`,
-              boxShadow: '0 -6px 24px -12px rgba(20,10,20,0.22)',
-            }}
-          >
-            {/* Title */}
-            <p className="text-[13.5px] font-bold leading-snug" style={{ color: theme === 'dark' ? '#F5EAF0' : '#141118' }}>
-              {t.cv_build_subtitle}
-            </p>
-
-            {/* Progress with item thumbnails (top/bottom or dress/footwear) */}
-            <div className="flex items-center gap-1 mt-4 px-1">
-              {gateMilestones.map((m, i) => (
-                <React.Fragment key={m.label}>
-                  {i > 0 && (
-                    <div className="flex-1 h-1.5 rounded-full overflow-hidden -mt-4" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(243,112,167,0.14)' }}>
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(gateDoneCount / 2) * 100}%`, background: 'linear-gradient(90deg,#F9A9CB,#F370A7)' }} />
-                    </div>
-                  )}
-                  <div className="flex flex-col items-center gap-1.5 flex-none">
-                    <div className="relative w-14 h-14 rounded-full flex items-center justify-center overflow-hidden" style={{ background: theme === 'dark' ? '#241823' : '#faf3f7', border: `2px solid ${m.done ? '#2FB27A' : (theme === 'dark' ? 'rgba(255,255,255,0.10)' : '#F1D9E6')}`, opacity: m.done ? 1 : 0.5 }}>
-                      <Image src={m.img} alt="" width={48} height={48} className="object-contain" unoptimized={needsUnoptimized(m.img)} />
-                      {m.done && (
-                        <span className="absolute -bottom-0.5 -right-0.5 rounded-full flex items-center justify-center" style={{ width: 18, height: 18, background: '#2FB27A', border: `2px solid ${theme === 'dark' ? '#1c1620' : '#fff'}` }}>
-                          <Check size={9} strokeWidth={3.5} color="#fff" />
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-[11.5px] font-bold" style={{ color: m.done ? '#2FB27A' : (theme === 'dark' ? '#B79AAC' : '#B03A72') }}>{m.label}</span>
-                  </div>
-                </React.Fragment>
-              ))}
-            </div>
-
-            {/* CTA (or in-flight spinner) */}
-            {pendingUploads.size > 0 ? (
-              <div className="mt-3 h-12 rounded-2xl flex items-center justify-center gap-2 text-[14px] font-bold" style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.06)' : '#faf0f5', color: theme === 'dark' ? '#F5EAF0' : '#B03A72' }}>
-                <Loader2 size={17} className="animate-spin" />
-                {t.cv_build_adding}
-              </div>
-            ) : (
-              <button
-                onClick={() => openAdd('TOPS')}
-                className="mt-3 w-full h-12 rounded-2xl flex items-center justify-center gap-2 text-white text-[15px] font-bold active:scale-[0.98] transition-transform"
-                style={{ background: '#F370A7' }}
-                aria-label={t.cv_add_item}
-              >
-                <Plus size={20} strokeWidth={2.6} color="white" />
-                {t.cv_add_item}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── Floating Add Button (hidden during the gate — the loader carries the add CTA) ── */}
-      {!buildMode && (
+      {/* ── Floating Add Button ── */}
       <div className="absolute right-5 z-50" style={{ bottom: '20px' }}>
         {closetV2 ? (
           <button
@@ -2734,7 +2697,6 @@ export default function ClosetPage() {
           </button>
         )}
       </div>
-      )}
 
       {/* ── How-to-use guide ── */}
       <ClosetGuide open={showGuide} onClose={() => setShowGuide(false)} />
@@ -3005,7 +2967,7 @@ export default function ClosetPage() {
 }
 
 // ─── My Outfits ─────────────────────────────────────────────────────────────────
-function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnError, tryOnHasMore, onRetryTryOns, onLoadMoreTryOns, onDeleteTryOn, calendarDays, canTryOn, onTryItOnItems, allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem, allowAutoGenerate, autoGenDone, onAutoGenerate, plansEnabled }: {
+function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnError, tryOnHasMore, onRetryTryOns, onLoadMoreTryOns, onDeleteTryOn, onTryItOnItems, allItems, canvases, plan, canGenerate, genCount, limits, tryOnCount, canAddCanvas, onViewItems, onRegenerate, onAddCanvas, onShowPlans, onTryItOn, onDeleteCanvas, aiSuggestingIdx, onAddItem, allowAutoGenerate, autoGenDone, onAutoGenerate, plansEnabled }: {
   activeTab: 'boards' | 'outfits' | 'dressme' | 'calendar';
   onTabChange: (tab: 'boards' | 'outfits' | 'dressme' | 'calendar') => void;
   tryOnJobs: TryOnJobResponse[];
@@ -3015,8 +2977,6 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
   onRetryTryOns: () => void;
   onLoadMoreTryOns: () => void;
   onDeleteTryOn: (id: string) => void;
-  calendarDays: number;
-  canTryOn: boolean;
   onTryItOnItems: (items: ClosetItem[]) => void;
   allItems: ClosetItem[];
   canvases: { id: string | null; layout: SavedCanvasLayout }[];
@@ -3042,6 +3002,20 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
   const { t } = useI18n();
   const { theme } = useTheme();
   const isEmpty = allItems.length === 0;
+
+  // Публикация доски: ?seed=board:<canvasId> открывает подпись с этой доской.
+  // Несохранённой канвы (id === null) в композере нет — делиться нечем.
+  // Выбор «в ленту / во внешние приложения» — общая шторка, как у примерок.
+  const [shareBoard, setShareBoard] = useState<{ id: string; layout: SavedCanvasLayout } | null>(null);
+
+  async function shareBoardExternally(layout: SavedCanvasLayout) {
+    try {
+      const blob = await captureCanvasSnapshot(layout, allItems);
+      await shareImageBlob(blob, 'libas-outfit.png');
+    } catch {
+      /* отмена шаринга или сбой рендера — молча выходим */
+    }
+  }
 
   return (
     <div className="mt-4">
@@ -3073,6 +3047,7 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
             tryOnCount={tryOnCount}
             tryOnLimit={limits.tryItOns}
             onDelete={idx > 0 ? () => onDeleteCanvas(idx) : undefined}
+            onShare={canvas.id ? () => setShareBoard({ id: canvas.id as string, layout: canvas.layout }) : undefined}
             onAddItem={onAddItem}
             allowAutoGenerate={allowAutoGenerate}
             autoGenDone={autoGenDone}
@@ -3141,21 +3116,22 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
           onRetry={onRetryTryOns}
           onLoadMore={onLoadMoreTryOns}
           onDelete={onDeleteTryOn}
+          onCreate={() => onTabChange('boards')}
         />
       )}
 
       {activeTab === 'dressme' && <DressMeReels allItems={allItems} />}
 
       {activeTab === 'calendar' && (
-        <CalendarTab
-          allItems={allItems}
-          calendarDays={calendarDays}
-          plansEnabled={plansEnabled}
-          onShowPlans={onShowPlans}
-          onTryItOn={onTryItOnItems}
-          canTryOn={canTryOn}
-          tryOnCount={tryOnCount}
-          tryOnLimit={limits.tryItOns}
+        <CalendarTab allItems={allItems} onTryItOn={onTryItOnItems} />
+      )}
+
+      {/* Куда делиться доской: в ленту или во внешние приложения */}
+      {shareBoard && (
+        <ShareSheet
+          onClose={() => setShareBoard(null)}
+          onExternal={() => shareBoardExternally(shareBoard.layout)}
+          feedSeed={`board:${shareBoard.id}`}
         />
       )}
     </div>
@@ -3163,7 +3139,10 @@ function OutfitSection({ activeTab, onTabChange, tryOnJobs, tryOnLoading, tryOnE
 }
 
 // ── Outfits tab: gallery of completed virtual try-on results ────────────────────
-function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDelete }: {
+// Витрина сгенерированных образов: сетка 2×N на всю вкладку (список вещей на ней
+// не показываем) и у каждого образа — явная кнопка «В ленту»: публикация и есть
+// главный сценарий этой вкладки.
+function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDelete, onCreate }: {
   jobs: TryOnJobResponse[];
   loading: boolean;
   error: boolean;
@@ -3171,14 +3150,38 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
   onRetry: () => void;
   onLoadMore: () => void;
   onDelete: (id: string) => void;
+  onCreate: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { theme } = useTheme();
+  const router = useRouter();
   const [viewingJob, setViewingJob] = useState<TryOnJobResponse | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  // Какие образы уже опубликованы — считаем по provenance (sourceRefId) своих
+  // постов, чтобы не предлагать выложить то, что уже в ленте.
+  const [sharedIds, setSharedIds] = useState<Set<string>>(() => new Set());
   // Hardware Back closes the full-screen look viewer instead of leaving the page.
   useOverlayBackClose(viewingJob !== null, () => setViewingJob(null));
+
+  useEffect(() => {
+    let cancelled = false;
+    getMyPosts(0, 60)
+      .then((page) => {
+        if (cancelled) return;
+        const ids = new Set<string>();
+        page.content.forEach((p) => p.images.forEach((img) => {
+          if (img.sourceType === 'tryon' && img.sourceRefId) ids.add(img.sourceRefId);
+        }));
+        setSharedIds(ids);
+      })
+      .catch(() => { /* лента недоступна — просто не помечаем образы */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Куда делиться образом — общая шторка: в ленту (?seed=tryon:<id> открывает
+  // подпись сразу с этим образом) или во внешние приложения.
+  const [sharingJob, setSharingJob] = useState<TryOnJobResponse | null>(null);
 
   function confirmDelete() {
     if (!confirmDeleteId) return;
@@ -3188,7 +3191,10 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
     setConfirmDeleteId(null);
   }
   // Newest generated first (createdAt desc). ISO strings compare lexically.
-  const sortedJobs = [...jobs].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+  // Без картинки образа нет — такие задания не занимают плитку в витрине.
+  const sortedJobs = jobs
+    .filter((j) => !!j.resultImageUrl)
+    .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
 
   async function handleDownload(url: string) {
     if (isDownloading) return;
@@ -3225,7 +3231,7 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
     );
   }
 
-  if (jobs.length === 0) {
+  if (sortedJobs.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
         <div
@@ -3236,61 +3242,95 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
         </div>
         <p className="text-[15px] font-bold mb-1" style={{ color: theme === 'dark' ? '#f0f0f0' : '#1f2937' }}>{t.noTryOnsYet}</p>
         <p className="text-[13px]" style={{ color: theme === 'dark' ? '#888' : '#9ca3af' }}>{t.noTryOnsHint}</p>
+        {/* Примерка начинается с доски — уводим туда, а не в пустоту. */}
+        <button
+          onClick={onCreate}
+          className="mt-5 h-11 px-6 rounded-full text-[14px] font-bold active:scale-[0.97] transition-transform"
+          style={{ background: theme === 'dark' ? '#fff' : '#141014', color: theme === 'dark' ? '#141014' : '#fff' }}
+        >
+          {t.cl_looks_empty_cta}
+        </button>
       </div>
     );
   }
 
   return (
     <>
-      <div
-        className="flex gap-3 hide-scrollbar py-2 overflow-x-auto pl-4"
-        style={{ overscrollBehaviorX: 'contain', contain: 'layout paint' }}
-      >
-        {sortedJobs.map((job) => (
-          <div
-            key={job.id}
-            role="button"
-            onClick={() => setViewingJob(job)}
-            className="relative shrink-0 overflow-hidden rounded-[28px] active:scale-[0.98] transition-transform cursor-pointer"
-            style={{
-              width: 'min(82vw, 340px)',
-              height: 440,
-              background: theme === 'dark' ? '#1a1a1a' : '#F3F4F6',
-              boxShadow: theme === 'dark' ? '0 2px 12px rgba(0,0,0,0.3)' : '0 2px 12px rgba(0,0,0,0.06)',
-            }}
-          >
-            {job.resultImageUrl && (
-              <Image src={job.resultImageUrl} alt="Try-on result" fill className="object-cover" unoptimized={needsUnoptimized(job.resultImageUrl)} />
-            )}
-            <button
-              onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(job.id); }}
-              className="absolute top-3.5 left-3.5 z-10 w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
-              style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}
-              title={t.delete}
-              aria-label={t.delete}
-            >
-              <Trash2 size={15} strokeWidth={2.2} className="text-white" />
-            </button>
-          </div>
-        ))}
-        {hasMore && (
+      <div className="px-4 pt-1">
+        <h2 className="text-[17px] font-bold text-gray-900 dark:text-white tracking-tight">
+          {t.cl_looks_n.replace('{n}', String(sortedJobs.length))}
+        </h2>
+        <p className="text-[12.5px] mt-0.5" style={{ color: theme === 'dark' ? '#8a8a8a' : '#9ca3af' }}>{t.cl_share_all_hint}</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-3 gap-y-4 px-4 mt-3">
+        {sortedJobs.map((job) => {
+          const shared = sharedIds.has(job.id);
+          return (
+            <div key={job.id}>
+              <div
+                role="button"
+                onClick={() => setViewingJob(job)}
+                className="relative w-full overflow-hidden rounded-[20px] active:scale-[0.98] transition-transform cursor-pointer"
+                style={{
+                  aspectRatio: '3 / 4',
+                  background: theme === 'dark' ? '#1a1a1a' : '#F3F4F6',
+                  boxShadow: theme === 'dark' ? '0 2px 10px rgba(0,0,0,0.3)' : '0 2px 10px rgba(0,0,0,0.06)',
+                }}
+              >
+                {job.resultImageUrl && (
+                  <Image src={job.resultImageUrl} alt="Try-on result" fill sizes="50vw" className="object-cover" unoptimized={needsUnoptimized(job.resultImageUrl)} />
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(job.id); }}
+                  className="absolute top-2 right-2 z-10 w-8 h-8 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
+                  style={{ background: 'rgba(0,0,0,0.42)', backdropFilter: 'blur(4px)' }}
+                  title={t.delete}
+                  aria-label={t.delete}
+                >
+                  <Trash2 size={14} strokeWidth={2.2} className="text-white" />
+                </button>
+                {job.createdAt && (
+                  <span
+                    className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-full text-[10.5px] font-semibold text-white"
+                    style={{ background: 'rgba(0,0,0,0.42)', backdropFilter: 'blur(4px)' }}
+                  >
+                    {new Date(job.createdAt).toLocaleDateString(locale)}
+                  </span>
+                )}
+              </div>
+              {/* Публикация — главное действие вкладки, поэтому кнопка видна на
+                  каждой карточке, а не спрятана внутри просмотра. */}
+              <button
+                onClick={() => (shared ? router.push('/feed/me') : setSharingJob(job))}
+                className="w-full h-9 mt-2 px-1.5 rounded-full flex items-center justify-center gap-1.5 text-[12.5px] font-bold whitespace-nowrap active:scale-[0.97] transition-transform"
+                style={shared
+                  ? { background: theme === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(20,16,20,0.06)', color: theme === 'dark' ? '#cfcfcf' : '#4b5563' }
+                  : { background: theme === 'dark' ? '#fff' : '#141014', color: theme === 'dark' ? '#141014' : '#fff' }}
+              >
+                {shared ? <Check size={13} strokeWidth={3} className="shrink-0" /> : <Send size={13} strokeWidth={2.4} className="shrink-0" />}
+                <span className="truncate">{shared ? t.cl_in_feed : t.cl_share_feed}</span>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {hasMore && (
+        <div className="px-4 mt-4">
           <button
             onClick={onLoadMore}
             disabled={loading}
-            className="shrink-0 rounded-[28px] flex items-center justify-center text-[14px] font-semibold active:scale-95 transition-transform disabled:opacity-60"
+            className="w-full h-11 rounded-full flex items-center justify-center text-[14px] font-semibold active:scale-[0.98] transition-transform disabled:opacity-60"
             style={{
-              width: 'min(40vw, 160px)',
-              height: 440,
-              background: theme === 'dark' ? '#2a2a2a' : '#FFFFFF',
-              color: '#F370A7',
-              boxShadow: theme === 'dark' ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)',
+              background: theme === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(20,16,20,0.06)',
+              color: theme === 'dark' ? '#f0f0f0' : '#141014',
             }}
           >
             {loading ? <Loader2 size={18} className="animate-spin" /> : t.loadMore}
           </button>
-        )}
-        <div className="w-6 shrink-0" />
-      </div>
+        </div>
+      )}
 
       {/* Full-screen viewer with download */}
       {viewingJob?.resultImageUrl && (
@@ -3326,21 +3366,38 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
               </div>
             </div>
           </div>
+          {/* «В ленту» — основное действие; сохранение в галерею ушло в иконку. */}
           <div className="shrink-0 px-5 pb-10 pt-4 flex gap-2.5">
+            <button
+              onClick={() => (sharedIds.has(viewingJob.id) ? router.push('/feed/me') : setSharingJob(viewingJob))}
+              className="flex-1 h-12 rounded-full bg-white text-black text-[14px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+            >
+              {sharedIds.has(viewingJob.id) ? <Check size={15} strokeWidth={3} /> : <Send size={15} strokeWidth={2.4} />}
+              {sharedIds.has(viewingJob.id) ? t.cl_in_feed : t.cl_share_feed}
+            </button>
             <button
               onClick={() => handleDownload(viewingJob.resultImageUrl!)}
               disabled={isDownloading}
-              className="flex-1 h-12 rounded-full bg-white text-black text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-12 h-12 shrink-0 rounded-full bg-white/15 text-white flex items-center justify-center disabled:opacity-50 active:scale-[0.95] transition-transform"
+              title={t.myLooksSaveLook}
+              aria-label={t.myLooksSaveLook}
             >
               {isDownloading ? (
-                <Loader2 size={14} className="animate-spin" />
+                <Loader2 size={16} className="animate-spin" />
               ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               )}
-              {t.myLooksSaveLook}
             </button>
           </div>
         </div>
+      )}
+
+      {sharingJob && (
+        <ShareSheet
+          onClose={() => setSharingJob(null)}
+          onExternal={() => { if (sharingJob.resultImageUrl) void shareWatermarked(sharingJob.resultImageUrl); }}
+          feedSeed={`tryon:${sharingJob.id}`}
+        />
       )}
 
       {/* Delete confirmation */}
@@ -3474,6 +3531,7 @@ function OutfitCard({
   tryOnCount,
   tryOnLimit,
   onDelete,
+  onShare,
   onAddItem,
   allowAutoGenerate,
   autoGenDone,
@@ -3494,6 +3552,8 @@ function OutfitCard({
   tryOnCount: number;
   tryOnLimit: number;
   onDelete?: () => void | Promise<void>;
+  /** Публикация доски в ленту. Нет id у канвы (ещё не сохранена) → нет и кнопки. */
+  onShare?: () => void;
   onAddItem?: (cat: ClosetCategory) => void;
   allowAutoGenerate: boolean;
   autoGenDone: boolean;
@@ -3554,17 +3614,30 @@ function OutfitCard({
         boxShadow: theme === 'dark' ? '0 2px 12px rgba(0,0,0,0.3)' : '0 2px 12px rgba(0,0,0,0.06)',
       }}
     >
-      {/* Top-left delete button */}
-      {onDelete && (
-        <button
-          onClick={onDelete}
-          className="absolute top-3.5 left-3.5 z-10 w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
-          style={{ background: theme === 'dark' ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.08)' }}
-          title="Delete"
-        >
-          <Trash2 size={14} strokeWidth={2.2} className="text-red-400" />
-        </button>
-      )}
+      {/* Top-left: удалить + «в ленту» (иконкой, как на карточках образов) */}
+      <div className="absolute top-3.5 left-3.5 z-10 flex items-center gap-2">
+        {onDelete && (
+          <button
+            onClick={onDelete}
+            className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
+            style={{ background: theme === 'dark' ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.08)' }}
+            title="Delete"
+          >
+            <Trash2 size={14} strokeWidth={2.2} className="text-red-400" />
+          </button>
+        )}
+        {onShare && displayEntries.length > 0 && (
+          <button
+            onClick={onShare}
+            className="w-9 h-9 rounded-full flex items-center justify-center active:scale-[0.95] transition-transform"
+            style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(20,16,20,0.06)' }}
+            title={t.cl_share_feed}
+            aria-label={t.cl_share_feed}
+          >
+            <Send size={14} strokeWidth={2.3} style={{ color: theme === 'dark' ? '#f0f0f0' : '#141014' }} />
+          </button>
+        )}
+      </div>
 
       {/* Top-right: Generate-outfit pill with its diamond cost */}
       {(canGenerateOutfit || isEmpty) && onRegenerate && (
@@ -3718,29 +3791,31 @@ function OutfitCard({
         )}
       </div>
 
-      {/* Bottom action bar — shown when there's a saved layout, outfit can be generated, or closet is empty */}
+      {/* Bottom action bar — shown when there's a saved layout, outfit can be generated, or closet is empty.
+          Публикация тут только иконкой сверху: подпись «в ленту» живёт в календаре. */}
       {(displayEntries.length > 0 || canGenerateOutfit || isEmpty) && (
       <div className="flex gap-2.5 px-5 pb-5">
         <button
           onClick={onViewItems}
-          className="flex-1 h-[44px] rounded-full flex items-center justify-center text-[12px] font-semibold tracking-wide"
+          className="flex-1 h-[44px] rounded-full flex items-center justify-center gap-1.5 text-[12px] font-semibold tracking-wide active:scale-[0.97] transition-transform"
           style={{
             background: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
             color: theme === 'dark' ? '#aaa' : '#666'
           }}
         >
+          <Pencil size={14} strokeWidth={2.2} />
           {t.viewItems}
         </button>
         {onTryItOn && (displayEntries.length > 0 || canGenerateOutfit || isEmpty) && (
         <button
           onClick={isEmpty ? undefined : onTryItOn}
           disabled={isEmpty}
-          className="flex-1 h-[44px] rounded-full flex items-center justify-center gap-1.5 text-[12px] font-bold text-white tracking-wide active:scale-[0.97] transition-transform"
+          className="flex-1 h-[44px] rounded-full flex items-center justify-center gap-1.5 text-[12px] font-bold text-white tracking-wide whitespace-nowrap active:scale-[0.97] transition-transform"
           style={{
-            background: 'linear-gradient(135deg, #F370A7 0%, #e0409a 50%, #F370A7 100%)',
+            background: 'linear-gradient(135deg, #141014 0%, #332c33 50%, #141014 100%)',
             backgroundSize: '200% auto',
             animation: 'tryOnShimmer 2.4s linear infinite, tryOnPulse 2s ease-in-out infinite',
-            boxShadow: '0 4px 18px rgba(243,112,167,0.5)',
+            boxShadow: '0 4px 18px rgba(20,16,20,0.35)',
           }}
         >
           <span>{t.tryItOn}</span>
@@ -3786,108 +3861,26 @@ function FlatLayPlaceholder({ label }: { label: string }) {
   );
 }
 
-// ─── Clothing Section ───────────────────────────────────────────────────────────
-interface ClothingSectionProps {
-  title: string;
-  cats: WardrobeSubcategory[];
-  filter: WardrobeSubcategory | null;
-  items: ClosetItem[];
-  totalCount: number;
-  pendingItems?: { id: string; category: ClosetCategory; imageData: string; step: string; progress: number; startedAt: number }[];
-  onFilterChange: (cat: WardrobeSubcategory | null) => void;
-  onTapItem: (item: ClosetItem) => void;
-  onViewAll: () => void;
-  onRemovePending?: (id: string) => void;
-  onAddItem?: () => void;
-  /** id вещей, для которых сейчас крутится Beautify в фоне (loader-оверлей на карточке). */
-  beautifyingIds?: Set<string>;
-  /** Тап по значку Beautify на карточке (undefined → значок не показываем). */
-  onBeautify?: (item: ClosetItem) => void;
-}
-
-function ClothingSection({ title, cats, filter, items, totalCount, pendingItems = [], onFilterChange, onTapItem, onViewAll, onRemovePending, onAddItem, beautifyingIds, onBeautify }: ClothingSectionProps) {
-  const { t, locale } = useI18n();
-  const isEmpty = items.length === 0 && pendingItems.length === 0;
+/** Фильтр-чип сетки. `subtle` — второй ряд (типы): визуально тише разделов,
+ *  чтобы два ряда чипов не спорили за внимание. */
+function FilterChip({ label, count, selected, onClick, subtle }: {
+  label: string;
+  count?: number;
+  selected: boolean;
+  onClick: () => void;
+  subtle?: boolean;
+}) {
+  const base = 'shrink-0 flex items-center gap-1.5 rounded-full transition-colors active:scale-[0.96]';
+  const size = subtle ? 'h-7 px-3 text-[12px]' : 'h-8 px-3.5 text-[12.5px]';
+  const skin = selected
+    ? (subtle ? 'bg-gray-900 text-white font-semibold dark:bg-white dark:text-black' : 'bg-black text-white font-bold dark:bg-white dark:text-black')
+    : 'bg-gray-100 text-gray-500 font-medium dark:bg-white/10 dark:text-white/60';
   return (
-    <div className="mt-9">
-      {/* Section header */}
-      <div className="flex items-center justify-between px-4 mb-3">
-        <div className="flex items-center gap-2">
-          <h2 className="text-[17px] font-bold text-gray-900 tracking-tight">{title}</h2>
-          <span className="px-1.5 py-0.5 rounded-full bg-gray-100 text-[11px] font-semibold text-gray-500">
-            {totalCount}
-          </span>
-        </div>
-        <button onClick={onViewAll} className="text-[12px] text-gray-400 font-medium">
-          {t.viewAll}
-        </button>
-      </div>
-
-      {/* Filter chips */}
-      {cats.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto hide-scrollbar px-4 mb-3.5">
-          <FilterChip label={t.all} selected={filter === null} onClick={() => onFilterChange(null)} />
-          {cats.map((cat) => (
-            <FilterChip
-              key={cat}
-              label={taxLabel(cat, locale)}
-              selected={filter === cat}
-              onClick={() => onFilterChange(cat)}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Horizontal scroll row — or empty state */}
-      {isEmpty ? (
-        <div className="mx-4 rounded-2xl border border-dashed border-gray-200 flex flex-col items-center justify-center gap-2 py-7 px-4">
-          <p className="text-[13px] font-medium text-gray-400">{t.noItemsInSection}</p>
-          {onAddItem && (
-            <button
-              onClick={onAddItem}
-              className="px-4 py-1.5 rounded-full text-[12px] font-semibold border active:scale-[0.97] transition-transform"
-              style={{ color: '#F370A7', borderColor: 'rgba(243,112,167,0.4)', background: 'rgba(243,112,167,0.06)' }}
-            >
-              {t.tapPlusToAdd}
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="flex gap-2.5 overflow-x-auto hide-scrollbar px-4">
-          {pendingItems.map((p) => (
-            <ClothingItemCard
-              key={p.id}
-              item={{ id: p.id, category: p.category, imageData: p.imageData, createdAt: '' }}
-              onTap={() => {}}
-              isProcessing
-              processingStep={p.step}
-              processingProgress={p.progress}
-              startedAt={p.startedAt}
-              onRemove={onRemovePending ? () => onRemovePending(p.id) : undefined}
-            />
-          ))}
-          {items.map((item) => (
-            <ClothingItemCard key={item.id} item={item} onTap={() => onTapItem(item)}
-              isProcessing={beautifyingIds?.has(item.id)} beautifying
-              onBeautify={onBeautify && !item.beautified && !item.sourceProductId ? () => onBeautify(item) : undefined} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function FilterChip({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`shrink-0 px-3.5 py-[6px] rounded-full text-[12px] transition-colors
-        ${selected
-          ? 'bg-black text-white font-semibold'
-          : 'bg-gray-100 text-gray-500 font-medium'
-        }`}
-    >
+    <button onClick={onClick} className={`${base} ${size} ${skin}`}>
       {label}
+      {count !== undefined && count > 0 && (
+        <span className="text-[11px] font-semibold" style={{ opacity: selected ? 0.65 : 0.75 }}>{count}</span>
+      )}
     </button>
   );
 }
@@ -3918,21 +3911,21 @@ function ClothingItemCard({ item, onTap, isProcessing, startedAt, onRemove, beau
   const currentPhase = PHASES.find((p) => elapsed < p.until) ?? PHASES[PHASES.length - 1];
   const simProgress = Math.min(Math.round((elapsed / 60) * 95), 95);
 
+  // Дата добавления под карточкой — как в Acloset: с сортировкой «сначала
+  // новые» она объясняет порядок сетки.
+  const added = item.createdAt ? new Date(item.createdAt) : null;
+  const addedLabel = added && !Number.isNaN(added.getTime()) ? added.toLocaleDateString(locale) : '';
+
   return (
-    <div
-      className={`shrink-0 w-[120px] h-[168px] rounded-2xl overflow-hidden relative cursor-pointer
-                 active:scale-[0.97] transition-transform`}
-      onClick={isProcessing ? undefined : onTap}
-    >
-      <div className="relative w-full h-full">
-        {item.imageData ? (
-          // beautified → unoptimized: next/image грузил бы /_next/image?url=…
-          // (другой URL, чем предзагретый raw) → секунда старого фото после свапа.
-          <Image src={item.imageData} alt={item.category} fill className={`object-contain ${isProcessing ? 'opacity-50' : ''}`} unoptimized={needsUnoptimized(item.imageData) || !!item.beautified} />
-        ) : (
-          <div className="w-full h-full bg-gray-200 animate-pulse" />
-        )}
-      </div>
+    <div className="cursor-pointer active:scale-[0.97] transition-transform" onClick={isProcessing ? undefined : onTap}>
+      <div className="relative w-full rounded-2xl overflow-hidden bg-gray-50 dark:bg-white/5" style={{ aspectRatio: '3 / 4' }}>
+      {item.imageData ? (
+        // beautified → unoptimized: next/image грузил бы /_next/image?url=…
+        // (другой URL, чем предзагретый raw) → секунда старого фото после свапа.
+        <Image src={item.imageData} alt={item.category} fill className={`object-contain ${isProcessing ? 'opacity-50' : ''}`} unoptimized={needsUnoptimized(item.imageData) || !!item.beautified} />
+      ) : (
+        <div className="w-full h-full bg-gray-200 dark:bg-white/10 animate-pulse" />
+      )}
       {/* Beautify — прямо на карточке (в попапе вещи кнопки больше нет) */}
       {!isProcessing && onBeautify && (
         <button
@@ -3977,121 +3970,59 @@ function ClothingItemCard({ item, onTap, isProcessing, startedAt, onRemove, beau
           )}
         </div>
       )}
-      {/* Category label */}
-      {!isProcessing && (
-        <div className="absolute bottom-0 left-0 right-0 px-2.5 py-2"
-             style={{ background: 'linear-gradient(transparent, rgba(0,0,0,0.4))' }}>
-          <span className="text-[10px] font-medium text-white/90 uppercase tracking-wide">
-            {taxLabel(effectiveSubcategory(item), locale)}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── View All Modal ─────────────────────────────────────────────────────────────
-function ViewAllModal({
-  title,
-  items,
-  onClose,
-  onDelete,
-  showDelete = true,
-}: {
-  title: string;
-  items: ClosetItem[];
-  onClose: () => void;
-  showDelete?: boolean;
-  onDelete: (id: string) => void;
-}) {
-  const { t, locale } = useI18n();
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/30 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-[430px] rounded-t-3xl bg-white flex flex-col"
-        style={{ maxHeight: '85vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Drag handle */}
-        <div className="flex justify-center pt-3 pb-2">
-          <div className="w-9 h-1 rounded-full bg-gray-200" />
-        </div>
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3">
-          <h3 className="text-[17px] font-bold text-gray-900">{title}</h3>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-            <X size={15} className="text-gray-500" />
-          </button>
-        </div>
-        {/* Grid */}
-        <div className="flex-1 overflow-y-auto px-4 pb-10">
-          {items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 gap-2">
-              <p className="text-[13px] text-gray-400 font-medium">{t.noItemsYet}</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-2.5">
-              {items.map((item) => (
-                <div key={item.id} className="relative aspect-[3/4] rounded-xl overflow-hidden">
-                  <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized={needsUnoptimized(item.imageData)} />
-                  {showDelete && (
-                    <button
-                      onClick={() => onDelete(item.id)}
-                      className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/85 flex items-center justify-center"
-                      aria-label="Delete"
-                    >
-                      <X size={10} color="#E53E3E" strokeWidth={2.5} />
-                    </button>
-                  )}
-                  <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5"
-                       style={{ background: 'linear-gradient(transparent, rgba(0,0,0,0.35))' }}>
-                    <span className="text-[9px] font-medium text-white/90 uppercase tracking-wide">
-                      {taxLabel(effectiveSubcategory(item), locale)}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
+
+      {/* Подпись под карточкой: что это + когда добавили (как в Acloset).
+          Раньше тип печатался поверх фото и мешал самой вещи. */}
+      <p className="text-[11.5px] font-semibold leading-tight truncate mt-1.5 text-gray-800 dark:text-white/90">
+        {isProcessing ? t.uploading : (item.displayName || taxLabel(effectiveSubcategory(item), locale))}
+      </p>
+      {!isProcessing && addedLabel && (
+        <p className="text-[10.5px] leading-tight truncate mt-0.5 text-gray-400 dark:text-white/40">{addedLabel}</p>
+      )}
     </div>
   );
 }
 
 // ─── Outfit Days Sheet ──────────────────────────────────────────────────────────
 
-function pickItem(items: ClosetItem[], day: Date): ClosetItem | null {
+// Вещь дня: детерминированный выбор по дате, сдвинутый на `offset` — так кнопка
+// «другой образ» перебирает варианты, а сам день остаётся стабильным.
+function pickItem(items: ClosetItem[], day: Date, offset = 0): ClosetItem | null {
   if (!items.length) return null;
-  const dayIndex = Math.floor(day.getTime() / 86400000);
-  return items[dayIndex % items.length];
+  const dayIndex = Math.floor(day.getTime() / 86400000) + offset;
+  return items[((dayIndex % items.length) + items.length) % items.length];
 }
 
 // ── Calendar tab: next-7-days outfit suggestions, window-sized cards ────────────
+// Вся неделя открыта всем (июль 2026): планов и замков на днях больше нет.
 function CalendarTab({
   allItems,
-  calendarDays,
-  onShowPlans,
-  plansEnabled,
   onTryItOn,
-  tryOnCount,
-  tryOnLimit,
 }: {
   allItems: ClosetItem[];
-  calendarDays: number;
-  onShowPlans: () => void;
-  plansEnabled: boolean;
   onTryItOn: (items: ClosetItem[]) => void;
-  canTryOn: boolean;
-  tryOnCount: number;
-  tryOnLimit: number;
 }) {
   const { t } = useI18n();
   const { theme } = useTheme();
+  const dark = theme === 'dark';
   const [selectedDayIdx, setSelectedDayIdx] = useState(0);
+  // Сдвиг подбора — свой у каждого дня, чтобы «другой образ» не сбрасывался при
+  // переключении дат.
+  const [shuffleByDay, setShuffleByDay] = useState<Record<number, number>>({});
+  // Свайп по карточке листает дни — так же, как тап по строке недели.
+  const swipeXRef = useRef<number | null>(null);
+  // Куда делиться образом дня: в ленту или во внешние приложения.
+  const [sharingDay, setSharingDay] = useState<ClosetItem[] | null>(null);
+
+  async function shareDayExternally(dayItems: ClosetItem[]) {
+    try {
+      const blob = await captureCanvasSnapshot(buildLayoutFromIds(dayItems.map((i) => i.id), allItems), allItems);
+      await shareImageBlob(blob, 'libas-outfit.png');
+    } catch {
+      /* отмена шаринга или сбой рендера — молча выходим */
+    }
+  }
   const days = useMemo(() => {
     const now = new Date();
     return Array.from({ length: 7 }, (_, i) => {
@@ -4113,135 +4044,196 @@ function CalendarTab({
         </div>
       ) : (() => {
         const selDay = days[selectedDayIdx];
-        const upper = pickItem(upperItems, selDay);
+        // Разные множители сдвига — иначе «другой образ» листал бы все категории
+        // синхронно и на коротких списках менял бы вид не всегда.
+        const shuffle = shuffleByDay[selectedDayIdx] ?? 0;
+        const upper = pickItem(upperItems, selDay, shuffle);
         // A dress/jumpsuit is a complete outfit on its own — never pair it with a
         // separate bottom (hard rule H1: no "dress + skirt/pants").
         const upperIsFullBody = !!upper && FULL_BODY_CATS.includes(upper.category);
-        const lower = upperIsFullBody ? null : pickItem(lowerItems, selDay);
-        const shoe = pickItem(shoeItems, selDay);
-        const shawl = pickItem(shawlItems, selDay);
-        const sideAcc = pickItem(sideAccItems, selDay);
+        const lower = upperIsFullBody ? null : pickItem(lowerItems, selDay, shuffle * 3);
+        const shoe = pickItem(shoeItems, selDay, shuffle * 5);
+        const shawl = pickItem(shawlItems, selDay, shuffle * 7);
+        const sideAcc = pickItem(sideAccItems, selDay, shuffle * 11);
         const selIsToday = selectedDayIdx === 0 && new Date().toDateString() === selDay.toDateString();
-        const selUnlocked = !plansEnabled || selectedDayIdx < calendarDays;
         const headerLabel = `${t.dayNames[selDay.getDay()]}, ${selDay.getDate()} ${t.monthNames[selDay.getMonth()]}`;
+        // Главная колонка тянется на всю карточку, поэтому пустые слоты не
+        // резервируем: два предмета заполняют её так же, как четыре.
+        const mainPieces = ([
+          upper ? { item: upper, grow: 1.15 } : null,
+          lower ? { item: lower, grow: 1 } : null,
+          shoe ? { item: shoe, grow: 0.5 } : null,
+        ].filter(Boolean) as { item: ClosetItem; grow: number }[]);
+        const accPieces = [shawl, sideAcc].filter(Boolean) as ClosetItem[];
+        const dayItems = [shawl, upper, lower, shoe, sideAcc].filter(Boolean) as ClosetItem[];
         return (
           <>
-            {/* Week day selector — makes it read clearly as a calendar */}
-            <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-3">
+            {/* Неделя целиком, без горизонтальной прокрутки: семь равных ячеек
+                читаются как строка календаря, а не как лента чипов. */}
+            <div className="flex gap-1.5 pb-3">
               {days.map((day, i) => {
-                const isUnlocked = !plansEnabled || i < calendarDays;
                 const isToday = i === 0 && new Date().toDateString() === day.toDateString();
                 const selected = i === selectedDayIdx;
                 return (
                   <button
                     key={i}
                     onClick={() => setSelectedDayIdx(i)}
-                    className="shrink-0 flex flex-col items-center justify-center rounded-2xl active:scale-95 transition-transform"
+                    className="flex-1 min-w-0 flex flex-col items-center justify-center rounded-2xl active:scale-95 transition-transform"
                     style={{
-                      width: 52,
-                      height: 64,
+                      height: 62,
+                      // Выбранный день — чёрный, как активный фильтр в гардеробе:
+                      // розовый в закладке оставлен за «добавить вещь».
                       background: selected
-                        ? 'linear-gradient(135deg, #F370A7, #e0559a)'
-                        : (theme === 'dark' ? '#1f1f1f' : '#f3f4f6'),
-                      opacity: isUnlocked ? 1 : 0.55,
+                        ? (dark ? '#ffffff' : '#141014')
+                        : (dark ? '#1f1f1f' : '#f3f4f6'),
                     }}
                   >
                     <span
                       className="text-[10px] font-semibold leading-none mb-1"
-                      style={{ color: selected ? 'rgba(255,255,255,0.85)' : (theme === 'dark' ? '#9ca3af' : '#6b7280') }}
+                      style={{ color: selected ? (dark ? 'rgba(20,16,20,0.55)' : 'rgba(255,255,255,0.7)') : (dark ? '#9ca3af' : '#6b7280') }}
                     >
-                      {isToday ? t.today : t.dayNames[day.getDay()]}
+                      {t.dayNames[day.getDay()]}
                     </span>
                     <span
-                      className="text-[17px] font-bold leading-none"
-                      style={{ color: selected ? '#fff' : (theme === 'dark' ? '#e5e7eb' : '#1f2937') }}
+                      className="text-[16px] font-bold leading-none"
+                      style={{ color: selected ? (dark ? '#141014' : '#fff') : (dark ? '#e5e7eb' : '#1f2937') }}
                     >
                       {day.getDate()}
                     </span>
-                    {!isUnlocked && <Crown size={9} strokeWidth={2} color={selected ? '#FFD700' : '#B8860B'} className="mt-0.5" />}
+                    {/* Точка = сегодня: подпись «Today» не влезает в узкую ячейку */}
+                    <span
+                      className="w-1 h-1 rounded-full mt-1"
+                      style={{
+                        background: isToday
+                          ? (selected ? (dark ? '#141014' : '#fff') : (dark ? '#e5e7eb' : '#141014'))
+                          : 'transparent',
+                      }}
+                    />
                   </button>
                 );
               })}
             </div>
 
-            {/* Selected day's outfit — same 440px footprint as Boards / Outfits */}
+            {/* Образ дня. Дата и «другой образ» лежат поверх карточки, а вещи
+                тянутся на всю её высоту — раньше пустые слоты под недостающие
+                категории оставляли половину карточки белой. */}
             <div
               className="relative rounded-[28px] overflow-hidden flex flex-col"
               style={{
-                height: 440,
-                background: theme === 'dark' ? '#1a1a1a' : '#FFFFFF',
-                boxShadow: theme === 'dark' ? '0 2px 12px rgba(0,0,0,0.3)' : '0 2px 12px rgba(0,0,0,0.06)',
+                height: 420,
+                background: dark ? '#1a1a1a' : '#FFFFFF',
+                boxShadow: dark ? '0 2px 12px rgba(0,0,0,0.3)' : '0 2px 12px rgba(0,0,0,0.06)',
+              }}
+              onTouchStart={(e) => { swipeXRef.current = e.touches[0].clientX; }}
+              onTouchEnd={(e) => {
+                const start = swipeXRef.current;
+                swipeXRef.current = null;
+                // Порог в 48px: вертикальную прокрутку страницы не трогаем.
+                if (start === null) return;
+                const dx = e.changedTouches[0].clientX - start;
+                if (Math.abs(dx) < 48) return;
+                setSelectedDayIdx((i) => Math.min(days.length - 1, Math.max(0, i + (dx < 0 ? 1 : -1))));
               }}
             >
-              {/* Date header band */}
-              <div
-                className="flex items-center gap-2 px-4 py-3 shrink-0"
-                style={{ background: selIsToday ? 'linear-gradient(135deg, #F370A7, #e0559a)' : (theme === 'dark' ? '#222222' : '#fafafa') }}
-              >
-                <CalendarDays size={18} strokeWidth={2} color={selIsToday ? '#fff' : '#F370A7'} />
-                <span className="text-[14px] font-bold" style={{ color: selIsToday ? '#fff' : (theme === 'dark' ? '#e5e7eb' : '#1f2937') }}>
+              <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-between gap-2">
+                <span
+                  className="h-8 px-3 rounded-full flex items-center gap-1.5 text-[12.5px] font-bold whitespace-nowrap"
+                  style={{
+                    background: dark ? 'rgba(255,255,255,0.10)' : 'rgba(20,16,20,0.06)',
+                    color: dark ? '#f0f0f0' : '#141014',
+                  }}
+                >
+                  <CalendarDays size={13} strokeWidth={2.4} />
                   {selIsToday ? t.today : headerLabel}
                 </span>
-              </div>
-              {/* Outfit stack */}
-              <div className="relative flex-1 flex flex-col">
-                <MiniOutfitSlot item={shawl} flex />
-                <MiniOutfitSlot item={upper} flex />
-                <MiniOutfitSlot item={lower} flex />
-                <MiniOutfitSlot item={shoe} flex />
-                <MiniOutfitSlot item={sideAcc} flex />
-
-                {/* Blur overlay for locked days — only when plans feature is enabled */}
-                {!selUnlocked && (
-                  <div
-                    className="absolute inset-0 flex items-center justify-center cursor-pointer active:scale-[0.99] transition-transform"
+                {dayItems.length > 0 && (
+                  <button
+                    onClick={() => setShuffleByDay((prev) => ({ ...prev, [selectedDayIdx]: (prev[selectedDayIdx] ?? 0) + 1 }))}
+                    className="h-8 px-3 rounded-full flex items-center gap-1.5 text-[12px] font-bold whitespace-nowrap active:scale-[0.95] transition-transform"
                     style={{
-                      backdropFilter: 'blur(8px)',
-                      WebkitBackdropFilter: 'blur(8px)',
-                      background: 'rgba(255,255,255,0.25)',
+                      background: dark ? 'rgba(255,255,255,0.10)' : 'rgba(20,16,20,0.06)',
+                      color: dark ? '#f0f0f0' : '#141014',
                     }}
-                    onClick={onShowPlans}
                   >
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg"
-                      style={{ background: 'linear-gradient(135deg, #B8860B 0%, #8B6914 100%)' }}
-                    >
-                      <Crown size={22} strokeWidth={1.5} color="#FFD700" />
-                    </div>
-                  </div>
+                    <RefreshCw size={12} strokeWidth={2.6} />
+                    {t.cl_cal_shuffle}
+                  </button>
                 )}
               </div>
+
+              {/* Вещи дня: главная колонка + рейл аксессуаров справа */}
+              {dayItems.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center px-8 text-center">
+                  <p className="text-[13px] font-medium" style={{ color: dark ? '#888' : '#9ca3af' }}>{t.addItemsFirst}</p>
+                </div>
+              ) : (
+                <div className="flex-1 flex items-stretch gap-2 px-4 pt-14 pb-4 min-h-0">
+                  <div className="flex-1 flex flex-col items-center justify-center min-h-0">
+                    {mainPieces.map((p) => (
+                      <div key={p.item.id} className="relative w-full min-h-0" style={{ flex: `${p.grow} 1 0` }}>
+                        <Image src={p.item.imageData} alt={p.item.category} fill className="object-contain" unoptimized={needsUnoptimized(p.item.imageData)} />
+                      </div>
+                    ))}
+                  </div>
+                  {accPieces.length > 0 && (
+                    <div className="w-16 shrink-0 flex flex-col justify-center gap-2">
+                      {accPieces.map((a) => (
+                        <div
+                          key={a.id}
+                          className="relative w-16 h-16 rounded-2xl overflow-hidden"
+                          style={{ background: dark ? 'rgba(255,255,255,0.06)' : '#F6F6F7' }}
+                        >
+                          <Image src={a.imageData} alt={a.category} fill className="object-contain p-1.5" unoptimized={needsUnoptimized(a.imageData)} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
 
-            {/* Try it on */}
-            <button
-              onClick={() => {
-                if (!selUnlocked) { onShowPlans(); return; }
-                const dayItems = [shawl, upper, lower, shoe, sideAcc].filter(Boolean) as ClosetItem[];
-                onTryItOn(dayItems);
-              }}
-              className="w-full h-11 mt-3 rounded-full flex items-center justify-center gap-1.5 text-[13px] font-bold text-white active:scale-[0.97] transition-transform"
-              style={{ background: 'linear-gradient(135deg, #F370A7 0%, #e0409a 50%, #F370A7 100%)', backgroundSize: '200% auto', animation: 'tryOnShimmer 2.4s linear infinite', boxShadow: '0 4px 18px rgba(243,112,167,0.45)' }}
-            >
-              <Sparkles size={13} />
-              <span>{t.tryItOn}</span>
-              <span className="flex items-center gap-0.5 h-[18px] pl-1 pr-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.24)' }}>
-                <Diamond size={11} />
-                <span className="text-[10px] font-extrabold leading-none">{ACTION_COST.tryOn}</span>
-              </span>
-            </button>
+            {/* В ленту + примерка. Образ дня нигде не сохранён, поэтому в
+                композер уходит список вещей — он соберёт из него раскладку. */}
+            <div className="flex gap-2 mt-3">
+              {dayItems.length > 0 && (
+                <button
+                  onClick={() => setSharingDay(dayItems)}
+                  className="shrink-0 h-11 px-4 rounded-full flex items-center justify-center gap-1.5 text-[12.5px] font-bold whitespace-nowrap active:scale-[0.96] transition-transform"
+                  style={{
+                    background: dark ? 'rgba(255,255,255,0.10)' : 'rgba(20,16,20,0.06)',
+                    color: dark ? '#f0f0f0' : '#141014',
+                  }}
+                >
+                  <Send size={13} strokeWidth={2.4} />
+                  {t.cl_share_feed}
+                </button>
+              )}
+              <button
+                onClick={() => onTryItOn(dayItems)}
+                disabled={dayItems.length === 0}
+                className="flex-1 h-11 rounded-full flex items-center justify-center gap-1.5 text-[13px] font-bold text-white whitespace-nowrap active:scale-[0.97] transition-transform disabled:opacity-40"
+                style={{ background: 'linear-gradient(135deg, #141014 0%, #332c33 50%, #141014 100%)', backgroundSize: '200% auto', animation: 'tryOnShimmer 2.4s linear infinite', boxShadow: '0 4px 18px rgba(20,16,20,0.32)' }}
+              >
+                <Sparkles size={13} />
+                <span>{t.tryItOn}</span>
+                <span className="flex items-center gap-0.5 h-[18px] pl-1 pr-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.24)' }}>
+                  <Diamond size={11} />
+                  <span className="text-[10px] font-extrabold leading-none">{ACTION_COST.tryOn}</span>
+                </span>
+              </button>
+            </div>
           </>
         );
       })()}
-    </div>
-  );
-}
 
-function MiniOutfitSlot({ item, flex }: { item: ClosetItem | null; flex?: boolean }) {
-  if (!item) return flex ? <div className="flex-1 bg-gray-50" /> : null;
-  return (
-    <div className={`relative w-full overflow-hidden bg-gray-50 ${flex ? 'flex-1' : 'h-10 shrink-0'}`}>
-      <Image src={item.imageData} alt={item.category} fill className="object-contain" unoptimized={needsUnoptimized(item.imageData)} />
+      {sharingDay && (
+        <ShareSheet
+          onClose={() => setSharingDay(null)}
+          onExternal={() => shareDayExternally(sharingDay)}
+          feedSeed={`calendar:${sharingDay.map((i) => i.id).join(',')}`}
+        />
+      )}
     </div>
   );
 }
@@ -4346,7 +4338,7 @@ function ItemEditSheet({
             title={t.share}
             className="shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-[#2a2a2a] disabled:opacity-50"
           >
-            {isSharing ? <Loader2 size={16} className="animate-spin" /> : <Share2 size={16} />}
+            {isSharing ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} strokeWidth={2.3} />}
           </button>
           {showShareSheet && (
             <ShareSheet onClose={() => setShowShareSheet(false)} onExternal={handleShare} />
