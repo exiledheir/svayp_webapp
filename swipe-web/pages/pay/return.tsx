@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { Check, X, Loader2 } from 'lucide-react';
+import { Check, X, Loader2, HelpCircle } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
 import Diamond from '@/components/closet/Diamond';
@@ -35,9 +35,23 @@ export default function PaymentReturnPage() {
   const [rechecking, setRechecking] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
-  const paymentId =
-    (typeof router.query.paymentId === 'string' ? router.query.paymentId : null) ??
-    (typeof window !== 'undefined' ? readPendingPayment() : null);
+  /**
+   * id платежа определяется РОВНО один раз и дальше не меняется.
+   *
+   * Раньше он вычислялся на каждом рендере из localStorage — а `applyPayment` этот же
+   * localStorage чистит по достижении терминального статуса. Из-за этого сразу после
+   * успешной оплаты id превращался в null, эффект перезапускался и экран на миг показывал
+   * «оплата не прошла» поверх уже успешного результата.
+   */
+  const [paymentId, setPaymentId] = useState<string | null>(null);
+  const [resolved, setResolved] = useState(false);
+
+  useEffect(() => {
+    if (!router.isReady || resolved) return;
+    const fromQuery = typeof router.query.paymentId === 'string' ? router.query.paymentId : null;
+    setPaymentId(fromQuery ?? readPendingPayment());
+    setResolved(true);
+  }, [router.isReady, router.query.paymentId, resolved]);
 
   const applyPayment = useCallback((p: Payment) => {
     setPayment(p);
@@ -53,7 +67,7 @@ export default function PaymentReturnPage() {
   }, []);
 
   useEffect(() => {
-    if (!router.isReady) return;
+    if (!resolved) return;
     if (!paymentId) {
       setPhase('unknown');
       return;
@@ -80,7 +94,7 @@ export default function PaymentReturnPage() {
 
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.isReady, paymentId]);
+  }, [resolved, paymentId]);
 
   async function recheck() {
     if (!paymentId || rechecking) return;
@@ -149,7 +163,27 @@ export default function PaymentReturnPage() {
         </>
       )}
 
-      {(phase === 'failed' || phase === 'unknown') && (
+      {/* «Не нашли платёж» — это НЕ отказ: деньги могли уйти, просто мы не знаем, за каким
+          платежом смотреть (открыли ссылку заново, вернулись из другого браузера). Красный
+          крест и «оплата не прошла» здесь врут пользователю, поэтому состояние отдельное. */}
+      {phase === 'unknown' && (
+        <>
+          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: dark ? '#2a2a2c' : '#f2f2f4' }}>
+            <HelpCircle size={34} style={{ color: sub }} strokeWidth={2.5} />
+          </div>
+          <h1 className="text-[22px] font-extrabold mt-4" style={{ color: ink }}>{t.pay_unknown_title}</h1>
+          <p className="text-[14px] mt-2 max-w-[320px]" style={{ color: sub }}>{t.pay_unknown_sub}</p>
+          <button
+            onClick={goBack}
+            className="mt-7 w-full max-w-[320px] h-14 rounded-2xl text-white text-[16px] font-bold"
+            style={{ background: '#F370A7' }}
+          >
+            {t.pay_back}
+          </button>
+        </>
+      )}
+
+      {phase === 'failed' && (
         <>
           <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: dark ? '#2a2a2c' : '#f2f2f4' }}>
             <X size={34} style={{ color: '#E0559A' }} strokeWidth={3} />
