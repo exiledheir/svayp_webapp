@@ -2,21 +2,39 @@ import React, { useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import Diamond from '@/components/closet/Diamond';
-import { coinsPrice, coinPackages, actionCosts, type CoinPricing } from '@/lib/coins';
+import { coinsPrice, coinPackages, actionCosts, quoteCoins, type CoinPricing } from '@/lib/coins';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events } from '@/lib/analytics-events';
 import { isInFlutterWebView } from '@/lib/flutter-bridge';
+import {
+  createCoinPayment,
+  goToCheckout,
+  rememberPendingPayment,
+  type PaymentOptions,
+  type PaymentProvider,
+} from '@/lib/payments';
 
 // Use the t.me host: the native WebView's navigation delegate intercepts t.me
 // links and opens them EXTERNALLY (native Telegram app), whereas telegram.me is
 // not intercepted and loads the web landing page inside the WebView instead.
 const TG_ADMIN = 'https://t.me/libasai_admin';
 
+/** Витринные названия провайдеров (в API они приходят кодами). */
+const PROVIDER_LABEL: Record<PaymentProvider, string> = {
+  PAYME: 'Payme',
+  CLICK: 'Click',
+  PAYLOV: 'Paylov',
+  UZUM: 'Uzum',
+};
+
 /**
- * Buy-diamonds sheet (coins BRD, stage 1: manual Telegram top-up). Shows the
- * balance, the action price-list, ready packages with the 200+ discount, a
- * free-form amount with live totals, the non-refundable warning, and a "Buy"
- * button that opens Telegram with a prefilled message. No in-app payment yet.
+ * Buy-diamonds sheet. Показывает баланс, прайс действий, готовые пакеты со скидкой 200+,
+ * свободную сумму с живым итогом и кнопку покупки.
+ *
+ * Два режима оплаты:
+ *  • онлайн (`paymentOptions.onlineEnabled`) — выбор провайдера и переход на страницу шлюза;
+ *  • Telegram — прежний ручной флоу. Он остаётся для всех, кто вне вайтлиста тестового
+ *    периода, чтобы возможность купить монеты не пропадала ни у кого.
  */
 export default function CoinsSheet({
   balance,
@@ -24,6 +42,7 @@ export default function CoinsSheet({
   dark,
   onClose,
   pricing = null,
+  paymentOptions = null,
 }: {
   balance: number;
   needMore?: boolean;
@@ -31,11 +50,18 @@ export default function CoinsSheet({
   onClose: () => void;
   /** Прайс с сервера (/app/coins/pricing). null → фолбэк на локальные константы. */
   pricing?: CoinPricing | null;
+  /** Способы оплаты с сервера (/payments/options). null → онлайн-оплата недоступна. */
+  paymentOptions?: PaymentOptions | null;
 }) {
   const { t } = useI18n();
   const packages = coinPackages(pricing);
   const cost = actionCosts(pricing);
   const [qty, setQty] = useState<number>(packages[0]);
+
+  const onlineEnabled = !!paymentOptions?.onlineEnabled && (paymentOptions?.providers?.length ?? 0) > 0;
+  const [provider, setProvider] = useState<PaymentProvider>(paymentOptions?.providers?.[0] ?? 'PAYME');
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState('');
 
   // Swipe-down-to-close: only start the drag when the content is scrolled to top,
   // so it doesn't fight the scrollable list.
@@ -66,12 +92,10 @@ export default function CoinsSheet({
   const fmt = (n: number) => n.toLocaleString('uz-UZ');
   const price = coinsPrice(qty, pricing);
 
-  function buy() {
-    if (qty < 1) return;
+  function buyViaTelegram() {
     const priceStr = `${fmt(price.total)} ${t.cn_currency}`;
     const msg = t.cn_tg_msg.replace('{n}', String(qty)).replace('{price}', priceStr);
-    logAnalyticsEvent(Events.UPGRADE_CTA_TAPPED);
-    const url = `${TG_ADMIN}?text=${encodeURIComponent(msg)}`;
+    const url = `${paymentOptions?.telegramUrl || TG_ADMIN}?text=${encodeURIComponent(msg)}`;
     // Inside the Flutter WebView (esp. iOS WKWebView) window.open('_blank') is a
     // no-op — the tap appears to do nothing. A real top-frame navigation instead
     // fires the native navigation delegate, which intercepts the t.me link and
@@ -80,6 +104,39 @@ export default function CoinsSheet({
       window.location.href = url;
     } else {
       window.open(url, '_blank');
+    }
+  }
+
+  async function buyOnline() {
+    setPaying(true);
+    setPayError('');
+    try {
+      // Сумму всё равно посчитает сервер; серверный quote запрашиваем, чтобы не увести
+      // пользователя на оплату с ценой, отличной от показанной.
+      await quoteCoins(qty).catch(() => null);
+      const payment = await createCoinPayment(qty, provider);
+      if (!payment.checkoutUrl) {
+        setPayError(t.cn_pay_error);
+        return;
+      }
+      // Пользователь может не вернуться по return_url (провайдер уводит в своё приложение) —
+      // сохраняем id, чтобы страница возврата нашла платёж и без query-параметров.
+      rememberPendingPayment(payment.paymentId);
+      goToCheckout(payment.checkoutUrl);
+    } catch {
+      setPayError(t.cn_pay_error);
+    } finally {
+      setPaying(false);
+    }
+  }
+
+  function buy() {
+    if (qty < 1 || paying) return;
+    logAnalyticsEvent(Events.UPGRADE_CTA_TAPPED);
+    if (onlineEnabled) {
+      void buyOnline();
+    } else {
+      buyViaTelegram();
     }
   }
 
@@ -180,14 +237,49 @@ export default function CoinsSheet({
             </span>
           </div>
 
+          {/* Способ оплаты — только когда онлайн-оплата доступна этому пользователю */}
+          {onlineEnabled && (
+            <>
+              <p className="text-[13px] font-semibold mt-4 mb-1.5" style={{ color: sub }}>{t.cn_pay_method}</p>
+              <div className="grid grid-cols-2 gap-2">
+                {paymentOptions!.providers.map((p) => {
+                  const active = provider === p;
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => setProvider(p)}
+                      className="h-11 rounded-xl text-[14px] font-bold active:scale-[0.98] transition-transform"
+                      style={{
+                        border: `1.5px solid ${active ? '#F370A7' : line}`,
+                        background: active ? (dark ? 'rgba(243,112,167,0.12)' : '#fdeef6') : 'transparent',
+                        color: active ? '#F370A7' : ink,
+                      }}
+                    >
+                      {PROVIDER_LABEL[p]}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {payError && <p className="text-[13px] mt-3 text-center" style={{ color: '#E0559A' }}>{payError}</p>}
+
           {/* Buy */}
           <button
             onClick={buy}
-            disabled={qty < 1}
+            disabled={qty < 1 || paying}
             className="w-full h-14 rounded-2xl mt-4 text-white text-[16px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40"
             style={{ background: '#F370A7' }}
           >
-            <Diamond size={18} />{t.cn_buy.replace('{n}', String(qty || 0))}
+            {paying ? (
+              t.cn_pay_redirecting
+            ) : (
+              <>
+                <Diamond size={18} />
+                {t.cn_buy.replace('{n}', String(qty || 0))}
+              </>
+            )}
           </button>
         </div>
       </div>

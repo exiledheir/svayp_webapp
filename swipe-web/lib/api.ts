@@ -542,7 +542,8 @@ export async function placeOrder(opts: {
   deliveryMethod: 'PICKUP' | 'DELIVERY';
   paymentMethod: 'CASH' | 'CARD';
   addressId?: string;
-}): Promise<{ orderNumber: string; status: string }> {
+  /** id заказа нужен, чтобы после создания начать онлайн-оплату (POST /orders/{id}/payment). */
+}): Promise<{ id: string; orderNumber: string; status: string }> {
   const body: Record<string, unknown> = {
     deliveryMethod: opts.deliveryMethod,
     paymentMethod: opts.paymentMethod,
@@ -553,6 +554,7 @@ export async function placeOrder(opts: {
   const res = await api.post('/orders', body);
   const d = (res.data?.data ?? res.data) as Record<string, unknown>;
   return {
+    id: (d.id ?? '') as string,
     orderNumber: (d.orderNumber ?? d.order_number ?? `#SW${Date.now().toString().slice(-6)}`) as string,
     status: (d.status ?? 'confirmed') as string,
   };

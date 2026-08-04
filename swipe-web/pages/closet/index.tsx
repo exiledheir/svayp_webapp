@@ -37,6 +37,7 @@ import ClosetGateShowcase from '@/components/closet/ClosetGateShowcase';
 import CoinsSheet from '@/components/closet/CoinsSheet';
 import Diamond from '@/components/closet/Diamond';
 import { ACTION_COST, actionCosts, fetchCoinBalance, fetchCoinPricing, type CoinPricing } from '@/lib/coins';
+import { fetchPaymentOptions, type PaymentOptions } from '@/lib/payments';
 import { isInsufficientCoins } from '@/lib/api';
 import ItemDetailSheet from '@/components/closet/ItemDetailSheet';
 import ClosetSectionTabs from '@/components/ClosetSectionTabs';
@@ -400,12 +401,16 @@ export default function ClosetPage() {
   // каждого платного действия (см. refreshCoins) и при открытии CoinsSheet.
   const [coins, setCoinsState] = useState(0);
   const [coinPricing, setCoinPricing] = useState<CoinPricing | null>(null);
+  // Способы оплаты приходят персонально: пока идёт тестовый период, онлайн-оплату видит
+  // только вайтлист, остальные покупают по-прежнему через Telegram.
+  const [paymentOptions, setPaymentOptions] = useState<PaymentOptions | null>(null);
   const refreshCoins = useCallback(() => {
     return fetchCoinBalance().then((b) => setCoinsState(b.balance)).catch(() => { /* offline — keep last known */ });
   }, []);
   useEffect(() => {
     refreshCoins();
     fetchCoinPricing().then(setCoinPricing).catch(() => { /* fallback to local constants */ });
+    fetchPaymentOptions().then(setPaymentOptions).catch(() => { /* нет ответа → Telegram-флоу */ });
   }, [refreshCoins]);
 
   // Монеты реально списываются только когда включён enforcement И юзер на FREE
@@ -2570,6 +2575,7 @@ export default function ClosetPage() {
         <CoinsSheet
           balance={coins}
           pricing={coinPricing}
+          paymentOptions={paymentOptions}
           needMore={showPremiumGate !== 'browse'}
           dark={theme === 'dark'}
           onClose={() => {

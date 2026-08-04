@@ -1,0 +1,13 @@
+[2026-07-28T10:40:29.698Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-07-28T10:40:29.819Z] [log] [HMR] connected
+[2026-07-28T10:40:29.879Z] [log] [Analytics] User properties set: {client_context: browser}
+[2026-07-28T10:40:29.879Z] [log] [Analytics] Firebase Analytics initialized
+[2026-07-28T10:40:29.879Z] [log] [Analytics] Event: page_view {page_path: /kiosk}
+[2026-07-28T10:44:01.220Z] [log] [Fast Refresh] rebuilding
+[2026-07-28T10:44:01.374Z] [log] [Fast Refresh] done in 157ms
+[2026-07-28T10:44:06.850Z] [info] %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-07-28T10:44:06.876Z] [log] [HMR] connected
+[2026-07-28T10:44:06.893Z] [log] [Analytics] User properties set: {client_context: browser}
+[2026-07-28T10:44:06.893Z] [log] [Analytics] Firebase Analytics initialized
+[2026-07-28T10:44:06.893Z] [log] [Analytics] Event: page_view {page_path: /kiosk}
+[2026-07-28T11:04:01.574Z] [log] [HMR] connected

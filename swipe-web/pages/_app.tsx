@@ -18,7 +18,9 @@ import 'react-image-crop/dist/ReactCrop.css';
 // at the wizard's phone step (so the browse→post funnel stays open).
 // Киоск и его QR-страница живут без пользователя: планшет в зале авторизуется
 // ключом устройства, а по QR образ открывает покупатель, у которого аккаунта ещё нет.
-const PUBLIC_PATHS = new Set(['/auth/phone', '/auth/otp', '/auth/verify-method', '/auth/basic-info', '/auth/telegram/callback', '/auth/partner', '/market', '/market/[id]', '/market/onboarding', '/market/create', '/market/mine', '/market/liked', '/market/chat/[id]', '/feed', '/feed/[username]', '/feed/p/[id]', '/kiosk', '/k/[code]']);
+// Страница возврата после оплаты тоже публична: провайдер может вернуть пользователя во
+// внешний браузер, где токена нет, и auth-гард увёл бы его на логин вместо результата оплаты.
+const PUBLIC_PATHS = new Set(['/auth/phone', '/auth/otp', '/auth/verify-method', '/auth/basic-info', '/auth/telegram/callback', '/auth/partner', '/market', '/market/[id]', '/market/onboarding', '/market/create', '/market/mine', '/market/liked', '/market/chat/[id]', '/feed', '/feed/[username]', '/feed/p/[id]', '/kiosk', '/k/[code]', '/pay/return']);
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
