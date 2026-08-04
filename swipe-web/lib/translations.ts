@@ -404,6 +404,22 @@ export interface Translations {
   cn_note: string;
   cn_currency: string;
   cn_tg_msg: string;
+  // Онлайн-оплата (WLCM: Payme/Click/Paylov/Uzum)
+  cn_pay_method: string;
+  cn_pay_error: string;
+  cn_pay_redirecting: string;
+  pay_checking_title: string;
+  pay_checking_sub: string;
+  pay_recheck: string;
+  pay_rechecking: string;
+  pay_success_title: string;
+  pay_success_coins: string;
+  pay_balance_now: string;
+  pay_continue: string;
+  pay_failed_title: string;
+  pay_failed_sub: string;
+  pay_failed_mismatch: string;
+  pay_back: string;
   // Batch add — processing screen + "fix category" sheet
   cv_proc_removing: string;
   cv_proc_identifying: string;
@@ -1204,6 +1220,21 @@ const en: Translations = {
   cn_note: 'Diamonds are credited after we verify your payment — usually within a few minutes. We’ll confirm in Telegram.',
   cn_currency: 'UZS',
   cn_tg_msg: 'I want to buy {n} diamonds ({price}). My phone: ',
+  cn_pay_method: 'Payment method',
+  cn_pay_error: 'Could not start the payment. Please try again.',
+  cn_pay_redirecting: 'Opening payment…',
+  pay_checking_title: 'Confirming your payment',
+  pay_checking_sub: 'This usually takes a few seconds. You can safely stay on this screen.',
+  pay_recheck: 'Check again',
+  pay_rechecking: 'Checking…',
+  pay_success_title: 'Payment received',
+  pay_success_coins: '{n} diamonds added',
+  pay_balance_now: 'Your balance: {n}',
+  pay_continue: 'Continue',
+  pay_failed_title: 'Payment not completed',
+  pay_failed_sub: 'No money was taken. You can try paying again.',
+  pay_failed_mismatch: 'The paid amount does not match the order. Our team is looking into it — please contact support.',
+  pay_back: 'Back',
   cv_proc_removing: 'Removing background… ✂️',
   cv_proc_identifying: 'Identifying category… 🏷️',
   cv_fix_title: 'Help us identify these items',
@@ -1997,6 +2028,21 @@ const ru: Translations = {
   cn_note: 'Монеты зачислим сразу после проверки платежа — обычно за несколько минут. Подтвердим в Telegram.',
   cn_currency: 'сум',
   cn_tg_msg: 'Хочу купить {n} монет ({price}). Мой номер: ',
+  cn_pay_method: 'Способ оплаты',
+  cn_pay_error: 'Не удалось начать оплату. Попробуйте ещё раз.',
+  cn_pay_redirecting: 'Открываем оплату…',
+  pay_checking_title: 'Подтверждаем оплату',
+  pay_checking_sub: 'Обычно это занимает несколько секунд. Можно оставаться на этом экране.',
+  pay_recheck: 'Проверить ещё раз',
+  pay_rechecking: 'Проверяем…',
+  pay_success_title: 'Оплата прошла',
+  pay_success_coins: 'Начислено {n} монет',
+  pay_balance_now: 'Ваш баланс: {n}',
+  pay_continue: 'Продолжить',
+  pay_failed_title: 'Оплата не прошла',
+  pay_failed_sub: 'Деньги не списаны. Можно попробовать оплатить снова.',
+  pay_failed_mismatch: 'Оплаченная сумма не совпала с заказом. Мы уже разбираемся — напишите в поддержку.',
+  pay_back: 'Назад',
   cv_proc_removing: 'Удаление фона… ✂️',
   cv_proc_identifying: 'Определяем категорию… 🏷️',
   cv_fix_title: 'Помогите определить эти вещи',
@@ -2791,6 +2837,21 @@ const uz: Translations = {
   cn_note: 'Tangalar to‘lov tekshirilgach zudlik bilan — odatda bir necha daqiqada — qo‘shiladi. Telegramda tasdiqlaymiz.',
   cn_currency: 'so‘m',
   cn_tg_msg: '{n} ta tanga sotib olmoqchiman ({price}). Raqamim: ',
+  cn_pay_method: 'To\'lov usuli',
+  cn_pay_error: 'To\'lovni boshlab bo\'lmadi. Qayta urinib ko\'ring.',
+  cn_pay_redirecting: 'To\'lov ochilmoqda…',
+  pay_checking_title: 'To\'lov tasdiqlanmoqda',
+  pay_checking_sub: 'Odatda bu bir necha soniya oladi. Shu ekranda qolishingiz mumkin.',
+  pay_recheck: 'Qayta tekshirish',
+  pay_rechecking: 'Tekshirilmoqda…',
+  pay_success_title: 'To\'lov qabul qilindi',
+  pay_success_coins: '{n} ta tanga qo\'shildi',
+  pay_balance_now: 'Balansingiz: {n}',
+  pay_continue: 'Davom etish',
+  pay_failed_title: 'To\'lov amalga oshmadi',
+  pay_failed_sub: 'Pul yechilmadi. Qayta to\'lashga urinib ko\'rishingiz mumkin.',
+  pay_failed_mismatch: 'To\'langan summa buyurtmaga mos kelmadi. Biz tekshiryapmiz — qo\'llab-quvvatlashga yozing.',
+  pay_back: 'Orqaga',
   cv_proc_removing: "Fon o'chirilmoqda… ✂️",
   cv_proc_identifying: 'Kategoriya aniqlanmoqda… 🏷️',
   cv_fix_title: 'Ushbu buyumlarni aniqlashga yordam bering',
