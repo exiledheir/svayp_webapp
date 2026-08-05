@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { Check, X, Loader2, HelpCircle } from 'lucide-react';
+import { Check, X, Loader2, HelpCircle, Clock } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
 import Diamond from '@/components/closet/Diamond';
@@ -31,7 +31,9 @@ export default function PaymentReturnPage() {
   const dark = theme === 'dark';
 
   const [payment, setPayment] = useState<Payment | null>(null);
-  const [phase, setPhase] = useState<'loading' | 'waiting' | 'success' | 'failed' | 'unknown'>('loading');
+  const [phase, setPhase] = useState<'loading' | 'waiting' | 'stalled' | 'success' | 'failed' | 'unknown'>(
+    'loading',
+  );
   const [rechecking, setRechecking] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -53,7 +55,11 @@ export default function PaymentReturnPage() {
     setResolved(true);
   }, [router.isReady, router.query.paymentId, resolved]);
 
-  const applyPayment = useCallback((p: Payment) => {
+  /**
+   * @param pendingPhase чем показывать неоплаченный платёж: `waiting` — пока идёт
+   *   автоматический опрос (спиннер), `stalled` — когда ждать дальше бессмысленно.
+   */
+  const applyPayment = useCallback((p: Payment, pendingPhase: 'waiting' | 'stalled' = 'waiting') => {
     setPayment(p);
     if (p.status === 'FULFILLED') {
       setPhase('success');
@@ -62,7 +68,7 @@ export default function PaymentReturnPage() {
       setPhase('failed');
       clearPendingPayment();
     } else {
-      setPhase('waiting');
+      setPhase(pendingPhase);
     }
   }, []);
 
@@ -89,18 +95,42 @@ export default function PaymentReturnPage() {
         signal: controller.signal,
         onTick: applyPayment,
       });
-      if (final) applyPayment(final);
+      if (final) {
+        applyPayment(final);
+      } else if (!controller.signal.aborted) {
+        // Опрос выдохся (90 с либо приложение было свёрнуто и время истекло в фоне).
+        // Без этой ветки экран навсегда застывал на «Подтверждаем оплату» — в том числе
+        // у людей, которые просто передумали платить.
+        setPhase('stalled');
+      }
     })();
 
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolved, paymentId]);
 
+  /**
+   * Возврат в приложение — самый вероятный момент, когда статус уже изменился:
+   * человек либо заплатил в приложении банка, либо закрыл его, не заплатив.
+   * Проверяем сразу, не дожидаясь следующего тика опроса.
+   */
+  useEffect(() => {
+    if (!paymentId) return;
+    function onVisibilityChange() {
+      if (document.visibilityState !== 'visible') return;
+      if (phase === 'success' || phase === 'failed') return;
+      void recheck();
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentId, phase]);
+
   async function recheck() {
     if (!paymentId || rechecking) return;
     setRechecking(true);
     try {
-      applyPayment(await fetchPaymentStatus(paymentId, true));
+      applyPayment(await fetchPaymentStatus(paymentId, true), 'stalled');
     } catch {
       /* остаёмся в текущем состоянии */
     } finally {
@@ -132,6 +162,33 @@ export default function PaymentReturnPage() {
             style={{ border: `1.5px solid ${dark ? '#2a2a2c' : '#ececed'}`, color: ink }}
           >
             {rechecking ? t.pay_rechecking : t.pay_recheck}
+          </button>
+        </>
+      )}
+
+      {/* Опрос закончился, а оплаты нет: чаще всего человек просто передумал.
+          Показываем понятный итог и оба пути — проверить ещё раз или вернуться. */}
+      {phase === 'stalled' && (
+        <>
+          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: dark ? '#2a2a2c' : '#f2f2f4' }}>
+            <Clock size={34} style={{ color: sub }} strokeWidth={2.5} />
+          </div>
+          <h1 className="text-[22px] font-extrabold mt-4" style={{ color: ink }}>{t.pay_stalled_title}</h1>
+          <p className="text-[14px] mt-2 max-w-[320px]" style={{ color: sub }}>{t.pay_stalled_sub}</p>
+          <button
+            onClick={recheck}
+            disabled={rechecking}
+            className="mt-6 h-12 px-6 rounded-2xl text-[15px] font-bold disabled:opacity-40"
+            style={{ border: `1.5px solid ${dark ? '#2a2a2c' : '#ececed'}`, color: ink }}
+          >
+            {rechecking ? t.pay_rechecking : t.pay_recheck}
+          </button>
+          <button
+            onClick={goBack}
+            className="mt-3 w-full max-w-[320px] h-14 rounded-2xl text-white text-[16px] font-bold"
+            style={{ background: '#F370A7' }}
+          >
+            {t.pay_back}
           </button>
         </>
       )}
