@@ -246,7 +246,13 @@ export default function CoinsSheet({
                   return (
                     <button
                       key={p}
-                      onClick={() => setProvider(p)}
+                      onClick={() => {
+                        setProvider(p);
+                        // Ошибка относится к КОНКРЕТНОМУ способу оплаты. Если её не убрать,
+                        // сообщение от прошлой попытки виснет под другим провайдером и
+                        // выглядит как его ошибка — на этом мы сами один раз ошиблись в диагнозе.
+                        setPayError('');
+                      }}
                       className="h-11 rounded-xl text-[14px] font-bold active:scale-[0.98] transition-transform"
                       style={{
                         border: `1.5px solid ${active ? '#F370A7' : line}`,

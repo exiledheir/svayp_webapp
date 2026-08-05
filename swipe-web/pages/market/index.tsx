@@ -1,5 +1,5 @@
 import { needsUnoptimized } from '@/lib/img';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
@@ -65,6 +65,11 @@ export default function MarketFeedPage() {
   }, [search]);
 
   const cacheKey = `market:feed:${category ?? 'all'}:${debouncedSearch.trim()}`;
+  // Scroll offset lives beside the feed snapshot (same TTL) so "listing → back"
+  // returns the user to where they scrolled to, not to the top of the grid.
+  const scrollKey = `${cacheKey}:scroll`;
+  // Offset waiting to be applied once the restored listings are painted.
+  const pendingScrollRef = useRef<number | null>(null);
 
   const loadFeed = useCallback(async (force = false) => {
     if (!force) {
@@ -73,9 +78,12 @@ export default function MarketFeedPage() {
         setListings(cached.listings);
         setNextPage(cached.nextPage);
         setHasMore(cached.hasMore);
+        pendingScrollRef.current = getPageCache<number>(scrollKey, MARKET_FEED_TTL_MS) ?? 0;
         return;
       }
     }
+    // A fresh list means a fresh scroll position (new category / new search).
+    pendingScrollRef.current = 0;
     // Live backend feed (GET /marketplace/listings) — first page.
     try {
       const page = await apiGetFeed({
@@ -92,7 +100,7 @@ export default function MarketFeedPage() {
       setListings([]);
       setHasMore(false);
     }
-  }, [category, debouncedSearch, cacheKey]);
+  }, [category, debouncedSearch, cacheKey, scrollKey]);
 
   useEffect(() => { loadFeed(); }, [loadFeed]);
 
@@ -132,6 +140,7 @@ export default function MarketFeedPage() {
       const el = mainScrollRef.current;
       if (!el) return;
       const { scrollHeight, scrollTop, clientHeight } = el;
+      setPageCache(scrollKey, scrollTop); // remember where we are for the way back
       if (scrollHeight - scrollTop - clientHeight < 800) loadMore();
     });
   }
@@ -187,6 +196,31 @@ export default function MarketFeedPage() {
     el.addEventListener('touchmove', onMove, { passive: false });
     return () => el.removeEventListener('touchmove', onMove);
   }, []);
+
+  // ── Scroll restore ──────────────────────────────────────────────────────────
+  // Apply the remembered offset once the restored grid is in the DOM but before
+  // paint, so returning from a listing never flashes the top of the feed. Cards
+  // have a fixed 4:5 image ratio, so layout height is known without the images.
+  useLayoutEffect(() => {
+    const y = pendingScrollRef.current;
+    if (y === null) return;
+    const el = mainScrollRef.current;
+    if (!el) return;
+    pendingScrollRef.current = null;
+    el.scrollTop = y;
+  }, [listings]);
+
+  // Navigating away (tap on a listing): persist the offset while the grid is
+  // still mounted — on unmount the detached node reports scrollTop 0. The scroll
+  // handler usually got there first; this covers the last frame before the push.
+  useEffect(() => {
+    const save = () => {
+      const el = mainScrollRef.current;
+      if (el) setPageCache(scrollKey, el.scrollTop);
+    };
+    router.events.on('routeChangeStart', save);
+    return () => router.events.off('routeChangeStart', save);
+  }, [router.events, scrollKey]);
 
   function handlePost() {
     if (isMarketOnboardingComplete()) router.push('/market/create');
