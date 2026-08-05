@@ -38,6 +38,17 @@ export default function PaymentReturnPage() {
   const abortRef = useRef<AbortController | null>(null);
 
   /**
+   * Идёт ли ещё автоматический опрос.
+   *
+   * Нужен, чтобы у фазы был ОДИН хозяин. Пока опрос жив, он раз в две секунды ставит
+   * `waiting`; если параллельно проверка при возврате в приложение выставит `stalled`,
+   * следующий тик тут же вернёт спиннер — экран моргает, и человек не успевает нажать
+   * ни одну кнопку. Поэтому «оплата не подтверждена» показывается только когда опрос
+   * действительно завершился.
+   */
+  const pollingRef = useRef(false);
+
+  /**
    * id платежа определяется РОВНО один раз и дальше не меняется.
    *
    * Раньше он вычислялся на каждом рендере из localStorage — а `applyPayment` этот же
@@ -81,6 +92,7 @@ export default function PaymentReturnPage() {
 
     const controller = new AbortController();
     abortRef.current = controller;
+    pollingRef.current = true;
 
     (async () => {
       try {
@@ -95,6 +107,7 @@ export default function PaymentReturnPage() {
         signal: controller.signal,
         onTick: applyPayment,
       });
+      pollingRef.current = false;
       if (final) {
         applyPayment(final);
       } else if (!controller.signal.aborted) {
@@ -105,7 +118,10 @@ export default function PaymentReturnPage() {
       }
     })();
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      pollingRef.current = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolved, paymentId]);
 
@@ -147,7 +163,8 @@ export default function PaymentReturnPage() {
     lastCheckRef.current = Date.now();
     if (!opts.silent) setRechecking(true);
     try {
-      applyPayment(await fetchPaymentStatus(paymentId, true), 'stalled');
+      // Пока автоопрос жив, он хозяин экрана — не перебиваем его «не подтверждена».
+      applyPayment(await fetchPaymentStatus(paymentId, true), pollingRef.current ? 'waiting' : 'stalled');
     } catch {
       /* остаёмся в текущем состоянии */
     } finally {
