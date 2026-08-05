@@ -449,6 +449,8 @@ export interface Translations {
   pay_back: string;
   pay_unknown_title: string;
   pay_unknown_sub: string;
+  pay_stalled_title: string;
+  pay_stalled_sub: string;
   // Batch add — processing screen + "fix category" sheet
   cv_bt_offer_all: string;
   cl_items_n: string;
@@ -1312,6 +1314,8 @@ const en: Translations = {
   pay_back: 'Back',
   pay_unknown_title: 'We couldn’t find this payment',
   pay_unknown_sub: 'If money was taken, the diamonds are credited automatically — check your balance in a minute or contact support.',
+  pay_stalled_title: 'Payment not confirmed yet',
+  pay_stalled_sub: 'If you completed the payment, the diamonds will arrive automatically — usually within a minute. If you changed your mind, nothing was charged.',
   cv_bt_offer_all: 'Beautify all',
   cl_items_n: '{n} items',
   cl_sort_recent: 'Recently added',
@@ -2169,6 +2173,8 @@ const ru: Translations = {
   pay_back: 'Назад',
   pay_unknown_title: 'Не нашли этот платёж',
   pay_unknown_sub: 'Если деньги списались, бриллианты начислятся автоматически — проверьте баланс через минуту или напишите в поддержку.',
+  pay_stalled_title: 'Оплата пока не подтверждена',
+  pay_stalled_sub: 'Если вы оплатили, бриллианты придут автоматически — обычно в течение минуты. Если передумали, деньги не списаны.',
   cv_bt_offer_all: 'Улучшить все',
   cl_items_n: '{n} вещей',
   cl_sort_recent: 'Сначала новые',
@@ -3025,6 +3031,8 @@ const uz: Translations = {
   pay_back: 'Orqaga',
   pay_unknown_title: 'Bu to‘lovni topa olmadik',
   pay_unknown_sub: 'Agar pul yechilgan bo‘lsa, brilliantlar avtomatik qo‘shiladi — bir daqiqadan so‘ng balansni tekshiring yoki qo‘llab-quvvatlashga yozing.',
+  pay_stalled_title: 'To‘lov hali tasdiqlanmadi',
+  pay_stalled_sub: 'Agar to‘lagan bo‘lsangiz, brilliantlar avtomatik qo‘shiladi — odatda bir daqiqa ichida. Agar fikringizdan qaytgan bo‘lsangiz, pul yechilmagan.',
   cv_bt_offer_all: 'Hammasini yaxshilash',
   cl_items_n: "{n} ta buyum",
   cl_sort_recent: "Avval yangilari",
