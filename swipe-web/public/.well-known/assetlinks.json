@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.svayp.app",
+      "sha256_cert_fingerprints": [
+        "6E:49:F7:70:55:1C:1B:F3:DF:43:D9:F2:B7:59:5C:79:D5:37:03:C5:69:20:E9:65:0C:D3:18:93:7F:EC:3D:DD",
+        "C5:DA:6C:F1:63:C3:B5:13:F5:82:F6:49:5D:1C:BE:3F:AA:B1:5C:2E:39:6B:16:0F:27:8B:C9:44:8F:5A:E7:C4"
+      ]
+    }
+  }
+]

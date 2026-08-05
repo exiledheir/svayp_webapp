@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["3NYRVPUZ5W.com.svaypai.app"],
+        "components": [
+          {
+            "/": "/pay/return*",
+            "comment": "Возврат с оплаты открывается в приложении, а не в браузере"
+          }
+        ]
+      }
+    ]
+  }
+}
