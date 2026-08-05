@@ -113,28 +113,45 @@ export default function PaymentReturnPage() {
    * Возврат в приложение — самый вероятный момент, когда статус уже изменился:
    * человек либо заплатил в приложении банка, либо закрыл его, не заплатив.
    * Проверяем сразу, не дожидаясь следующего тика опроса.
+   *
+   * С защитой от частых повторов: при возврате из другого приложения система шлёт
+   * несколько событий видимости подряд, и без неё экран заметно «дёргался», повторно
+   * проверяя статус каждую секунду. Заодно каждая такая проверка просит сервер сходить
+   * в шлюз — устраивать это очередью тем более незачем.
    */
+  const lastCheckRef = useRef(0);
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+
   useEffect(() => {
     if (!paymentId) return;
+    const MIN_GAP_MS = 10_000;
     function onVisibilityChange() {
       if (document.visibilityState !== 'visible') return;
-      if (phase === 'success' || phase === 'failed') return;
-      void recheck();
+      if (phaseRef.current === 'success' || phaseRef.current === 'failed') return;
+      if (Date.now() - lastCheckRef.current < MIN_GAP_MS) return;
+      lastCheckRef.current = Date.now();
+      // Тихо: без индикатора. Человек не просил проверять — он просто вернулся в приложение,
+      // и мигающая надпись «Проверяем…» выглядит как будто экран сам себя дёргает.
+      void recheck({ silent: true });
     }
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => document.removeEventListener('visibilitychange', onVisibilityChange);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paymentId, phase]);
+  }, [paymentId]);
 
-  async function recheck() {
+  async function recheck(opts: { silent?: boolean } = {}) {
     if (!paymentId || rechecking) return;
-    setRechecking(true);
+    // Ручная проверка тоже сдвигает окно: иначе нажатие кнопки и автопроверка при
+    // возврате в приложение накладываются друг на друга.
+    lastCheckRef.current = Date.now();
+    if (!opts.silent) setRechecking(true);
     try {
       applyPayment(await fetchPaymentStatus(paymentId, true), 'stalled');
     } catch {
       /* остаёмся в текущем состоянии */
     } finally {
-      setRechecking(false);
+      if (!opts.silent) setRechecking(false);
     }
   }
 
@@ -156,7 +173,7 @@ export default function PaymentReturnPage() {
           <h1 className="text-[20px] font-extrabold mt-4" style={{ color: ink }}>{t.pay_checking_title}</h1>
           <p className="text-[14px] mt-2 max-w-[300px]" style={{ color: sub }}>{t.pay_checking_sub}</p>
           <button
-            onClick={recheck}
+            onClick={() => recheck()}
             disabled={rechecking}
             className="mt-6 h-12 px-6 rounded-2xl text-[15px] font-bold disabled:opacity-40"
             style={{ border: `1.5px solid ${dark ? '#2a2a2c' : '#ececed'}`, color: ink }}
@@ -176,7 +193,7 @@ export default function PaymentReturnPage() {
           <h1 className="text-[22px] font-extrabold mt-4" style={{ color: ink }}>{t.pay_stalled_title}</h1>
           <p className="text-[14px] mt-2 max-w-[320px]" style={{ color: sub }}>{t.pay_stalled_sub}</p>
           <button
-            onClick={recheck}
+            onClick={() => recheck()}
             disabled={rechecking}
             className="mt-6 h-12 px-6 rounded-2xl text-[15px] font-bold disabled:opacity-40"
             style={{ border: `1.5px solid ${dark ? '#2a2a2c' : '#ececed'}`, color: ink }}
