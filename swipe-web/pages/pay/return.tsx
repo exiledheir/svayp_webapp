@@ -103,7 +103,11 @@ export default function PaymentReturnPage() {
       }
       const final = await pollPaymentUntilTerminal(paymentId, {
         intervalMs: 2000,
-        timeoutMs: 90_000,
+        // 30 секунд, а не 90: успешная оплата подтверждается за пару секунд, а вот тот,
+        // кто передумал платить, всё это время смотрел на спиннер без единой кнопки.
+        // Ждать дольше незачем — начисление всё равно делает сервер по вебхуку, даже
+        // если человек закроет приложение.
+        timeoutMs: 30_000,
         signal: controller.signal,
         onTick: applyPayment,
       });
@@ -196,6 +200,16 @@ export default function PaymentReturnPage() {
             style={{ border: `1.5px solid ${dark ? '#2a2a2c' : '#ececed'}`, color: ink }}
           >
             {rechecking ? t.pay_rechecking : t.pay_recheck}
+          </button>
+          {/* Выход обязан быть и здесь: без него человек, передумавший платить, заперт
+              на экране ожидания до конца опроса. Начисление от ухода не зависит —
+              его делает сервер по вебхуку. */}
+          <button
+            onClick={goBack}
+            className="mt-3 h-12 px-6 rounded-2xl text-[15px] font-bold"
+            style={{ color: sub }}
+          >
+            {t.pay_back}
           </button>
         </>
       )}
