@@ -5,6 +5,7 @@
 // продолжает работать по-старому (через Telegram).
 
 import { api } from '@/lib/api';
+import { isInFlutterWebView, openExternal } from '@/lib/flutter-bridge';
 
 export type PaymentProvider = 'PAYME' | 'CLICK' | 'PAYLOV' | 'UZUM';
 
@@ -93,11 +94,6 @@ export async function createCoinPayment(coins: number, provider: PaymentProvider
   return unwrap<Payment>(res);
 }
 
-export async function createOrderPayment(orderId: string, provider: PaymentProvider): Promise<Payment> {
-  const res = await api.post(`/orders/${orderId}/payment`, { provider, returnUrl: paymentReturnUrl() });
-  return unwrap<Payment>(res);
-}
-
 /** `refresh` дополнительно просит сервер опросить шлюз (когда вебхук ещё не дошёл). */
 export async function fetchPaymentStatus(paymentId: string, refresh = false): Promise<Payment> {
   const res = await api.get(`/payments/${paymentId}`, { params: refresh ? { refresh: true } : undefined });
@@ -109,13 +105,26 @@ export function isTerminal(status: PaymentStatus): boolean {
 }
 
 /**
- * Уводит пользователя на страницу оплаты.
+ * Уводит пользователя на оплату.
  *
- * Только полноценная навигация верхнего уровня: внутри WebView (особенно WKWebView на iOS)
- * `window.open('_blank')` — no-op, и нажатие просто «ничего не делает». Заодно так срабатывает
- * нативный перехватчик ссылок, если провайдер отдаёт deep-link своего приложения.
+ * Внутри приложения ссылку открывает ОПЕРАЦИОННАЯ СИСТЕМА, а не WebView. Это принципиально:
+ * WLCM отдаёт настоящие адреса провайдеров (`checkout.paycom.uz`, `my.click.uz`), а их
+ * приложения регистрируют эти домены как App Links — но внутри WebView App Links не
+ * срабатывают, поэтому переход в Payme/Click возможен только через натив. Если приложение
+ * не установлено, система откроет ту же страницу в браузере, где есть оплата картой.
+ *
+ * Сами при этом уходим на экран ожидания: пользователь может завершить оплату в чужом
+ * приложении и вернуться в наше, так и не открыв `return_url`. Страница возврата опрашивает
+ * статус, поэтому результат он увидит в любом случае.
+ *
+ * В обычном браузере — обычная навигация верхнего уровня. `window.open('_blank')` здесь
+ * не годится: в WKWebView на iOS это no-op, и нажатие «ничего не делает».
  */
 export function goToCheckout(url: string) {
+  if (isInFlutterWebView() && openExternal(url)) {
+    window.location.href = '/pay/return';
+    return;
+  }
   window.location.href = url;
 }
 

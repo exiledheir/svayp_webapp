@@ -18,7 +18,8 @@ export type BridgeMessageType =
   | 'set_theme'
   | 'save_image'
   | 'share_image'
-  | 'open_chat';
+  | 'open_chat'
+  | 'open_external';
 
 export interface AuthCompletePayload {
   type: 'auth_complete';
@@ -203,6 +204,23 @@ export function sendToFlutter(payload: BridgePayload): void {
   const channel = getChannel();
   if (!channel) return;
   channel.postMessage(JSON.stringify(payload));
+}
+
+/**
+ * Просит нативное приложение открыть ссылку СИСТЕМОЙ, а не внутри WebView.
+ * Возвращает true, если сообщение ушло в натив.
+ *
+ * Нужно для оплаты: WLCM отдаёт настоящие адреса провайдеров (checkout.paycom.uz,
+ * my.click.uz), а приложения Payme и Click регистрируют эти домены как App Links.
+ * Внутри WebView App Links не срабатывают никогда — это ограничение платформы,
+ * поэтому ссылку обязана открыть ОС. Если приложение не установлено, система
+ * откроет ту же страницу в браузере, где есть оплата картой.
+ */
+export function openExternal(url: string): boolean {
+  const channel = getChannel();
+  if (!channel) return false;
+  channel.postMessage(JSON.stringify({ type: 'open_external', url }));
+  return true;
 }
 
 /**

@@ -5,23 +5,7 @@ import { useRouter } from 'next/router';
 import { ArrowLeft, Store, CreditCard, ShoppingBag, CheckCircle, ChevronRight } from 'lucide-react';
 import { getCartItems, formatPrice, removeFromCart } from '@/lib/cart-storage';
 import { placeOrder } from '@/lib/api';
-import {
-  createOrderPayment,
-  fetchPaymentOptions,
-  goToCheckout,
-  rememberPendingPayment,
-  type PaymentOptions,
-  type PaymentProvider,
-} from '@/lib/payments';
 import type { CartItem } from '@/lib/cart-storage';
-
-/** Витринные названия провайдеров (в API они приходят кодами). */
-const PROVIDER_LABEL: Record<PaymentProvider, string> = {
-  PAYME: 'Payme',
-  CLICK: 'Click',
-  PAYLOV: 'Paylov',
-  UZUM: 'Uzum',
-};
 
 function fmtSize(s: string) {
   return s.toUpperCase().startsWith('SIZE_') ? s.slice(5) : s;
@@ -96,21 +80,6 @@ export default function CheckoutPage() {
     setItems(cart);
   }, [router]);
 
-  // Способы оплаты приходят персонально: во время тестового периода онлайн-оплату
-  // видит только вайтлист, остальные оформляют заказ наличными как раньше.
-  const [paymentOptions, setPaymentOptions] = useState<PaymentOptions | null>(null);
-  const [payOnline, setPayOnline] = useState(false);
-  const [provider, setProvider] = useState<PaymentProvider>('PAYME');
-  useEffect(() => {
-    fetchPaymentOptions()
-      .then((o) => {
-        setPaymentOptions(o);
-        if (o.providers?.length) setProvider(o.providers[0]);
-      })
-      .catch(() => { /* нет ответа → только наличные */ });
-  }, []);
-  const onlineEnabled = !!paymentOptions?.onlineEnabled && (paymentOptions?.providers?.length ?? 0) > 0;
-
   const total = items.reduce((acc, i) => acc + i.price * i.quantity, 0);
   const currency = items[0]?.currency ?? 'UZS';
   const itemCount = items.reduce((acc, i) => acc + i.quantity, 0);
@@ -119,25 +88,9 @@ export default function CheckoutPage() {
     setPlacing(true);
     setError('');
     try {
-      // Заказ создаётся всегда; онлайн-оплата — второй шаг поверх уже созданного заказа,
-      // чтобы при сбое оплаты заказ не терялся и его можно было оплатить повторно.
-      const result = await placeOrder({
-        deliveryMethod: 'PICKUP',
-        paymentMethod: onlineEnabled && payOnline ? 'CARD' : 'CASH',
-      });
+      const result = await placeOrder({ deliveryMethod: 'PICKUP', paymentMethod: 'CASH' });
       // Clear local cart
       items.forEach((i) => removeFromCart(i.cartId));
-
-      if (onlineEnabled && payOnline && result.id) {
-        const payment = await createOrderPayment(result.id, provider);
-        if (payment.checkoutUrl) {
-          rememberPendingPayment(payment.paymentId);
-          goToCheckout(payment.checkoutUrl);
-          return;
-        }
-        // Ссылку не дали — заказ создан, показываем успех и даём оплатить позже.
-        setError('Could not open the payment page. Your order is saved — you can pay later.');
-      }
       setOrderNumber(result.orderNumber);
     } catch {
       setError('Failed to place order. Please try again.');
@@ -278,58 +231,15 @@ export default function CheckoutPage() {
 
           {/* Payment Method */}
           <SectionCard icon={<CreditCard size={16} strokeWidth={1.8} color="rgba(0,0,0,0.6)" />} title="Payment Method">
-            <button
-              type="button"
-              onClick={() => setPayOnline(false)}
-              className="flex items-center gap-3 px-4 py-3.5 w-full text-left"
-            >
+            <div className="flex items-center gap-3 px-4 py-3.5">
               <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0" style={{ borderColor: '#000' }}>
-                {!payOnline && <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#000' }} />}
+                <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#000' }} />
               </div>
               <div className="flex-1">
-                <p className="text-[14px] font-semibold" style={{ color: '#000' }}>Cash on pickup</p>
+                <p className="text-[14px] font-semibold" style={{ color: '#000' }}>Cash on delivery</p>
                 <p className="text-[12px]" style={{ color: 'rgba(0,0,0,0.45)' }}>Pay when you receive</p>
               </div>
-            </button>
-
-            {onlineEnabled && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setPayOnline(true)}
-                  className="flex items-center gap-3 px-4 py-3.5 w-full text-left"
-                  style={{ borderTop: '0.5px solid rgba(0,0,0,0.08)' }}
-                >
-                  <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0" style={{ borderColor: '#000' }}>
-                    {payOnline && <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#000' }} />}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-[14px] font-semibold" style={{ color: '#000' }}>Pay online</p>
-                    <p className="text-[12px]" style={{ color: 'rgba(0,0,0,0.45)' }}>Payme, Click, Paylov, Uzum</p>
-                  </div>
-                </button>
-
-                {payOnline && (
-                  <div className="grid grid-cols-2 gap-2 px-4 pb-3.5">
-                    {paymentOptions!.providers.map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => setProvider(p)}
-                        className="h-10 rounded-xl text-[13px] font-bold"
-                        style={{
-                          border: `1.5px solid ${provider === p ? '#000' : 'rgba(0,0,0,0.12)'}`,
-                          background: provider === p ? 'rgba(0,0,0,0.04)' : 'transparent',
-                          color: '#000',
-                        }}
-                      >
-                        {PROVIDER_LABEL[p]}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
+            </div>
           </SectionCard>
 
           {/* Order Items */}
@@ -380,7 +290,7 @@ export default function CheckoutPage() {
           {placing ? (
             <div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
           ) : (
-            <>{onlineEnabled && payOnline ? 'Pay' : 'Place Order'} · {formatPrice(total, currency)}</>
+            <>Place Order · {formatPrice(total, currency)}</>
           )}
         </button>
       </div>
