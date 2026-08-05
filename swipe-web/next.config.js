@@ -24,6 +24,18 @@ const nextConfig = {
       },
     ];
   },
+
+  async headers() {
+    return [
+      {
+        // Apple забирает этот файл своим CDN и принимает ТОЛЬКО с типом application/json.
+        // Файл лежит без расширения, поэтому Next отдал бы его как octet-stream, и
+        // проверка Universal Links молча не прошла бы.
+        source: "/.well-known/apple-app-site-association",
+        headers: [{ key: "Content-Type", value: "application/json" }],
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
