@@ -23,6 +23,17 @@ const SLOT_CATEGORIES: Record<SlotKey, string[]> = {
 /** Curated catalog-ready list is small (tens of items) — one page covers it. */
 const CATALOG_PAGE = 100;
 
+/** The two source rows are the sheet's tallest fixed block — shrink them on a
+ *  short WebView so the shop row underneath stays above the fold. */
+const SRC_PAD = 'clamp(10px, 1.9dvh, 14px)';
+const SRC_ICON = 'clamp(36px, 5.8dvh, 44px)';
+const SRC_LABEL: React.CSSProperties = {
+  fontWeight: 700,
+  fontSize: 'clamp(13.5px, min(2.1dvh, 4.2vw), 16px)',
+  lineHeight: 1.2,
+  fontFamily: 'Roboto, system-ui',
+};
+
 /**
  * Add-to-closet sheet used by the first-run setup screen.
  *
@@ -128,12 +139,15 @@ export default function SetupAddSheet({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-[460px] flex flex-col su-sheet"
+        className="w-full max-w-[460px] flex flex-col su-sheet overflow-y-auto su-hide-scroll"
         style={{
           background: '#fff',
           borderRadius: '26px 26px 0 0',
-          padding: '10px 20px 24px',
+          padding: '10px clamp(13px, 4.4vw, 20px) 24px',
           paddingBottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
+          // On a short WebView the sheet is taller than the screen; bound it and
+          // let the shop row scroll into view instead of falling off the bottom.
+          maxHeight: '90dvh',
         }}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -147,19 +161,19 @@ export default function SetupAddSheet({
         </div>
 
         {/* Photo sources — camera first: it needs no gallery permission dance. */}
-        <div className="flex-none flex flex-col gap-2.5" style={{ marginTop: 18 }}>
+        <div className="flex-none flex flex-col gap-2.5" style={{ marginTop: 'clamp(11px, 2.4dvh, 18px)' }}>
           <button
             onClick={onCamera}
             className="flex items-center gap-3.5 w-full text-left active:scale-[0.99] transition-transform"
-            style={{ padding: 14, borderRadius: 18, background: SU.ink }}
+            style={{ padding: SRC_PAD, borderRadius: 18, background: SU.ink }}
           >
             <span
               className="flex items-center justify-center flex-none"
-              style={{ width: 44, height: 44, borderRadius: 14, background: 'rgba(255,255,255,0.14)' }}
+              style={{ width: SRC_ICON, height: SRC_ICON, borderRadius: 14, background: 'rgba(255,255,255,0.14)' }}
             >
               <Camera size={20} color="#fff" strokeWidth={2} />
             </span>
-            <span className="flex-1 min-w-0" style={{ font: '700 16px/1.2 Roboto, system-ui', color: '#fff' }}>
+            <span className="flex-1 min-w-0" style={{ ...SRC_LABEL, color: '#fff' }}>
               {t.su_src_camera}
             </span>
           </button>
@@ -167,15 +181,15 @@ export default function SetupAddSheet({
           <button
             onClick={onGallery}
             className="flex items-center gap-3.5 w-full text-left active:scale-[0.99] transition-transform"
-            style={{ padding: 14, borderRadius: 18, background: SU.pinkSoft, border: `1px solid ${SU.pinkSoftBorder}` }}
+            style={{ padding: SRC_PAD, borderRadius: 18, background: SU.pinkSoft, border: `1px solid ${SU.pinkSoftBorder}` }}
           >
             <span
               className="flex items-center justify-center flex-none"
-              style={{ width: 44, height: 44, borderRadius: 14, background: SU.pink }}
+              style={{ width: SRC_ICON, height: SRC_ICON, borderRadius: 14, background: SU.pink }}
             >
               <Images size={20} color="#fff" strokeWidth={2} />
             </span>
-            <span className="flex-1 min-w-0" style={{ font: '700 16px/1.2 Roboto, system-ui', color: SU.ink }}>
+            <span className="flex-1 min-w-0" style={{ ...SRC_LABEL, color: SU.ink }}>
               {t.su_src_gallery}
             </span>
           </button>
