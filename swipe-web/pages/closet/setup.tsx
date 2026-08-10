@@ -541,15 +541,19 @@ export default function ClosetSetupPage() {
           key={slot}
           aria-live="polite"
           aria-busy="true"
-          className="flex items-center gap-[15px]"
+          className="flex items-center"
           style={{
-            height: 150, borderRadius: 22, border: `2px dashed ${SU.pinkBorder}`,
-            background: SU.pinkTint, padding: '0 16px',
+            minHeight: 'var(--su-slot-h)', gap: 'var(--su-card-gap)',
+            borderRadius: 'var(--su-radius)', border: `2px dashed ${SU.pinkBorder}`,
+            background: SU.pinkTint, padding: '10px var(--su-card-px)',
           }}
         >
           <span
             className="relative flex-none flex items-center justify-center"
-            style={{ width: 88, height: 114, borderRadius: 13, background: behind ? '#fff' : SU.ghost }}
+            style={{
+              height: 'var(--su-thumb-h)', aspectRatio: '88 / 114',
+              borderRadius: 'var(--su-thumb-r)', background: behind ? '#fff' : SU.ghost,
+            }}
           >
             {behind && (
               // eslint-disable-next-line @next/next/no-img-element
@@ -557,7 +561,7 @@ export default function ClosetSetupPage() {
                 src={behind}
                 alt=""
                 className="absolute inset-0"
-                style={{ width: '100%', height: '100%', borderRadius: 13, objectFit: 'contain', padding: 4 }}
+                style={{ width: '100%', height: '100%', borderRadius: 'var(--su-thumb-r)', objectFit: 'contain', padding: 4 }}
               />
             )}
             <span
@@ -573,7 +577,13 @@ export default function ClosetSetupPage() {
             </span>
           </span>
           <span className="flex-1 min-w-0">
-            <span className="block" style={{ font: '700 16px/1.25 Roboto, system-ui', color: SU.ink }}>
+            <span
+              className="block"
+              style={{
+                fontWeight: 700, fontSize: 'var(--su-f-slot-name)', lineHeight: 1.25,
+                fontFamily: 'Roboto, system-ui', color: SU.ink,
+              }}
+            >
               {polishing ? t.su_polishing : t.su_cutting}
             </span>
             {/* One bar across both stages — no time estimate to be wrong about. */}
@@ -583,7 +593,7 @@ export default function ClosetSetupPage() {
               aria-valuenow={Math.round(progress)}
               aria-valuemin={0}
               aria-valuemax={100}
-              style={{ marginTop: 11, height: 6, borderRadius: 99, background: SU.pinkSoftBorder, overflow: 'hidden' }}
+              style={{ marginTop: 'var(--su-gap-sm)', height: 6, borderRadius: 99, background: SU.pinkSoftBorder, overflow: 'hidden' }}
             >
               <span
                 className="block"
@@ -609,40 +619,58 @@ export default function ClosetSetupPage() {
           aria-label={t.su_a11y_filled.replace('{name}', nameOf(item))}
           onClick={() => openPicker(slot, true)}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPicker(slot, true); } }}
-          className="su-rise flex items-center gap-[15px] cursor-pointer active:scale-[0.985] transition-transform"
+          className="su-rise flex items-center cursor-pointer active:scale-[0.985] transition-transform"
           style={{
-            height: 150, borderRadius: 22, border: `2px solid ${SU.success}`,
-            background: SU.successBg, padding: '0 16px',
+            minHeight: 'var(--su-slot-h)', gap: 'var(--su-card-gap)',
+            borderRadius: 'var(--su-radius)', border: `2px solid ${SU.success}`,
+            background: SU.successBg, padding: '10px var(--su-card-px)',
           }}
         >
-          <div className="relative flex-none" style={{ width: 88, height: 114 }}>
+          <div className="relative flex-none" style={{ height: 'var(--su-thumb-h)', aspectRatio: '88 / 114' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={item.imageData}
               alt=""
-              style={{ width: 88, height: 114, borderRadius: 13, objectFit: 'contain', background: '#fff' }}
+              style={{ width: '100%', height: '100%', borderRadius: 'var(--su-thumb-r)', objectFit: 'contain', background: '#fff' }}
             />
             <span
               className="absolute flex items-center justify-center text-white"
-              style={{ top: -6, right: -6, width: 26, height: 26, borderRadius: 999, background: SU.success }}
+              style={{
+                top: -6, right: -6, width: 'clamp(21px, 3.4dvh, 26px)', height: 'clamp(21px, 3.4dvh, 26px)',
+                borderRadius: 999, background: SU.success,
+              }}
             >
               <Check size={14} strokeWidth={3.4} />
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <div style={{ font: '600 11px/1 Roboto, system-ui', color: SU.success, letterSpacing: '0.06em' }}>
+            <div
+              className="truncate"
+              style={{
+                fontWeight: 600, fontSize: 'var(--su-f-eyebrow)', lineHeight: 1.2,
+                fontFamily: 'Roboto, system-ui', color: SU.success, letterSpacing: '0.06em',
+              }}
+            >
               {other ? t.su_ready : t.su_more_to_go}
             </div>
-            <div className="truncate" style={{ marginTop: 6, font: '700 18px/1.2 Roboto, system-ui', color: SU.ink }}>
+            <div
+              className="truncate"
+              style={{
+                marginTop: 5, fontWeight: 700, fontSize: 'var(--su-f-slot-name)', lineHeight: 1.2,
+                fontFamily: 'Roboto, system-ui', color: SU.ink,
+              }}
+            >
               {nameOf(item)}
             </div>
             <span
               aria-hidden="true"
-              className="inline-flex items-center"
+              className="inline-flex items-center max-w-full"
               style={{
-                marginTop: 12, height: 32, padding: '0 13px', borderRadius: 999, background: '#fff',
+                marginTop: 'var(--su-gap-sm)', minHeight: 'var(--su-chip-h)', padding: '0 13px',
+                borderRadius: 999, background: '#fff',
                 border: `1px solid ${SU.successBorder}`, color: SU.successChipText,
-                font: '600 12.5px/1 Roboto, system-ui', whiteSpace: 'nowrap',
+                fontWeight: 600, fontSize: 'var(--su-f-chip)', lineHeight: 1.2,
+                fontFamily: 'Roboto, system-ui',
               }}
             >
               {t.su_replace}
@@ -657,31 +685,50 @@ export default function ClosetSetupPage() {
         key={slot}
         onClick={() => openPicker(slot, true)}
         aria-label={t.su_a11y_empty.replace('{title}', SLOT_TITLE[slot])}
-        className={`w-full text-left flex items-center gap-[15px] active:scale-[0.985] transition-transform${isNext && !adding ? ' su-pulse' : ''}`}
+        className={`w-full text-left flex items-center active:scale-[0.985] transition-transform${isNext && !adding ? ' su-pulse' : ''}`}
         style={{
-          height: 150, borderRadius: 22, border: `2px dashed ${SU.pinkBorder}`,
-          background: SU.pinkTint, padding: '0 16px',
+          minHeight: 'var(--su-slot-h)', gap: 'var(--su-card-gap)',
+          borderRadius: 'var(--su-radius)', border: `2px dashed ${SU.pinkBorder}`,
+          background: SU.pinkTint, padding: '10px var(--su-card-px)',
         }}
       >
         <span
           className="flex-none flex items-end justify-center"
           style={{
-            width: 88, height: 114, borderRadius: 13, background: SU.ghost, paddingBottom: 9,
-            font: '600 8.5px/1 ui-monospace, monospace', color: SU.ghostText, letterSpacing: '0.1em',
+            height: 'var(--su-thumb-h)', aspectRatio: '88 / 114',
+            borderRadius: 'var(--su-thumb-r)', background: SU.ghost, paddingBottom: 9,
+            fontWeight: 600, fontSize: 8.5, lineHeight: 1,
+            fontFamily: 'ui-monospace, monospace', color: SU.ghostText, letterSpacing: '0.1em',
           }}
         >
           {SLOT_SLUG[slot]}
         </span>
         <span className="flex-1 min-w-0">
-          <span className="block" style={{ font: '700 19px/1.2 Roboto, system-ui', color: SU.ink }}>{SLOT_TITLE[slot]}</span>
-          <span className="block" style={{ marginTop: 4, font: '400 13px/1.35 Roboto, system-ui', color: SU.mutedOnTint }}>
+          <span
+            className="block"
+            style={{
+              fontWeight: 700, fontSize: 'var(--su-f-slot-title)', lineHeight: 1.2,
+              fontFamily: 'Roboto, system-ui', color: SU.ink,
+            }}
+          >
+            {SLOT_TITLE[slot]}
+          </span>
+          <span
+            className="su-clamp2"
+            style={{
+              marginTop: 3, fontWeight: 400, fontSize: 'var(--su-f-slot-desc)', lineHeight: 1.3,
+              fontFamily: 'Roboto, system-ui', color: SU.mutedOnTint,
+            }}
+          >
             {SLOT_DESC[slot]}
           </span>
           <span
-            className="inline-flex items-center gap-[7px]"
+            className="inline-flex items-center gap-[7px] max-w-full"
             style={{
-              marginTop: 11, height: 36, padding: '0 15px', borderRadius: 999, background: SU.pink,
-              color: '#fff', font: '700 13.5px/1 Roboto, system-ui', whiteSpace: 'nowrap',
+              marginTop: 'var(--su-gap-sm)', minHeight: 'var(--su-chip-h)', padding: '0 15px',
+              borderRadius: 999, background: SU.pink, color: '#fff',
+              fontWeight: 700, fontSize: 'var(--su-f-chip)', lineHeight: 1.2,
+              fontFamily: 'Roboto, system-ui',
             }}
           >
             {adding ? (
@@ -697,7 +744,10 @@ export default function ClosetSetupPage() {
   }
 
   return (
-    <div className="phone-container flex flex-col" style={{ height: '100dvh', background: '#fff', color: SU.ink }}>
+    <div
+      className="phone-container su-screen flex flex-col"
+      style={{ height: '100dvh', background: '#fff', color: SU.ink, overflowX: 'hidden' }}
+    >
       <span aria-live="polite" className="sr-only">{announcement}</span>
 
       {toast && (
@@ -712,12 +762,22 @@ export default function ClosetSetupPage() {
       {/* ── Scrolling body ── */}
       <div
         className="flex-1 min-h-0 overflow-y-auto flex flex-col"
-        style={{ padding: 'calc(6px + env(safe-area-inset-top, 0px)) 20px 0' }}
+        style={{ padding: 'calc(6px + env(safe-area-inset-top, 0px)) var(--su-px) 0' }}
       >
-        <h1 style={{ font: '900 28px/1.12 Roboto, system-ui', letterSpacing: '-0.6px', textWrap: 'pretty' }}>
+        <h1
+          style={{
+            fontWeight: 900, fontSize: 'var(--su-f-title)', lineHeight: 1.12,
+            fontFamily: 'Roboto, system-ui', letterSpacing: '-0.6px', textWrap: 'pretty',
+          }}
+        >
           {t.su_title}
         </h1>
-        <p style={{ marginTop: 9, font: '400 15px/1.45 Roboto, system-ui', color: SU.sub, textWrap: 'pretty' }}>
+        <p
+          style={{
+            marginTop: 'var(--su-gap-sm)', fontWeight: 400, fontSize: 'var(--su-f-sub)',
+            lineHeight: 1.4, fontFamily: 'Roboto, system-ui', color: SU.sub, textWrap: 'pretty',
+          }}
+        >
           {t.su_subtitle}
         </p>
 
@@ -726,7 +786,7 @@ export default function ClosetSetupPage() {
         <div
           role="tablist"
           className="flex gap-1.5"
-          style={{ marginTop: 16, padding: 4, background: SU.surface, borderRadius: 999 }}
+          style={{ marginTop: 'var(--su-gap-lg)', padding: 4, background: SU.surface, borderRadius: 999 }}
         >
           {(['pair', 'dress'] as SetupMode[]).map((m) => {
             const on = mode === m;
@@ -736,10 +796,14 @@ export default function ClosetSetupPage() {
                 role="tab"
                 aria-selected={on}
                 onClick={() => applyMode(m)}
-                className="flex-1 flex items-center justify-center active:scale-[0.98] transition-transform"
+                // No nowrap and min-width:0 — "Koʻylak + poyabzal" is wide
+                // enough that pinning it to one line made the tab row, and with
+                // it the whole page, wider than a narrow screen.
+                className="flex-1 min-w-0 flex items-center justify-center text-center active:scale-[0.98] transition-transform"
                 style={{
-                  height: 38, borderRadius: 999, whiteSpace: 'nowrap',
-                  font: '700 13.5px/1 Roboto, system-ui',
+                  minHeight: 'var(--su-tab-h)', padding: '4px 6px', borderRadius: 999,
+                  fontWeight: 700, fontSize: 'var(--su-f-tab)', lineHeight: 1.15,
+                  fontFamily: 'Roboto, system-ui',
                   background: on ? '#fff' : 'transparent',
                   color: on ? SU.ink : SU.sub,
                   boxShadow: on ? '0 1px 3px rgba(0,0,0,0.1)' : undefined,
@@ -751,7 +815,7 @@ export default function ClosetSetupPage() {
           })}
         </div>
 
-        <div className="flex flex-col gap-[11px]" style={{ marginTop: 14 }}>
+        <div className="flex flex-col" style={{ marginTop: 'var(--su-gap-md)', gap: 'var(--su-gap-slots)' }}>
           {renderSlot(slotA, nextSlot === slotA)}
           {renderSlot(slotB, nextSlot === slotB)}
         </div>
@@ -763,12 +827,18 @@ export default function ClosetSetupPage() {
       <div
         className="flex-none"
         style={{
-          padding: '14px 20px calc(22px + env(safe-area-inset-bottom, 0px))',
+          padding: 'var(--su-gap-md) var(--su-px) calc(var(--su-gap-lg) + env(safe-area-inset-bottom, 0px))',
           background: 'linear-gradient(180deg,rgba(255,255,255,0) 0,#fff 22px)',
         }}
       >
-        <div className="flex items-center justify-between gap-3" style={{ marginBottom: 10 }}>
-          <div style={{ font: '600 12.5px/1 Roboto, system-ui', color: SU.sub }}>
+        <div className="flex items-center justify-between gap-3" style={{ marginBottom: 'var(--su-gap-sm)' }}>
+          <div
+            className="min-w-0 truncate"
+            style={{
+              fontWeight: 600, fontSize: 'var(--su-f-meta)', lineHeight: 1.2,
+              fontFamily: 'Roboto, system-ui', color: SU.sub,
+            }}
+          >
             {t.su_progress.replace('{n}', String(addedCount))}
           </div>
           <div className="flex gap-[5px] flex-none">
@@ -780,10 +850,14 @@ export default function ClosetSetupPage() {
         <button
           onClick={() => (nextSlot ? openPicker(nextSlot, false) : leaveSetup(true))}
           disabled={busy}
-          className="w-full flex items-center justify-center active:scale-[0.99] transition-transform"
+          // The label carries a whole slot title ("＋ Ustki kiyim qoʻshing"), so
+          // it wraps rather than running past the button on a narrow screen.
+          className="w-full flex items-center justify-center text-center active:scale-[0.99] transition-transform"
           style={{
-            height: 56, borderRadius: 999, background: SU.pink, color: '#fff',
-            font: '700 17px/1 Roboto, system-ui', whiteSpace: 'nowrap',
+            minHeight: 'var(--su-cta-h)', padding: '8px 16px', borderRadius: 999,
+            background: SU.pink, color: '#fff',
+            fontWeight: 700, fontSize: 'var(--su-f-cta)', lineHeight: 1.2,
+            fontFamily: 'Roboto, system-ui',
             boxShadow: '0 8px 22px rgba(237,61,142,0.28)',
             opacity: busy ? 0.55 : 1,
           }}
@@ -809,7 +883,14 @@ export default function ClosetSetupPage() {
 
       {/* ── Upload failure: keep the slot empty, offer a retry ── */}
       {failed && (
-        <div className="fixed inset-x-0 z-[89] flex justify-center px-5" style={{ bottom: 'calc(100px + env(safe-area-inset-bottom, 0px))' }}>
+        <div
+          className="fixed inset-x-0 z-[89] flex justify-center"
+          style={{
+            paddingLeft: 'var(--su-px)', paddingRight: 'var(--su-px)',
+            // Clear the footer, which is now itself fluid.
+            bottom: 'calc(var(--su-cta-h) + 46px + env(safe-area-inset-bottom, 0px))',
+          }}
+        >
           <div
             className="w-full max-w-[420px] flex items-center gap-3"
             style={{ background: '#101014', borderRadius: 18, padding: '12px 14px' }}
@@ -852,13 +933,33 @@ export default function ClosetSetupPage() {
       {finished && (
         <div
           className="fixed inset-0 z-[86] flex flex-col su-rise"
-          style={{ background: '#fff', padding: 'calc(52px + env(safe-area-inset-top, 0px)) 20px calc(24px + env(safe-area-inset-bottom, 0px))' }}
+          style={{
+            background: '#fff',
+            padding: 'calc(clamp(20px, 6dvh, 52px) + env(safe-area-inset-top, 0px)) var(--su-px) calc(var(--su-gap-lg) + env(safe-area-inset-bottom, 0px))',
+          }}
         >
-          <h2 style={{ font: '900 27px/1.14 Roboto, system-ui', letterSpacing: '-0.5px', color: SU.ink }}>{t.su_done_title}</h2>
-          <p style={{ marginTop: 9, font: '400 15px/1.45 Roboto, system-ui', color: SU.sub }}>{t.su_done_body}</p>
+          <h2
+            style={{
+              fontWeight: 900, fontSize: 'var(--su-f-title)', lineHeight: 1.14,
+              fontFamily: 'Roboto, system-ui', letterSpacing: '-0.5px', color: SU.ink, textWrap: 'pretty',
+            }}
+          >
+            {t.su_done_title}
+          </h2>
+          <p
+            style={{
+              marginTop: 'var(--su-gap-sm)', fontWeight: 400, fontSize: 'var(--su-f-sub)', lineHeight: 1.4,
+              fontFamily: 'Roboto, system-ui', color: SU.sub, textWrap: 'pretty',
+            }}
+          >
+            {t.su_done_body}
+          </p>
           <div
             className="flex-1 min-h-0 flex flex-col items-center justify-center gap-2"
-            style={{ marginTop: 22, borderRadius: 24, background: 'linear-gradient(180deg,#FFF6FA 0,#FDFDFE 100%)', border: '1px solid #F7E3EE' }}
+            style={{
+              marginTop: 'var(--su-gap-lg)', borderRadius: 24,
+              background: 'linear-gradient(180deg,#FFF6FA 0,#FDFDFE 100%)', border: '1px solid #F7E3EE',
+            }}
           >
             {[itemA, itemB].map((item, i) => item && (
               // eslint-disable-next-line @next/next/no-img-element
@@ -866,38 +967,97 @@ export default function ClosetSetupPage() {
                 key={i}
                 src={item.imageData}
                 alt=""
-                style={{ width: i === 0 ? 120 : 130, maxHeight: '40%', borderRadius: 14, objectFit: 'contain' }}
+                // Bounded on both axes so two garments always fit the panel,
+                // however short it gets.
+                style={{ maxWidth: i === 0 ? '32%' : '35%', maxHeight: '40%', borderRadius: 14, objectFit: 'contain' }}
               />
             ))}
           </div>
           <button
             onClick={() => leaveSetup(true)}
-            className="w-full flex items-center justify-center gap-2 active:scale-[0.99] transition-transform"
+            className="w-full flex items-center justify-center gap-2 text-center active:scale-[0.99] transition-transform"
             style={{
-              marginTop: 18, height: 56, borderRadius: 999, background: SU.pink, color: '#fff',
-              font: '700 17px/1 Roboto, system-ui', whiteSpace: 'nowrap',
+              marginTop: 'var(--su-gap-lg)', minHeight: 'var(--su-cta-h)', padding: '8px 16px',
+              borderRadius: 999, background: SU.pink, color: '#fff',
+              fontWeight: 700, fontSize: 'var(--su-f-cta)', lineHeight: 1.2, fontFamily: 'Roboto, system-ui',
               boxShadow: '0 8px 22px rgba(237,61,142,0.28)',
             }}
           >
-            <Sparkles size={18} strokeWidth={2.4} />
+            <Sparkles size={18} strokeWidth={2.4} className="flex-none" />
             {t.su_generate}
           </button>
           <button
             onClick={() => leaveSetup(true, { tryOn: true })}
-            className="w-full flex items-center justify-center gap-2 active:scale-[0.99] transition-transform"
+            className="w-full flex items-center justify-center gap-2 text-center active:scale-[0.99] transition-transform"
             style={{
-              marginTop: 10, height: 52, borderRadius: 999, background: '#fff',
+              marginTop: 'var(--su-gap-sm)', minHeight: 'var(--su-cta-h-sm)', padding: '8px 16px',
+              borderRadius: 999, background: '#fff',
               border: `1.5px solid ${SU.pinkBorder}`, color: SU.pink,
-              font: '700 15.5px/1 Roboto, system-ui', whiteSpace: 'nowrap',
+              fontWeight: 700, fontSize: 'var(--su-f-cta)', lineHeight: 1.2, fontFamily: 'Roboto, system-ui',
             }}
           >
-            <Shirt size={17} strokeWidth={2.3} />
+            <Shirt size={17} strokeWidth={2.3} className="flex-none" />
             {t.su_tryon}
           </button>
         </div>
       )}
 
       <style jsx global>{`
+        /* ── Fluid scale ────────────────────────────────────────────────────
+           Setup is one blocking screen that must fit without scrolling, and it
+           runs inside a WebView whose height is whatever the Flutter shell has
+           left over after its bottom nav — as little as ~540px on a small
+           phone. So nothing here is a fixed pixel size.
+
+           Every type size is bounded by BOTH the viewport height (short
+           screens) and its width (narrow screens, and the enlarged text an
+           Android system font scale forces on us). That width bound is what
+           lets the labels wrap or shrink instead of relying on nowrap, which
+           is what pushed the page wider than the viewport and clipped the mode
+           toggle and the CTA.
+
+           Box heights are floors, not ceilings: if text still outgrows a card
+           the card grows with it and the body scrolls, rather than clipping.
+           Each clamp reaches its maximum at roughly a 800px-tall viewport, so
+           large screens keep the layout they already have. */
+        .su-screen {
+          --su-px: clamp(13px, 4.4vw, 20px);
+
+          --su-f-title: clamp(19px, min(3.5dvh, 7.2vw), 28px);
+          --su-f-sub: clamp(12px, min(1.9dvh, 3.9vw), 15px);
+          --su-f-tab: clamp(10.5px, min(1.95dvh, 3.5vw), 13.5px);
+          --su-f-slot-title: clamp(14.5px, min(2.45dvh, 4.6vw), 19px);
+          --su-f-slot-desc: clamp(10.5px, min(1.7dvh, 3.3vw), 13px);
+          --su-f-slot-name: clamp(14.5px, min(2.35dvh, 4.5vw), 18px);
+          --su-f-chip: clamp(11px, min(1.75dvh, 3.3vw), 13.5px);
+          --su-f-cta: clamp(13.5px, min(2.2dvh, 4.3vw), 17px);
+          --su-f-meta: clamp(10.5px, min(1.6dvh, 3.2vw), 12.5px);
+          --su-f-eyebrow: clamp(9.5px, min(1.4dvh, 2.8vw), 11px);
+
+          --su-slot-h: clamp(104px, 18.5dvh, 150px);
+          --su-thumb-h: clamp(76px, 14.1dvh, 114px);
+          --su-thumb-r: clamp(9px, 1.6dvh, 13px);
+          --su-tab-h: clamp(30px, 4.7dvh, 38px);
+          --su-chip-h: clamp(28px, 4.4dvh, 36px);
+          --su-cta-h: clamp(44px, 7dvh, 56px);
+          --su-cta-h-sm: clamp(41px, 6.5dvh, 52px);
+
+          --su-card-px: clamp(11px, 3.4vw, 16px);
+          --su-card-gap: clamp(10px, 3vw, 15px);
+          --su-gap-slots: clamp(7px, 1.4dvh, 11px);
+          --su-gap-lg: clamp(9px, 2dvh, 16px);
+          --su-gap-md: clamp(6px, 1.7dvh, 14px);
+          --su-gap-sm: clamp(5px, 1.1dvh, 9px);
+          --su-radius: clamp(16px, 2.8dvh, 22px);
+        }
+        /* Descriptions are the one place that can run to three lines in uz/ru;
+           cap them so a long line can never push the chip out of its card. */
+        .su-clamp2 {
+          display: -webkit-box;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
+          overflow: hidden;
+        }
         @keyframes suPulseRing {
           0%   { box-shadow: 0 0 0 0 rgba(237, 61, 142, 0.35); }
           70%  { box-shadow: 0 0 0 14px rgba(237, 61, 142, 0); }
