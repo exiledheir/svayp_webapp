@@ -7,6 +7,7 @@ import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events } from '@/lib/analytics-events';
 import { isInFlutterWebView } from '@/lib/flutter-bridge';
 import { apiErrorCode } from '@/lib/api';
+import PaymentLogo from '@/components/closet/PaymentLogos';
 import {
   createCoinPayment,
   goToCheckout,
@@ -20,13 +21,20 @@ import {
 // not intercepted and loads the web landing page inside the WebView instead.
 const TG_ADMIN = 'https://t.me/libasai_admin';
 
-/** Витринные названия провайдеров (в API они приходят кодами). */
+/** Названия провайдеров — теперь только для aria-label: в кнопках стоят логотипы. */
 const PROVIDER_LABEL: Record<PaymentProvider, string> = {
   PAYME: 'Payme',
   CLICK: 'Click',
   PAYLOV: 'Paylov',
   UZUM: 'Uzum',
 };
+
+/**
+ * Paylov скрыт из интерфейса решением продукта: остальные три бренда узнаваемы
+ * по логотипам, а сервер по-прежнему может присылать его в списке — фильтруем
+ * на клиенте, чтобы не ждать правку бэка.
+ */
+const HIDDEN_PROVIDERS: PaymentProvider[] = ['PAYLOV'];
 
 /**
  * Buy-diamonds sheet. Показывает баланс, готовые пакеты со скидкой 200+, свободную сумму
@@ -62,8 +70,11 @@ export default function CoinsSheet({
   const packages = coinPackages(pricing);
   const [qty, setQty] = useState<number>(packages[0]);
 
-  const onlineEnabled = !!paymentOptions?.onlineEnabled && (paymentOptions?.providers?.length ?? 0) > 0;
-  const [provider, setProvider] = useState<PaymentProvider>(paymentOptions?.providers?.[0] ?? 'PAYME');
+  // Дефолт выбора берём из ВИДИМОГО списка: если сервер пришлёт скрытый провайдер
+  // первым, иначе оказался бы выбран способ, которого нет на экране.
+  const visibleProviders = (paymentOptions?.providers ?? []).filter((p) => !HIDDEN_PROVIDERS.includes(p));
+  const onlineEnabled = !!paymentOptions?.onlineEnabled && visibleProviders.length > 0;
+  const [provider, setProvider] = useState<PaymentProvider>(visibleProviders[0] ?? 'PAYME');
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState('');
 
@@ -240,12 +251,14 @@ export default function CoinsSheet({
           {onlineEnabled && (
             <>
               <p className="text-[13px] font-semibold mt-4 mb-1.5" style={{ color: sub }}>{t.cn_pay_method}</p>
-              <div className="grid grid-cols-2 gap-2">
-                {paymentOptions!.providers.map((p) => {
+              {/* До трёх колонок: три провайдера встают в один ряд, при двух сетка не разъезжается. */}
+              <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(visibleProviders.length, 3)}, minmax(0, 1fr))` }}>
+                {visibleProviders.map((p) => {
                   const active = provider === p;
                   return (
                     <button
                       key={p}
+                      aria-label={PROVIDER_LABEL[p]}
                       onClick={() => {
                         setProvider(p);
                         // Ошибка относится к КОНКРЕТНОМУ способу оплаты. Если её не убрать,
@@ -253,14 +266,13 @@ export default function CoinsSheet({
                         // выглядит как его ошибка — на этом мы сами один раз ошиблись в диагнозе.
                         setPayError('');
                       }}
-                      className="h-11 rounded-xl text-[14px] font-bold active:scale-[0.98] transition-transform"
+                      className="h-11 rounded-xl flex items-center justify-center active:scale-[0.98] transition-transform"
                       style={{
                         border: `1.5px solid ${active ? '#F370A7' : line}`,
                         background: active ? (dark ? 'rgba(243,112,167,0.12)' : '#fdeef6') : 'transparent',
-                        color: active ? '#F370A7' : ink,
                       }}
                     >
-                      {PROVIDER_LABEL[p]}
+                      <PaymentLogo provider={p} ink={ink} dark={dark} />
                     </button>
                   );
                 })}
