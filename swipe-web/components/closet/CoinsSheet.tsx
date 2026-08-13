@@ -37,6 +37,17 @@ const PROVIDER_LABEL: Record<PaymentProvider, string> = {
 const HIDDEN_PROVIDERS: PaymentProvider[] = ['PAYLOV'];
 
 /**
+ * Порядок способов оплаты на экране. Сервер отдаёт providers в своём порядке,
+ * поэтому раскладываем сами: Click идёт первым и он же выбран по умолчанию.
+ * Незнакомые провайдеры уезжают в конец, а не в начало (indexOf вернул бы -1).
+ */
+const PROVIDER_ORDER: PaymentProvider[] = ['CLICK', 'PAYME', 'UZUM', 'PAYLOV'];
+const providerRank = (p: PaymentProvider) => {
+  const i = PROVIDER_ORDER.indexOf(p);
+  return i === -1 ? PROVIDER_ORDER.length : i;
+};
+
+/**
  * Buy-diamonds sheet. Показывает баланс, готовые пакеты со скидкой 200+, свободную сумму
  * с живым итогом и кнопку покупки.
  *
@@ -72,11 +83,24 @@ export default function CoinsSheet({
 
   // Дефолт выбора берём из ВИДИМОГО списка: если сервер пришлёт скрытый провайдер
   // первым, иначе оказался бы выбран способ, которого нет на экране.
-  const visibleProviders = (paymentOptions?.providers ?? []).filter((p) => !HIDDEN_PROVIDERS.includes(p));
+  const visibleProviders = (paymentOptions?.providers ?? [])
+    .filter((p) => !HIDDEN_PROVIDERS.includes(p))
+    .sort((a, b) => providerRank(a) - providerRank(b));
   const onlineEnabled = !!paymentOptions?.onlineEnabled && visibleProviders.length > 0;
-  const [provider, setProvider] = useState<PaymentProvider>(visibleProviders[0] ?? 'PAYME');
+  const [provider, setProvider] = useState<PaymentProvider>(visibleProviders[0] ?? 'CLICK');
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState('');
+
+  // Шторку могут открыть до ответа /payments/options — тогда в state лежит дефолтный
+  // CLICK, которого может не оказаться в серверном списке. Как только список приехал,
+  // переводим выбор на первый доступный способ, иначе оплата ушла бы в недоступный шлюз.
+  const providerKey = visibleProviders.join(',');
+  useEffect(() => {
+    if (visibleProviders.length > 0 && !visibleProviders.includes(provider)) {
+      setProvider(visibleProviders[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [providerKey, provider]);
 
   // Кнопка «назад» со страницы шлюза восстанавливает страницу из bfcache вместе с
   // состоянием React. Без сброса кнопка навсегда осталась бы в «Открываем оплату…»,
