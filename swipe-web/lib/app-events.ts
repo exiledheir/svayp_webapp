@@ -88,7 +88,8 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
-function getAnonId(): string {
+/** Стабильный анонимный id устройства. Экспортируется для анти-фрода промокодов. */
+export function getAnonId(): string {
   let id: string | null = null;
   try {
     id = localStorage.getItem(ANON_KEY);

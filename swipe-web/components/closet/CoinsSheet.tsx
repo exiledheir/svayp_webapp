@@ -8,6 +8,9 @@ import { Events } from '@/lib/analytics-events';
 import { isInFlutterWebView } from '@/lib/flutter-bridge';
 import { apiErrorCode } from '@/lib/api';
 import PaymentLogo from '@/components/closet/PaymentLogos';
+import PromoSection from '@/components/closet/PromoSection';
+import PromoSuccessSheet from '@/components/closet/PromoSuccessSheet';
+import { fetchMyPromo, fetchPromoQuote, type MyPromo, type PromoApplied, type PromoQuote } from '@/lib/promo';
 import {
   createCoinPayment,
   goToCheckout,
@@ -140,7 +143,56 @@ export default function CoinsSheet({
   const rowBg = dark ? '#141014' : '#faf7fb';
 
   const fmt = (n: number) => n.toLocaleString('uz-UZ');
-  const price = coinsPrice(qty, pricing);
+  const tierPrice = coinsPrice(qty, pricing);
+
+  // ── Промокод ───────────────────────────────────────────────────────────────
+  // Цена со скидкой приходит С СЕРВЕРА, а не считается локально: минимум платежа,
+  // округление и проверка срока живут там, и локальный расчёт разошёлся бы с суммой,
+  // которую выставит createCoinPayment. Пока quote не пришёл, показываем тарифную цену —
+  // хуже показать цену без скидки на долю секунды, чем показать неверную.
+  const [promo, setPromo] = useState<MyPromo | null>(null);
+  const [promoQuote, setPromoQuote] = useState<PromoQuote | null>(null);
+  const [promoSuccess, setPromoSuccess] = useState<PromoApplied | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetchMyPromo()
+      .then((p) => alive && setPromo(p))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const discountLive = !!promo?.discountActive;
+  useEffect(() => {
+    if (!discountLive || qty < 1) {
+      setPromoQuote(null);
+      return;
+    }
+    let alive = true;
+    const timer = setTimeout(() => {
+      fetchPromoQuote(qty)
+        .then((q) => alive && setPromoQuote(q))
+        .catch(() => alive && setPromoQuote(null));
+    }, 250);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [discountLive, qty]);
+
+  const promoApplied = !!promoQuote && promoQuote.discountUzs > 0 && promoQuote.listUzs === tierPrice.total;
+  const price = promoApplied
+    ? {
+        total: promoQuote!.finalUzs,
+        original: promoQuote!.listUzs,
+        // Итоговый процент показываем от суммарной экономии: пользователю важна цифра
+        // на ценнике, а не то, какая часть пришла от объёма, а какая от блогера.
+        discountPct: Math.round((promoQuote!.discountUzs / promoQuote!.listUzs) * 100),
+        perUnit: tierPrice.perUnit,
+      }
+    : tierPrice;
 
   function buyViaTelegram() {
     const priceStr = `${fmt(price.total)} ${t.cn_currency}`;
@@ -248,6 +300,20 @@ export default function CoinsSheet({
             })}
           </div>
 
+          {/* Промокод: строка «Есть промокод?» либо плашка уже привязанного кода */}
+          <PromoSection
+            promo={promo}
+            dark={dark}
+            onApplied={(result) => {
+              setPromoSuccess(result);
+              // Перечитываем состояние: у бонусного кода изменился баланс, у скидочного —
+              // появилось право, от которого зависит цена.
+              fetchMyPromo()
+                .then(setPromo)
+                .catch(() => {});
+            }}
+          />
+
           {/* Custom amount */}
           <p className="text-[13px] font-semibold mt-4 mb-1.5" style={{ color: sub }}>{t.cn_custom}</p>
           <input
@@ -327,6 +393,10 @@ export default function CoinsSheet({
           </button>
         </div>
       </div>
+
+      {promoSuccess && (
+        <PromoSuccessSheet result={promoSuccess} dark={dark} onClose={() => setPromoSuccess(null)} />
+      )}
     </div>
   );
 }
