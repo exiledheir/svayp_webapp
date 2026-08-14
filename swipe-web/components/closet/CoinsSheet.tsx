@@ -165,16 +165,35 @@ export default function CoinsSheet({
   }, []);
 
   const discountLive = !!promo?.discountActive;
+
+  /**
+   * Котировка в пути. Нужна отдельным состоянием, потому что до ответа сервера показывать
+   * нечего: полная цена заведомо неверна (скидка есть), а считать её на клиенте нельзя —
+   * минимум платежа, округление и диапазон живут на сервере, и локальный расчёт разойдётся
+   * с суммой, которую выставит платёжка.
+   */
+  const [quotePending, setQuotePending] = useState(false);
+
   useEffect(() => {
     if (!discountLive || qty < 1) {
       setPromoQuote(null);
+      setQuotePending(false);
       return;
     }
     let alive = true;
+    setQuotePending(true);
     const timer = setTimeout(() => {
       fetchPromoQuote(qty)
-        .then((q) => alive && setPromoQuote(q))
-        .catch(() => alive && setPromoQuote(null));
+        .then((q) => {
+          if (!alive) return;
+          setPromoQuote(q);
+          setQuotePending(false);
+        })
+        .catch(() => {
+          if (!alive) return;
+          setPromoQuote(null);
+          setQuotePending(false);
+        });
     }, 250);
     return () => {
       alive = false;
@@ -183,6 +202,23 @@ export default function CoinsSheet({
   }, [discountLive, qty]);
 
   const promoApplied = !!promoQuote && promoQuote.discountUzs > 0 && promoQuote.listUzs === tierPrice.total;
+
+  // Код живой, но на выбранное количество не действует. Сравнение listUzs с текущим тиром —
+  // защита от устаревшей котировки: количество уже изменилось, а ответ ещё не пришёл.
+  const outOfRange =
+    !!promoQuote && promoQuote.reason === 'OUT_OF_RANGE' && promoQuote.listUzs === tierPrice.total;
+  const rangeHint =
+    outOfRange && promoQuote
+      ? (promoQuote.minCoins !== null && promoQuote.maxCoins !== null
+          ? t.promo_range_between
+          : promoQuote.minCoins !== null
+            ? t.promo_range_from
+            : t.promo_range_to
+        )
+          .replace('{code}', promoQuote.code ?? '')
+          .replace('{min}', String(promoQuote.minCoins ?? ''))
+          .replace('{max}', String(promoQuote.maxCoins ?? ''))
+      : '';
   const price = promoApplied
     ? {
         total: promoQuote!.finalUzs,
@@ -323,18 +359,32 @@ export default function CoinsSheet({
             value={qty || ''}
             onChange={(e) => setQty(Math.max(0, parseInt(e.target.value, 10) || 0))}
             placeholder={t.cn_custom_ph}
-            className="w-full h-12 rounded-2xl px-4 text-[15px] font-semibold outline-none"
+            className="w-full h-12 rounded-2xl px-4 text-[16px] font-semibold outline-none"
             style={{ background: rowBg, border: `1.5px solid ${line}`, color: ink }}
           />
+
+          {/* Код есть, но на такую покупку не действует — это надо сказать вслух: иначе видно
+              только полную цену, и выглядит как «промокод не сработал». */}
+          {outOfRange && (
+            <p className="text-[12px] mt-2" style={{ color: '#E0559A' }}>
+              {rangeHint}
+            </p>
+          )}
 
           {/* Live total + discount */}
           <div className="flex items-center justify-between mt-3">
             <span className="text-[13px]" style={{ color: sub }}>{t.cn_total}</span>
-            <span className="flex items-baseline gap-2">
-              {price.discountPct > 0 && <span className="text-[12px] line-through" style={{ color: sub }}>{fmt(price.original)}</span>}
-              <span className="text-[17px] font-extrabold" style={{ color: ink }}>{fmt(price.total)} {t.cn_currency}</span>
-              {price.discountPct > 0 && <span className="text-[11px] font-extrabold px-1.5 py-0.5 rounded-full text-white" style={{ background: '#F370A7' }}>{t.cn_off.replace('{n}', String(price.discountPct))}</span>}
-            </span>
+            {/* Пока сервер считает цену со скидкой, полную цену НЕ показываем: она заведомо
+                неверная, и человек видел бы «24 000 → 16 800» через секунду после открытия. */}
+            {quotePending ? (
+              <span className="h-[22px] w-28 rounded-lg animate-pulse" style={{ background: line }} />
+            ) : (
+              <span className="flex items-baseline gap-2">
+                {price.discountPct > 0 && <span className="text-[12px] line-through" style={{ color: sub }}>{fmt(price.original)}</span>}
+                <span className="text-[17px] font-extrabold" style={{ color: ink }}>{fmt(price.total)} {t.cn_currency}</span>
+                {price.discountPct > 0 && <span className="text-[11px] font-extrabold px-1.5 py-0.5 rounded-full text-white" style={{ background: '#F370A7' }}>{t.cn_off.replace('{n}', String(price.discountPct))}</span>}
+              </span>
+            )}
           </div>
 
           {/* Способ оплаты — только когда онлайн-оплата доступна этому пользователю */}

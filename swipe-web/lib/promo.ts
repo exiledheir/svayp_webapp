@@ -47,6 +47,13 @@ export interface PromoApplied {
   balanceAfter: number;
 }
 
+/**
+ * Почему в котировке нет скидки.
+ * Без этого поля «кода нет» и «код есть, но не действует на такое количество» приезжали
+ * неотличимо, и витрина молча показывала полную цену — человек не понимал, что произошло.
+ */
+export type PromoQuoteReason = 'APPLIED' | 'NO_PROMO' | 'OUT_OF_RANGE';
+
 export interface PromoQuote {
   promoCodeId: string | null;
   code: string | null;
@@ -55,6 +62,10 @@ export interface PromoQuote {
   discountUzs: number;
   finalUzs: number;
   raisedToMinimum: boolean;
+  reason: PromoQuoteReason;
+  /** Границы кода — приходят при OUT_OF_RANGE, чтобы написать «действует от 100 до 200». */
+  minCoins: number | null;
+  maxCoins: number | null;
 }
 
 /** Коды ошибок сервера — ровно четыре, разбираются через apiErrorCode(). */
