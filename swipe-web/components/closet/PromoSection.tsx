@@ -8,13 +8,16 @@ import { applyPromo, normalizePromoInput, type MyPromo, type PromoApplied } from
 /**
  * Строка «Есть промокод?» на экране покупки.
  *
- * Три состояния, и они разные по смыслу:
- *   • кода нет — свёрнутая строка, по тапу раскрывается поле ввода;
- *   • код привязан и скидка жива — плашка «Промокод MALIKA · −20%»;
- *   • код привязан, скидка потрачена или истекла — показываем сам код без плашки скидки,
- *     потому что привязка вечная, а право на скидку нет.
+ * Два состояния, и граница между ними — ЖИВОЕ право на скидку, а не факт применения кода:
+ *   • скидка жива — плашка «Промокод MALIKA · −20%», вводить нечего: коды не суммируются,
+ *     на одну покупку идёт ровно один;
+ *   • скидки нет (потрачена, истекла или кода не было вовсе) — открыто поле ввода для
+ *     СЛЕДУЮЩЕГО кода. Человек применил код, купил, вернулся — и вводит другой.
  *
- * Тексты ошибок берутся по коду из тела ответа — сервер отдаёт ровно четыре.
+ * Именно поэтому «код применён» больше не запирает секцию навсегда: раньше после покупки
+ * на экране висело «Скидка уже использована» и ввести новый код было физически негде.
+ *
+ * Тексты ошибок берутся по коду из тела ответа.
  */
 
 const ERROR_KEYS = {
@@ -22,6 +25,7 @@ const ERROR_KEYS = {
   PROMO_EXPIRED: 'promo_err_expired',
   PROMO_LIMIT_REACHED: 'promo_err_limit',
   PROMO_ALREADY_HAS: 'promo_err_already',
+  PROMO_ALREADY_USED: 'promo_err_already_used',
 } as const;
 
 export default function PromoSection({
@@ -65,40 +69,38 @@ export default function PromoSection({
     }
   }
 
-  // Код привязан: показываем его. Плашка скидки — только пока право живо.
-  if (promo) {
-    const discountLive = promo.discountActive && promo.discountPercent !== null;
+  // Скидка жива — вводить нечего, показываем плашку.
+  const discountLive = !!promo && promo.discountActive && promo.discountPercent !== null;
+  if (discountLive && promo) {
     return (
       <div
         className="mt-4 rounded-2xl px-3.5 py-3 flex items-center justify-between"
-        style={{
-          background: discountLive ? accentBg : rowBg,
-          border: `1.5px solid ${discountLive ? '#F370A7' : line}`,
-        }}
+        style={{ background: accentBg, border: '1.5px solid #F370A7' }}
       >
         <span className="text-[13px] font-semibold" style={{ color: ink }}>
-          {discountLive
-            ? t.promo_badge.replace('{code}', promo.code).replace('{n}', String(promo.discountPercent))
-            : t.promo_your_code.replace('{code}', promo.code)}
+          {t.promo_badge.replace('{code}', promo.code).replace('{n}', String(promo.discountPercent))}
         </span>
-        {!discountLive && promo.type === 'DISCOUNT_PERCENT' && (
-          <span className="text-[11px]" style={{ color: sub }}>
-            {t.promo_used}
-          </span>
-        )}
       </div>
     );
   }
 
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        className="mt-4 w-full rounded-2xl px-3.5 py-3 text-left text-[13px] font-semibold active:scale-[0.99] transition-transform"
-        style={{ background: rowBg, border: `1.5px dashed ${line}`, color: '#E0559A' }}
-      >
-        {t.promo_have}
-      </button>
+      <div className="mt-4">
+        <button
+          onClick={() => setOpen(true)}
+          className="w-full rounded-2xl px-3.5 py-3 text-left text-[13px] font-semibold active:scale-[0.99] transition-transform"
+          style={{ background: rowBg, border: `1.5px dashed ${line}`, color: '#E0559A' }}
+        >
+          {promo ? t.promo_have_another : t.promo_have}
+        </button>
+        {/* Прежний код никуда не делся — покупки по-прежнему засчитываются блогеру. */}
+        {promo && (
+          <p className="mt-1.5 px-1 text-[11px]" style={{ color: sub }}>
+            {t.promo_your_code.replace('{code}', promo.code)}
+          </p>
+        )}
+      </div>
     );
   }
 
