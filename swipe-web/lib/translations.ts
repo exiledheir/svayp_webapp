@@ -451,8 +451,10 @@ export interface Translations {
   promo_err_not_found: string;
   promo_err_expired: string;
   promo_err_limit: string;
-  promo_err_already: string;
   promo_err_already_used: string;
+  promo_range_between: string;
+  promo_range_from: string;
+  promo_range_to: string;
   promo_err_generic: string;
   cn_pay_redirecting: string;
   pay_checking_title: string;
@@ -1335,8 +1337,10 @@ const en: Translations = {
   promo_err_not_found: 'No such promo code',
   promo_err_expired: 'This promo code has expired',
   promo_err_limit: 'This promo code is no longer valid',
-  promo_err_already: 'Use your current discount first — codes don\u2019t stack',
   promo_err_already_used: 'You have already used this promo code',
+  promo_range_between: 'Promo code {code} applies to purchases of {min}\u2013{max} diamonds',
+  promo_range_from: 'Promo code {code} applies to purchases from {min} diamonds',
+  promo_range_to: 'Promo code {code} applies to purchases up to {max} diamonds',
   promo_err_generic: 'Could not apply the promo code. Please try again.',
   cn_pay_redirecting: 'Opening payment…',
   pay_checking_title: 'Confirming your payment',
@@ -2213,8 +2217,10 @@ const ru: Translations = {
   promo_err_not_found: 'Такого промокода не существует',
   promo_err_expired: 'Срок действия промокода истёк',
   promo_err_limit: 'Промокод больше не действует',
-  promo_err_already: 'Сначала используйте текущую скидку — коды не суммируются',
   promo_err_already_used: 'Этот промокод вы уже применяли',
+  promo_range_between: 'Промокод {code} действует на покупку от {min} до {max} алмазов',
+  promo_range_from: 'Промокод {code} действует на покупку от {min} алмазов',
+  promo_range_to: 'Промокод {code} действует на покупку до {max} алмазов',
   promo_err_generic: 'Не удалось применить промокод. Попробуйте ещё раз.',
   cn_pay_redirecting: 'Открываем оплату…',
   pay_checking_title: 'Подтверждаем оплату',
@@ -3090,8 +3096,10 @@ const uz: Translations = {
   promo_err_not_found: 'Bunday promokod mavjud emas',
   promo_err_expired: 'Promokod muddati tugagan',
   promo_err_limit: 'Promokod endi amal qilmaydi',
-  promo_err_already: 'Avval joriy chegirmadan foydalaning — kodlar qo\u2018shilmaydi',
   promo_err_already_used: 'Bu promokodni siz allaqachon ishlatgansiz',
+  promo_range_between: '{code} promokodi {min}\u2013{max} olmos xaridiga amal qiladi',
+  promo_range_from: '{code} promokodi {min} olmosdan boshlab amal qiladi',
+  promo_range_to: '{code} promokodi {max} olmosgacha amal qiladi',
   promo_err_generic: 'Promokodni qo\'llab bo\'lmadi. Qayta urinib ko\'ring.',
   cn_pay_redirecting: 'To\'lov ochilmoqda…',
   pay_checking_title: 'To\'lov tasdiqlanmoqda',

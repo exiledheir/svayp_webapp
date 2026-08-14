@@ -24,7 +24,6 @@ const ERROR_KEYS = {
   PROMO_NOT_FOUND: 'promo_err_not_found',
   PROMO_EXPIRED: 'promo_err_expired',
   PROMO_LIMIT_REACHED: 'promo_err_limit',
-  PROMO_ALREADY_HAS: 'promo_err_already',
   PROMO_ALREADY_USED: 'promo_err_already_used',
 } as const;
 
@@ -69,46 +68,58 @@ export default function PromoSection({
     }
   }
 
-  // Скидка жива — вводить нечего, показываем плашку.
   const discountLive = !!promo && promo.discountActive && promo.discountPercent !== null;
-  if (discountLive && promo) {
-    return (
-      <div
-        className="mt-4 rounded-2xl px-3.5 py-3 flex items-center justify-between"
-        style={{ background: accentBg, border: '1.5px solid #F370A7' }}
-      >
-        <span className="text-[13px] font-semibold" style={{ color: ink }}>
-          {t.promo_badge.replace('{code}', promo.code).replace('{n}', String(promo.discountPercent))}
-        </span>
-      </div>
-    );
-  }
+
+  // Действующая скидка. Показываем её всегда, но НЕ вместо поля ввода: новый код заменяет
+  // прежний, и человек не должен застревать с кодом, который не подходит под его покупку.
+  const badge = discountLive && promo && (
+    <div
+      className="mt-4 rounded-2xl px-3.5 py-3"
+      style={{ background: accentBg, border: '1.5px solid #F370A7' }}
+    >
+      <span className="text-[13px] font-semibold" style={{ color: ink }}>
+        {t.promo_badge.replace('{code}', promo.code).replace('{n}', String(promo.discountPercent))}
+      </span>
+    </div>
+  );
 
   if (!open) {
     return (
-      <div className="mt-4">
-        <button
-          onClick={() => setOpen(true)}
-          className="w-full rounded-2xl px-3.5 py-3 text-left text-[13px] font-semibold active:scale-[0.99] transition-transform"
-          style={{ background: rowBg, border: `1.5px dashed ${line}`, color: '#E0559A' }}
-        >
-          {promo ? t.promo_have_another : t.promo_have}
-        </button>
-        {/* Прежний код никуда не делся — покупки по-прежнему засчитываются блогеру. */}
-        {promo && (
-          <p className="mt-1.5 px-1 text-[11px]" style={{ color: sub }}>
-            {t.promo_your_code.replace('{code}', promo.code)}
-          </p>
-        )}
+      <div>
+        {badge}
+        <div className="mt-2">
+          <button
+            onClick={() => setOpen(true)}
+            className="w-full rounded-2xl px-3.5 py-3 text-left text-[13px] font-semibold active:scale-[0.99] transition-transform"
+            style={{ background: rowBg, border: `1.5px dashed ${line}`, color: '#E0559A' }}
+          >
+            {promo ? t.promo_have_another : t.promo_have}
+          </button>
+          {/* Прежний код никуда не делся — покупки по-прежнему засчитываются блогеру. */}
+          {promo && !discountLive && (
+            <p className="mt-1.5 px-1 text-[11px]" style={{ color: sub }}>
+              {t.promo_your_code.replace('{code}', promo.code)}
+            </p>
+          )}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mt-4">
-      <div className="flex gap-2">
+    <div>
+      {badge}
+      <div className="mt-2 flex gap-2">
+        {/*
+          min-w-0 обязателен: у флекс-элемента min-width по умолчанию auto, и <input> не
+          сжимается уже своей внутренней ширины (~20 символов). Без этого строка становится
+          шире листа, кнопка «Применить» уезжает за край, а вся страница получает
+          горизонтальную прокрутку — на телефоне это выглядит как «вебка съехала и зумится».
+          size={1} убирает саму внутреннюю ширину, чтобы флексу было от чего отталкиваться.
+        */}
         <input
           autoFocus
+          size={1}
           value={code}
           onChange={(e) => {
             setCode(normalizePromoInput(e.target.value));
@@ -118,13 +129,13 @@ export default function PromoSection({
             if (e.key === 'Enter') void submit();
           }}
           placeholder={t.promo_placeholder}
-          className="flex-1 h-12 rounded-2xl px-4 text-[15px] font-semibold uppercase outline-none"
+          className="flex-1 min-w-0 h-12 rounded-2xl px-4 text-[16px] font-semibold uppercase outline-none"
           style={{ background: rowBg, border: `1.5px solid ${error ? '#E0559A' : line}`, color: ink }}
         />
         <button
           onClick={() => void submit()}
           disabled={code.length < 4 || busy}
-          className="h-12 px-5 rounded-2xl text-white text-[14px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40"
+          className="shrink-0 h-12 px-5 rounded-2xl text-white text-[14px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-40"
           style={{ background: '#F370A7' }}
         >
           {busy ? <Loader2 size={16} className="animate-spin" /> : t.promo_apply}
