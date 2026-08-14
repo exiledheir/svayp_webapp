@@ -9,11 +9,21 @@
 import { api } from '@/lib/api';
 import { getAnonId } from '@/lib/app-events';
 
+/**
+ * Достаёт payload из конверта ApiResponse.
+ *
+ * Тонкость: на сервере у ApiResponse стоит @JsonInclude(NON_NULL), поэтому пустой ответ
+ * приезжает как `{}` — БЕЗ ключа `data`. Наивная проверка `'data' in body` его не ловит и
+ * возвращает сам конверт: объект-пустышка выглядит «истинным», и UI решает, что промокод есть.
+ * Отсюда была плашка «Ваш промокод: undefined» вместо поля ввода. Пустой объект = null.
+ */
 function unwrap<T>(res: { data: unknown }): T {
-  const body = res.data as { data?: T } | T;
-  return (body && typeof body === 'object' && 'data' in (body as object)
-    ? (body as { data: T }).data
-    : body) as T;
+  const body = res.data;
+  if (!body || typeof body !== 'object') return body as T;
+  if ('data' in body) return ((body as { data: T }).data ?? null) as T;
+  // Конверт без payload (`{}` или только `message`) — данных нет.
+  if (Object.keys(body).every((k) => k === 'message')) return null as T;
+  return body as T;
 }
 
 export type PromoType = 'BONUS_COINS' | 'DISCOUNT_PERCENT';
@@ -60,10 +70,17 @@ export async function applyPromo(code: string): Promise<PromoApplied> {
   return unwrap<PromoApplied>(res);
 }
 
-/** Промокод пользователя или null, если не активирован. */
+/**
+ * Промокод пользователя или null, если не активирован.
+ *
+ * Проверка на `code` — страховка от любого «почти пустого» ответа: экран покупки решает по
+ * этому значению, показывать поле ввода или плашку привязки, и объект без кода превращает
+ * рабочий экран в тупик, где промокод ввести уже нельзя.
+ */
 export async function fetchMyPromo(): Promise<MyPromo | null> {
   const res = await api.get('/promo/me');
-  return unwrap<MyPromo | null>(res);
+  const promo = unwrap<MyPromo | null>(res);
+  return promo && typeof promo.code === 'string' && promo.code.length > 0 ? promo : null;
 }
 
 /** Серверная цена пакета с учётом промокода. */
