@@ -437,6 +437,7 @@ export interface Translations {
 
   // Промокоды блогеров
   promo_have: string;
+  promo_have_another: string;
   promo_title: string;
   promo_placeholder: string;
   promo_apply: string;
@@ -451,6 +452,7 @@ export interface Translations {
   promo_err_expired: string;
   promo_err_limit: string;
   promo_err_already: string;
+  promo_err_already_used: string;
   promo_err_generic: string;
   cn_pay_redirecting: string;
   pay_checking_title: string;
@@ -1319,8 +1321,9 @@ const en: Translations = {
   cn_pay_provider_down: 'This payment method is unavailable right now. Please pick another one.',
 
   promo_have: 'Have a promo code?',
+  promo_have_another: 'Have another promo code?',
   promo_title: 'Promo code',
-  promo_placeholder: 'MALIKA',
+  promo_placeholder: '',
   promo_apply: 'Apply',
   promo_your_code: 'Your promo code: {code}',
   promo_badge: 'Promo code {code} · −{n}%',
@@ -1332,7 +1335,8 @@ const en: Translations = {
   promo_err_not_found: 'No such promo code',
   promo_err_expired: 'This promo code has expired',
   promo_err_limit: 'This promo code is no longer valid',
-  promo_err_already: 'You have already activated a promo code',
+  promo_err_already: 'Use your current discount first — codes don\u2019t stack',
+  promo_err_already_used: 'You have already used this promo code',
   promo_err_generic: 'Could not apply the promo code. Please try again.',
   cn_pay_redirecting: 'Opening payment…',
   pay_checking_title: 'Confirming your payment',
@@ -2195,8 +2199,9 @@ const ru: Translations = {
   cn_pay_provider_down: 'Этот способ оплаты сейчас недоступен. Выберите другой.',
 
   promo_have: 'Есть промокод?',
+  promo_have_another: 'Есть другой промокод?',
   promo_title: 'Промокод',
-  promo_placeholder: 'MALIKA',
+  promo_placeholder: '',
   promo_apply: 'Применить',
   promo_your_code: 'Ваш промокод: {code}',
   promo_badge: 'Промокод {code} · −{n}%',
@@ -2208,7 +2213,8 @@ const ru: Translations = {
   promo_err_not_found: 'Такого промокода не существует',
   promo_err_expired: 'Срок действия промокода истёк',
   promo_err_limit: 'Промокод больше не действует',
-  promo_err_already: 'Вы уже активировали промокод',
+  promo_err_already: 'Сначала используйте текущую скидку — коды не суммируются',
+  promo_err_already_used: 'Этот промокод вы уже применяли',
   promo_err_generic: 'Не удалось применить промокод. Попробуйте ещё раз.',
   cn_pay_redirecting: 'Открываем оплату…',
   pay_checking_title: 'Подтверждаем оплату',
@@ -3070,8 +3076,9 @@ const uz: Translations = {
   cn_pay_provider_down: 'Bu to\'lov usuli hozir ishlamayapti. Boshqasini tanlang.',
 
   promo_have: 'Promokodingiz bormi?',
+  promo_have_another: 'Boshqa promokodingiz bormi?',
   promo_title: 'Promokod',
-  promo_placeholder: 'MALIKA',
+  promo_placeholder: '',
   promo_apply: 'Qo\'llash',
   promo_your_code: 'Sizning promokodingiz: {code}',
   promo_badge: '{code} promokodi · −{n}%',
@@ -3083,7 +3090,8 @@ const uz: Translations = {
   promo_err_not_found: 'Bunday promokod mavjud emas',
   promo_err_expired: 'Promokod muddati tugagan',
   promo_err_limit: 'Promokod endi amal qilmaydi',
-  promo_err_already: 'Siz allaqachon promokod faollashtirgansiz',
+  promo_err_already: 'Avval joriy chegirmadan foydalaning — kodlar qo\u2018shilmaydi',
+  promo_err_already_used: 'Bu promokodni siz allaqachon ishlatgansiz',
   promo_err_generic: 'Promokodni qo\'llab bo\'lmadi. Qayta urinib ko\'ring.',
   cn_pay_redirecting: 'To\'lov ochilmoqda…',
   pay_checking_title: 'To\'lov tasdiqlanmoqda',
