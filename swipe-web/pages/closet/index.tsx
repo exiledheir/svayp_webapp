@@ -392,6 +392,19 @@ export default function ClosetPage() {
   const refreshCoins = useCallback(() => {
     return fetchCoinBalance().then((b) => setCoinsState(b.balance)).catch(() => { /* offline — keep last known */ });
   }, []);
+
+  // Промокод применяется в НАТИВНОМ экране профиля Flutter, а этот таб сидит в IndexedStack
+  // и не перемонтируется — сам он о начислении не узнает. Нативная оболочка дёргает эту
+  // функцию после активации бонусного кода (см. WebViewBridge.requestCoinsRefresh).
+  // Тот же приём, что у __setNativeTheme / __setNativeLocale.
+  useEffect(() => {
+    (window as unknown as { __svaypRefreshCoins?: () => void }).__svaypRefreshCoins = () => {
+      void refreshCoins();
+    };
+    return () => {
+      delete (window as unknown as { __svaypRefreshCoins?: () => void }).__svaypRefreshCoins;
+    };
+  }, [refreshCoins]);
   useEffect(() => {
     refreshCoins();
     fetchCoinPricing().then(setCoinPricing).catch(() => { /* fallback to local constants */ });
