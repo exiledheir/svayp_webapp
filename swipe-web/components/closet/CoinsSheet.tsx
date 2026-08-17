@@ -4,7 +4,7 @@ import { useI18n } from '@/lib/i18n';
 import Diamond from '@/components/closet/Diamond';
 import { coinsPrice, coinPackages, type CoinPricing } from '@/lib/coins';
 import { logAnalyticsEvent } from '@/lib/analytics';
-import { Events } from '@/lib/analytics-events';
+import { Events, Params } from '@/lib/analytics-events';
 import { isInFlutterWebView } from '@/lib/flutter-bridge';
 import { apiErrorCode } from '@/lib/api';
 import PaymentLogo from '@/components/closet/PaymentLogos';
@@ -441,6 +441,23 @@ export default function CoinsSheet({
               </>
             )}
           </button>
+
+          {/* Ручной флоу через админа. Когда онлайн-оплата включена, кнопка «купить» ведёт
+              в шлюз, и телеграм-путь становится недостижим — а он единственный выход, если
+              у человека не проходит карта. Поэтому оставляем его текстовой ссылкой; при
+              выключенной онлайн-оплате основная кнопка и так ведёт в Telegram. */}
+          {onlineEnabled && (
+            <button
+              onClick={() => {
+                logAnalyticsEvent(Events.UPGRADE_CTA_TAPPED, { [Params.DESTINATION]: 'telegram_admin' });
+                buyViaTelegram();
+              }}
+              className="w-full mt-3 py-2 text-[13px] font-semibold text-center active:opacity-60 transition-opacity"
+              style={{ color: '#E0559A' }}
+            >
+              {t.cn_tg_contact}
+            </button>
+          )}
         </div>
       </div>
 

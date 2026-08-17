@@ -434,6 +434,7 @@ export interface Translations {
   cn_pay_method: string;
   cn_pay_error: string;
   cn_pay_provider_down: string;
+  cn_tg_contact: string;
 
   // Промокоды блогеров
   promo_have: string;
@@ -1321,6 +1322,7 @@ const en: Translations = {
   cn_pay_method: 'Payment method',
   cn_pay_error: 'Could not start the payment. Please try again.',
   cn_pay_provider_down: 'This payment method is unavailable right now. Please pick another one.',
+  cn_tg_contact: 'Trouble paying? Message the admin on Telegram',
 
   promo_have: 'Have a promo code?',
   promo_have_another: 'Have another promo code?',
@@ -2201,6 +2203,7 @@ const ru: Translations = {
   cn_pay_method: 'Способ оплаты',
   cn_pay_error: 'Не удалось начать оплату. Попробуйте ещё раз.',
   cn_pay_provider_down: 'Этот способ оплаты сейчас недоступен. Выберите другой.',
+  cn_tg_contact: 'Проблемы с оплатой? Напишите админу в Telegram',
 
   promo_have: 'Есть промокод?',
   promo_have_another: 'Есть другой промокод?',
@@ -3080,6 +3083,7 @@ const uz: Translations = {
   cn_pay_method: 'To\'lov usuli',
   cn_pay_error: 'To\'lovni boshlab bo\'lmadi. Qayta urinib ko\'ring.',
   cn_pay_provider_down: 'Bu to\'lov usuli hozir ishlamayapti. Boshqasini tanlang.',
+  cn_tg_contact: 'To\'lovda muammo bormi? Telegramda admin bilan bog\'laning',
 
   promo_have: 'Promokodingiz bormi?',
   promo_have_another: 'Boshqa promokodingiz bormi?',
