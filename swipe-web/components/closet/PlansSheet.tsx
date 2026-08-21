@@ -88,13 +88,21 @@ export default function PlansSheet({
   }, [providerKey, provider]);
 
   // Кнопка «назад» со страницы шлюза восстанавливает страницу из bfcache вместе с состоянием
-  // React. Без сброса кнопка навсегда осталась бы в «Открываем оплату…».
+  // React: кнопка навсегда осталась бы в «Открываем оплату…», а плашка промокода — висеть
+  // со скидкой, которую оплата уже потратила. Поэтому не только сбрасываем кнопку, но и
+  // перечитываем состояние кода и тарифов.
   useEffect(() => {
     const onShow = (e: PageTransitionEvent) => {
-      if (e.persisted) setPaying(false);
+      if (!e.persisted) return;
+      setPaying(false);
+      fetchMyPromo()
+        .then(setPromo)
+        .catch(() => {});
+      onPromoApplied?.();
     };
     window.addEventListener('pageshow', onShow);
     return () => window.removeEventListener('pageshow', onShow);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Swipe-down-to-close: тянем только когда список прокручен вверх, иначе жест дерётся со скроллом.
@@ -283,6 +291,7 @@ export default function PlansSheet({
           <PromoSection
             promo={promo}
             dark={dark}
+            allowReplaceWhileActive={false}
             onApplied={(result) => {
               setPromoSuccess(result);
               fetchMyPromo()
@@ -293,12 +302,6 @@ export default function PlansSheet({
               onPromoApplied?.();
             }}
           />
-
-          {plan && plan.discountPercent > 0 && (
-            <p className="text-[12px] mt-2 text-center" style={{ color: accent }}>
-              {t.pl_promo_applied.replace('{n}', String(plan.discountPercent))}
-            </p>
-          )}
 
           {onlineEnabled && (
             <>

@@ -31,10 +31,20 @@ export default function PromoSection({
   promo,
   dark,
   onApplied,
+  allowReplaceWhileActive = true,
 }: {
   promo: MyPromo | null;
   dark: boolean;
   onApplied: (result: PromoApplied) => void;
+  /**
+   * Показывать ли поле ввода, пока скидка активна.
+   *
+   * Для алмазов — да: код может действовать только на определённое количество, и человек
+   * должен иметь возможность ввести другой, не застревая с неподходящим.
+   * Для подписки — нет: диапазона в алмазах у тарифа не существует, код действует всегда,
+   * и предлагать «введите другой» рядом с уже применённой скидкой просто путает.
+   */
+  allowReplaceWhileActive?: boolean;
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -83,6 +93,11 @@ export default function PromoSection({
     </div>
   );
 
+  // Скидка уже действует и заменять её нечем — показываем только плашку.
+  if (discountLive && !allowReplaceWhileActive) {
+    return <div>{badge}</div>;
+  }
+
   if (!open) {
     return (
       <div>
@@ -95,8 +110,10 @@ export default function PromoSection({
           >
             {promo ? t.promo_have_another : t.promo_have}
           </button>
-          {/* Прежний код никуда не делся — покупки по-прежнему засчитываются блогеру. */}
-          {promo && !discountLive && (
+          {/* Прежний код никуда не делся — покупки по-прежнему засчитываются блогеру.
+              В шторке тарифов эту строку не показываем: после потраченной скидки она
+              читается как «код ещё действует» и путает. */}
+          {allowReplaceWhileActive && promo && !discountLive && (
             <p className="mt-1.5 px-1 text-[11px]" style={{ color: sub }}>
               {t.promo_your_code.replace('{code}', promo.code)}
             </p>
