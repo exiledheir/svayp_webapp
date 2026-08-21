@@ -63,6 +63,27 @@ const providerRank = (p: PaymentProvider) => {
  * sheet opens when someone wants diamonds, and every priced action already
  * shows its own cost at the point of use.
  */
+/**
+ * Состояние промокода из ответа на применение.
+ *
+ * Показываем плашку сразу, не дожидаясь повторного /promo/me: запрос может опоздать или
+ * упасть, и тогда только что применённый код исчезал бы с экрана. Ответ применения уже
+ * содержит всё нужное, а фоновый refetch потом уточнит владельца кода.
+ */
+function promoFromApplied(result: PromoApplied): MyPromo {
+  const isDiscount = result.type === 'DISCOUNT_PERCENT';
+  return {
+    code: result.code,
+    ownerName: '',
+    type: result.type,
+    value: result.value,
+    activatedAt: new Date().toISOString(),
+    discountActive: result.discountActive ?? isDiscount,
+    discountPercent: isDiscount ? result.value : null,
+    discountExpiresAt: result.discountExpiresAt ?? null,
+  };
+}
+
 export default function CoinsSheet({
   balance,
   needMore = false,
@@ -385,6 +406,9 @@ export default function CoinsSheet({
             onDismiss={() => setPromoSkipped(true)}
             onApplied={(result) => {
               setPromoSuccess(result);
+              // Новый код отменяет прежнее снятие, иначе его плашку скрыл бы флаг отказа.
+              setPromoSkipped(false);
+              setPromo(promoFromApplied(result));
               // Перечитываем состояние: у бонусного кода изменился баланс, у скидочного —
               // появилось право, от которого зависит цена.
               fetchMyPromo()

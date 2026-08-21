@@ -36,6 +36,27 @@ const PROVIDER_LABEL: Record<PaymentProvider, string> = {
  * Способы оплаты — общий список с покупкой алмазов (`visiblePaymentProviders`): два разных
  * набора в одном приложении невозможно объяснить в поддержке.
  */
+/**
+ * Состояние промокода из ответа на применение.
+ *
+ * Показываем плашку сразу, не дожидаясь повторного /promo/me: запрос может опоздать или
+ * упасть, и тогда только что применённый код исчезал бы с экрана. Ответ применения уже
+ * содержит всё нужное, а фоновый refetch потом уточнит владельца кода.
+ */
+function promoFromApplied(result: PromoApplied): MyPromo {
+  const isDiscount = result.type === 'DISCOUNT_PERCENT';
+  return {
+    code: result.code,
+    ownerName: '',
+    type: result.type,
+    value: result.value,
+    activatedAt: new Date().toISOString(),
+    discountActive: result.discountActive ?? isDiscount,
+    discountPercent: isDiscount ? result.value : null,
+    discountExpiresAt: result.discountExpiresAt ?? null,
+  };
+}
+
 export default function PlansSheet({
   entitlements,
   dark,
@@ -300,6 +321,10 @@ export default function PlansSheet({
             onDismiss={() => setPromoSkipped(true)}
             onApplied={(result) => {
               setPromoSuccess(result);
+              // Новый код отменяет прежнее снятие: иначе плашка только что применённого
+              // промокода была бы скрыта флагом от предыдущего отказа.
+              setPromoSkipped(false);
+              setPromo(promoFromApplied(result));
               fetchMyPromo()
                 .then(setPromo)
                 .catch(() => {});
