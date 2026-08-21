@@ -116,7 +116,13 @@ export default function CoinsSheet({
   // и повторно заплатить было бы нечем.
   useEffect(() => {
     const onShow = (e: PageTransitionEvent) => {
-      if (e.persisted) setPaying(false);
+      if (!e.persisted) return;
+      setPaying(false);
+      // Оплата могла потратить скидку, а bfcache вернул страницу со старым состоянием —
+      // без перечитывания плашка «−20%» висела бы над уже использованным кодом.
+      fetchMyPromo()
+        .then(setPromo)
+        .catch(() => {});
     };
     window.addEventListener('pageshow', onShow);
     return () => window.removeEventListener('pageshow', onShow);
@@ -159,6 +165,9 @@ export default function CoinsSheet({
   const [promo, setPromo] = useState<MyPromo | null>(null);
   const [promoQuote, setPromoQuote] = useState<PromoQuote | null>(null);
   const [promoSuccess, setPromoSuccess] = useState<PromoApplied | null>(null);
+  // Человек снял промокод с этой покупки: платим полную цену, но право на скидку не тратим —
+  // код останется доступен на следующий раз.
+  const [promoSkipped, setPromoSkipped] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -170,7 +179,7 @@ export default function CoinsSheet({
     };
   }, []);
 
-  const discountLive = !!promo?.discountActive;
+  const discountLive = !!promo?.discountActive && !promoSkipped;
 
   /**
    * Котировка в пути. Нужна отдельным состоянием, потому что до ответа сервера показывать
@@ -258,7 +267,7 @@ export default function CoinsSheet({
       // Отдельный запрос quote отсюда убран: его результат нигде не использовался,
       // а лишний круг к серверу удлинял паузу между нажатием и переходом на оплату.
       // Сумму всё равно считает сервер внутри createCoinPayment — она и уходит в шлюз.
-      const payment = await createCoinPayment(qty, provider);
+      const payment = await createCoinPayment(qty, provider, promoSkipped);
       if (!payment.checkoutUrl) {
         setPayError(t.cn_pay_error);
         setPaying(false);
@@ -366,8 +375,14 @@ export default function CoinsSheet({
 
           {/* Промокод: строка «Есть промокод?» либо плашка уже привязанного кода */}
           <PromoSection
-            promo={promo}
+            promo={promoSkipped ? null : promo}
             dark={dark}
+            // Пока скидка действует и применяется к этой покупке, менять нечего: коды не
+            // суммируются, и «есть другой промокод?» рядом с уже применённой скидкой читается
+            // как «эта не сработала». Поле возвращаем, только если код не подошёл под
+            // выбранное количество — иначе человек застрял бы с неподходящим кодом.
+            allowReplaceWhileActive={outOfRange}
+            onDismiss={() => setPromoSkipped(true)}
             onApplied={(result) => {
               setPromoSuccess(result);
               // Перечитываем состояние: у бонусного кода изменился баланс, у скидочного —

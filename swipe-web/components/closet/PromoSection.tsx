@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { apiErrorCode } from '@/lib/api';
 import { logAnalyticsEvent } from '@/lib/analytics';
@@ -32,6 +32,7 @@ export default function PromoSection({
   dark,
   onApplied,
   allowReplaceWhileActive = true,
+  onDismiss,
 }: {
   promo: MyPromo | null;
   dark: boolean;
@@ -45,6 +46,11 @@ export default function PromoSection({
    * и предлагать «введите другой» рядом с уже применённой скидкой просто путает.
    */
   allowReplaceWhileActive?: boolean;
+  /**
+   * Снять применённый код с этой покупки. Задан — на плашке появляется крестик.
+   * Право на скидку при этом не тратится: снятие относится к покупке, а не к коду.
+   */
+  onDismiss?: () => void;
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -84,12 +90,23 @@ export default function PromoSection({
   // прежний, и человек не должен застревать с кодом, который не подходит под его покупку.
   const badge = discountLive && promo && (
     <div
-      className="mt-4 rounded-2xl px-3.5 py-3"
+      className="mt-4 rounded-2xl px-3.5 py-3 flex items-center justify-between gap-2"
       style={{ background: accentBg, border: '1.5px solid #F370A7' }}
     >
       <span className="text-[13px] font-semibold" style={{ color: ink }}>
         {t.promo_badge.replace('{code}', promo.code).replace('{n}', String(promo.discountPercent))}
       </span>
+      {onDismiss && (
+        <button
+          onClick={onDismiss}
+          aria-label={t.promo_remove}
+          title={t.promo_remove}
+          className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center active:scale-[0.92] transition-transform"
+          style={{ color: sub }}
+        >
+          <X size={16} />
+        </button>
+      )}
     </div>
   );
 
