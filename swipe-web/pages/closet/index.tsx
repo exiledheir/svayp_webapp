@@ -2644,6 +2644,16 @@ export default function ClosetPage() {
           balance={coins}
           pricing={coinPricing}
           paymentOptions={paymentOptions}
+          onOpenPlans={
+            plansAvailable
+              ? () => {
+                  // Из шторки алмазов сразу в тарифы: закрываем текущую, чтобы не копить
+                  // два оверлея друг на друге.
+                  setShowPremiumGate(null);
+                  setShowPlans('coins_sheet');
+                }
+              : undefined
+          }
           needMore={showPremiumGate !== 'browse'}
           dark={theme === 'dark'}
           onClose={() => {

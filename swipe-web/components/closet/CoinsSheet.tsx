@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Crown, ChevronRight } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import Diamond from '@/components/closet/Diamond';
 import { coinsPrice, coinPackages, type CoinPricing } from '@/lib/coins';
@@ -70,6 +70,7 @@ export default function CoinsSheet({
   onClose,
   pricing = null,
   paymentOptions = null,
+  onOpenPlans,
 }: {
   balance: number;
   needMore?: boolean;
@@ -79,6 +80,11 @@ export default function CoinsSheet({
   pricing?: CoinPricing | null;
   /** Способы оплаты с сервера (/payments/options). null → онлайн-оплата недоступна. */
   paymentOptions?: PaymentOptions | null;
+  /**
+   * Открыть экран тарифов. Не задан — блока «Премиум» в шторке нет: пейволл выключен
+   * или каталог пуст, и показывать кнопку, ведущую в пустоту, нельзя.
+   */
+  onOpenPlans?: () => void;
 }) {
   const { t } = useI18n();
   const packages = coinPackages(pricing);
@@ -308,6 +314,28 @@ export default function CoinsSheet({
             </div>
             {needMore && <p className="text-[13px] mt-2" style={{ color: '#E0559A' }}>{t.cn_need_more}</p>}
           </div>
+
+          {/* Премиум как альтернатива разовой покупке: человек уже здесь ради лимитов,
+              и подписка закрывает ту же потребность на месяц вперёд. */}
+          {onOpenPlans && (
+            <button
+              onClick={onOpenPlans}
+              className="w-full mt-4 rounded-2xl px-4 py-3 flex items-center justify-between gap-3 active:scale-[0.99] transition-transform"
+              style={{
+                border: `1.5px solid ${dark ? 'rgba(243,112,167,0.32)' : '#F8D3E4'}`,
+                background: dark ? 'rgba(243,112,167,0.10)' : '#fdeef6',
+              }}
+            >
+              <span className="flex items-center gap-2 min-w-0">
+                <Crown size={18} color="#F370A7" />
+                <span className="text-left min-w-0">
+                  <span className="block text-[14px] font-extrabold" style={{ color: ink }}>{t.pl_title}</span>
+                  <span className="block text-[12px]" style={{ color: sub }}>{t.pl_upsell_hint}</span>
+                </span>
+              </span>
+              <ChevronRight size={18} color={sub} />
+            </button>
+          )}
 
           {/* Packages */}
           <p className="text-[15px] font-extrabold mt-4 mb-2.5" style={{ color: ink }}>{t.cn_pack_title}</p>
