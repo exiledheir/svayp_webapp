@@ -45,6 +45,15 @@ export interface PromoApplied {
   type: PromoType;
   value: number;
   balanceAfter: number;
+  /**
+   * Код уже был активирован раньше — повторный ввод ничего не начислил.
+   * Раньше сервер отвечал на это ошибкой «промокод уже использован», и человек читал её как
+   * «код сгорел», хотя скидка была жива. Поле опционально: старый бэк его не присылает.
+   */
+  alreadyActivated?: boolean;
+  /** Живо ли право на скидку прямо сейчас. */
+  discountActive?: boolean;
+  discountExpiresAt?: string | null;
 }
 
 /**

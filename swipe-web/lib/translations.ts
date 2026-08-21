@@ -436,6 +436,26 @@ export interface Translations {
   cn_pay_provider_down: string;
   cn_tg_contact: string;
 
+  // ── Тарифы (шторка подписки) ───────────────────────────────────────────────
+  pl_title: string;
+  pl_active_until: string;
+  pl_empty: string;
+  pl_duration: string;
+  pl_unlimited: string;
+  pl_badge_popular: string;
+  pl_badge_best: string;
+  pl_perk_tryon: string;
+  pl_perk_outfits: string;
+  pl_perk_items: string;
+  pl_perk_ai: string;
+  pl_promo_applied: string;
+  pl_buy: string;
+  pl_downgrade_blocked: string;
+  pl_unavailable: string;
+  pl_payment_unavailable: string;
+  pl_open: string;
+  pay_success_subscription: string;
+
   // Промокоды блогеров
   promo_have: string;
   promo_have_another: string;
@@ -445,6 +465,9 @@ export interface Translations {
   promo_your_code: string;
   promo_badge: string;
   promo_used: string;
+  promo_already_title: string;
+  promo_already_active: string;
+  promo_already_used_info: string;
   promo_success_title: string;
   promo_success_bonus: string;
   promo_success_discount: string;
@@ -1324,6 +1347,25 @@ const en: Translations = {
   cn_pay_provider_down: 'This payment method is unavailable right now. Please pick another one.',
   cn_tg_contact: 'Trouble paying? Message the admin on Telegram',
 
+  pl_title: 'Premium',
+  pl_active_until: 'Active until {date}',
+  pl_empty: 'No plans available yet.',
+  pl_duration: '{n} days',
+  pl_unlimited: 'Unlimited',
+  pl_badge_popular: 'Popular',
+  pl_badge_best: 'Best value',
+  pl_perk_tryon: '{n} try-ons per month',
+  pl_perk_outfits: '{n} AI outfits per month',
+  pl_perk_items: 'Up to {n} items in your closet',
+  pl_perk_ai: 'Fresh AI outfits every morning',
+  pl_promo_applied: 'Promo code applied — {n}% off',
+  pl_buy: 'Get Premium',
+  pl_downgrade_blocked: 'You already have a higher plan. It stays active until it expires.',
+  pl_unavailable: 'This plan is not available right now.',
+  pl_payment_unavailable: 'Online payment is not available for your account yet.',
+  pl_open: 'Premium',
+  pay_success_subscription: 'Premium is active until {date}',
+
   promo_have: 'Have a promo code?',
   promo_have_another: 'Have another promo code?',
   promo_title: 'Promo code',
@@ -1332,6 +1374,9 @@ const en: Translations = {
   promo_your_code: 'Your promo code: {code}',
   promo_badge: 'Promo code {code} · −{n}%',
   promo_used: 'Discount already used',
+  promo_already_title: 'Promo code is already active',
+  promo_already_active: 'Your {n}% discount is still available',
+  promo_already_used_info: 'This code has already been used',
   promo_success_title: 'Promo code applied',
   promo_success_bonus: '+{n} diamonds on your balance',
   promo_success_discount: '−{n}% off your first purchase',
@@ -2205,6 +2250,25 @@ const ru: Translations = {
   cn_pay_provider_down: 'Этот способ оплаты сейчас недоступен. Выберите другой.',
   cn_tg_contact: 'Проблемы с оплатой? Напишите админу в Telegram',
 
+  pl_title: 'Премиум',
+  pl_active_until: 'Активен до {date}',
+  pl_empty: 'Тарифы пока недоступны.',
+  pl_duration: '{n} дней',
+  pl_unlimited: 'Без ограничений',
+  pl_badge_popular: 'Популярный',
+  pl_badge_best: 'Выгодный',
+  pl_perk_tryon: '{n} примерок в месяц',
+  pl_perk_outfits: '{n} ИИ-образов в месяц',
+  pl_perk_items: 'До {n} вещей в гардеробе',
+  pl_perk_ai: 'Новые ИИ-образы каждое утро',
+  pl_promo_applied: 'Промокод применён — скидка {n}%',
+  pl_buy: 'Оформить премиум',
+  pl_downgrade_blocked: 'У вас уже есть более высокий тариф. Он действует до конца срока.',
+  pl_unavailable: 'Этот тариф сейчас недоступен.',
+  pl_payment_unavailable: 'Онлайн-оплата пока недоступна для вашего аккаунта.',
+  pl_open: 'Премиум',
+  pay_success_subscription: 'Премиум активен до {date}',
+
   promo_have: 'Есть промокод?',
   promo_have_another: 'Есть другой промокод?',
   promo_title: 'Промокод',
@@ -2213,6 +2277,9 @@ const ru: Translations = {
   promo_your_code: 'Ваш промокод: {code}',
   promo_badge: 'Промокод {code} · −{n}%',
   promo_used: 'Скидка уже использована',
+  promo_already_title: 'Промокод уже активирован',
+  promo_already_active: 'Скидка {n}% всё ещё действует',
+  promo_already_used_info: 'Этот код уже был использован',
   promo_success_title: 'Промокод применён',
   promo_success_bonus: '+{n} алмазов на баланс',
   promo_success_discount: '−{n}% на первую покупку',
@@ -3085,6 +3152,25 @@ const uz: Translations = {
   cn_pay_provider_down: 'Bu to\'lov usuli hozir ishlamayapti. Boshqasini tanlang.',
   cn_tg_contact: 'To\'lovda muammo bormi? Telegramda admin bilan bog\'laning',
 
+  pl_title: 'Premium',
+  pl_active_until: '{date} gacha amal qiladi',
+  pl_empty: 'Tariflar hozircha mavjud emas.',
+  pl_duration: '{n} kun',
+  pl_unlimited: 'Cheksiz',
+  pl_badge_popular: 'Ommabop',
+  pl_badge_best: 'Foydali',
+  pl_perk_tryon: 'Oyiga {n} marta kiyib ko\'rish',
+  pl_perk_outfits: 'Oyiga {n} ta AI obraz',
+  pl_perk_items: 'Garderobda {n} tagacha kiyim',
+  pl_perk_ai: 'Har kuni yangi AI obrazlar',
+  pl_promo_applied: 'Promokod qo\'llandi — {n}% chegirma',
+  pl_buy: 'Premium olish',
+  pl_downgrade_blocked: 'Sizda yuqoriroq tarif bor. U muddati tugagunicha amal qiladi.',
+  pl_unavailable: 'Bu tarif hozir mavjud emas.',
+  pl_payment_unavailable: 'Onlayn to\'lov hisobingiz uchun hozircha mavjud emas.',
+  pl_open: 'Premium',
+  pay_success_subscription: 'Premium {date} gacha faol',
+
   promo_have: 'Promokodingiz bormi?',
   promo_have_another: 'Boshqa promokodingiz bormi?',
   promo_title: 'Promokod',
@@ -3093,6 +3179,9 @@ const uz: Translations = {
   promo_your_code: 'Sizning promokodingiz: {code}',
   promo_badge: '{code} promokodi · −{n}%',
   promo_used: 'Chegirma allaqachon ishlatilgan',
+  promo_already_title: 'Promokod allaqachon faol',
+  promo_already_active: '{n}% chegirma hali ham amal qiladi',
+  promo_already_used_info: 'Bu kod allaqachon ishlatilgan',
   promo_success_title: 'Promokod qo\'llandi',
   promo_success_bonus: 'Balansingizga +{n} olmos',
   promo_success_discount: 'Birinchi xaridga −{n}% chegirma',
