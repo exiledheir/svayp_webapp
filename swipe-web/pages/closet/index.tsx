@@ -2209,16 +2209,18 @@ export default function ClosetPage() {
             {plansAvailable && (
               <button
                 onClick={() => setShowPlans('header')}
-                className="flex items-center gap-1.5 pl-2 pr-3 h-8 rounded-full text-[13px] font-extrabold active:scale-[0.95] transition-all"
+                // Только корона, без подписи: в шапке уже стоят чип алмазов и «Руководство»,
+                // и слово «Премиум» выдавливало последнюю кнопку за край экрана.
+                className="flex items-center justify-center w-8 h-8 rounded-full active:scale-[0.95] transition-all"
                 style={{
                   background: theme === 'dark' ? 'rgba(243,112,167,0.16)' : '#fdeef6',
                   border: `1px solid ${theme === 'dark' ? 'rgba(243,112,167,0.32)' : '#F8D3E4'}`,
                   color: theme === 'dark' ? '#F5EAF0' : '#B03A72',
                 }}
                 aria-label={t.pl_title}
+                title={t.pl_title}
               >
-                <Crown size={15} />
-                <span>{t.pl_open}</span>
+                <Crown size={16} />
               </button>
             )}
             {/* Profile icon — hidden inside the Flutter app (it has its own) */}
