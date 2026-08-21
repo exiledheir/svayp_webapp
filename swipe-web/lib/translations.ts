@@ -454,6 +454,7 @@ export interface Translations {
   pl_unavailable: string;
   pl_payment_unavailable: string;
   pl_open: string;
+  pl_upsell_hint: string;
   pay_success_subscription: string;
 
   // Промокоды блогеров
@@ -1364,6 +1365,7 @@ const en: Translations = {
   pl_unavailable: 'This plan is not available right now.',
   pl_payment_unavailable: 'Online payment is not available for your account yet.',
   pl_open: 'Premium',
+  pl_upsell_hint: 'Monthly limits instead of one-off top-ups',
   pay_success_subscription: 'Premium is active until {date}',
 
   promo_have: 'Have a promo code?',
@@ -2267,6 +2269,7 @@ const ru: Translations = {
   pl_unavailable: 'Этот тариф сейчас недоступен.',
   pl_payment_unavailable: 'Онлайн-оплата пока недоступна для вашего аккаунта.',
   pl_open: 'Премиум',
+  pl_upsell_hint: 'Лимиты на месяц вместо разовых пополнений',
   pay_success_subscription: 'Премиум активен до {date}',
 
   promo_have: 'Есть промокод?',
@@ -3169,6 +3172,7 @@ const uz: Translations = {
   pl_unavailable: 'Bu tarif hozir mavjud emas.',
   pl_payment_unavailable: 'Onlayn to\'lov hisobingiz uchun hozircha mavjud emas.',
   pl_open: 'Premium',
+  pl_upsell_hint: 'Bir martalik to‘ldirish o‘rniga oylik limitlar',
   pay_success_subscription: 'Premium {date} gacha faol',
 
   promo_have: 'Promokodingiz bormi?',
