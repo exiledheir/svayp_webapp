@@ -117,8 +117,17 @@ export function paymentReturnUrl(): string {
   return `${window.location.origin}/pay/return`;
 }
 
-export async function createCoinPayment(coins: number, provider: PaymentProvider): Promise<Payment> {
-  const res = await api.post('/payments/coins', { coins, provider, returnUrl: paymentReturnUrl() });
+export async function createCoinPayment(
+  coins: number,
+  provider: PaymentProvider,
+  skipPromo = false,
+): Promise<Payment> {
+  const res = await api.post('/payments/coins', {
+    coins,
+    provider,
+    returnUrl: paymentReturnUrl(),
+    skipPromo,
+  });
   return unwrap<Payment>(res);
 }
 
@@ -126,8 +135,17 @@ export async function createCoinPayment(coins: number, provider: PaymentProvider
  * Покупка тарифа. Наружу уходит только код плана: цену, срок и промо-скидку считает сервер.
  * Клиент не может назначить свою сумму — иначе премиум покупался бы за 1 сум.
  */
-export async function createSubscriptionPayment(planCode: string, provider: PaymentProvider): Promise<Payment> {
-  const res = await api.post('/payments/subscription', { planCode, provider, returnUrl: paymentReturnUrl() });
+export async function createSubscriptionPayment(
+  planCode: string,
+  provider: PaymentProvider,
+  skipPromo = false,
+): Promise<Payment> {
+  const res = await api.post('/payments/subscription', {
+    planCode,
+    provider,
+    returnUrl: paymentReturnUrl(),
+    skipPromo,
+  });
   return unwrap<Payment>(res);
 }
 

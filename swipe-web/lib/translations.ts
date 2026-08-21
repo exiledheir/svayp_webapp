@@ -454,6 +454,7 @@ export interface Translations {
   pl_unavailable: string;
   pl_payment_unavailable: string;
   pl_sales_disabled: string;
+  promo_remove: string;
   pl_open: string;
   pl_upsell_hint: string;
   pay_success_subscription: string;
@@ -1366,6 +1367,7 @@ const en: Translations = {
   pl_unavailable: 'This plan is not available right now.',
   pl_payment_unavailable: 'Online payment is not available for your account yet.',
   pl_sales_disabled: 'Plans are not on sale yet — we are finishing the setup.',
+  promo_remove: 'Remove promo code',
   pl_open: 'Premium',
   pl_upsell_hint: 'Monthly limits instead of one-off top-ups',
   pay_success_subscription: 'Premium is active until {date}',
@@ -2271,6 +2273,7 @@ const ru: Translations = {
   pl_unavailable: 'Этот тариф сейчас недоступен.',
   pl_payment_unavailable: 'Онлайн-оплата пока недоступна для вашего аккаунта.',
   pl_sales_disabled: 'Тарифы пока не продаются — заканчиваем настройку.',
+  promo_remove: 'Убрать промокод',
   pl_open: 'Премиум',
   pl_upsell_hint: 'Лимиты на месяц вместо разовых пополнений',
   pay_success_subscription: 'Премиум активен до {date}',
@@ -3175,6 +3178,7 @@ const uz: Translations = {
   pl_unavailable: 'Bu tarif hozir mavjud emas.',
   pl_payment_unavailable: 'Onlayn to\'lov hisobingiz uchun hozircha mavjud emas.',
   pl_sales_disabled: 'Tariflar hozircha sotuvda emas — sozlamalarni yakunlayapmiz.',
+  promo_remove: 'Promokodni olib tashlash',
   pl_open: 'Premium',
   pl_upsell_hint: 'Bir martalik to‘ldirish o‘rniga oylik limitlar',
   pay_success_subscription: 'Premium {date} gacha faol',

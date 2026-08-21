@@ -66,6 +66,9 @@ export default function PlansSheet({
   const [payError, setPayError] = useState('');
   const [promo, setPromo] = useState<MyPromo | null>(null);
   const [promoSuccess, setPromoSuccess] = useState<PromoApplied | null>(null);
+  // Человек снял промокод с этой покупки. Право на скидку при этом не тратится — сервер
+  // просто считает полную цену, и код останется доступен для следующей покупки.
+  const [promoSkipped, setPromoSkipped] = useState(false);
 
   useEffect(() => {
     fetchMyPromo()
@@ -144,7 +147,7 @@ export default function PlansSheet({
     logAnalyticsEvent(Events.UPGRADE_CTA_TAPPED, { plan: plan.code });
     reportPurchaseFunnel('UPGRADE_CLICKED', trigger ?? 'plans');
     try {
-      const payment = await createSubscriptionPayment(plan.code, provider);
+      const payment = await createSubscriptionPayment(plan.code, provider, promoSkipped);
       if (!payment.checkoutUrl) {
         setPayError(t.cn_pay_error);
         setPaying(false);
@@ -228,7 +231,9 @@ export default function PlansSheet({
           <div className="flex flex-col gap-2.5 mt-4">
             {plans.map((p) => {
               const active = p.code === plan?.code;
-              const discounted = p.discountPercent > 0;
+              // Сняли промокод — показываем полную цену: карточка обязана совпадать с тем,
+              // что выставит чекаут, иначе человек увидит в банке другую сумму.
+              const discounted = !promoSkipped && p.discountPercent > 0;
               return (
                 <button
                   key={p.code}
@@ -269,7 +274,7 @@ export default function PlansSheet({
                       </span>
                     )}
                     <span className="text-[15px] font-extrabold" style={{ color: discounted ? accent : ink }}>
-                      {fmt(p.finalPriceUzs)} {t.cn_currency}
+                      {fmt(discounted ? p.finalPriceUzs : p.priceUzs)} {t.cn_currency}
                     </span>
                   </span>
                 </button>
@@ -289,9 +294,10 @@ export default function PlansSheet({
 
           {/* Промокод — тот же компонент, что и в покупке алмазов: право на скидку общее */}
           <PromoSection
-            promo={promo}
+            promo={promoSkipped ? null : promo}
             dark={dark}
             allowReplaceWhileActive={false}
+            onDismiss={() => setPromoSkipped(true)}
             onApplied={(result) => {
               setPromoSuccess(result);
               fetchMyPromo()
