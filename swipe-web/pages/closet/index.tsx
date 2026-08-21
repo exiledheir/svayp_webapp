@@ -35,6 +35,8 @@ import BeautifyIntroSheet from '@/components/closet/BeautifyIntroSheet';
 import { DEMO_ITEM_IDS, DEMO_ITEMS, DEMO_CANVAS_LAYOUT } from '@/lib/closet-demo';
 import { isSetupDone, isSetupSatisfied, wasSetupEntered } from '@/lib/closet-setup';
 import CoinsSheet from '@/components/closet/CoinsSheet';
+import PlansSheet from '@/components/closet/PlansSheet';
+import { fetchEntitlements, type Entitlements } from '@/lib/entitlements';
 import Diamond from '@/components/closet/Diamond';
 import { ACTION_COST, actionCosts, fetchCoinBalance, fetchCoinPricing, type CoinPricing } from '@/lib/coins';
 import { fetchPaymentOptions, type PaymentOptions } from '@/lib/payments';
@@ -393,6 +395,17 @@ export default function ClosetPage() {
     return fetchCoinBalance().then((b) => setCoinsState(b.balance)).catch(() => { /* offline — keep last known */ });
   }, []);
 
+  // Тарифы и текущие права. Экран подписки открывается ТОЛЬКО когда сервер разрешил
+  // (flags.paywallEnabled) и в каталоге есть что показать: пустая шторка хуже её отсутствия.
+  const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
+  const [showPlans, setShowPlans] = useState<string | null>(null);
+  const refreshEntitlements = useCallback(() => {
+    return fetchEntitlements()
+      .then(setEntitlements)
+      .catch(() => { /* старый бэк или офлайн — экран тарифов просто не показываем */ });
+  }, []);
+  const plansAvailable = !!entitlements?.flags.paywallEnabled && (entitlements?.plans.length ?? 0) > 0;
+
   // Промокод применяется в НАТИВНОМ экране профиля Flutter, а этот таб сидит в IndexedStack
   // и не перемонтируется — сам он о начислении не узнает. Нативная оболочка дёргает эту
   // функцию после активации бонусного кода (см. WebViewBridge.requestCoinsRefresh).
@@ -409,7 +422,8 @@ export default function ClosetPage() {
     refreshCoins();
     fetchCoinPricing().then(setCoinPricing).catch(() => { /* fallback to local constants */ });
     fetchPaymentOptions().then(setPaymentOptions).catch(() => { /* нет ответа → Telegram-флоу */ });
-  }, [refreshCoins]);
+    void refreshEntitlements();
+  }, [refreshCoins, refreshEntitlements]);
 
   // Монеты реально списываются только когда включён enforcement И юзер на FREE
   // (у pro/premium — старые безлимитные квоты, монеты не тратятся — зеркалит
@@ -2190,6 +2204,23 @@ export default function ClosetPage() {
               <span style={{ fontVariantNumeric: 'tabular-nums' }}>{coins}</span>
             </button>
             )}
+            {/* Премиум. Появляется только когда сервер разрешил пейволл и каталог не пуст —
+                кнопка, ведущая в пустую шторку, хуже отсутствующей кнопки. */}
+            {plansAvailable && (
+              <button
+                onClick={() => setShowPlans('header')}
+                className="flex items-center gap-1.5 pl-2 pr-3 h-8 rounded-full text-[13px] font-extrabold active:scale-[0.95] transition-all"
+                style={{
+                  background: theme === 'dark' ? 'rgba(243,112,167,0.16)' : '#fdeef6',
+                  border: `1px solid ${theme === 'dark' ? 'rgba(243,112,167,0.32)' : '#F8D3E4'}`,
+                  color: theme === 'dark' ? '#F5EAF0' : '#B03A72',
+                }}
+                aria-label={t.pl_title}
+              >
+                <Crown size={15} />
+                <span>{t.pl_open}</span>
+              </button>
+            )}
             {/* Profile icon — hidden inside the Flutter app (it has its own) */}
             {profileEnabled && !isFlutterWebView && (
               <button
@@ -2623,6 +2654,27 @@ export default function ClosetPage() {
             reportPurchaseFunnel('PAYWALL_DISMISSED', showPremiumGate ?? undefined);
             setShowPremiumGate(null);
             refreshCoins(); // баланс мог измениться (покупка/возврат)
+          }}
+        />
+      )}
+
+      {/* ── Шторка тарифов ── */}
+      {showPlans && entitlements && (
+        <PlansSheet
+          entitlements={entitlements}
+          dark={theme === 'dark'}
+          paymentOptions={paymentOptions}
+          trigger={showPlans}
+          onPromoApplied={() => {
+            // Цену со скидкой считает сервер — перечитываем каталог, иначе на карточке
+            // останется прежняя сумма, а чекаут выставит другую.
+            void refreshEntitlements();
+            void refreshCoins();
+          }}
+          onClose={() => {
+            setShowPlans(null);
+            void refreshEntitlements();
+            void refreshCoins();
           }}
         />
       )}

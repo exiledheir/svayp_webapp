@@ -253,6 +253,16 @@ export default function PaymentReturnPage() {
               {t.pay_success_coins.replace('{n}', String(payment.coins))}
             </p>
           )}
+          {/* Купили подписку — человеку важна дата окончания, а не сумма платежа.
+              Она приходит вместе со статусом, так что второго запроса не нужно. */}
+          {payment?.purpose === 'SUBSCRIPTION' && payment.subscriptionEndsAt && (
+            <p className="text-[15px] font-bold mt-2" style={{ color: ink }}>
+              {t.pay_success_subscription.replace(
+                '{date}',
+                new Date(payment.subscriptionEndsAt).toLocaleDateString('ru-RU'),
+              )}
+            </p>
+          )}
           {payment?.coinBalance != null && (
             <p className="text-[14px] mt-1" style={{ color: sub }}>
               {t.pay_balance_now.replace('{n}', payment.coinBalance.toLocaleString('uz-UZ'))}

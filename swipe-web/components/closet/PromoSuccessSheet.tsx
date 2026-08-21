@@ -26,8 +26,13 @@ export default function PromoSuccessSheet({
   const sub = dark ? '#8e8e93' : '#9a8f98';
   const surface = dark ? '#1c1c1e' : '#fff';
 
-  const detail =
-    result.type === 'BONUS_COINS'
+  // Повторный ввод ничего не начисляет — писать «вам зачислено 50 алмазов» второй раз значит
+  // врать. Показываем текущее состояние: скидка ещё жива или уже потрачена.
+  const detail = result.alreadyActivated
+    ? result.discountActive
+      ? t.promo_already_active.replace('{n}', String(result.value))
+      : t.promo_already_used_info
+    : result.type === 'BONUS_COINS'
       ? t.promo_success_bonus.replace('{n}', String(result.value))
       : t.promo_success_discount.replace('{n}', String(result.value));
 
@@ -51,7 +56,7 @@ export default function PromoSuccessSheet({
         <div className="flex flex-col items-center text-center">
           <Diamond size={52} glow />
           <h3 className="text-[19px] font-extrabold mt-3" style={{ color: ink }}>
-            {t.promo_success_title}
+            {result.alreadyActivated ? t.promo_already_title : t.promo_success_title}
           </h3>
           <p className="text-[15px] font-bold mt-1.5" style={{ color: '#E0559A' }}>
             {detail}

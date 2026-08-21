@@ -31,7 +31,7 @@ export interface PaymentOptions {
 export interface Payment {
   paymentId: string;
   externalId: string;
-  purpose: 'COINS' | 'ORDER';
+  purpose: 'COINS' | 'ORDER' | 'SUBSCRIPTION';
   status: PaymentStatus;
   provider: PaymentProvider;
   /** В СУМАХ (не в тийинах) — можно показывать как есть. */
@@ -43,6 +43,34 @@ export interface Payment {
   expiresAt?: string | null;
   /** Актуальный баланс монет — приходит вместе со статусом, экономит второй запрос. */
   coinBalance?: number | null;
+  /** purpose=SUBSCRIPTION: код купленного тарифа. */
+  planCode?: string | null;
+  /** purpose=SUBSCRIPTION: до какого момента подписка активна после этой оплаты. */
+  subscriptionEndsAt?: string | null;
+}
+
+/**
+ * Paylov скрыт из интерфейса решением продукта: остальные три бренда узнаваемы по логотипам.
+ * Сервер по-прежнему может присылать его в списке — фильтруем на клиенте.
+ */
+const HIDDEN_PROVIDERS: PaymentProvider[] = ['PAYLOV'];
+
+/**
+ * Порядок способов оплаты на экране. Сервер отдаёт providers в своём порядке, поэтому
+ * раскладываем сами: Click идёт первым и он же выбран по умолчанию. Незнакомые провайдеры
+ * уезжают в конец, а не в начало (indexOf вернул бы −1).
+ */
+const PROVIDER_ORDER: PaymentProvider[] = ['CLICK', 'PAYME', 'UZUM', 'PAYLOV'];
+
+/**
+ * Способы оплаты, которые реально показываем. Один список на все экраны покупки: пока
+ * фильтр был скопирован в каждую шторку, наборы способов легко разъезжались между
+ * покупкой алмазов и подпиской, а объяснять это в саппорте невозможно.
+ */
+export function visiblePaymentProviders(options: PaymentOptions | null): PaymentProvider[] {
+  return (options?.providers ?? [])
+    .filter((p) => !HIDDEN_PROVIDERS.includes(p))
+    .sort((a, b) => PROVIDER_ORDER.indexOf(a) - PROVIDER_ORDER.indexOf(b));
 }
 
 function unwrap<T>(res: { data: unknown }): T {
@@ -91,6 +119,15 @@ export function paymentReturnUrl(): string {
 
 export async function createCoinPayment(coins: number, provider: PaymentProvider): Promise<Payment> {
   const res = await api.post('/payments/coins', { coins, provider, returnUrl: paymentReturnUrl() });
+  return unwrap<Payment>(res);
+}
+
+/**
+ * Покупка тарифа. Наружу уходит только код плана: цену, срок и промо-скидку считает сервер.
+ * Клиент не может назначить свою сумму — иначе премиум покупался бы за 1 сум.
+ */
+export async function createSubscriptionPayment(planCode: string, provider: PaymentProvider): Promise<Payment> {
+  const res = await api.post('/payments/subscription', { planCode, provider, returnUrl: paymentReturnUrl() });
   return unwrap<Payment>(res);
 }
 

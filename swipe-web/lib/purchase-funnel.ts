@@ -13,7 +13,9 @@ export type PurchaseFunnelEventType =
   | 'TELEGRAM_OPENED'
   | 'LIMIT_HIT_LOOKS'
   | 'LIMIT_HIT_ITEMS'
-  | 'LIMIT_HIT_TRYON';
+  | 'LIMIT_HIT_TRYON'
+  /** Выбор тарифа в шторке подписки — шаг между показом пейволла и переходом к оплате. */
+  | 'PLAN_SELECTED';
 
 /** Fire-and-forget: аналитика не должна мешать UI и не роняет ошибки в caller. */
 export function reportPurchaseFunnel(eventType: PurchaseFunnelEventType, surface?: string): void {
