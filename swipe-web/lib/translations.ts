@@ -453,6 +453,7 @@ export interface Translations {
   pl_downgrade_blocked: string;
   pl_unavailable: string;
   pl_payment_unavailable: string;
+  pl_sales_disabled: string;
   pl_open: string;
   pl_upsell_hint: string;
   pay_success_subscription: string;
@@ -1364,6 +1365,7 @@ const en: Translations = {
   pl_downgrade_blocked: 'You already have a higher plan. It stays active until it expires.',
   pl_unavailable: 'This plan is not available right now.',
   pl_payment_unavailable: 'Online payment is not available for your account yet.',
+  pl_sales_disabled: 'Plans are not on sale yet — we are finishing the setup.',
   pl_open: 'Premium',
   pl_upsell_hint: 'Monthly limits instead of one-off top-ups',
   pay_success_subscription: 'Premium is active until {date}',
@@ -2268,6 +2270,7 @@ const ru: Translations = {
   pl_downgrade_blocked: 'У вас уже есть более высокий тариф. Он действует до конца срока.',
   pl_unavailable: 'Этот тариф сейчас недоступен.',
   pl_payment_unavailable: 'Онлайн-оплата пока недоступна для вашего аккаунта.',
+  pl_sales_disabled: 'Тарифы пока не продаются — заканчиваем настройку.',
   pl_open: 'Премиум',
   pl_upsell_hint: 'Лимиты на месяц вместо разовых пополнений',
   pay_success_subscription: 'Премиум активен до {date}',
@@ -3171,6 +3174,7 @@ const uz: Translations = {
   pl_downgrade_blocked: 'Sizda yuqoriroq tarif bor. U muddati tugagunicha amal qiladi.',
   pl_unavailable: 'Bu tarif hozir mavjud emas.',
   pl_payment_unavailable: 'Onlayn to\'lov hisobingiz uchun hozircha mavjud emas.',
+  pl_sales_disabled: 'Tariflar hozircha sotuvda emas — sozlamalarni yakunlayapmiz.',
   pl_open: 'Premium',
   pl_upsell_hint: 'Bir martalik to‘ldirish o‘rniga oylik limitlar',
   pay_success_subscription: 'Premium {date} gacha faol',
