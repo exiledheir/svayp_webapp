@@ -341,10 +341,16 @@ export default function PlansSheet({
             </p>
           )}
 
-          {/* Оплата недоступна — честно говорим об этом вместо неработающей кнопки */}
-          {!onlineEnabled && plans.length > 0 && (
+          {/* Кнопка может быть неактивна по двум разным причинам, и молчащая серая кнопка
+              одинаково выглядит в обоих случаях. Говорим, что именно мешает. */}
+          {plans.length > 0 && !onlineEnabled && (
             <p className="text-[13px] mt-4 text-center" style={{ color: sub }}>
               {t.pl_payment_unavailable}
+            </p>
+          )}
+          {plans.length > 0 && onlineEnabled && plan && !plan.purchasable && (
+            <p className="text-[13px] mt-4 text-center" style={{ color: sub }}>
+              {t.pl_sales_disabled}
             </p>
           )}
 
