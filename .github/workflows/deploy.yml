@@ -21,7 +21,15 @@ jobs:
           script: |
             set -e
             cd ~/svayp_webapp
-            git pull origin main
+            # Копия на VM — зеркало ветки, а не самостоятельный репозиторий: своих
+            # коммитов здесь не бывает, поэтому сливать нечего.
+            #
+            # Было `git pull origin main`, и деплой падал на любом переписывании
+            # истории: git видел разошедшиеся ветки и требовал выбрать стратегию
+            # слияния. fetch + reset --hard приводит копию ровно к состоянию ветки,
+            # чем бы ни закончилась история на сервере.
+            git fetch origin main
+            git reset --hard origin/main
             cd swipe-web
             docker compose up -d --build
             echo "✅ Deployed successfully"
