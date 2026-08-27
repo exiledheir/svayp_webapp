@@ -12,6 +12,18 @@ export const Events = {
   CLOSET_GUIDE_OPENED: 'closet_guide_opened',
   CLOSET_GUIDE_VIDEO_PLAYED: 'closet_guide_video_played',
   CLOSET_FEEDBACK_CTA_TAPPED: 'closet_feedback_cta_tapped',
+
+  // ── AI-стилист «Nur» ───────────────────────────────────────────────────────
+  // Кнопка видна только бете, поэтому показ логируем отдельно от нажатия:
+  // без события показа конверсия входа в чат считается от всей аудитории и врёт.
+  STYLIST_ENTRY_SHOWN: 'stylist_entry_shown',
+  STYLIST_ENTRY_TAPPED: 'stylist_entry_tapped',
+  STYLIST_CHAT_OPENED: 'stylist_chat_opened',
+  STYLIST_STARTER_CHIP_TAPPED: 'stylist_starter_question_tapped',
+  STYLIST_MESSAGE_SENT: 'stylist_message_sent',
+  STYLIST_ANSWER_SHOWN: 'stylist_answer_shown',
+  // Ключевое событие воронки: чат оставил после себя вещь, которую можно надеть.
+  STYLIST_OUTFIT_SAVED: 'stylist_outfit_saved',
   // "Add N items to unlock" get-started card (persistent closet nudge)
   GET_STARTED_CARD_VIEWED: 'get_started_card_viewed',
   GET_STARTED_CARD_ADD_TAPPED: 'get_started_card_add_tapped',
@@ -165,6 +177,8 @@ export const Params = {
   PLAN_TIER: 'plan_tier',
   CATEGORY: 'category',
   SOURCE: 'source',
+  /** Было ли к сообщению приложено фото — главный разрез сценариев AI-стилиста. */
+  HAS_PHOTO: 'has_photo',
   DURATION_MS: 'duration_ms',
   ERROR_CODE: 'error_code',
   TRIGGER: 'trigger',
