@@ -1501,7 +1501,7 @@ export default function ClosetPage() {
       setStylistAvailable(true);
       // Показ логируем отдельно от нажатия: иначе конверсия входа в чат считалась бы
       // от всей аудитории, а кнопку видит только бета.
-      logAnalyticsEvent(Events.STYLIST_ENTRY_SHOWN, { [Params.SOURCE]: 'closet_header' });
+      logAnalyticsEvent(Events.STYLIST_ENTRY_SHOWN, { [Params.SOURCE]: 'closet_fab' });
     });
     return () => { cancelled = true; };
   }, []);
@@ -2213,28 +2213,6 @@ export default function ClosetPage() {
 
         {/* Right: action buttons + profile + guide */}
         <div className="flex items-center gap-1.5">
-            {/* AI-стилист Nur. Виден только тем, кому его открыл сервер (флаги
-                feature.stylist.* + вайтлист беты) — состава беты на клиенте нет.
-                Иконка без подписи: в шапке уже четыре элемента, и подпись выдавила бы
-                последнюю кнопку за край экрана (та же причина, что у короны ниже). */}
-            {stylistAvailable && (
-              <button
-                onClick={() => {
-                  logAnalyticsEvent(Events.STYLIST_ENTRY_TAPPED, { [Params.SOURCE]: 'closet_header' });
-                  router.push('/stylist');
-                }}
-                className="flex items-center justify-center w-8 h-8 rounded-full active:scale-[0.95] transition-all"
-                style={{
-                  background: theme === 'dark' ? 'rgba(200,168,130,0.18)' : '#F6EFE4',
-                  border: `1px solid ${theme === 'dark' ? 'rgba(200,168,130,0.34)' : '#E8DAC2'}`,
-                  color: theme === 'dark' ? '#E8D4B4' : '#8A6D3B',
-                }}
-                aria-label="Nur — AI-стилист"
-                title="Nur — AI-стилист"
-              >
-                <Sparkles size={16} strokeWidth={2} />
-              </button>
-            )}
             {/* Diamond balance (subscription badge) — opens the buy-diamonds
                 sheet. Gated by the `feature.subscription_badge.enabled` flag so it
                 can be hidden for the App/Play review account. */}
@@ -2811,7 +2789,29 @@ export default function ClosetPage() {
       )}
 
       {/* ── Floating Add Button ── */}
-      <div className="absolute right-5 z-50" style={{ bottom: '20px' }}>
+      <div className="absolute right-5 z-50 flex flex-col items-end gap-3" style={{ bottom: '20px' }}>
+        {/* AI-стилист Nur. Виден только тем, кому его открыл сервер (флаги feature.stylist.*
+            + вайтлист беты) — состава беты на клиенте нет.
+
+            Стоит здесь, а не в шапке: шапка уже переполнена — алмазы, тариф и «Руководство»
+            не влезают на узких экранах, и «Руководство» обрезается краем. Ещё одна кнопка
+            там сделала бы хуже. Внизу справа есть место, и для флагманской фичи заметная
+            кнопка честнее иконки, зажатой в углу. */}
+        {stylistAvailable && (
+          <button
+            onClick={() => {
+              logAnalyticsEvent(Events.STYLIST_ENTRY_TAPPED, { [Params.SOURCE]: 'closet_fab' });
+              router.push('/stylist');
+            }}
+            className="flex items-center gap-2 pl-4 pr-5 rounded-full text-[15px] font-bold shadow-xl active:scale-[0.96] transition-transform"
+            style={{ background: '#141014', color: '#fff', height: 48 }}
+            aria-label="Nur — AI-стилист"
+          >
+            <Sparkles size={18} strokeWidth={2.4} color="#C8A882" />
+            Спросить Nur
+          </button>
+        )}
+
         {closetV2 ? (
           <button
             onClick={() => openAdd('TOPS')}
