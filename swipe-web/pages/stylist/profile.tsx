@@ -151,7 +151,11 @@ export default function StyleProfilePage() {
         className="sticky top-0 z-10 flex items-center gap-3 px-4 h-14"
         style={{ background: bg, borderBottom: `1px solid ${line}` }}
       >
-        <button onClick={() => router.back()} aria-label={S.goBack} className="active:scale-95 transition-transform">
+        <button
+          onClick={() => router.push('/stylist')}
+          aria-label={S.goBack}
+          className="active:scale-95 transition-transform"
+        >
           <ArrowLeft size={20} style={{ color: ink }} />
         </button>
         <span className="text-[16px] font-bold" style={{ color: ink }}>

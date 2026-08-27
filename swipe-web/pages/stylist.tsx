@@ -1,6 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Send, Loader2, Sparkles, ImagePlus, X, UserRound } from 'lucide-react';
+import {
+  ArrowLeft,
+  Send,
+  Loader2,
+  Sparkles,
+  ImagePlus,
+  X,
+  UserRound,
+  MessageSquarePlus,
+  History,
+  Trash2,
+} from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { useI18n } from '@/lib/i18n';
 import { getStylistStrings } from '@/lib/stylist-strings';
@@ -12,6 +23,11 @@ import {
   fetchStylistThread,
   fetchStylistHistory,
   sendStylistMessage,
+  fetchStylistThreads,
+  startStylistThread,
+  deleteStylistThread,
+  clearStylistHistory,
+  type StylistThread,
   rateStylistAnswer,
   saveStylistOutfit,
   SLOT_LABELS,
@@ -93,6 +109,11 @@ export default function StylistPage() {
   // после каждого тапа и не дать оценить дважды.
   const [rated, setRated] = useState<Record<string, 'UP' | 'DOWN'>>({});
   const [reasonFor, setReasonFor] = useState<string | null>(null);
+
+  // Панель разговоров: список грузим только когда открыли — на входе в чат он не нужен.
+  const [showThreads, setShowThreads] = useState(false);
+  const [threads, setThreads] = useState<StylistThread[]>([]);
+  const [confirmClear, setConfirmClear] = useState(false);
   const [refundNote, setRefundNote] = useState<Record<string, string>>({});
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -128,6 +149,71 @@ export default function StylistPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, sending]);
+
+  /** Открывает панель и подтягивает список разговоров. */
+  const openThreads = useCallback(async () => {
+    setShowThreads(true);
+    setConfirmClear(false);
+    try {
+      setThreads(await fetchStylistThreads());
+    } catch {
+      setThreads([]);
+    }
+  }, []);
+
+  /** Переключиться на существующий разговор. */
+  const openThread = useCallback(async (id: string) => {
+    setShowThreads(false);
+    setThreadId(id);
+    setMessages([]);
+    try {
+      setMessages(await fetchStylistHistory(id));
+    } catch {
+      /* пустой разговор — рабочее состояние */
+    }
+  }, []);
+
+  /** Новый разговор. Старые остаются: к прежней теме можно вернуться. */
+  const newThread = useCallback(async () => {
+    try {
+      const id = await startStylistThread();
+      setThreadId(id);
+      setMessages([]);
+      setShowThreads(false);
+    } catch {
+      setError(S.errorGeneric);
+    }
+  }, [S]);
+
+  const removeThread = useCallback(
+    async (id: string) => {
+      try {
+        await deleteStylistThread(id);
+        setThreads((prev) => prev.filter((t) => t.id !== id));
+        // Удалили тот, что открыт — показываем пустой чат, а не чужую переписку.
+        if (id === threadId) {
+          setThreadId(null);
+          setMessages([]);
+        }
+      } catch {
+        setError(S.errorGeneric);
+      }
+    },
+    [threadId, S],
+  );
+
+  const clearAll = useCallback(async () => {
+    try {
+      await clearStylistHistory();
+      setThreads([]);
+      setThreadId(null);
+      setMessages([]);
+      setConfirmClear(false);
+      setShowThreads(false);
+    } catch {
+      setError(S.errorGeneric);
+    }
+  }, [S]);
 
   /**
    * Сохранить образ в гардероб. После успеха кнопка меняется на переход к доскам —
@@ -304,7 +390,13 @@ export default function StylistPage() {
         className="sticky top-0 z-10 flex items-center gap-3 px-4 h-14"
         style={{ background: bg, borderBottom: `1px solid ${line}` }}
       >
-        <button onClick={() => router.back()} aria-label="Назад" className="active:scale-95 transition-transform">
+        {/* push, а не back(): внутри WebView история может быть пустой — тогда back()
+            молча ничего не делает, и кнопка выглядит сломанной. */}
+        <button
+          onClick={() => router.push('/closet')}
+          aria-label={S.goBack}
+          className="active:scale-95 transition-transform"
+        >
           <ArrowLeft size={20} style={{ color: ink }} />
         </button>
         <div className="flex items-center gap-2">
@@ -321,17 +413,139 @@ export default function StylistPage() {
           )}
         </div>
 
-        {/* Вход в профиль — по ТЗ 3.4 он живёт в шапке чата: онбординга нет, и это
-            единственное место, где видно, что Nur о тебе знает. */}
-        <button
-          onClick={() => router.push('/stylist/profile')}
-          aria-label="Мой стилевой профиль"
-          className="ml-auto w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition-transform"
-          style={{ background: card, color: muted, border: `1px solid ${line}` }}
-        >
-          <UserRound size={15} />
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={newThread}
+            aria-label={S.newChat}
+            title={S.newChat}
+            className="w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+            style={{ background: card, color: muted, border: `1px solid ${line}` }}
+          >
+            <MessageSquarePlus size={15} />
+          </button>
+          <button
+            onClick={openThreads}
+            aria-label={S.chatList}
+            title={S.chatList}
+            className="w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+            style={{ background: card, color: muted, border: `1px solid ${line}` }}
+          >
+            <History size={15} />
+          </button>
+          {/* Вход в профиль — по ТЗ 3.4 он живёт в шапке чата: онбординга нет, и это
+              единственное место, где видно, что Nur о тебе знает. */}
+          <button
+            onClick={() => router.push('/stylist/profile')}
+            aria-label={S.profileTitle}
+            className="w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+            style={{ background: card, color: muted, border: `1px solid ${line}` }}
+          >
+            <UserRound size={15} />
+          </button>
+        </div>
       </header>
+
+      {/* Панель разговоров. Оверлеем, а не отдельной страницей: переключение между
+          темами — короткое действие, ради него уходить с экрана чата незачем. */}
+      {showThreads && (
+        <div className="fixed inset-0 z-30 flex flex-col" style={{ background: bg }}>
+          <div
+            className="flex items-center gap-3 px-4 h-14 shrink-0"
+            style={{ borderBottom: `1px solid ${line}` }}
+          >
+            <button onClick={() => setShowThreads(false)} aria-label={S.goBack}>
+              <ArrowLeft size={20} style={{ color: ink }} />
+            </button>
+            <span className="text-[16px] font-bold" style={{ color: ink }}>
+              {S.chatList}
+            </span>
+            <button
+              onClick={newThread}
+              className="ml-auto flex items-center gap-1.5 px-3 h-8 rounded-full text-[13px] font-bold"
+              style={{ background: ink, color: bg }}
+            >
+              <MessageSquarePlus size={14} />
+              {S.newChat}
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 py-3">
+            {threads.length === 0 && (
+              <p className="text-[14px]" style={{ color: muted }}>
+                {S.noChats}
+              </p>
+            )}
+            <ul className="flex flex-col gap-2">
+              {threads.map((t) => (
+                <li
+                  key={t.id}
+                  className="flex items-center gap-3 px-4 py-3 rounded-2xl"
+                  style={{
+                    background: t.id === threadId ? card : 'transparent',
+                    border: `1px solid ${line}`,
+                  }}
+                >
+                  <button onClick={() => openThread(t.id)} className="min-w-0 flex-1 text-left">
+                    <p className="text-[14px] font-semibold truncate" style={{ color: ink }}>
+                      {t.title ?? S.emptyChat}
+                    </p>
+                    {t.preview && (
+                      <p className="text-[12px] truncate mt-0.5" style={{ color: muted }}>
+                        {t.preview}
+                      </p>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => removeThread(t.id)}
+                    aria-label={S.deleteChat}
+                    className="shrink-0 p-2 rounded-full"
+                    style={{ color: muted }}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Очистка — внизу и с подтверждением: действие необратимое. */}
+          <div className="px-4 py-3 shrink-0" style={{ borderTop: `1px solid ${line}` }}>
+            {confirmClear ? (
+              <div className="flex flex-col gap-2">
+                <p className="text-[13px]" style={{ color: ink }}>
+                  {S.clearHistoryConfirm}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={clearAll}
+                    className="flex-1 h-10 rounded-full text-[13px] font-bold"
+                    style={{ background: '#8B1A1A', color: '#fff' }}
+                  >
+                    {S.clearHistory}
+                  </button>
+                  <button
+                    onClick={() => setConfirmClear(false)}
+                    className="flex-1 h-10 rounded-full text-[13px] font-bold"
+                    style={{ background: card, color: ink, border: `1px solid ${line}` }}
+                  >
+                    {S.cancel}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmClear(true)}
+                disabled={threads.length === 0}
+                className="flex items-center gap-2 text-[13px] disabled:opacity-40"
+                style={{ color: '#8B1A1A' }}
+              >
+                <Trash2 size={14} />
+                {S.clearHistory}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Лента */}
       <main className="flex-1 px-4 py-4 flex flex-col gap-3">

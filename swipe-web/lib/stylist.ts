@@ -121,6 +121,36 @@ export async function fetchStylistAccess(): Promise<StylistAccess> {
   }
 }
 
+export interface StylistThread {
+  id: string;
+  /** Первая реплика пользователя — по ней разговор и узнаётся в списке. */
+  title: string | null;
+  preview: string | null;
+  messages: number;
+  lastMessageAt: string | null;
+  createdAt: string;
+}
+
+export async function fetchStylistThreads(): Promise<StylistThread[]> {
+  const res = await api.get('/stylist/threads');
+  return unwrap<StylistThread[]>(res) ?? [];
+}
+
+/** Новый разговор. Старые не удаляются — к прежней теме можно вернуться. */
+export async function startStylistThread(): Promise<string> {
+  const res = await api.post('/stylist/threads');
+  return unwrap<string>(res);
+}
+
+export async function deleteStylistThread(threadId: string): Promise<void> {
+  await api.delete(`/stylist/threads/${threadId}`);
+}
+
+/** Стирает переписку. Стилевой профиль остаётся — он правится на своём экране. */
+export async function clearStylistHistory(): Promise<void> {
+  await api.delete('/stylist/threads');
+}
+
 /** Активный разговор пользователя; создаётся сервером при первом обращении. */
 export async function fetchStylistThread(): Promise<string> {
   const res = await api.get('/stylist/thread');

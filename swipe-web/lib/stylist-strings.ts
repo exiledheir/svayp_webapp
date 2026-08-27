@@ -52,6 +52,15 @@ export interface StylistStrings {
   profileEditHint: string;
   profileDeleteHint: string;
   editField: (label: string) => string;
+
+  newChat: string;
+  chatList: string;
+  noChats: string;
+  deleteChat: string;
+  clearHistory: string;
+  clearHistoryConfirm: string;
+  cancel: string;
+  emptyChat: string;
   sourceLabels: Record<string, string>;
   confidence: (pct: number) => string;
 }
@@ -111,6 +120,15 @@ const RU: StylistStrings = {
     'Nur иногда ошибается — например, в цветотипе. Поправленное вручную она больше не перезапишет, даже если ты пришлёшь новое фото.',
   profileDeleteHint: 'Оставь пустым, чтобы удалить',
   editField: (label) => `Изменить: ${label}`,
+
+  newChat: 'Новый чат',
+  chatList: 'Мои разговоры',
+  noChats: 'Пока нет разговоров',
+  deleteChat: 'Удалить разговор',
+  clearHistory: 'Очистить историю',
+  clearHistoryConfirm: 'Стереть все разговоры? Профиль и настройки останутся.',
+  cancel: 'Отмена',
+  emptyChat: 'Пустой разговор',
   sourceLabels: {
     PHOTO_INFERRED: 'определено по фото',
     USER_ANSWERED: 'ты сказала',
@@ -176,6 +194,15 @@ const UZ: StylistStrings = {
     'Nur ba’zan xato qiladi — masalan, rang turida. Qo‘lda tuzatilganini u boshqa qayta yozmaydi, hatto yangi surat yuborsangiz ham.',
   profileDeleteHint: 'O‘chirish uchun bo‘sh qoldiring',
   editField: (label) => `O‘zgartirish: ${label}`,
+
+  newChat: 'Yangi suhbat',
+  chatList: 'Mening suhbatlarim',
+  noChats: 'Hozircha suhbatlar yo‘q',
+  deleteChat: 'Suhbatni o‘chirish',
+  clearHistory: 'Tarixni tozalash',
+  clearHistoryConfirm: 'Barcha suhbatlar o‘chirilsinmi? Profil va sozlamalar qoladi.',
+  cancel: 'Bekor qilish',
+  emptyChat: 'Bo‘sh suhbat',
   sourceLabels: {
     PHOTO_INFERRED: 'suratdan aniqlandi',
     USER_ANSWERED: 'siz aytdingiz',
@@ -240,6 +267,15 @@ const EN: StylistStrings = {
     'Nur sometimes gets things wrong — colour type, for instance. Anything you fix by hand stays fixed, even if you send a new photo.',
   profileDeleteHint: 'Leave empty to remove',
   editField: (label) => `Edit: ${label}`,
+
+  newChat: 'New chat',
+  chatList: 'My conversations',
+  noChats: 'No conversations yet',
+  deleteChat: 'Delete conversation',
+  clearHistory: 'Clear history',
+  clearHistoryConfirm: 'Delete all conversations? Your profile and settings stay.',
+  cancel: 'Cancel',
+  emptyChat: 'Empty conversation',
   sourceLabels: {
     PHOTO_INFERRED: 'from your photo',
     USER_ANSWERED: 'you told me',
