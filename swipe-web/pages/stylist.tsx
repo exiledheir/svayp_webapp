@@ -56,23 +56,57 @@ function stripMarkdown(text: string): string {
     .replace(/^#{1,6}\s+/gm, '');
 }
 
+/** Кусок ответа: обычный текст либо группа вариантов выбора. */
+type AnswerBlock = { kind: 'text'; text: string } | { kind: 'options'; options: string[] };
+
 /**
- * Вытаскивает варианты выбора из ответа.
+ * Разбирает ответ на текст и варианты выбора.
  *
- * Модель перечисляет их строками «— Минимализм», и по ТЗ любое уточнение должно быть
- * тапабельным, а не требовать печатать ответ руками. Берём только короткие строки
- * подряд идущего списка: описания вещей в образе тоже начинаются с тире, но они длиннее.
+ * Варианты становятся кнопками НА СВОЁМ МЕСТЕ внутри текста, а не отдельным блоком
+ * снизу: так это сделано в Claude и ChatGPT, и так не возникает дубля — раньше список
+ * оставался в тексте и повторялся кнопками под ним.
+ *
+ * Что считается вариантом: подряд идущие короткие строки с тире, без двоеточий и
+ * завершающей точки. Описания вещей в образе тоже начинаются с тире, но они длиннее
+ * и обычно содержат пояснение — поэтому длина ограничена, а группа должна быть
+ * не меньше двух и не больше восьми строк.
  */
-function extractOptions(text: string): string[] {
-  const lines = text.split('\n').map((l) => l.trim());
-  const out: string[] = [];
-  for (const line of lines) {
-    const m = line.match(/^[—–-]\s*(.{2,32})$/);
-    if (m && !m[1].includes(':')) out.push(m[1].trim());
-    else if (out.length > 0 && line === '') continue;
-    else if (out.length > 0) break;
+function parseAnswer(text: string): AnswerBlock[] {
+  const lines = text.split('\n');
+  const blocks: AnswerBlock[] = [];
+  let buffer: string[] = [];
+  let options: string[] = [];
+
+  const flushText = () => {
+    const t = buffer.join('\n').trim();
+    if (t) blocks.push({ kind: 'text', text: t });
+    buffer = [];
+  };
+  const flushOptions = () => {
+    // Одиночная строка с тире — это не выбор, а пункт перечисления: возвращаем в текст.
+    if (options.length >= 2 && options.length <= 8) {
+      blocks.push({ kind: 'options', options: [...options] });
+    } else {
+      buffer.push(...options.map((o) => `— ${o}`));
+    }
+    options = [];
+  };
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    const m = line.match(/^[—–-]\s*(.{2,40})$/);
+    const isOption = !!m && !m[1].includes(':') && !/[.!?]$/.test(m[1]);
+    if (isOption) {
+      if (options.length === 0) flushText();
+      options.push(m![1].trim());
+      continue;
+    }
+    if (options.length > 0) flushOptions();
+    buffer.push(raw);
   }
-  return out.length >= 2 && out.length <= 8 ? out : [];
+  if (options.length > 0) flushOptions();
+  flushText();
+  return blocks;
 }
 
 export default function StylistPage() {
@@ -598,38 +632,41 @@ export default function StylistPage() {
                 вся информация уже в них, и абзац рядом был бы дублем. */}
             {(!m.outfits || m.outfits.length === 0) && m.content && (
               <div
-                className="px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed whitespace-pre-wrap"
+                className="px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed"
                 style={
                   m.role === 'USER'
                     ? { background: ink, color: bg }
                     : { background: card, color: ink, border: `1px solid ${line}` }
                 }
               >
-                {m.role === 'ASSISTANT' ? stripMarkdown(m.content) : m.content}
+                {m.role === 'USER' ? (
+                  <span className="whitespace-pre-wrap">{m.content}</span>
+                ) : (
+                  parseAnswer(stripMarkdown(m.content)).map((block, bi) =>
+                    block.kind === 'text' ? (
+                      <p key={bi} className="whitespace-pre-wrap">
+                        {block.text}
+                      </p>
+                    ) : (
+                      // Варианты — кнопками прямо в тексте, на своём месте.
+                      <div key={bi} className="flex flex-col gap-1.5 my-2">
+                        {block.options.map((opt) => (
+                          <button
+                            key={opt}
+                            onClick={() => send(opt)}
+                            disabled={sending}
+                            className="text-left px-3.5 py-2 rounded-xl text-[14px] font-medium active:scale-[0.99] transition-transform disabled:opacity-50"
+                            style={{ background: bg, color: ink, border: `1px solid ${line}` }}
+                          >
+                            {opt}
+                          </button>
+                        ))}
+                      </div>
+                    ),
+                  )
+                )}
               </div>
             )}
-
-            {/* Варианты выбора из ответа — тапабельными чипами.
-                По ТЗ 3.3 любое уточнение должно быть вариантом, а не просьбой напечатать:
-                до этого стиль приходилось вводить руками. */}
-            {m.role === 'ASSISTANT' && !sending && (() => {
-              const options = extractOptions(m.content ?? '');
-              if (options.length === 0) return null;
-              return (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {options.map((opt) => (
-                    <button
-                      key={opt}
-                      onClick={() => send(opt)}
-                      className="px-3.5 py-2 rounded-full text-[13px] font-medium active:scale-[0.97] transition-transform"
-                      style={{ background: ink, color: bg }}
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              );
-            })()}
 
             {/* Follow-up чипы: раньше бэкенд их считал и фильтровал, а экран не рисовал. */}
             {m.role === 'ASSISTANT' && m.followups && m.followups.length > 0 && !sending && (
