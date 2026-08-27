@@ -38,10 +38,17 @@ export default function ShopPage() {
   const catIdxRef = useRef(0);
 
 
+  // Поисковый запрос из адреса: по нему в магазин ведёт «подобрать» из карточки
+  // образа у Nur — иначе кнопка вела бы в общий каталог, где искать вручную.
+  const searchQuery = typeof router.query.q === 'string' ? router.query.q : '';
+
   const fetchProducts = useCallback(async (pageNum: number, idx: number, append = false) => {
     try {
       let res: Product[];
-      if (idx === 0) {
+      if (searchQuery) {
+        const { products: r } = await getAllProducts(pageNum, 20, searchQuery);
+        res = r;
+      } else if (idx === 0) {
         res = await getTrendingProducts(pageNum * 20, 20);
       } else {
         const cat = idx >= 2 ? CATEGORIES[idx].value : undefined;
@@ -58,7 +65,7 @@ export default function ShopPage() {
     } catch {
       setError('Failed to load products');
     }
-  }, []);
+  }, [searchQuery]);
 
   useEffect(() => {
     catIdxRef.current = catIdx;
@@ -68,7 +75,7 @@ export default function ShopPage() {
     setHasMore(true);
     setError('');
     fetchProducts(0, catIdx).finally(() => setLoading(false));
-  }, [catIdx, fetchProducts]);
+  }, [catIdx, fetchProducts, searchQuery]);
 
   function handleScroll(e: React.UIEvent<HTMLElement>) {
     const el = e.currentTarget;

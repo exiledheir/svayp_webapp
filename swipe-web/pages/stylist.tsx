@@ -668,8 +668,15 @@ export default function StylistPage() {
               </div>
             )}
 
-            {/* Follow-up чипы: раньше бэкенд их считал и фильтровал, а экран не рисовал. */}
-            {m.role === 'ASSISTANT' && m.followups && m.followups.length > 0 && !sending && (
+            {/* Follow-up чипы только под ПОСЛЕДНИМ ответом и только если в нём нет
+                своих вариантов выбора: под каждым ответом они превращались в шум,
+                а рядом с готовыми вариантами спорили с ними за внимание. */}
+            {m.role === 'ASSISTANT' &&
+              m.id === messages[messages.length - 1]?.id &&
+              parseAnswer(stripMarkdown(m.content ?? '')).every((b) => b.kind === 'text') &&
+              m.followups &&
+              m.followups.length > 0 &&
+              !sending && (
               <div className="flex flex-wrap gap-2 mt-2">
                 {m.followups.map((f) => (
                   <button
@@ -731,12 +738,21 @@ export default function StylistPage() {
                           {slot.description}
                         </p>
                       </div>
-                      <span
-                        className="text-[11px] font-semibold shrink-0"
-                        style={{ color: slot.source === 'WARDROBE' ? '#2D6A4F' : '#C8A882' }}
-                      >
-                        {slot.source === 'WARDROBE' ? S.inWardrobe : S.pickUp}
-                      </span>
+                      {slot.source === 'WARDROBE' ? (
+                        <span className="text-[11px] font-semibold shrink-0" style={{ color: '#2D6A4F' }}>
+                          {S.inWardrobe}
+                        </span>
+                      ) : (
+                        // «подобрать» была просто подписью и никуда не вела.
+                        // Теперь открывает каталог с поиском по описанию слота.
+                        <button
+                          onClick={() => router.push(`/shop?q=${encodeURIComponent(slot.description)}`)}
+                          className="shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold active:scale-95 transition-transform"
+                          style={{ background: '#C8A882', color: '#fff' }}
+                        >
+                          {S.pickUp}
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
