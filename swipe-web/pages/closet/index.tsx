@@ -2241,11 +2241,9 @@ export default function ClosetPage() {
                 // У бесплатного тира — только корона: в шапке уже стоят чип алмазов и
                 // «Руководство», и подпись выдавливала последнюю кнопку за край экрана.
                 // У платящих название тарифа важнее компактности — показываем бейдж.
-                className={
-                  isPaidTier
-                    ? 'flex items-center gap-1 pl-2 pr-2.5 h-8 rounded-full text-[12px] font-extrabold active:scale-[0.95] transition-all'
-                    : 'flex items-center justify-center w-8 h-8 rounded-full active:scale-[0.95] transition-all'
-                }
+                // Подпись тарифа убрана: с ней шапка не влезала на узких экранах и
+                // «Руководство» обрезалось краем. Корона одинаково понятна и на платном.
+                className="flex items-center justify-center w-8 h-8 rounded-full active:scale-[0.95] transition-all"
                 style={{
                   background: isPaidTier
                     ? (theme === 'dark' ? `${tierColor}28` : `${tierColor}1F`)
@@ -2256,8 +2254,7 @@ export default function ClosetPage() {
                 aria-label={isPaidTier ? tierLabel : t.pl_title}
                 title={isPaidTier ? tierLabel : t.pl_title}
               >
-                <Crown size={isPaidTier ? 14 : 16} />
-                {isPaidTier && <span>{tierLabel}</span>}
+                <Crown size={16} />
               </button>
             )}
             {/* Profile icon — hidden inside the Flutter app (it has its own) */}

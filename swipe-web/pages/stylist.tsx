@@ -29,6 +29,36 @@ import {
  * сообщения — хуже, чем честный отказ сразу.
  */
 
+/**
+ * Убирает markdown, который модель ставит несмотря на просьбу: без рендерера
+ * `**жирный**` показывался пользователю звёздочками.
+ */
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/(^|\s)\*(?!\s)(.+?)\*(?=\s|$)/g, '$1$2')
+    .replace(/^#{1,6}\s+/gm, '');
+}
+
+/**
+ * Вытаскивает варианты выбора из ответа.
+ *
+ * Модель перечисляет их строками «— Минимализм», и по ТЗ любое уточнение должно быть
+ * тапабельным, а не требовать печатать ответ руками. Берём только короткие строки
+ * подряд идущего списка: описания вещей в образе тоже начинаются с тире, но они длиннее.
+ */
+function extractOptions(text: string): string[] {
+  const lines = text.split('\n').map((l) => l.trim());
+  const out: string[] = [];
+  for (const line of lines) {
+    const m = line.match(/^[—–-]\s*(.{2,32})$/);
+    if (m && !m[1].includes(':')) out.push(m[1].trim());
+    else if (out.length > 0 && line === '') continue;
+    else if (out.length > 0) break;
+  }
+  return out.length >= 2 && out.length <= 8 ? out : [];
+}
+
 export default function StylistPage() {
   const router = useRouter();
   const { theme } = useTheme();
@@ -41,7 +71,10 @@ export default function StylistPage() {
   const [beta, setBeta] = useState(false);
 
   const [threadId, setThreadId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<StylistMessage[]>([]);
+  // Локальные поля поверх серверного типа: превью прикреплённых фото живёт только
+  // на клиенте (сервер отдаёт ключи, а не картинки), follow-up приходит с ответом.
+  type ChatMessage = StylistMessage & { previews?: string[]; followups?: string[] };
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -170,14 +203,16 @@ export default function StylistPage() {
       setSending(true);
       setDraft('');
       const keys = attachments.map((a) => a.key);
+      const previews = attachments.map((a) => a.preview);
       setAttachments([]);
 
       // Оптимистично показываем свою реплику: ждать ответа модели молча — плохой UX.
-      const optimistic: StylistMessage = {
+      const optimistic: ChatMessage = {
         id: `local-${Date.now()}`,
         role: 'USER',
         action: null,
-        content: body || (keys.length === 1 ? S.photoOne : S.photoMany(keys.length)),
+        content: body,
+        previews,
         coinsSpent: 0,
         createdAt: new Date().toISOString(),
       };
@@ -204,6 +239,7 @@ export default function StylistPage() {
             action: null,
             content: answer.answer ?? '',
             outfits: answer.outfits ?? [],
+            followups: answer.followups ?? [],
             coinsSpent: answer.coinsSpent,
             createdAt: new Date().toISOString(),
           },
@@ -251,7 +287,7 @@ export default function StylistPage() {
           {S.unavailableText}
         </p>
         <button
-          onClick={() => router.back()}
+          onClick={() => router.push('/closet')}
           className="mt-6 px-5 h-10 rounded-full text-[13px] font-bold"
           style={{ background: ink, color: bg }}
         >
@@ -327,6 +363,23 @@ export default function StylistPage() {
 
         {messages.map((m) => (
           <div key={m.id} className={`flex flex-col ${m.role === 'USER' ? 'self-end' : 'self-start'} max-w-[85%]`}>
+            {/* Прикреплённые фото показываем в самом сообщении: раньше вместо снимка
+                стояла подпись «📷 Фото», и человек не видел, что именно отправил. */}
+            {m.previews && m.previews.length > 0 && (
+              <div className="flex gap-2 mb-1.5 self-end">
+                {m.previews.map((src) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={src}
+                    src={src}
+                    alt="Отправленное фото"
+                    className="w-28 h-36 rounded-2xl object-cover"
+                    style={{ border: `1px solid ${line}` }}
+                  />
+                ))}
+              </div>
+            )}
+
             {/* Текст показываем, только когда карточек нет: при сборке образа
                 вся информация уже в них, и абзац рядом был бы дублем. */}
             {(!m.outfits || m.outfits.length === 0) && m.content && (
@@ -338,7 +391,45 @@ export default function StylistPage() {
                     : { background: card, color: ink, border: `1px solid ${line}` }
                 }
               >
-                {m.content}
+                {m.role === 'ASSISTANT' ? stripMarkdown(m.content) : m.content}
+              </div>
+            )}
+
+            {/* Варианты выбора из ответа — тапабельными чипами.
+                По ТЗ 3.3 любое уточнение должно быть вариантом, а не просьбой напечатать:
+                до этого стиль приходилось вводить руками. */}
+            {m.role === 'ASSISTANT' && !sending && (() => {
+              const options = extractOptions(m.content ?? '');
+              if (options.length === 0) return null;
+              return (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {options.map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => send(opt)}
+                      className="px-3.5 py-2 rounded-full text-[13px] font-medium active:scale-[0.97] transition-transform"
+                      style={{ background: ink, color: bg }}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {/* Follow-up чипы: раньше бэкенд их считал и фильтровал, а экран не рисовал. */}
+            {m.role === 'ASSISTANT' && m.followups && m.followups.length > 0 && !sending && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {m.followups.map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => send(f)}
+                    className="px-3.5 py-2 rounded-full text-[13px] active:scale-[0.97] transition-transform"
+                    style={{ background: card, color: ink, border: `1px solid ${line}` }}
+                  >
+                    {f}
+                  </button>
+                ))}
               </div>
             )}
 
