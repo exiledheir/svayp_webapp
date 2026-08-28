@@ -22,13 +22,14 @@ export interface StylistStrings {
   removePhoto: string;
   photoOne: string;
   photoMany: (n: number) => string;
-  defaultOutfitPrompt: string;
 
   errorGeneric: string;
   errorPhoto: string;
   errorCoins: string;
   errorSaveOutfit: string;
   errorNoWardrobeItems: string;
+  errorOutfitNeedsClothing: string;
+  errorItemNotReady: string;
 
   saveOutfit: string;
   saving: string;
@@ -36,6 +37,9 @@ export interface StylistStrings {
   inWardrobe: string;
   pickUp: string;
   howWorn: string;
+  yourItem: string;
+  findInCatalog: string;
+  noReferences: string;
 
   unavailableTitle: string;
   unavailableText: string;
@@ -77,13 +81,14 @@ const RU: StylistStrings = {
   removePhoto: 'Убрать фото',
   photoOne: '📷 Фото',
   photoMany: (n) => `📷 ${n} фото`,
-  defaultOutfitPrompt: 'Собери образ вокруг этой вещи',
 
   errorGeneric: 'Не получилось ответить. Попробуй ещё раз',
   errorPhoto: 'Не получилось загрузить фото. Попробуй ещё раз',
   errorCoins: 'Не хватает монет на это действие',
   errorSaveOutfit: 'Не получилось сохранить образ',
   errorNoWardrobeItems: 'В этом образе нет вещей из твоего гардероба — сначала добавь их',
+  errorOutfitNeedsClothing: 'В образе нужна хотя бы одна вещь одежды или обуви, аксессуаров мало',
+  errorItemNotReady: 'Одна из вещей ещё обрабатывается — попробуй через минуту',
 
   saveOutfit: 'Сохранить образ',
   saving: 'Сохраняю…',
@@ -91,6 +96,9 @@ const RU: StylistStrings = {
   inWardrobe: '🟢 есть у тебя',
   pickUp: 'подобрать',
   howWorn: 'Как такое носят',
+  yourItem: '📷 твоя вещь',
+  findInCatalog: 'Найти в каталоге',
+  noReferences: 'Примеров не нашлось',
 
   unavailableTitle: 'Nur пока недоступна',
   unavailableText: 'Стилист открыт ограниченному кругу. Мы включим его для всех чуть позже.',
@@ -151,13 +159,14 @@ const UZ: StylistStrings = {
   removePhoto: 'Suratni olib tashlash',
   photoOne: '📷 Surat',
   photoMany: (n) => `📷 ${n} ta surat`,
-  defaultOutfitPrompt: 'Shu kiyim atrofida obraz yig‘ing',
 
   errorGeneric: 'Javob bera olmadim. Yana urinib ko‘ring',
   errorPhoto: 'Suratni yuklab bo‘lmadi. Yana urinib ko‘ring',
   errorCoins: 'Bu amal uchun tanga yetarli emas',
   errorSaveOutfit: 'Obrazni saqlab bo‘lmadi',
   errorNoWardrobeItems: 'Bu obrazda sizning garderobingizdagi kiyimlar yo‘q — avval ularni qo‘shing',
+  errorOutfitNeedsClothing: 'Obrazda kamida bitta kiyim yoki poyabzal bo‘lishi kerak, aksessuar yetarli emas',
+  errorItemNotReady: 'Kiyimlardan biri hali qayta ishlanmoqda — bir daqiqadan so‘ng urinib ko‘ring',
 
   saveOutfit: 'Obrazni saqlash',
   saving: 'Saqlanmoqda…',
@@ -165,6 +174,9 @@ const UZ: StylistStrings = {
   inWardrobe: '🟢 sizda bor',
   pickUp: 'tanlash',
   howWorn: 'Buni qanday kiyishadi',
+  yourItem: '📷 sizning kiyimingiz',
+  findInCatalog: 'Katalogdan topish',
+  noReferences: 'Namunalar topilmadi',
 
   unavailableTitle: 'Nur hozircha mavjud emas',
   unavailableText: 'Stilist cheklangan doiraga ochilgan. Tez orada hamma uchun yoqamiz.',
@@ -224,13 +236,14 @@ const EN: StylistStrings = {
   removePhoto: 'Remove photo',
   photoOne: '📷 Photo',
   photoMany: (n) => `📷 ${n} photos`,
-  defaultOutfitPrompt: 'Build an outfit around this item',
 
   errorGeneric: 'Couldn’t answer. Please try again',
   errorPhoto: 'Couldn’t upload the photo. Please try again',
   errorCoins: 'Not enough coins for this action',
   errorSaveOutfit: 'Couldn’t save the outfit',
   errorNoWardrobeItems: 'This outfit has no items from your wardrobe — add them first',
+  errorOutfitNeedsClothing: 'An outfit needs at least one clothing or footwear item — accessories alone won’t do',
+  errorItemNotReady: 'One of the items is still processing — try again in a minute',
 
   saveOutfit: 'Save outfit',
   saving: 'Saving…',
@@ -238,6 +251,9 @@ const EN: StylistStrings = {
   inWardrobe: '🟢 you have it',
   pickUp: 'find one',
   howWorn: 'How it’s worn',
+  yourItem: '📷 your item',
+  findInCatalog: 'Find in catalog',
+  noReferences: 'No examples found',
 
   unavailableTitle: 'Nur isn’t available yet',
   unavailableText: 'The stylist is open to a limited group. We’ll turn it on for everyone soon.',

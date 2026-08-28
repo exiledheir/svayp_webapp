@@ -30,6 +30,8 @@ export interface StylistMessage {
   content: string;
   /** Карточки образов, если это был ответ-сборка. Приходят и из истории. */
   outfits?: StylistOutfitCard[];
+  /** Подписанные URL присланных фото — чтобы снимок остался в переписке после перезахода. */
+  attachments?: string[];
   coinsSpent: number;
   createdAt: string;
 }
@@ -49,10 +51,15 @@ export const SLOT_LABELS: Record<SlotRole, string> = {
 export interface OutfitSlot {
   role: SlotRole;
   description: string;
-  /** WARDROBE — вещь нашлась у пользователя, CATALOG — предлагаем подобрать. */
-  source: 'WARDROBE' | 'CATALOG';
+  /**
+   * WARDROBE — вещь нашлась у пользователя, CATALOG — предлагаем подобрать,
+   * ATTACHED — это вещь с присланного фото: предлагать купить её было бы ошибкой.
+   */
+  source: 'WARDROBE' | 'CATALOG' | 'ATTACHED';
   wardrobeItemId: string | null;
   imageUrl: string | null;
+  /** Примеры «как носят» под этот слот. Раскрываются по тапу на «подобрать». */
+  references?: InspirationImage[];
 }
 
 /**
@@ -74,8 +81,6 @@ export interface StylistOutfitCard {
   title: string;
   slots: OutfitSlot[];
   why: string | null;
-  /** Пусто, пока блок «вдохновение» выключен флагом или ничего не нашлось. */
-  inspiration?: InspirationImage[];
 }
 
 export interface StylistAnswer {
@@ -196,7 +201,8 @@ export async function rateStylistAnswer(
  */
 export async function sendStylistMessage(payload: {
   action?: StylistAction;
-  text: string;
+  /** Может отсутствовать: фото без подписи — рабочий запрос, сценарий бэкенд ставит сам. */
+  text?: string;
   imageKeys?: string[];
   wardrobeItemIds?: string[];
   chosenStyle?: string;

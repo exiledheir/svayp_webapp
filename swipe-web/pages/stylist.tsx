@@ -138,6 +138,10 @@ export default function StylistPage() {
   // кнопка сразу сменилась на «Открыть в гардеробе» без перезапроса истории.
   const [savedOutfits, setSavedOutfits] = useState<Record<string, string>>({});
   const [savingOutfit, setSavingOutfit] = useState<string | null>(null);
+  /** Отказ сохранения по конкретной карточке: показывается под её кнопкой. */
+  const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
+  /** Раскрытый слот с примерами «как носят»: ключ «сообщение-образ-слот». */
+  const [openSlot, setOpenSlot] = useState<string | null>(null);
 
   // Оценки: id сообщения → вердикт. Тоже локально — чтобы не тянуть историю
   // после каждого тапа и не дать оценить дважды.
@@ -253,27 +257,40 @@ export default function StylistPage() {
    * Сохранить образ в гардероб. После успеха кнопка меняется на переход к доскам —
    * там образ живёт как обычный и оттуда же запускается примерка.
    */
+  /** Текст отказа по коду бэкенда: каждый барьер канваса чинится по-своему. */
+  const saveErrorText = useCallback(
+    (code?: string) => {
+      if (code === 'OUTFIT_HAS_NO_WARDROBE_ITEMS') return S.errorNoWardrobeItems;
+      if (code === 'INVALID_OUTFIT_COMPOSITION') return S.errorOutfitNeedsClothing;
+      if (code === 'WARDROBE_ITEM_NOT_READY') return S.errorItemNotReady;
+      return S.errorSaveOutfit;
+    },
+    [S],
+  );
+
   const saveOutfit = useCallback(
     async (messageId: string, index: number, outfit: StylistOutfitCard) => {
       const key = `${messageId}-${index}`;
       setSavingOutfit(key);
-      setError(null);
+      setSaveErrors((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
       try {
         const canvasId = await saveStylistOutfit(messageId, index, outfit.title);
         setSavedOutfits((prev) => ({ ...prev, [key]: canvasId }));
         logAnalyticsEvent(Events.STYLIST_OUTFIT_SAVED, { [Params.SOURCE]: 'chat' });
       } catch (e: unknown) {
         const code = (e as { response?: { data?: { code?: string } } })?.response?.data?.code;
-        setError(
-          code === 'OUTFIT_HAS_NO_WARDROBE_ITEMS'
-            ? S.errorNoWardrobeItems
-            : S.errorSaveOutfit,
-        );
+        // Ошибку кладём к самой карточке: общий баннер печатался в конце ленты, куда
+        // после нажатия никто не смотрит, и отказ выглядел как «кнопка не работает».
+        setSaveErrors((prev) => ({ ...prev, [key]: saveErrorText(code) }));
       } finally {
         setSavingOutfit(null);
       }
     },
-    [S],
+    [saveErrorText],
   );
 
   /**
@@ -341,9 +358,10 @@ export default function StylistPage() {
 
       try {
         const answer = await sendStylistMessage({
-          // Фото без подписи трактуем как «собери образ вокруг этой вещи» — главный сценарий.
-          text: body || S.defaultOutfitPrompt,
-          action: keys.length > 0 && !body ? 'OUTFIT' : undefined,
+          // Ни текста, ни действия за пользователя не подставляем. Раньше любое фото без
+          // подписи объявлялось сборкой образа — и фото в полный рост уходило в сценарий
+          // «собери образ вокруг этой вещи». Что на снимке, разбирает бэкенд.
+          text: body || undefined,
           imageKeys: keys.length > 0 ? keys : undefined,
           // Nur обязана отвечать на языке приложения: узбекоязычному пользователю
           // русский ответ бесполезен.
@@ -613,9 +631,12 @@ export default function StylistPage() {
           <div key={m.id} className={`flex flex-col ${m.role === 'USER' ? 'self-end' : 'self-start'} max-w-[85%]`}>
             {/* Прикреплённые фото показываем в самом сообщении: раньше вместо снимка
                 стояла подпись «📷 Фото», и человек не видел, что именно отправил. */}
-            {m.previews && m.previews.length > 0 && (
+            {/* Локальное превью живёт только до ответа; после перезахода снимок приходит
+                из истории подписанной ссылкой — иначе переписка теряет то, что человек
+                прислал, и разговор перестаёт читаться. */}
+            {(m.previews ?? m.attachments ?? []).length > 0 && (
               <div className="flex gap-2 mb-1.5 self-end">
-                {m.previews.map((src) => (
+                {(m.previews ?? m.attachments ?? []).map((src) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={src}
@@ -705,12 +726,12 @@ export default function StylistPage() {
                 </div>
 
                 <div className="flex flex-col">
-                  {outfit.slots.map((slot, si) => (
-                    <div
-                      key={si}
-                      className="flex items-center gap-3 px-4 py-2"
-                      style={{ borderTop: `1px solid ${line}` }}
-                    >
+                  {outfit.slots.map((slot, si) => {
+                    const slotKey = `${m.id}-${idx}-${si}`;
+                    const expanded = openSlot === slotKey;
+                    return (
+                    <div key={si} style={{ borderTop: `1px solid ${line}` }}>
+                      <div className="flex items-center gap-3 px-4 py-2">
                       {slot.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -724,7 +745,7 @@ export default function StylistPage() {
                           className="w-11 h-11 rounded-lg shrink-0 flex items-center justify-center text-[16px]"
                           style={{ background: bg, border: `1px dashed ${line}` }}
                         >
-                          🔵
+                          {slot.source === 'ATTACHED' ? '📷' : '🔵'}
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
@@ -738,23 +759,89 @@ export default function StylistPage() {
                           {slot.description}
                         </p>
                       </div>
-                      {slot.source === 'WARDROBE' ? (
+                      {slot.source === 'WARDROBE' && (
                         <span className="text-[11px] font-semibold shrink-0" style={{ color: '#2D6A4F' }}>
                           {S.inWardrobe}
                         </span>
-                      ) : (
-                        // «подобрать» была просто подписью и никуда не вела.
-                        // Теперь открывает каталог с поиском по описанию слота.
+                      )}
+                      {/* Присланную вещь не предлагаем искать: человек только что её показал,
+                          и кнопка «подобрать» здесь читалась бы как «купи своё». */}
+                      {slot.source === 'ATTACHED' && (
+                        <span className="text-[11px] font-semibold shrink-0" style={{ color: muted }}>
+                          {S.yourItem}
+                        </span>
+                      )}
+                      {slot.source === 'CATALOG' && (
+                        // Тап раскрывает примеры прямо здесь. Раньше он сразу выбрасывал
+                        // в магазин — человек хотел увидеть вещь, а терял разговор.
                         <button
-                          onClick={() => router.push(`/shop?q=${encodeURIComponent(slot.description)}`)}
+                          onClick={() => setOpenSlot(expanded ? null : slotKey)}
+                          aria-expanded={expanded}
                           className="shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold active:scale-95 transition-transform"
-                          style={{ background: '#C8A882', color: '#fff' }}
+                          style={
+                            expanded
+                              ? { background: bg, color: ink, border: `1px solid ${line}` }
+                              : { background: '#C8A882', color: '#fff' }
+                          }
                         >
                           {S.pickUp}
                         </button>
                       )}
+                      </div>
+
+                      {expanded && (
+                        <div className="px-4 pb-3">
+                          {/* Референсы из открытых источников. Это не рекомендация: на снимке
+                              другой человек. Атрибуция обязательна по лицензии CC — автор,
+                              лицензия и ссылка на оригинал видны и кликабельны. */}
+                          {slot.references && slot.references.length > 0 ? (
+                            <>
+                              <p
+                                className="text-[10px] font-bold uppercase mb-2"
+                                style={{ color: muted, letterSpacing: '0.5px' }}
+                              >
+                                {S.howWorn}
+                              </p>
+                              <div className="flex gap-2 overflow-x-auto">
+                                {slot.references.map((img) => (
+                                  <a
+                                    key={img.thumbnailUrl}
+                                    href={img.sourceUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="shrink-0 w-24"
+                                  >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={img.thumbnailUrl}
+                                      alt={`Референс, автор ${img.creator ?? 'неизвестен'}`}
+                                      className="w-24 h-32 rounded-lg object-cover"
+                                      style={{ background: bg, border: `1px solid ${line}` }}
+                                    />
+                                    <span className="block mt-1 text-[9px] leading-tight" style={{ color: muted }}>
+                                      {img.creator ?? 'неизвестный автор'} · {img.license.toUpperCase()}
+                                    </span>
+                                  </a>
+                                ))}
+                              </div>
+                            </>
+                          ) : (
+                            <p className="text-[12px] mb-2" style={{ color: muted }}>
+                              {S.noReferences}
+                            </p>
+                          )}
+                          <button
+                            onClick={() => router.push(`/shop?q=${encodeURIComponent(slot.description)}`)}
+                            className="mt-2 w-full h-9 rounded-full text-[12px] font-bold active:scale-[0.98] transition-transform"
+                            style={{ background: bg, color: ink, border: `1px solid ${line}` }}
+                          >
+                            {S.findInCatalog}
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {outfit.why && (
@@ -763,49 +850,11 @@ export default function StylistPage() {
                   </p>
                 )}
 
-                {/* Блок «вдохновение» — чужие фото из открытых источников.
-                    Стоит ОТДЕЛЬНО от слотов и подписан честно: на снимке другой человек
-                    с другой фигурой, и выдавать его за персональную рекомендацию нельзя.
-                    Атрибуция обязательна по лицензии CC — автор, лицензия и ссылка
-                    на оригинал видны и кликабельны. */}
-                {outfit.inspiration && outfit.inspiration.length > 0 && (
-                  <div className="px-4 py-3" style={{ borderTop: `1px solid ${line}` }}>
-                    <p
-                      className="text-[10px] font-bold uppercase mb-2"
-                      style={{ color: muted, letterSpacing: '0.5px' }}
-                    >
-                      {S.howWorn}
-                    </p>
-                    <div className="flex gap-2 overflow-x-auto">
-                      {outfit.inspiration.map((img) => (
-                        <a
-                          key={img.thumbnailUrl}
-                          href={img.sourceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="shrink-0 w-24"
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={img.thumbnailUrl}
-                            alt={`Референс, автор ${img.creator ?? 'неизвестен'}`}
-                            className="w-24 h-32 rounded-lg object-cover"
-                            style={{ background: bg, border: `1px solid ${line}` }}
-                          />
-                          <span className="block mt-1 text-[9px] leading-tight" style={{ color: muted }}>
-                            {img.creator ?? 'неизвестный автор'} · {img.license.toUpperCase()}
-                          </span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex gap-2 px-4 py-3" style={{ borderTop: `1px solid ${line}` }}>
+                <div className="px-4 py-3" style={{ borderTop: `1px solid ${line}` }}>
                   {savedOutfits[`${m.id}-${idx}`] ? (
                     <button
                       onClick={() => router.push('/closet?tab=boards')}
-                      className="flex-1 h-9 rounded-full text-[13px] font-bold active:scale-[0.98] transition-transform"
+                      className="w-full h-9 rounded-full text-[13px] font-bold active:scale-[0.98] transition-transform"
                       style={{ background: '#2D6A4F', color: '#fff' }}
                     >
                       {S.openInCloset}
@@ -814,11 +863,17 @@ export default function StylistPage() {
                     <button
                       onClick={() => saveOutfit(m.id, idx, outfit)}
                       disabled={savingOutfit === `${m.id}-${idx}`}
-                      className="flex-1 h-9 rounded-full text-[13px] font-bold active:scale-[0.98] transition-transform disabled:opacity-50"
+                      className="w-full h-9 rounded-full text-[13px] font-bold active:scale-[0.98] transition-transform disabled:opacity-50"
                       style={{ background: ink, color: bg }}
                     >
                       {savingOutfit === `${m.id}-${idx}` ? S.saving : S.saveOutfit}
                     </button>
+                  )}
+                  {/* Отказ — здесь же, под кнопкой: в конце ленты его никто не видел. */}
+                  {saveErrors[`${m.id}-${idx}`] && (
+                    <p className="mt-2 text-[12px] leading-snug text-center" style={{ color: '#B4443C' }}>
+                      {saveErrors[`${m.id}-${idx}`]}
+                    </p>
                   )}
                 </div>
               </div>
