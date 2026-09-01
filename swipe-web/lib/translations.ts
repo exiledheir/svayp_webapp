@@ -446,6 +446,7 @@ export interface Translations {
   pl_badge_best: string;
   pl_perk_tryon: string;
   pl_perk_outfits: string;
+  pl_perk_enhance: string;
   pl_perk_items: string;
   pl_perk_ai: string;
   pl_promo_applied: string;
@@ -1359,6 +1360,7 @@ const en: Translations = {
   pl_badge_best: 'Best value',
   pl_perk_tryon: '{n} try-ons per month',
   pl_perk_outfits: '{n} AI outfits per month',
+  pl_perk_enhance: 'Up to {n} photo enhancements',
   pl_perk_items: 'Up to {n} items in your closet',
   pl_perk_ai: 'Fresh AI outfits every morning',
   pl_promo_applied: 'Promo code applied — {n}% off',
@@ -2265,6 +2267,7 @@ const ru: Translations = {
   pl_badge_best: 'Выгодный',
   pl_perk_tryon: '{n} примерок в месяц',
   pl_perk_outfits: '{n} ИИ-образов в месяц',
+  pl_perk_enhance: 'До {n} улучшений фото',
   pl_perk_items: 'До {n} вещей в гардеробе',
   pl_perk_ai: 'Новые ИИ-образы каждое утро',
   pl_promo_applied: 'Промокод применён — скидка {n}%',
@@ -3170,6 +3173,7 @@ const uz: Translations = {
   pl_badge_best: 'Foydali',
   pl_perk_tryon: 'Oyiga {n} marta kiyib ko\'rish',
   pl_perk_outfits: 'Oyiga {n} ta AI obraz',
+  pl_perk_enhance: '{n} tagacha rasm yaxshilash',
   pl_perk_items: 'Garderobda {n} tagacha kiyim',
   pl_perk_ai: 'Har kuni yangi AI obrazlar',
   pl_promo_applied: 'Promokod qo\'llandi — {n}% chegirma',

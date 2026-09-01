@@ -113,10 +113,13 @@ const GET_STARTED_TARGET = 5;
 // ─── Plan system ────────────────────────────────────────────────────────────────
 type UserPlan = PlanTier;
 
+// Фолбэк на время до ответа /me/plan и на случай его ошибки. Вещи безлимитны у всех тиров
+// (V154): числа 10/40/100 здесь означали бы, что до загрузки плана клиент сам запрещает
+// добавление одежды, которое сервер разрешает.
 const PLAN_LIMITS_FALLBACK: Record<UserPlan, PlanLimits> = {
-  free:    { wardrobeItems: 10,  outfitCanvases: 1, tryItOns: 2,  regenerations: 5,  calendarDays: 2 },
-  pro:     { wardrobeItems: 40,  outfitCanvases: 3, tryItOns: 10, regenerations: 20, calendarDays: 7 },
-  premium: { wardrobeItems: 100, outfitCanvases: 7, tryItOns: 30, regenerations: 50, calendarDays: 7 },
+  free:    { wardrobeItems: Infinity, outfitCanvases: 1, tryItOns: 2,  regenerations: 5,  calendarDays: 2 },
+  pro:     { wardrobeItems: Infinity, outfitCanvases: 3, tryItOns: 10, regenerations: 20, calendarDays: 7 },
+  premium: { wardrobeItems: Infinity, outfitCanvases: 7, tryItOns: 30, regenerations: 50, calendarDays: 7 },
 };
 
 const PLAN_COLORS: Record<UserPlan, { bg: string; text: string; crownColor: string }> = {

@@ -17,6 +17,8 @@ export interface EffectiveLimits {
   outfitCanvases: number | null;
   tryOnMonthly: number | null;
   regenMonthly: number | null;
+  /** Бесплатных улучшений фото в месяц. 0 = только за монеты (режим FREE), null = безлимит. */
+  enhanceMonthly: number | null;
   dailyLooks: number | null;
   calendarDays: number;
   mlDailyOutfits: boolean;
@@ -68,6 +70,7 @@ export interface Entitlements {
     wardrobeItems: number;
     tryOnMonthly: number;
     regenMonthly: number;
+    enhanceMonthly: number;
     dailyLooks: number;
   };
   periodStart: string;

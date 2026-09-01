@@ -308,7 +308,15 @@ export default function PlansSheet({
             <ul className="mt-4 flex flex-col gap-1.5">
               <PerkRow ink={ink} accent={accent} text={limitText(t.pl_perk_tryon, plan.limits.tryOnMonthly, t.pl_unlimited)} />
               <PerkRow ink={ink} accent={accent} text={limitText(t.pl_perk_outfits, plan.limits.regenMonthly, t.pl_unlimited)} />
-              <PerkRow ink={ink} accent={accent} text={limitText(t.pl_perk_items, plan.limits.wardrobeItems, t.pl_unlimited)} />
+              {/* Улучшения фото: ноль — это «только за монеты», перком такое не назовёшь. */}
+              {plan.limits.enhanceMonthly !== 0 && (
+                <PerkRow ink={ink} accent={accent} text={limitText(t.pl_perk_enhance, plan.limits.enhanceMonthly, t.pl_unlimited)} />
+              )}
+              {/* Кап вещей снят у всех тиров, и «без ограничений» здесь не преимущество тарифа —
+                  строку показываем, только если админ вернул капу конкретное число. */}
+              {plan.limits.wardrobeItems !== null && (
+                <PerkRow ink={ink} accent={accent} text={limitText(t.pl_perk_items, plan.limits.wardrobeItems, t.pl_unlimited)} />
+              )}
               {plan.limits.mlDailyOutfits && <PerkRow ink={ink} accent={accent} text={t.pl_perk_ai} />}
             </ul>
           )}
