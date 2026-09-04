@@ -1102,6 +1102,14 @@ export default function StylistPage() {
                 )}
 
                 <div className="px-4 py-3" style={{ borderTop: `1px solid ${line}` }}>
+                  {/* Доска состоит из вещей гардероба: чужое фото с сайта в неё не положить,
+                      это ссылка на чужой ресурс, а не наш файл. Раньше такие позиции просто
+                      исчезали при сохранении, и образ на доске оказывался неполным. */}
+                  {outfit.slots.some((sl) => sl.source === 'CATALOG') && (
+                    <p className="mb-2 text-[12px] leading-snug" style={{ color: muted }}>
+                      {S.savePartial(outfit.slots.filter((sl) => sl.source === 'CATALOG').length)}
+                    </p>
+                  )}
                   {savedOutfits[`${m.id}-${idx}`] ? (
                     <button
                       onClick={() => router.push('/closet?tab=boards')}
