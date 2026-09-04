@@ -170,7 +170,11 @@ export default function StylistPage() {
   const [threadId, setThreadId] = useState<string | null>(null);
   // Локальные поля поверх серверного типа: превью прикреплённых фото живёт только
   // на клиенте (сервер отдаёт ключи, а не картинки), follow-up приходит с ответом.
-  type ChatMessage = StylistMessage & { previews?: string[]; followups?: string[] };
+  type ChatMessage = StylistMessage & {
+    previews?: string[];
+    followups?: string[];
+    constraints?: string | null;
+  };
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -490,6 +494,7 @@ export default function StylistPage() {
             outfits: answer.outfits ?? [],
             shopping: answer.shopping ?? [],
             followups: answer.followups ?? [],
+            constraints: answer.constraints ?? null,
             coinsSpent: answer.coinsSpent,
             createdAt: new Date().toISOString(),
           },
@@ -971,6 +976,18 @@ export default function StylistPage() {
                   </div>
                 ))}
               </div>
+            )}
+
+            {/* Что учтено из отказов. Без этой строки запрет молча убирал вещи
+                из образов, и человек видел меньше своего гардероба без объяснений. */}
+            {m.constraints && m.outfits && m.outfits.length > 0 && (
+              <button
+                onClick={() => router.push('/stylist/profile')}
+                className="self-start mb-2 px-3 py-1.5 rounded-full text-[11px] text-left active:scale-[0.98] transition-transform"
+                style={{ background: card, color: muted, border: `1px solid ${line}` }}
+              >
+                {S.constraintsApplied(m.constraints)}
+              </button>
             )}
 
             {/* Карточки образов: слоты по ролям с метками происхождения. */}

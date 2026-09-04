@@ -102,6 +102,8 @@ export interface StylistAnswer {
   outfits: StylistOutfitCard[];
   shopping?: ShoppingItem[];
   followups: string[];
+  /** Что учтено из отказов: без подписи запрет молча убирал вещи из образов. */
+  constraints?: string | null;
   coinsSpent: number;
   chargedSource: ChargedSource;
 }

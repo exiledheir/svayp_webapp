@@ -39,6 +39,7 @@ export interface StylistStrings {
   yourItem: string;
   close: string;
   shoppingTitle: string;
+  constraintsApplied: (list: string) => string;
   savePartial: (count: number) => string;
   uploading: string;
 
@@ -99,6 +100,7 @@ const RU: StylistStrings = {
   yourItem: '📷 твоя вещь',
   close: 'Закрыть',
   shoppingTitle: 'Что стоит добавить',
+  constraintsApplied: (list) => `Не предлагаю: ${list} · изменить`,
   savePartial: (n) =>
     `На доску попадут только твои вещи. ${n} ${n === 1 ? 'позицию' : 'позиции'} нужно сначала добавить в гардероб.`,
   uploading: 'Загружаю…',
@@ -179,6 +181,7 @@ const UZ: StylistStrings = {
   yourItem: '📷 sizning kiyimingiz',
   close: 'Yopish',
   shoppingTitle: 'Nimani qo‘shish kerak',
+  constraintsApplied: (list) => `Taklif qilmayman: ${list} · o‘zgartirish`,
   savePartial: (n) => `Doskaga faqat sizning kiyimlaringiz tushadi. ${n} ta pozitsiyani avval garderobga qo‘shish kerak.`,
   uploading: 'Yuklanmoqda…',
 
@@ -257,6 +260,7 @@ const EN: StylistStrings = {
   yourItem: '📷 your item',
   close: 'Close',
   shoppingTitle: 'Worth adding',
+  constraintsApplied: (list) => `Not suggesting: ${list} · change`,
   savePartial: (n) => `Only your own pieces go to the board. ${n} ${n === 1 ? 'item' : 'items'} must be added to your wardrobe first.`,
   uploading: 'Uploading…',
 
