@@ -206,6 +206,8 @@ export default function StylistPage() {
   const [threads, setThreads] = useState<StylistThread[]>([]);
   const [confirmClear, setConfirmClear] = useState(false);
   const [refundNote, setRefundNote] = useState<Record<string, string>>({});
+  /** Подсказки после 👎: тап превращает оценку в запрет, а не оставляет её в статистике. */
+  const [refusalHints, setRefusalHints] = useState<Record<string, string[]>>({});
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -379,6 +381,9 @@ export default function StylistPage() {
       const res = await rateStylistAnswer(messageId, positive, reason);
       if (res.refunded) {
         setRefundNote((prev) => ({ ...prev, [messageId]: S.refunded(res.coins) }));
+      }
+      if (res.refusalHints && res.refusalHints.length > 0) {
+        setRefusalHints((prev) => ({ ...prev, [messageId]: res.refusalHints as string[] }));
       }
     } catch {
       // Оценка не критична — молча откатываем отметку, чтобы можно было попробовать снова.
@@ -1182,6 +1187,34 @@ export default function StylistPage() {
                     {refundNote[m.id]}
                   </span>
                 )}
+              </div>
+            )}
+
+            {/* После причины «некрасиво» предлагаем сказать, что именно не подошло:
+                тап отправляет «не люблю чёрное», и запрет уходит в профиль. Без этого
+                оценка оставалась в статистике и на подбор не влияла. */}
+            {refusalHints[m.id] && refusalHints[m.id].length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                <span className="text-[12px] w-full" style={{ color: muted }}>
+                  {S.whatWasWrong}
+                </span>
+                {refusalHints[m.id].map((hint) => (
+                  <button
+                    key={hint}
+                    onClick={() => {
+                      setRefusalHints((prev) => {
+                        const next = { ...prev };
+                        delete next[m.id];
+                        return next;
+                      });
+                      send(hint);
+                    }}
+                    className="px-3 py-1.5 rounded-full text-[13px] active:scale-[0.97] transition-transform"
+                    style={{ background: card, color: ink, border: `1px solid ${line}` }}
+                  >
+                    {hint}
+                  </button>
+                ))}
               </div>
             )}
 

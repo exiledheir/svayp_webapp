@@ -196,6 +196,11 @@ export interface FeedbackResult {
   /** Вернулись ли монеты — за «не по теме» возврат автоматический, первые 3 раза в месяц. */
   refunded: boolean;
   coins: number;
+  /**
+   * Что предложить уточнить после 👎: «не люблю чёрное», «не ношу юбки».
+   * Тап отправляет фразу обычным сообщением, и запрет попадает в профиль.
+   */
+  refusalHints?: string[];
 }
 
 export async function rateStylistAnswer(
