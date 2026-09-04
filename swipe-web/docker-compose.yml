@@ -6,7 +6,8 @@ services:
     container_name: svayp-webapp
     restart: unless-stopped
     ports:
-      - "3010:3000"
+      # loopback only — served through host nginx (web.libas.uz)
+      - "127.0.0.1:3010:3000"
     environment:
       NODE_ENV: production
     # Optimized-image cache survives rebuilds — without it every deploy
