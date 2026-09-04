@@ -43,6 +43,12 @@ export interface StylistStrings {
   constraintsApplied: (list: string) => string;
   savePartial: (count: number) => string;
   uploading: string;
+  takeThisItem: string;
+  addingItem: string;
+  itemAdded: string;
+  itemAddFailed: string;
+  itemQuotaFull: string;
+  openSource: string;
 
   unavailableTitle: string;
   unavailableText: string;
@@ -104,8 +110,14 @@ const RU: StylistStrings = {
   whatWasWrong: 'Что именно не подошло?',
   constraintsApplied: (list) => `Не предлагаю: ${list} · изменить`,
   savePartial: (n) =>
-    `На доску попадут только твои вещи. ${n} ${n === 1 ? 'позицию' : 'позиции'} нужно сначала добавить в гардероб.`,
+    `На доску попадут только твои вещи. ${n} ${n === 1 ? 'позицию' : 'позиции'} нужно сначала добавить в гардероб: выбери фото под вещью и нажми «Взять эту вещь».`,
   uploading: 'Загружаю…',
+  takeThisItem: 'Взять эту вещь',
+  addingItem: 'Добавляю в гардероб…',
+  itemAdded: '🟢 добавлено в гардероб',
+  itemAddFailed: 'Не получилось добавить это фото. Попробуй другое.',
+  itemQuotaFull: 'В гардеробе кончилось место — освободи его или расширь тариф.',
+  openSource: 'Открыть источник',
 
   unavailableTitle: 'Nur пока недоступна',
   unavailableText: 'Стилист открыт ограниченному кругу. Мы включим его для всех чуть позже.',
@@ -185,8 +197,15 @@ const UZ: StylistStrings = {
   shoppingTitle: 'Nimani qo‘shish kerak',
   whatWasWrong: 'Aynan nima to‘g‘ri kelmadi?',
   constraintsApplied: (list) => `Taklif qilmayman: ${list} · o‘zgartirish`,
-  savePartial: (n) => `Doskaga faqat sizning kiyimlaringiz tushadi. ${n} ta pozitsiyani avval garderobga qo‘shish kerak.`,
+  savePartial: (n) =>
+    `Doskaga faqat sizning kiyimlaringiz tushadi. ${n} ta pozitsiyani avval garderobga qo‘shing: rasmni tanlab, «Bu kiyimni olish» tugmasini bosing.`,
   uploading: 'Yuklanmoqda…',
+  takeThisItem: 'Bu kiyimni olish',
+  addingItem: 'Garderobga qo‘shilmoqda…',
+  itemAdded: '🟢 garderobga qo‘shildi',
+  itemAddFailed: 'Bu rasmni qo‘shib bo‘lmadi. Boshqasini tanlang.',
+  itemQuotaFull: 'Garderobda joy tugadi — joy bo‘shating yoki tarifni kengaytiring.',
+  openSource: 'Manbani ochish',
 
   unavailableTitle: 'Nur hozircha mavjud emas',
   unavailableText: 'Stilist cheklangan doiraga ochilgan. Tez orada hamma uchun yoqamiz.',
@@ -265,8 +284,15 @@ const EN: StylistStrings = {
   shoppingTitle: 'Worth adding',
   whatWasWrong: 'What exactly didn’t work?',
   constraintsApplied: (list) => `Not suggesting: ${list} · change`,
-  savePartial: (n) => `Only your own pieces go to the board. ${n} ${n === 1 ? 'item' : 'items'} must be added to your wardrobe first.`,
+  savePartial: (n) =>
+    `Only your own pieces go to the board. ${n} ${n === 1 ? 'item' : 'items'} must be added to your wardrobe first: pick a photo below the piece and tap “Take this piece”.`,
   uploading: 'Uploading…',
+  takeThisItem: 'Take this piece',
+  addingItem: 'Adding to wardrobe…',
+  itemAdded: '🟢 added to wardrobe',
+  itemAddFailed: 'Couldn’t add this photo. Try another one.',
+  itemQuotaFull: 'Your wardrobe is full — free up space or upgrade your plan.',
+  openSource: 'Open source',
 
   unavailableTitle: 'Nur isn’t available yet',
   unavailableText: 'The stylist is open to a limited group. We’ll turn it on for everyone soon.',

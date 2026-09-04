@@ -31,6 +31,8 @@ import {
   type StylistThread,
   rateStylistAnswer,
   saveStylistOutfit,
+  importStylistReference,
+  waitForItemReady,
   SLOT_LABELS,
   type StylistOutfitCard,
   FEEDBACK_REASONS,
@@ -191,6 +193,11 @@ export default function StylistPage() {
   const [savingOutfit, setSavingOutfit] = useState<string | null>(null);
   /** Отказ сохранения по конкретной карточке: показывается под её кнопкой. */
   const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
+  /** Какое из показанных фото человек выбрал для слота: ключ «сообщение-образ-слот». */
+  const [pickedRef, setPickedRef] = useState<Record<string, string>>({});
+  /** Слоты, вещь для которых сейчас скачивается и обрабатывается. */
+  const [importingSlot, setImportingSlot] = useState<Record<string, boolean>>({});
+  const [importErrors, setImportErrors] = useState<Record<string, string>>({});
   /** Картинка, открытая на весь экран: превью 44×44 не разглядеть. */
   const [zoomed, setZoomed] = useState<string | null>(null);
   /** Знакомство с Nur вместо пустого чата при первом заходе. null — ещё не решили. */
@@ -367,6 +374,71 @@ export default function StylistPage() {
       }
     },
     [saveErrorText],
+  );
+
+  /**
+   * Забрать выбранный пример из интернета в гардероб.
+   *
+   * <p>Раньше эти позиции нельзя было ни выбрать, ни сохранить: доска состоит из вещей
+   * пользователя, и каталожный слот при сохранении просто исчезал. Теперь фото скачивается
+   * к нам, проходит обычную обработку вещи и встаёт в тот же слот — образ сохраняется целиком.
+   *
+   * <p>Ждём готовности здесь, а не после нажатия «Сохранить образ»: доска не примет вещь,
+   * пока пайплайн не закончил, и человек получил бы отказ на ровном месте.
+   */
+  const takeReference = useCallback(
+    async (messageId: string, outfitIndex: number, slotIndex: number, imageUrl: string) => {
+      const key = `${messageId}-${outfitIndex}-${slotIndex}`;
+      setImportingSlot((prev) => ({ ...prev, [key]: true }));
+      setImportErrors((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      try {
+        const { uploadJobId } = await importStylistReference(messageId, outfitIndex, slotIndex, imageUrl);
+        const ready = await waitForItemReady(uploadJobId);
+        if (!ready) {
+          setImportErrors((prev) => ({ ...prev, [key]: S.itemAddFailed }));
+          return;
+        }
+        // Слот перерисовываем сами: история не перезапрашивается, а метка «есть у тебя»
+        // должна появиться сразу — иначе выглядит, будто ничего не произошло.
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== messageId || !m.outfits) return m;
+            return {
+              ...m,
+              outfits: m.outfits.map((o, oi) =>
+                oi !== outfitIndex
+                  ? o
+                  : {
+                      ...o,
+                      slots: o.slots.map((sl, si) =>
+                        si !== slotIndex ? sl : { ...sl, source: 'WARDROBE' as const, imageUrl },
+                      ),
+                    },
+              ),
+            };
+          }),
+        );
+      } catch (e: unknown) {
+        const data = (e as { response?: { data?: { code?: string; error?: { code?: string } } } })
+          ?.response?.data;
+        const code = data?.error?.code ?? data?.code;
+        setImportErrors((prev) => ({
+          ...prev,
+          [key]: code === 'QUOTA_EXCEEDED' ? S.itemQuotaFull : S.itemAddFailed,
+        }));
+      } finally {
+        setImportingSlot((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+      }
+    },
+    [S],
   );
 
   /**
@@ -1013,6 +1085,9 @@ export default function StylistPage() {
                     // Примеры видны сразу: раньше они прятались за тапом по «подобрать»,
                     // и о них никто не догадывался — кнопка выглядела неработающей.
                     const hasRefs = !!slot.references && slot.references.length > 0;
+                    const slotKey = `${m.id}-${idx}-${si}`;
+                    const picked = pickedRef[slotKey];
+                    const busy = !!importingSlot[slotKey];
                     return (
                     <div key={si} style={{ borderTop: `1px solid ${line}` }}>
                       <div className="flex items-center gap-3 px-4 py-2">
@@ -1080,36 +1155,78 @@ export default function StylistPage() {
                           </p>
                           <div className="flex gap-2 overflow-x-auto">
                                 {(slot.references ?? []).map((img) => (
-                                  <a
+                                  // Тап выбирает фото, а не уводит на сайт: выбранное можно
+                                  // забрать в гардероб, и тогда образ сохранится целиком.
+                                  // Ссылка на источник осталась отдельной строкой ниже.
+                                  <div
                                     key={img.thumbnailUrl}
-                                    href={img.sourceUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
                                     className="shrink-0 w-24"
                                     // Битая миниатюра прячется целиком: рамка с alt-текстом
                                     // выглядит хуже, чем на одну картинку меньше.
                                   >
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                      src={img.thumbnailUrl}
-                                      alt={`Референс, автор ${img.creator ?? 'неизвестен'}`}
-                                      className="w-24 h-32 rounded-lg object-cover"
-                                      style={{ background: bg, border: `1px solid ${line}` }}
-                                      onError={(e) => {
-                                        const a = e.currentTarget.closest('a');
-                                        if (a) a.style.display = 'none';
-                                      }}
-                                    />
-                                    <span className="block mt-1 text-[9px] leading-tight" style={{ color: muted }}>
+                                    <button
+                                      onClick={() =>
+                                        setPickedRef((prev) => ({
+                                          ...prev,
+                                          [slotKey]: prev[slotKey] === img.thumbnailUrl ? '' : img.thumbnailUrl,
+                                        }))
+                                      }
+                                      disabled={busy}
+                                      className="block w-full"
+                                      aria-pressed={picked === img.thumbnailUrl}
+                                    >
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img
+                                        src={img.thumbnailUrl}
+                                        alt={`Референс, автор ${img.creator ?? 'неизвестен'}`}
+                                        className="w-24 h-32 rounded-lg object-cover"
+                                        style={{
+                                          background: bg,
+                                          border:
+                                            picked === img.thumbnailUrl
+                                              ? `2px solid ${ink}`
+                                              : `1px solid ${line}`,
+                                        }}
+                                        onError={(e) => {
+                                          const box = e.currentTarget.closest('div');
+                                          if (box) box.style.display = 'none';
+                                        }}
+                                      />
+                                    </button>
+                                    <a
+                                      href={img.sourceUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="block mt-1 text-[9px] leading-tight underline"
+                                      style={{ color: muted }}
+                                    >
                                       {/* Веб-картинка подписывается источником: у поисковой
                                           выдачи нет лицензии, есть сайт, откуда фото. */}
                                       {img.license === 'web'
-                                        ? img.creator ?? ''
+                                        ? img.creator ?? S.openSource
                                         : `${img.creator ?? 'неизвестный автор'} · ${img.license.toUpperCase()}`}
-                                    </span>
-                                  </a>
+                                    </a>
+                                  </div>
                                 ))}
                           </div>
+
+                          {/* Действие появляется только после выбора: кнопка «взять» без
+                              выбранного фото непонятно к чему относится, их тут три. */}
+                          {(picked || busy) && (
+                            <button
+                              onClick={() => picked && takeReference(m.id, idx, si, picked)}
+                              disabled={busy}
+                              className="mt-2 w-full h-9 rounded-full text-[13px] font-bold active:scale-[0.98] transition-transform disabled:opacity-60"
+                              style={{ background: ink, color: bg }}
+                            >
+                              {busy ? S.addingItem : S.takeThisItem}
+                            </button>
+                          )}
+                          {importErrors[slotKey] && (
+                            <p className="mt-1.5 text-[12px] leading-snug" style={{ color: '#B4443C' }}>
+                              {importErrors[slotKey]}
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>

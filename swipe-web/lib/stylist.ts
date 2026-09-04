@@ -78,6 +78,8 @@ export interface InspirationImage {
   license: string;
   licenseUrl: string | null;
   provider: string | null;
+  /** Файл в исходном размере на сайте-источнике: его забираем, когда вещь берут себе. */
+  fullUrl?: string | null;
 }
 
 /** Позиция списка покупок: что докупить и как это выглядит. */
@@ -119,6 +121,49 @@ export async function saveStylistOutfit(
 ): Promise<string> {
   const res = await api.post(`/stylist/messages/${messageId}/save-outfit`, { outfitIndex, name });
   return unwrap<string>(res);
+}
+
+/**
+ * Забрать понравившийся пример в гардероб.
+ *
+ * <p>Возвращает id вещи и id задачи обработки. Вещь появляется сразу, но до конца
+ * обработки она не готова — образ с ней сохранится только после {@link waitForItemReady}.
+ */
+export async function importStylistReference(
+  messageId: string,
+  outfitIndex: number,
+  slotIndex: number,
+  imageUrl: string,
+): Promise<{ wardrobeItemId: string; uploadJobId: string }> {
+  const res = await api.post(`/stylist/messages/${messageId}/import-reference`, {
+    outfitIndex,
+    slotIndex,
+    imageUrl,
+  });
+  return unwrap<{ wardrobeItemId: string; uploadJobId: string }>(res);
+}
+
+/**
+ * Дождаться, пока новая вещь пройдёт обработку.
+ *
+ * <p>Доска принимает только готовые вещи, поэтому кнопка «Сохранить образ» до этого
+ * момента отбивалась бы ошибкой. Опрос, а не поток: путь короткий, а SSE через прокси
+ * в этом экране уже приносил больше проблем, чем пользы.
+ */
+export async function waitForItemReady(jobId: string, timeoutMs = 120000): Promise<boolean> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      const res = await api.get(`/wardrobe/uploads/${jobId}`);
+      const status = unwrap<{ status?: string }>(res)?.status;
+      if (status === 'COMPLETED') return true;
+      if (status === 'FAILED') return false;
+    } catch {
+      // Разрыв связи не повод бросать ожидание: следующая попытка через две секунды.
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  return false;
 }
 
 function unwrap<T>(res: { data: unknown }): T {
