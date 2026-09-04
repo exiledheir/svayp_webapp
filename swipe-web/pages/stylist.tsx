@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
+import NurOnboarding from '@/components/stylist/NurOnboarding';
 import {
   ArrowLeft,
   Send,
@@ -35,6 +36,10 @@ import {
   FEEDBACK_REASONS,
   type FeedbackReason,
   type StylistMessage,
+  type StylistAnswer,
+  fetchStyleProfile,
+  streamStylistMessage,
+  StreamUnsupportedError,
 } from '@/lib/stylist';
 
 /**
@@ -95,7 +100,11 @@ function parseAnswer(text: string): AnswerBlock[] {
   for (const raw of lines) {
     const line = raw.trim();
     const m = line.match(/^[—–-]\s*(.{2,40})$/);
-    const isOption = !!m && !m[1].includes(':') && !/[.!?]$/.test(m[1]);
+    // Скобка почти всегда означает пометку вроде «(есть в гардеробе)» — это перечисление
+    // вещей образа, а не вариант ответа. Раньше такие строки становились кнопками, и тап
+    // отправлял в чат «Белая рубашка (есть)».
+    const isOption =
+      !!m && !m[1].includes(':') && !/[()]/.test(m[1]) && !/[.!?]$/.test(m[1]);
     if (isOption) {
       if (options.length === 0) flushText();
       options.push(m![1].trim());
@@ -108,6 +117,44 @@ function parseAnswer(text: string): AnswerBlock[] {
   flushText();
   return blocks;
 }
+
+
+/**
+ * Вопрос предполагает конкретную вещь («к этим брюкам», «эту блузку»)?
+ *
+ * <p>Тап по такому чипу без фото вёл в тупик: Nur по правилам просила прислать снимок,
+ * и человек делал лишний круг. Теперь такой чип сразу открывает выбор фото, а текст
+ * ложится в поле ввода — отправка одним касанием после выбора.
+ */
+function chipNeedsPhoto(text: string): boolean {
+  return /\bэт(?:а|у|о|и|ой|им|ому|ими|их)\b|скинь фото|мой образ\b/i.test(text);
+}
+
+
+/**
+ * Когда был разговор — в привычном для списка чатов виде: сегодняшний показывает время,
+ * вчерашний так и называется, старше — дату. Абсолютная дата у каждого разговора
+ * позволяет отличить два похожих начала друг от друга.
+ */
+function threadStamp(iso: string | null, locale: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const loc = locale === 'uz' ? 'uz-UZ' : locale === 'en' ? 'en-US' : 'ru-RU';
+  const time = d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });
+
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOfDay(new Date()) - startOfDay(d)) / 86400000);
+  if (days === 0) return time;
+  if (days === 1) return `${YESTERDAY[loc] ?? 'вчера'}, ${time}`;
+  return `${d.toLocaleDateString(loc, { day: 'numeric', month: 'short' })}, ${time}`;
+}
+
+const YESTERDAY: Record<string, string> = {
+  'ru-RU': 'вчера',
+  'uz-UZ': 'kecha',
+  'en-US': 'yesterday',
+};
 
 export default function StylistPage() {
   const router = useRouter();
@@ -140,8 +187,10 @@ export default function StylistPage() {
   const [savingOutfit, setSavingOutfit] = useState<string | null>(null);
   /** Отказ сохранения по конкретной карточке: показывается под её кнопкой. */
   const [saveErrors, setSaveErrors] = useState<Record<string, string>>({});
-  /** Раскрытый слот с примерами «как носят»: ключ «сообщение-образ-слот». */
-  const [openSlot, setOpenSlot] = useState<string | null>(null);
+  /** Картинка, открытая на весь экран: превью 44×44 не разглядеть. */
+  const [zoomed, setZoomed] = useState<string | null>(null);
+  /** Знакомство с Nur вместо пустого чата при первом заходе. null — ещё не решили. */
+  const [needsIntro, setNeedsIntro] = useState<boolean | null>(null);
 
   // Оценки: id сообщения → вердикт. Тоже локально — чтобы не тянуть историю
   // после каждого тапа и не дать оценить дважды.
@@ -169,14 +218,31 @@ export default function StylistPage() {
       if (!access.available) return;
 
       logAnalyticsEvent(Events.STYLIST_CHAT_OPENED, { [Params.SOURCE]: 'closet_header' });
+      let hasHistory = false;
       try {
         const id = await fetchStylistThread();
         if (cancelled) return;
         setThreadId(id);
         const history = await fetchStylistHistory(id);
         if (!cancelled) setMessages(history);
+        hasHistory = history.length > 0;
       } catch {
         // История не критична: пустой тред — рабочее состояние, чат откроется чистым.
+      }
+
+      // Знакомство — только тем, кто ещё ничего о себе не рассказал. Переписка или
+      // заполненный профиль означают, что человек уже здесь был: показывать ему
+      // приветствие заново — назойливость.
+      if (cancelled) return;
+      if (hasHistory) {
+        setNeedsIntro(false);
+        return;
+      }
+      try {
+        const profile = await fetchStyleProfile();
+        if (!cancelled) setNeedsIntro(profile.completeness === 0);
+      } catch {
+        if (!cancelled) setNeedsIntro(false);
       }
     })();
     return () => {
@@ -282,7 +348,11 @@ export default function StylistPage() {
         setSavedOutfits((prev) => ({ ...prev, [key]: canvasId }));
         logAnalyticsEvent(Events.STYLIST_OUTFIT_SAVED, { [Params.SOURCE]: 'chat' });
       } catch (e: unknown) {
-        const code = (e as { response?: { data?: { code?: string } } })?.response?.data?.code;
+        // Бэкенд заворачивает ошибку в {"error":{"code":...}} — чтение data.code
+        // всегда давало undefined, и вместо причины показывался общий текст.
+        const data = (e as { response?: { data?: { code?: string; error?: { code?: string } } } })
+          ?.response?.data;
+        const code = data?.error?.code ?? data?.code;
         // Ошибку кладём к самой карточке: общий баннер печатался в конце ленты, куда
         // после нажатия никто не смотрит, и отказ выглядел как «кнопка не работает».
         setSaveErrors((prev) => ({ ...prev, [key]: saveErrorText(code) }));
@@ -356,18 +426,59 @@ export default function StylistPage() {
       setMessages((prev) => [...prev, optimistic]);
       logAnalyticsEvent(Events.STYLIST_MESSAGE_SENT, { [Params.HAS_PHOTO]: keys.length > 0 });
 
+      // Черновик потокового ответа: пока идут куски, сообщение живёт под этим id
+      // и переписывается на месте, а по «done» заменяется финальной версией.
+      const streamId = `stream-${Date.now()}`;
+
       try {
-        const answer = await sendStylistMessage({
-          // Ни текста, ни действия за пользователя не подставляем. Раньше любое фото без
-          // подписи объявлялось сборкой образа — и фото в полный рост уходило в сценарий
-          // «собери образ вокруг этой вещи». Что на снимке, разбирает бэкенд.
-          text: body || undefined,
-          imageKeys: keys.length > 0 ? keys : undefined,
-          // Nur обязана отвечать на языке приложения: узбекоязычному пользователю
-          // русский ответ бесполезен.
-          locale,
-          threadId: threadId ?? undefined,
-        });
+        let answer: StylistAnswer;
+        // Поток пробуем только для текста: у сборки образа и списка покупок ответ —
+        // структура, её нечем показывать по кускам, и бэкенд отвечает на такое 409.
+        if (keys.length === 0 && body) {
+          try {
+            let acc = '';
+            answer = await streamStylistMessage(
+              { text: body, locale, threadId: threadId ?? undefined },
+              (piece) => {
+                acc += piece;
+                setMessages((prev) => {
+                  const next = [...prev];
+                  const at = next.findIndex((m) => m.id === streamId);
+                  const draftMsg: ChatMessage = {
+                    id: streamId,
+                    role: 'ASSISTANT',
+                    action: null,
+                    content: acc,
+                    coinsSpent: 0,
+                    createdAt: new Date().toISOString(),
+                  };
+                  if (at === -1) next.push(draftMsg);
+                  else next[at] = draftMsg;
+                  return next;
+                });
+              },
+            );
+            // Черновик убираем: ниже добавится финальное сообщение с настоящим id,
+            // оценкой и follow-up. Оставить оба — значит показать ответ дважды.
+            setMessages((prev) => prev.filter((m) => m.id !== streamId));
+          } catch (streamError) {
+            setMessages((prev) => prev.filter((m) => m.id !== streamId));
+            if (!(streamError instanceof StreamUnsupportedError)) throw streamError;
+            answer = await sendStylistMessage({ text: body, locale, threadId: threadId ?? undefined });
+          }
+        } else {
+          answer = await sendStylistMessage({
+            // Ни текста, ни действия за пользователя не подставляем. Раньше любое фото без
+            // подписи объявлялось сборкой образа — и фото в полный рост уходило в сценарий
+            // «собери образ вокруг этой вещи». Что на снимке, разбирает бэкенд.
+            text: body || undefined,
+            imageKeys: keys.length > 0 ? keys : undefined,
+            // Nur обязана отвечать на языке приложения: узбекоязычному пользователю
+            // русский ответ бесполезен.
+            locale,
+            threadId: threadId ?? undefined,
+          });
+        }
         setThreadId(answer.threadId);
         setMessages((prev) => [
           ...prev,
@@ -377,6 +488,7 @@ export default function StylistPage() {
             action: null,
             content: answer.answer ?? '',
             outfits: answer.outfits ?? [],
+            shopping: answer.shopping ?? [],
             followups: answer.followups ?? [],
             coinsSpent: answer.coinsSpent,
             createdAt: new Date().toISOString(),
@@ -387,17 +499,62 @@ export default function StylistPage() {
         // Реплику оставляем на экране. На сервере её нет: при сбое генерации транзакция
         // откатывается целиком, чтобы в истории не оседали вопросы без ответов. Значит
         // единственная копия написанного — эта, и стирать её нельзя.
-        const status = (e as { response?: { status?: number; data?: { code?: string } } })?.response;
-        setError(
-          status?.data?.code === 'INSUFFICIENT_COINS'
-            ? S.errorCoins
-            : S.errorGeneric,
-        );
+        const data = (e as { response?: { data?: { code?: string; error?: { code?: string } } } })
+          ?.response?.data;
+        const code = data?.error?.code ?? data?.code;
+        setError(code === 'INSUFFICIENT_COINS' ? S.errorCoins : S.errorGeneric);
       } finally {
         setSending(false);
       }
     },
     [sending, threadId, attachments, locale, S],
+  );
+
+  /**
+   * Отправить фото, полученное в знакомстве.
+   *
+   * <p>Отдельный путь, а не `send`: тот берёт снимки из `attachments`, а здесь ключ уже
+   * загружен на предыдущем экране. Текста нет намеренно — сценарий бэкенд определяет
+   * по самому снимку.
+   */
+  const sendWithPhoto = useCallback(
+    async (key: string) => {
+      setSending(true);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `local-${Date.now()}`,
+          role: 'USER',
+          action: null,
+          content: '',
+          coinsSpent: 0,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+      try {
+        const answer = await sendStylistMessage({ imageKeys: [key], locale });
+        setThreadId(answer.threadId);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: answer.messageId,
+            role: 'ASSISTANT',
+            action: null,
+            content: answer.answer ?? '',
+            outfits: answer.outfits ?? [],
+            shopping: answer.shopping ?? [],
+            followups: answer.followups ?? [],
+            coinsSpent: answer.coinsSpent,
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+      } catch {
+        setError(S.errorGeneric);
+      } finally {
+        setSending(false);
+      }
+    },
+    [locale, S],
   );
 
   const bg = dark ? '#0F0F0F' : '#FAFAF8';
@@ -411,6 +568,23 @@ export default function StylistPage() {
       <div className="flex items-center justify-center min-h-screen" style={{ background: bg }}>
         <Loader2 size={22} className="animate-spin" style={{ color: muted }} />
       </div>
+    );
+  }
+
+  // Знакомство идёт до чата: без него человек попадает в пустое поле ввода и
+  // разговаривает с ассистентом, который о нём ничего не знает.
+  if (allowed && needsIntro) {
+    return (
+      <NurOnboarding
+        S={S}
+        dark={dark}
+        onFinish={(photoKey) => {
+          setNeedsIntro(false);
+          // Фото уходит первым сообщением: разбирает его тот же путь, что и обычно,
+          // и ответ Nur сразу оказывается персональным.
+          if (photoKey) sendWithPhoto(photoKey);
+        }}
+      />
     );
   }
 
@@ -538,9 +712,18 @@ export default function StylistPage() {
                   }}
                 >
                   <button onClick={() => openThread(t.id)} className="min-w-0 flex-1 text-left">
-                    <p className="text-[14px] font-semibold truncate" style={{ color: ink }}>
-                      {t.title ?? S.emptyChat}
-                    </p>
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-[14px] font-semibold truncate flex-1" style={{ color: ink }}>
+                        {t.title ?? S.emptyChat}
+                      </p>
+                      <span
+                        className="text-[11px] shrink-0 tabular-nums"
+                        style={{ color: muted }}
+                        title={t.lastMessageAt ?? t.createdAt}
+                      >
+                        {threadStamp(t.lastMessageAt ?? t.createdAt, locale)}
+                      </span>
+                    </div>
                     {t.preview && (
                       <p className="text-[12px] truncate mt-0.5" style={{ color: muted }}>
                         {t.preview}
@@ -615,7 +798,12 @@ export default function StylistPage() {
                   key={chip}
                   onClick={() => {
                     logAnalyticsEvent(Events.STYLIST_STARTER_CHIP_TAPPED, { [Params.SOURCE]: chip });
-                    send(chip);
+                    if (chipNeedsPhoto(chip)) {
+                      setDraft(chip);
+                      fileRef.current?.click();
+                    } else {
+                      send(chip);
+                    }
                   }}
                   className="text-left px-4 py-3 rounded-2xl text-[14px] active:scale-[0.99] transition-transform"
                   style={{ background: card, color: ink, border: `1px solid ${line}` }}
@@ -637,21 +825,24 @@ export default function StylistPage() {
             {(m.previews ?? m.attachments ?? []).length > 0 && (
               <div className="flex gap-2 mb-1.5 self-end">
                 {(m.previews ?? m.attachments ?? []).map((src) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    key={src}
-                    src={src}
-                    alt="Отправленное фото"
-                    className="w-28 h-36 rounded-2xl object-cover"
-                    style={{ border: `1px solid ${line}` }}
-                  />
+                  <button key={src} onClick={() => setZoomed(src)} aria-label="Открыть фото">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={src}
+                      alt="Отправленное фото"
+                      className="w-28 h-36 rounded-2xl object-cover"
+                      style={{ border: `1px solid ${line}` }}
+                    />
+                  </button>
                 ))}
               </div>
             )}
 
             {/* Текст показываем, только когда карточек нет: при сборке образа
                 вся информация уже в них, и абзац рядом был бы дублем. */}
-            {(!m.outfits || m.outfits.length === 0) && m.content && (
+            {(!m.outfits || m.outfits.length === 0) &&
+              (!m.shopping || m.shopping.length === 0) &&
+              m.content && (
               <div
                 className="px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed"
                 style={
@@ -702,12 +893,82 @@ export default function StylistPage() {
                 {m.followups.map((f) => (
                   <button
                     key={f}
-                    onClick={() => send(f)}
+                    onClick={() => {
+                      if (chipNeedsPhoto(f)) {
+                        setDraft(f);
+                        fileRef.current?.click();
+                      } else {
+                        send(f);
+                      }
+                    }}
                     className="px-3.5 py-2 rounded-full text-[13px] active:scale-[0.97] transition-transform"
                     style={{ background: card, color: ink, border: `1px solid ${line}` }}
                   >
                     {f}
                   </button>
+                ))}
+              </div>
+            )}
+
+            {/* Список покупок: карточки с фото вместо шести абзацев «купи брюки». */}
+            {m.shopping && m.shopping.length > 0 && (
+              <div
+                className="mb-2 rounded-2xl overflow-hidden"
+                style={{ background: card, border: `1px solid ${line}` }}
+              >
+                <div className="px-4 pt-3 pb-2">
+                  <p className="text-[15px] font-semibold" style={{ color: ink }}>
+                    {S.shoppingTitle}
+                  </p>
+                </div>
+                {m.shopping.map((item, ii) => (
+                  <div key={ii} style={{ borderTop: `1px solid ${line}` }}>
+                    <div className="flex items-center gap-3 px-4 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[14px] font-semibold leading-snug" style={{ color: ink }}>
+                          {ii + 1}. {item.title}
+                        </p>
+                        {item.why && (
+                          <p className="text-[12px] leading-snug mt-0.5" style={{ color: muted }}>
+                            {item.why}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {item.references && item.references.length > 0 && (
+                      <div className="px-4 pb-3">
+                        <div className="flex gap-2 overflow-x-auto">
+                          {item.references.map((img) => (
+                            <a
+                              key={img.thumbnailUrl}
+                              href={img.sourceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="shrink-0 w-24"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={img.thumbnailUrl}
+                                alt={item.title}
+                                className="w-24 h-32 rounded-lg object-cover"
+                                style={{ background: bg, border: `1px solid ${line}` }}
+                                onError={(e) => {
+                                  const a = e.currentTarget.closest('a');
+                                  if (a) a.style.display = 'none';
+                                }}
+                              />
+                              <span
+                                className="block mt-1 text-[9px] leading-tight truncate"
+                                style={{ color: muted }}
+                              >
+                                {img.creator ?? img.provider ?? ''}
+                              </span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
@@ -727,19 +988,27 @@ export default function StylistPage() {
 
                 <div className="flex flex-col">
                   {outfit.slots.map((slot, si) => {
-                    const slotKey = `${m.id}-${idx}-${si}`;
-                    const expanded = openSlot === slotKey;
+                    // Примеры видны сразу: раньше они прятались за тапом по «подобрать»,
+                    // и о них никто не догадывался — кнопка выглядела неработающей.
+                    const hasRefs = !!slot.references && slot.references.length > 0;
                     return (
                     <div key={si} style={{ borderTop: `1px solid ${line}` }}>
                       <div className="flex items-center gap-3 px-4 py-2">
                       {slot.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={slot.imageUrl}
-                          alt={slot.description}
-                          className="w-11 h-11 rounded-lg object-cover shrink-0"
-                          style={{ background: bg }}
-                        />
+                        // Превью 44×44 вещь не показывает — по тапу открываем целиком.
+                        <button
+                          onClick={() => setZoomed(slot.imageUrl)}
+                          className="shrink-0"
+                          aria-label={`Посмотреть: ${slot.description}`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={slot.imageUrl}
+                            alt={slot.description}
+                            className="w-11 h-11 rounded-lg object-cover"
+                            style={{ background: bg }}
+                          />
+                        </button>
                       ) : (
                         <div
                           className="w-11 h-11 rounded-lg shrink-0 flex items-center justify-center text-[16px]"
@@ -771,45 +1040,32 @@ export default function StylistPage() {
                           {S.yourItem}
                         </span>
                       )}
-                      {slot.source === 'CATALOG' && (
-                        // Тап раскрывает примеры прямо здесь. Раньше он сразу выбрасывал
-                        // в магазин — человек хотел увидеть вещь, а терял разговор.
-                        <button
-                          onClick={() => setOpenSlot(expanded ? null : slotKey)}
-                          aria-expanded={expanded}
-                          className="shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold active:scale-95 transition-transform"
-                          style={
-                            expanded
-                              ? { background: bg, color: ink, border: `1px solid ${line}` }
-                              : { background: '#C8A882', color: '#fff' }
-                          }
-                        >
-                          {S.pickUp}
-                        </button>
-                      )}
+                      {/* У каталожного слота метки нет намеренно: примеры под ним уже
+                          показывают вещь, а кнопка вела в каталог, который к описанию
+                          стилиста почти ничего не находит — путь в никуда. */}
                       </div>
 
-                      {expanded && (
+                      {hasRefs && (
                         <div className="px-4 pb-3">
                           {/* Референсы из открытых источников. Это не рекомендация: на снимке
                               другой человек. Атрибуция обязательна по лицензии CC — автор,
                               лицензия и ссылка на оригинал видны и кликабельны. */}
-                          {slot.references && slot.references.length > 0 ? (
-                            <>
-                              <p
-                                className="text-[10px] font-bold uppercase mb-2"
-                                style={{ color: muted, letterSpacing: '0.5px' }}
-                              >
-                                {S.howWorn}
-                              </p>
-                              <div className="flex gap-2 overflow-x-auto">
-                                {slot.references.map((img) => (
+                          <p
+                            className="text-[10px] font-bold uppercase mb-2"
+                            style={{ color: muted, letterSpacing: '0.5px' }}
+                          >
+                            {S.howWorn}
+                          </p>
+                          <div className="flex gap-2 overflow-x-auto">
+                                {(slot.references ?? []).map((img) => (
                                   <a
                                     key={img.thumbnailUrl}
                                     href={img.sourceUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="shrink-0 w-24"
+                                    // Битая миниатюра прячется целиком: рамка с alt-текстом
+                                    // выглядит хуже, чем на одну картинку меньше.
                                   >
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
@@ -817,26 +1073,21 @@ export default function StylistPage() {
                                       alt={`Референс, автор ${img.creator ?? 'неизвестен'}`}
                                       className="w-24 h-32 rounded-lg object-cover"
                                       style={{ background: bg, border: `1px solid ${line}` }}
+                                      onError={(e) => {
+                                        const a = e.currentTarget.closest('a');
+                                        if (a) a.style.display = 'none';
+                                      }}
                                     />
                                     <span className="block mt-1 text-[9px] leading-tight" style={{ color: muted }}>
-                                      {img.creator ?? 'неизвестный автор'} · {img.license.toUpperCase()}
+                                      {/* Веб-картинка подписывается источником: у поисковой
+                                          выдачи нет лицензии, есть сайт, откуда фото. */}
+                                      {img.license === 'web'
+                                        ? img.creator ?? ''
+                                        : `${img.creator ?? 'неизвестный автор'} · ${img.license.toUpperCase()}`}
                                     </span>
                                   </a>
                                 ))}
-                              </div>
-                            </>
-                          ) : (
-                            <p className="text-[12px] mb-2" style={{ color: muted }}>
-                              {S.noReferences}
-                            </p>
-                          )}
-                          <button
-                            onClick={() => router.push(`/shop?q=${encodeURIComponent(slot.description)}`)}
-                            className="mt-2 w-full h-9 rounded-full text-[12px] font-bold active:scale-[0.98] transition-transform"
-                            style={{ background: bg, color: ink, border: `1px solid ${line}` }}
-                          >
-                            {S.findInCatalog}
-                          </button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -932,11 +1183,20 @@ export default function StylistPage() {
         ))}
 
         {sending && (
+          // Точки, а не фраза: «Работаю над этим…» читалось как готовый ответ,
+          // и человек не понимал, что Nur ещё думает.
           <div
-            className="self-start px-4 py-2.5 rounded-2xl text-[13px]"
-            style={{ background: card, color: muted, border: `1px solid ${line}` }}
+            className="self-start px-4 py-3 rounded-2xl flex items-center gap-1.5"
+            aria-label={S.thinking}
+            style={{ background: card, border: `1px solid ${line}` }}
           >
-            {S.thinking}
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className="w-1.5 h-1.5 rounded-full animate-bounce"
+                style={{ background: muted, animationDelay: `${i * 150}ms` }}
+              />
+            ))}
           </div>
         )}
 
@@ -1025,6 +1285,29 @@ export default function StylistPage() {
           </button>
         </div>
       </footer>
+
+      {/* Фото на весь экран. Превью в слоте 44×44 и присланный снимок в ленте вещь
+          не показывают — по ним нельзя понять, ту ли вещь нашёл стилист. */}
+      {zoomed && (
+        <div
+          onClick={() => setZoomed(null)}
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.92)' }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={zoomed} alt="" className="max-w-full max-h-full object-contain rounded-2xl" />
+          <button
+            onClick={() => setZoomed(null)}
+            aria-label={S.close}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center"
+            style={{ background: 'rgba(255,255,255,0.14)', color: '#fff' }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

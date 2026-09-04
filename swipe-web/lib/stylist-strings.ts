@@ -35,11 +35,11 @@ export interface StylistStrings {
   saving: string;
   openInCloset: string;
   inWardrobe: string;
-  pickUp: string;
   howWorn: string;
   yourItem: string;
-  findInCatalog: string;
-  noReferences: string;
+  close: string;
+  shoppingTitle: string;
+  uploading: string;
 
   unavailableTitle: string;
   unavailableText: string;
@@ -94,11 +94,11 @@ const RU: StylistStrings = {
   saving: 'Сохраняю…',
   openInCloset: 'Открыть в гардеробе',
   inWardrobe: '🟢 есть у тебя',
-  pickUp: 'подобрать',
   howWorn: 'Как такое носят',
   yourItem: '📷 твоя вещь',
-  findInCatalog: 'Найти в каталоге',
-  noReferences: 'Примеров не нашлось',
+  close: 'Закрыть',
+  shoppingTitle: 'Что стоит добавить',
+  uploading: 'Загружаю…',
 
   unavailableTitle: 'Nur пока недоступна',
   unavailableText: 'Стилист открыт ограниченному кругу. Мы включим его для всех чуть позже.',
@@ -172,11 +172,11 @@ const UZ: StylistStrings = {
   saving: 'Saqlanmoqda…',
   openInCloset: 'Garderobda ochish',
   inWardrobe: '🟢 sizda bor',
-  pickUp: 'tanlash',
   howWorn: 'Buni qanday kiyishadi',
   yourItem: '📷 sizning kiyimingiz',
-  findInCatalog: 'Katalogdan topish',
-  noReferences: 'Namunalar topilmadi',
+  close: 'Yopish',
+  shoppingTitle: 'Nimani qo‘shish kerak',
+  uploading: 'Yuklanmoqda…',
 
   unavailableTitle: 'Nur hozircha mavjud emas',
   unavailableText: 'Stilist cheklangan doiraga ochilgan. Tez orada hamma uchun yoqamiz.',
@@ -249,11 +249,11 @@ const EN: StylistStrings = {
   saving: 'Saving…',
   openInCloset: 'Open in wardrobe',
   inWardrobe: '🟢 you have it',
-  pickUp: 'find one',
   howWorn: 'How it’s worn',
   yourItem: '📷 your item',
-  findInCatalog: 'Find in catalog',
-  noReferences: 'No examples found',
+  close: 'Close',
+  shoppingTitle: 'Worth adding',
+  uploading: 'Uploading…',
 
   unavailableTitle: 'Nur isn’t available yet',
   unavailableText: 'The stylist is open to a limited group. We’ll turn it on for everyone soon.',

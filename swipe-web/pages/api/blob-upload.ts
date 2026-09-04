@@ -27,8 +27,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'Invalid putUrl' });
   }
 
-  // Only allow Azure Blob Storage URLs
-  if (!parsedUrl.hostname.endsWith('.blob.core.windows.net')) {
+  // Список хостов — защита от SSRF: без него ручка проксировала бы PUT на любой адрес,
+  // включая внутренние. Локальный Azurite добавляется ТОЛЬКО когда бэкенд локальный,
+  // поэтому в прод-сборке список остаётся прежним — один Azure.
+  const backendOrigin = process.env.NEXT_PUBLIC_API_ORIGIN || '';
+  const isLocalBackend = /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(backendOrigin);
+  const isAzure = parsedUrl.hostname.endsWith('.blob.core.windows.net');
+  const isLocalBlob =
+    isLocalBackend && (parsedUrl.hostname === '127.0.0.1' || parsedUrl.hostname === 'localhost');
+  if (!isAzure && !isLocalBlob) {
     return res.status(400).json({ error: 'putUrl must be an Azure Blob Storage URL' });
   }
 

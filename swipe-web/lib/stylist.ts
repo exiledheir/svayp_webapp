@@ -3,6 +3,7 @@
 // (uz.svayp.svayp.stylist.StylistAccessService). На клиенте НЕТ списка телефонов —
 // иначе состав беты уехал бы в бандл и менялся только редеплоем.
 
+import { getToken } from '@/lib/auth';
 import { api } from '@/lib/api';
 
 export type StylistAction =
@@ -30,6 +31,8 @@ export interface StylistMessage {
   content: string;
   /** Карточки образов, если это был ответ-сборка. Приходят и из истории. */
   outfits?: StylistOutfitCard[];
+  /** Список покупок карточками — сценарий «чего не хватает в гардеробе». */
+  shopping?: ShoppingItem[];
   /** Подписанные URL присланных фото — чтобы снимок остался в переписке после перезахода. */
   attachments?: string[];
   coinsSpent: number;
@@ -77,6 +80,14 @@ export interface InspirationImage {
   provider: string | null;
 }
 
+/** Позиция списка покупок: что докупить и как это выглядит. */
+export interface ShoppingItem {
+  title: string;
+  why: string | null;
+  searchQuery: string | null;
+  references?: InspirationImage[];
+}
+
 export interface StylistOutfitCard {
   title: string;
   slots: OutfitSlot[];
@@ -89,6 +100,7 @@ export interface StylistAnswer {
   /** Текст ответа. Пусто, когда собрались карточки — тогда показываем их. */
   answer: string | null;
   outfits: StylistOutfitCard[];
+  shopping?: ShoppingItem[];
   followups: string[];
   coinsSpent: number;
   chargedSource: ChargedSource;
@@ -212,6 +224,84 @@ export async function sendStylistMessage(payload: {
 }): Promise<StylistAnswer> {
   const res = await api.post('/stylist/messages', payload);
   return unwrap<StylistAnswer>(res);
+}
+
+/**
+ * Потоковый ответ Nur.
+ *
+ * <p>Не `EventSource`: тот умеет только GET и не носит заголовки, а нам нужен POST с
+ * телом и `Authorization`. Поэтому обычный fetch и ручной разбор SSE из тела ответа.
+ *
+ * <p>Поток есть не у всех сценариев: сборка образа и список покупок приходят структурой,
+ * стримить её нечем — бэкенд честно отвечает 409, и вызывающий уходит на обычный путь.
+ * Тем же способом обрабатывается выключенный флаг.
+ *
+ * @returns финальную сводку, как у обычной отправки
+ * @throws StreamUnsupportedError когда поток недоступен и нужен обычный запрос
+ */
+export class StreamUnsupportedError extends Error {}
+
+export async function streamStylistMessage(
+  payload: { text?: string; threadId?: string; locale?: string },
+  onChunk: (text: string) => void,
+): Promise<StylistAnswer> {
+  // Не через `/proxy/*`: тот путь — rewrites Next, и он копит SSE в буфере, отдавая
+  // весь ответ одним куском в конце. Отдельный роут форвардит поток по частям.
+  const res = await fetch('/api/stylist-stream', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (res.status === 409) throw new StreamUnsupportedError('stream unsupported');
+  if (!res.ok || !res.body) throw new Error(`stream failed: ${res.status}`);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let done: StylistAnswer | null = null;
+  let failure: string | null = null;
+
+  // SSE-кадры разделены пустой строкой; последний кусок буфера может быть неполным,
+  // поэтому режем только по полному разделителю, а остаток оставляем в буфере.
+  const handleFrame = (frame: string) => {
+    let event = 'message';
+    const dataLines: string[] = [];
+    for (const line of frame.split('\n')) {
+      if (line.startsWith('event:')) event = line.slice(6).trim();
+      else if (line.startsWith('data:')) dataLines.push(line.slice(5));
+    }
+    const data = dataLines.join('\n');
+    if (event === 'chunk') onChunk(data);
+    else if (event === 'done') {
+      try {
+        done = JSON.parse(data) as StylistAnswer;
+      } catch {
+        failure = 'bad done payload';
+      }
+    } else if (event === 'error') failure = data || 'generation_failed';
+  };
+
+  for (;;) {
+    const { value, done: finished } = await reader.read();
+    if (finished) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sep = buffer.indexOf('\n\n');
+    while (sep !== -1) {
+      handleFrame(buffer.slice(0, sep));
+      buffer = buffer.slice(sep + 2);
+      sep = buffer.indexOf('\n\n');
+    }
+  }
+  if (buffer.trim()) handleFrame(buffer);
+
+  if (failure) throw new Error(failure);
+  if (!done) throw new Error('stream ended without result');
+  return done;
 }
 
 // ── Стилевой профиль ─────────────────────────────────────────────────────────
