@@ -2217,11 +2217,13 @@ export default function ClosetPage() {
             {/* Одна кнопка на обе покупки: баланс алмазов и вход в тарифы. Раньше их было
                 две, и человеку приходилось угадывать, за какой из них лежит нужный способ
                 заплатить, — теперь обе покупки живут вкладками в одной шторке.
-                Корону показываем, только когда вкладка тарифов реально откроется: сервер
-                разрешил пейволл и каталог не пуст, либо тариф уже куплен (тогда цвет короны
-                и есть бейдж тира). Чип целиком спрятан за `feature.subscription_badge.enabled`,
-                чтобы его можно было убрать для ревью-аккаунта App/Play. */}
-            {(plansEnabled || plansAvailable || isPaidTier) && (
+                Чип ЦЕЛИКОМ спрятан за `feature.subscription_badge.enabled` — и алмазы, и
+                корона: флаг существует, чтобы убрать всё платное с экрана ревью-аккаунта
+                App/Play, и корона без алмазов выдавала бы его так же. Корону внутри чипа
+                показываем, только когда вкладка тарифов реально откроется: сервер разрешил
+                пейволл и каталог не пуст, либо тариф уже куплен (тогда цвет короны и есть
+                бейдж тира). */}
+            {plansEnabled && (
             <button
               onClick={() => setShowPremiumGate('browse')}
               className="flex items-center gap-1.5 px-2.5 h-8 rounded-full text-[13px] font-extrabold active:scale-[0.95] transition-all"
@@ -2233,20 +2235,14 @@ export default function ClosetPage() {
               aria-label={`${t.cn_title} · ${isPaidTier ? tierLabel : t.pl_title}`}
               title={isPaidTier ? tierLabel : undefined}
             >
-              {plansEnabled && (
-                <>
-                  <Diamond size={16} />
-                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>{coins}</span>
-                </>
-              )}
+              <Diamond size={16} />
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>{coins}</span>
               {(plansAvailable || isPaidTier) && (
                 <>
-                  {plansEnabled && (
-                    <span
-                      className="w-px h-3.5"
-                      style={{ background: theme === 'dark' ? 'rgba(243,112,167,0.32)' : '#F1BFD8' }}
-                    />
-                  )}
+                  <span
+                    className="w-px h-3.5"
+                    style={{ background: theme === 'dark' ? 'rgba(243,112,167,0.32)' : '#F1BFD8' }}
+                  />
                   <Crown size={15} color={isPaidTier ? tierColor : undefined} />
                 </>
               )}
@@ -2678,7 +2674,9 @@ export default function ClosetPage() {
           pricing={coinPricing}
           paymentOptions={paymentOptions}
           entitlements={entitlements}
-          plansTab={plansAvailable || isPaidTier}
+          // Тот же флаг, что прячет чип в шапке: шторку могут открыть гейты «не хватает
+          // алмазов», и без этого условия вкладка тарифов всплывала бы у ревью-аккаунта.
+          plansTab={plansEnabled && (plansAvailable || isPaidTier)}
           initialTab="coins"
           trigger={showPremiumGate}
           needMore={showPremiumGate !== 'browse'}

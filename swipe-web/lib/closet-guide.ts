@@ -1,11 +1,30 @@
 import type { Locale } from '@/lib/translations';
 
+/**
+ * Which built-in illustration a step shows — see components/closet/GuideIllustrations.tsx.
+ *
+ * The guide used to ship app screenshots. They went stale with every redesign (the last
+ * set still showed the retired «Kiyintirish» tab) and at phone size the text in them was
+ * unreadable. The illustrations are drawn from the same labels and components as the live
+ * UI, so they follow the locale and theme and can't show a previous version of the app.
+ */
+export type GuideIllustration =
+  | 'add'
+  | 'beautify'
+  | 'closet'
+  | 'boards'
+  | 'tryon'
+  | 'looks'
+  | 'feed'
+  | 'diamonds';
+
 /** A single step in the closet "how to use" guide. */
 export interface GuideStep {
-  /** Screenshot(s) for this step. Live in /public/images/closet/guide/. */
-  images: string[];
+  illustration: GuideIllustration;
+  /** Where in the app this happens — short kicker shown next to the step number. */
+  eyebrow: string;
   title: string;
-  /** One or more short lines explaining the step. */
+  /** Short lines explaining the step. Three at most: the guide is skimmed, not read. */
   bullets: string[];
 }
 
@@ -15,12 +34,14 @@ export interface GuideStrings {
   guide: string;
   /** Subtitle under the modal title. */
   subtitle: string;
-  /** Video section heading. */
+  /** Title of the video player (iframe title / aria). */
   videoTitle: string;
-  /** Shown in the video card until a link is wired up. */
-  videoSoon: string;
+  /** Header pill that opens the video. */
+  video: string;
   /** "Step {n}" badge — {n} is replaced with the step number. */
   stepLabel: string;
+  /** "{n} / {total}" counter in the header. */
+  stepCounter: string;
   /** Closing CTA at the bottom of the guide. */
   done: string;
   /** Accessibility labels (screen readers / aria). */
@@ -33,9 +54,10 @@ const STRINGS: Record<Locale, GuideStrings> = {
   uz: {
     guide: "Qo'llanma",
     subtitle: "Libas'dan qanday foydalanishni bosqichma-bosqich o'rganing",
-    videoTitle: 'Video qo‘llanma',
-    videoSoon: 'Video tez orada qo‘shiladi',
+    videoTitle: "Video qo'llanma",
+    video: 'Video',
     stepLabel: '{n}-QADAM',
+    stepCounter: '{n} / {total}',
     done: 'Tushunarli',
     closeLabel: 'Yopish',
     prevLabel: 'Oldingi',
@@ -45,8 +67,9 @@ const STRINGS: Record<Locale, GuideStrings> = {
     guide: 'Руководство',
     subtitle: 'Пошагово узнайте, как пользоваться Libas',
     videoTitle: 'Видеоруководство',
-    videoSoon: 'Видео появится в ближайшее время',
+    video: 'Видео',
     stepLabel: 'ШАГ {n}',
+    stepCounter: '{n} / {total}',
     done: 'Понятно',
     closeLabel: 'Закрыть',
     prevLabel: 'Назад',
@@ -56,8 +79,9 @@ const STRINGS: Record<Locale, GuideStrings> = {
     guide: 'Guide',
     subtitle: 'Learn how to use Libas, step by step',
     videoTitle: 'Video guide',
-    videoSoon: 'Video coming soon',
+    video: 'Video',
     stepLabel: 'STEP {n}',
+    stepCounter: '{n} / {total}',
     done: 'Got it',
     closeLabel: 'Close',
     prevLabel: 'Previous',
@@ -65,124 +89,262 @@ const STRINGS: Record<Locale, GuideStrings> = {
   },
 };
 
-function shot(name: string): string {
-  return `/images/closet/guide/${name}.png`;
-}
-
-/** Screenshot list for a step. Step 4 (Boards) ships two screenshots. */
-function img(n: number): string[] {
-  if (n === 4) return [shot('qadam-4-1'), shot('qadam-4-2')];
-  return [shot(`qadam-${n}`)];
-}
-
+/**
+ * The steps follow the order a new person meets the app: add clothes → clean the photos →
+ * browse the closet → outfits on boards → try-on → outfits & calendar → feed → paying for
+ * AI actions. Button names in the text match the UI labels in lib/translations.ts — when a
+ * label there changes, change it here too, or the guide sends people looking for a button
+ * that no longer exists.
+ */
 const STEPS: Record<Locale, GuideStep[]> = {
   uz: [
-    { images: img(1), title: 'Kiyimlarni yuklash', bullets: [
-      '"+" tugmasini bosing',
-      'Kiyimlaringiz rasmini tanlang va qo‘shing',
-      'Tasdiqlash tugmasini bosing',
-    ] },
-    { images: img(2), title: 'Kategoriyani tanlang', bullets: [
-      'Kiyim uchun mos kategoriyani tanlang va qo‘shimcha ma’lumotlarni kiriting.',
-      'Bu sun’iy intellektga siz uchun yanada aniq obrazlar yaratishga yordam beradi.',
-    ] },
-    { images: img(3), title: 'Sun’iy intellekt kiyimlarni tayyorlaydi', bullets: [
-      'Bir necha daqiqadan so‘ng Libas AI kiyimlaringizni qayta ishlab, garderobingizni shakllantiradi.',
-    ] },
-    { images: img(4), title: 'Doskalar', bullets: [
-      'Doskalar bo‘limida o‘zingizning obrazlaringizni yaratishingiz mumkin.',
-      'Sun’iy intellekt yordamida yangi obrazlar generatsiya qiling.',
-      'Yoki kiyimlarni qo‘lda tanlab, o‘zingizga mos kombinatsiyalar yarating.',
-    ] },
-    { images: img(5), title: 'Virtual kiyib ko‘ring', bullets: [
-      '"Kiyib ko‘ring" tugmasini bosing.',
-      'Maneken ustida kiyimlar qanday turishini ko‘ring.',
-    ] },
-    { images: img(6), title: 'Kiyintirish', bullets: [
-      '"Kiyintirish" funksiyasi orqali yuklangan kiyimlaringiz qanday turishini juda tez ko‘rishingiz mumkin.',
-    ] },
-    { images: img(7), title: 'Haftalik obrazlar', bullets: [
-      'Kalendar bo‘limida sun’iy intellekt siz uchun haftalik obrazlar yaratadi.',
-      'Har kuni nima kiyishni oldindan rejalashtiring.',
-    ] },
-    { images: img(8), title: 'Obrazlar', bullets: [
-      'Bu yerda sun’iy intellekt yaratgan barcha obrazlar saqlanadi.',
-      'Istalgan vaqtda avvalgi kombinatsiyalarni ko‘rib chiqishingiz mumkin.',
-    ] },
+    {
+      illustration: 'add',
+      eyebrow: 'Garderob',
+      title: "Kiyimlaringizni qo'shing",
+      bullets: [
+        "«Qo'shish»ni bosing va Galereya yoki Kamerani tanlang — bir vaqtda bir nechta rasm bo'lsa ham bo'ladi.",
+        "Istalgan rasm to'g'ri keladi: AI fonni olib tashlaydi va har bir kiyimni o'z kategoriyasiga joylaydi.",
+        "Rasm yo'qmi? LIBAS do'konidan kiyimlarni bir bosishda qo'shing.",
+      ],
+    },
+    {
+      illustration: 'beautify',
+      eyebrow: 'Beautify',
+      title: "Rasmlar do'kondagidek",
+      bullets: [
+        "Har bir yangi kiyimning kategoriyasini tekshiring, AI adashgan bo'lsa — to'g'rilang.",
+        "Beautify rasmni tozalaydi: fonni olib, studiya sifatiga keltiradi. «Oldin» va «keyin»ni solishtirib, yoqqanini qoldiring.",
+        'Har bir rasm uchun bir necha olmos turadi.',
+      ],
+    },
+    {
+      illustration: 'closet',
+      eyebrow: 'Garderob',
+      title: "Hammasi o'z joyida",
+      bullets: [
+        "Kiyimlar kategoriya bo'yicha guruhlangan: chiplar orqali filtrlang yoki sana bo'yicha saralang.",
+        "Kiyimni bosing — rang, mavsum, material va «Kiyib ko'rish» tugmasi chiqadi.",
+        '«Belgilash» — aslida nima kiyganingizni eslab qolish uchun.',
+      ],
+    },
+    {
+      illustration: 'boards',
+      eyebrow: 'Doskalar',
+      title: 'AI yaratgan obrazlar',
+      bullets: [
+        "✦ «Kombinatsiya yaratish»ni bosing — AI kiyimlaringizdan obraz yig'adi. ↻ — yana bir variant.",
+        "«O'zgartirish» muharrirni ochadi: surib joylashtiring, ikki barmoq bilan kattalashtiring, garderob yoki do'kondan kiyim almashtiring.",
+        'Keyinroq qaytish uchun doskani saqlang.',
+      ],
+    },
+    {
+      illustration: 'tryon',
+      eyebrow: "Kiyib ko'rish",
+      title: "O'zingizda ko'ring",
+      bullets: [
+        "Istalgan doskada «Kiyib ko'ring»ni bosing.",
+        "Manekenni tanlang yoki yaxshi yorug'likda to'liq bo'yli suratingizni yuklang.",
+        "Natija 30–60 soniyada tayyor bo'ladi va «Obrazlar»ga saqlanadi.",
+      ],
+    },
+    {
+      illustration: 'looks',
+      eyebrow: 'Obrazlar · Kalendar',
+      title: 'Kunma-kun obrazlaringiz',
+      bullets: [
+        "«Obrazlar» bo'limida barcha kiyib ko'rish natijalari saqlanadi.",
+        '«Kalendar» haftaning har kuniga obraz taklif qiladi — «Boshqa obraz» bilan almashtiring.',
+      ],
+    },
+    {
+      illustration: 'feed',
+      eyebrow: 'Lenta',
+      title: 'Uslubingizni ulashing',
+      bullets: [
+        "«Obrazlar» bo'limidan «Lentaga joylash» tugmasi bilan obrazni lentaga chiqaring.",
+        "Boshqalarga obuna bo'ling, obrazlariga layk bosing va izoh qoldiring.",
+        "Kiyib ko'rilgan postlar ko'proq e'tibor oladi.",
+      ],
+    },
+    {
+      illustration: 'diamonds',
+      eyebrow: 'Olmoslar · Premium',
+      title: "AI amallari qanday to'lanadi",
+      bullets: [
+        "Olmoslar kiyib ko'rish, Beautify va obraz yaratishga sarflanadi — narx har bir tugmada ko'rinadi.",
+        "Balansni to'ldirish — yuqoridagi olmos tugmasi orqali.",
+        "Premium bir martalik to'ldirish o'rniga oylik limit beradi — «Premium» bo'limi.",
+      ],
+    },
   ],
   ru: [
-    { images: img(1), title: 'Загрузка одежды', bullets: [
-      'Нажмите кнопку "+"',
-      'Выберите и добавьте фото вашей одежды',
-      'Нажмите кнопку подтверждения',
-    ] },
-    { images: img(2), title: 'Выберите категорию', bullets: [
-      'Выберите подходящую категорию для вещи и укажите дополнительные детали.',
-      'Это поможет искусственному интеллекту создавать для вас более точные образы.',
-    ] },
-    { images: img(3), title: 'Искусственный интеллект обрабатывает одежду', bullets: [
-      'Через несколько минут Libas AI обработает вашу одежду и сформирует ваш гардероб.',
-    ] },
-    { images: img(4), title: 'Доски', bullets: [
-      'В разделе "Доски" вы можете создавать свои образы.',
-      'Генерируйте новые образы с помощью искусственного интеллекта.',
-      'Или выбирайте вещи вручную и создавайте подходящие вам комбинации.',
-    ] },
-    { images: img(5), title: 'Виртуальная примерка', bullets: [
-      'Нажмите кнопку "Примерить".',
-      'Посмотрите, как одежда смотрится на манекене.',
-    ] },
-    { images: img(6), title: 'Одевание', bullets: [
-      'Функция "Одевание" позволяет очень быстро увидеть, как смотрится загруженная одежда.',
-    ] },
-    { images: img(7), title: 'Образы на неделю', bullets: [
-      'В разделе "Календарь" искусственный интеллект создаёт для вас образы на неделю.',
-      'Планируйте заранее, что надеть каждый день.',
-    ] },
-    { images: img(8), title: 'Образы', bullets: [
-      'Здесь хранятся все образы, созданные искусственным интеллектом.',
-      'В любой момент вы можете просмотреть предыдущие комбинации.',
-    ] },
+    {
+      illustration: 'add',
+      eyebrow: 'Гардероб',
+      title: 'Добавьте свою одежду',
+      bullets: [
+        'Нажмите «Добавить» и выберите «Галерея» или «Камера» — можно сразу несколько фото.',
+        'Подойдёт любое фото: ИИ уберёт фон и разложит вещи по категориям.',
+        'Нет фото? Добавьте вещи из магазина LIBAS в одно касание.',
+      ],
+    },
+    {
+      illustration: 'beautify',
+      eyebrow: 'Beautify',
+      title: 'Фото как в магазине',
+      bullets: [
+        'Проверьте категорию каждой новой вещи и поправьте, если ИИ ошибся.',
+        'Beautify очищает фото: убирает фон и делает студийный кадр. Сравните «до» и «после» и оставьте то, что нравится.',
+        'Стоит несколько алмазов за фото.',
+      ],
+    },
+    {
+      illustration: 'closet',
+      eyebrow: 'Гардероб',
+      title: 'Всё по полочкам',
+      bullets: [
+        'Вещи сгруппированы по категориям: фильтруйте по чипам или сортируйте по дате.',
+        'Нажмите на вещь — увидите цвет, сезон, материал и кнопку «Примерить».',
+        '«Отметить» — чтобы помнить, что вы носите на самом деле.',
+      ],
+    },
+    {
+      illustration: 'boards',
+      eyebrow: 'Доски',
+      title: 'Образы от ИИ',
+      bullets: [
+        'Нажмите ✦ «Генерировать образ» — ИИ соберёт вещи в образ. ↻ — ещё вариант.',
+        '«Изменить» откроет редактор: тяните, чтобы двигать, сводите пальцы, чтобы менять размер, меняйте вещи из гардероба или магазина.',
+        'Сохраните доску, чтобы вернуться к ней позже.',
+      ],
+    },
+    {
+      illustration: 'tryon',
+      eyebrow: 'Примерка',
+      title: 'Посмотрите на себе',
+      bullets: [
+        'Нажмите «Примерить» на любой доске.',
+        'Выберите манекен или загрузите своё фото в полный рост при хорошем свете.',
+        'Результат готов за 30–60 секунд и сохраняется в «Образы».',
+      ],
+    },
+    {
+      illustration: 'looks',
+      eyebrow: 'Образы · Календарь',
+      title: 'Ваши образы по дням',
+      bullets: [
+        'Во вкладке «Образы» хранятся все результаты примерок.',
+        '«Календарь» предлагает образ на каждый день недели — нажмите «Другой образ», чтобы сменить.',
+      ],
+    },
+    {
+      illustration: 'feed',
+      eyebrow: 'Лента',
+      title: 'Делитесь стилем',
+      bullets: [
+        'Выложите образ в ленту из вкладки «Образы» — кнопка «Выложить в ленту».',
+        'Подписывайтесь, ставьте лайки и комментируйте образы других.',
+        'Посты с примеркой собирают больше внимания.',
+      ],
+    },
+    {
+      illustration: 'diamonds',
+      eyebrow: 'Алмазы · Премиум',
+      title: 'Как оплачиваются действия ИИ',
+      bullets: [
+        'Алмазы тратятся на примерки, Beautify и генерацию образов — цена видна на каждой кнопке.',
+        'Пополнить баланс — по кнопке с алмазом в шапке.',
+        'Премиум даёт месячные лимиты вместо разовых пополнений — вкладка «Премиум».',
+      ],
+    },
   ],
   en: [
-    { images: img(1), title: 'Upload your clothes', bullets: [
-      'Tap the "+" button',
-      'Pick and add a photo of your clothing',
-      'Tap the confirm button',
-    ] },
-    { images: img(2), title: 'Choose a category', bullets: [
-      'Pick the right category for the item and add extra details.',
-      'This helps the AI create more accurate looks for you.',
-    ] },
-    { images: img(3), title: 'The AI prepares your clothes', bullets: [
-      'In a few minutes Libas AI processes your clothes and builds your wardrobe.',
-    ] },
-    { images: img(4), title: 'Boards', bullets: [
-      'In the Boards section you can create your own looks.',
-      'Generate new looks with AI.',
-      'Or pick items manually and build combinations that suit you.',
-    ] },
-    { images: img(5), title: 'Virtual try-on', bullets: [
-      'Tap the "Try on" button.',
-      'See how the clothes look on the mannequin.',
-    ] },
-    { images: img(6), title: 'Styling', bullets: [
-      'The "Styling" feature lets you very quickly see how your uploaded clothes look.',
-    ] },
-    { images: img(7), title: 'Weekly looks', bullets: [
-      'In the Calendar section the AI creates weekly outfits for you.',
-      'Plan ahead what to wear each day.',
-    ] },
-    { images: img(8), title: 'Looks', bullets: [
-      'All looks created by the AI are stored here.',
-      'You can review previous combinations anytime.',
-    ] },
+    {
+      illustration: 'add',
+      eyebrow: 'Closet',
+      title: 'Add your clothes',
+      bullets: [
+        'Tap "Add item" and choose Gallery or Camera — several photos at once is fine.',
+        'Any photo works: the AI removes the background and sorts each item into its category.',
+        'No photo? Add pieces from the LIBAS shop with one tap.',
+      ],
+    },
+    {
+      illustration: 'beautify',
+      eyebrow: 'Beautify',
+      title: 'Photos that look like a shop',
+      bullets: [
+        'Check the category of each new item and fix it if the AI got it wrong.',
+        'Beautify cleans up a photo — background gone, studio look. Compare before and after and keep the one you like.',
+        'It costs a few diamonds per photo.',
+      ],
+    },
+    {
+      illustration: 'closet',
+      eyebrow: 'Closet',
+      title: 'Everything in its place',
+      bullets: [
+        'Items are grouped by category: filter with the chips or sort by date.',
+        'Tap an item for details — colour, season, material and a "Try on" button.',
+        '"Mark worn" keeps track of what you actually wear.',
+      ],
+    },
+    {
+      illustration: 'boards',
+      eyebrow: 'Boards',
+      title: 'Outfits by AI',
+      bullets: [
+        'Tap ✦ "Generate outfit" — the AI combines your pieces into a look. Tap ↻ for another one.',
+        '"Edit" opens the editor: drag to move, pinch to resize, swap pieces from your closet or the shop.',
+        'Save the board to come back to it later.',
+      ],
+    },
+    {
+      illustration: 'tryon',
+      eyebrow: 'Try-on',
+      title: 'See it on you',
+      bullets: [
+        'Tap "Try it on" on any board.',
+        'Choose a mannequin or upload your own full-length photo taken in good light.',
+        'The result takes 30–60 seconds and is saved to Outfits.',
+      ],
+    },
+    {
+      illustration: 'looks',
+      eyebrow: 'Outfits · Calendar',
+      title: 'Your looks, day by day',
+      bullets: [
+        'The Outfits tab keeps every try-on result in one gallery.',
+        'The Calendar suggests a look for each day of the week — tap "Another look" to shuffle.',
+      ],
+    },
+    {
+      illustration: 'feed',
+      eyebrow: 'Feed',
+      title: 'Share your style',
+      bullets: [
+        'Post a look to the feed from the Outfits tab with "Share to feed".',
+        'Follow people, like and comment on their outfits.',
+        'Posts with a try-on get more attention.',
+      ],
+    },
+    {
+      illustration: 'diamonds',
+      eyebrow: 'Diamonds · Premium',
+      title: 'How AI actions are paid for',
+      bullets: [
+        'Diamonds pay for try-ons, Beautify and outfit generation — the price is shown on each button.',
+        'Tap the diamond pill in the header to top up.',
+        'Premium gives monthly limits instead of one-off top-ups — see the Premium tab.',
+      ],
+    },
   ],
 };
 
 /**
  * YouTube video URL for the guide. Paste the share/watch link or an embed URL —
- * `getYouTubeEmbedUrl` normalizes it. Leave empty to show the "coming soon" card.
+ * `getYouTubeEmbedUrl` normalizes it. Leave empty to hide the video button.
  */
 export const GUIDE_VIDEO_URL = 'https://www.youtube.com/shorts/KoviqEhfaVY';
 
