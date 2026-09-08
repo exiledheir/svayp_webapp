@@ -106,7 +106,7 @@ export function sendMarketMessage(threadId: string, text: string): void {
 // Replace with a real Telegram-username field when the backend lands.
 // Use the t.me host (not telegram.me) — the native WebView's navigation
 // delegate reliably intercepts t.me and opens the external Telegram app
-// (same reasoning as CoinsSheet/support-chat).
+// (same reasoning as CoinsPanel/support-chat).
 export function buildTelegramLink(seller: MarketSeller, listing: MarketListing, listingUrl: string): string {
   if (seller.telegramUsername) {
     return `https://t.me/${seller.telegramUsername.replace(/^@/, '')}`;
@@ -128,7 +128,7 @@ export function openTelegramLink(url: string): void {
   // no-op — the tap appears to do nothing. A real top-frame navigation instead
   // fires the native navigation delegate, which intercepts the t.me link and
   // launches the Telegram app externally (the page itself never loads).
-  // Same fix as CoinsSheet.buy() / support-chat.openSupportChat().
+  // Same fix as CoinsPanel.buy() / support-chat.openSupportChat().
   if (isInFlutterWebView()) {
     window.location.href = url;
   } else {

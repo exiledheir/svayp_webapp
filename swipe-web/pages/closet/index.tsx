@@ -35,8 +35,7 @@ import BeautifyCompareSheet from '@/components/closet/BeautifyCompareSheet';
 import BeautifyIntroSheet from '@/components/closet/BeautifyIntroSheet';
 import { DEMO_ITEM_IDS, DEMO_ITEMS, DEMO_CANVAS_LAYOUT } from '@/lib/closet-demo';
 import { isSetupDone, isSetupSatisfied, wasSetupEntered } from '@/lib/closet-setup';
-import CoinsSheet from '@/components/closet/CoinsSheet';
-import PlansSheet from '@/components/closet/PlansSheet';
+import BillingSheet from '@/components/closet/BillingSheet';
 import { fetchEntitlements, type Entitlements } from '@/lib/entitlements';
 import Diamond from '@/components/closet/Diamond';
 import { ACTION_COST, actionCosts, fetchCoinBalance, fetchCoinPricing, type CoinPricing } from '@/lib/coins';
@@ -392,7 +391,7 @@ export default function ClosetPage() {
   const [showPremiumGate, setShowPremiumGate] = useState<'generation' | 'items' | 'tryOn' | 'canvas' | 'browse' | 'beautify' | null>(null);
   const { plan, limits, usage, fetchPlan, canGenerate, canTryOn } = usePlan();
   // Diamond/coin balance — реальный баланс с бэка (/me/coins). Рефетчим после
-  // каждого платного действия (см. refreshCoins) и при открытии CoinsSheet.
+  // каждого платного действия (см. refreshCoins) и при открытии BillingSheet.
   const [coins, setCoinsState] = useState(0);
   const [coinPricing, setCoinPricing] = useState<CoinPricing | null>(null);
   // Способы оплаты приходят персонально: пока идёт тестовый период, онлайн-оплату видит
@@ -405,7 +404,6 @@ export default function ClosetPage() {
   // Тарифы и текущие права. Экран подписки открывается ТОЛЬКО когда сервер разрешил
   // (flags.paywallEnabled) и в каталоге есть что показать: пустая шторка хуже её отсутствия.
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
-  const [showPlans, setShowPlans] = useState<string | null>(null);
   const refreshEntitlements = useCallback(() => {
     return fetchEntitlements()
       .then(setEntitlements)
@@ -444,7 +442,7 @@ export default function ClosetPage() {
   // (у pro/premium — старые безлимитные квоты, монеты не тратятся — зеркалит
   // CoinGateService на бэке). В этом режиме платные действия гейтим по БАЛАНСУ
   // МОНЕТ, а не по старой подписочной квоте (иначе исчерпанная квота FREE ложно
-  // открывала CoinsSheet «недостаточно», хотя монет полно).
+  // открывала BillingSheet «недостаточно», хотя монет полно).
   const coinsApply = !!coinPricing?.enforcementEnabled && plan === 'free';
   const coinCosts = actionCosts(coinPricing);
 
@@ -2216,49 +2214,43 @@ export default function ClosetPage() {
 
         {/* Right: action buttons + profile + guide */}
         <div className="flex items-center gap-1.5">
-            {/* Diamond balance (subscription badge) — opens the buy-diamonds
-                sheet. Gated by the `feature.subscription_badge.enabled` flag so it
-                can be hidden for the App/Play review account. */}
-            {plansEnabled && (
+            {/* Одна кнопка на обе покупки: баланс алмазов и вход в тарифы. Раньше их было
+                две, и человеку приходилось угадывать, за какой из них лежит нужный способ
+                заплатить, — теперь обе покупки живут вкладками в одной шторке.
+                Корону показываем, только когда вкладка тарифов реально откроется: сервер
+                разрешил пейволл и каталог не пуст, либо тариф уже куплен (тогда цвет короны
+                и есть бейдж тира). Чип целиком спрятан за `feature.subscription_badge.enabled`,
+                чтобы его можно было убрать для ревью-аккаунта App/Play. */}
+            {(plansEnabled || plansAvailable || isPaidTier) && (
             <button
               onClick={() => setShowPremiumGate('browse')}
-              className="flex items-center gap-1.5 pl-2 pr-3 h-8 rounded-full text-[13px] font-extrabold active:scale-[0.95] transition-all"
+              className="flex items-center gap-1.5 px-2.5 h-8 rounded-full text-[13px] font-extrabold active:scale-[0.95] transition-all"
               style={{
                 background: theme === 'dark' ? 'rgba(243,112,167,0.16)' : '#fdeef6',
                 border: `1px solid ${theme === 'dark' ? 'rgba(243,112,167,0.32)' : '#F8D3E4'}`,
                 color: theme === 'dark' ? '#F5EAF0' : '#B03A72',
               }}
-              aria-label={t.cn_title}
+              aria-label={`${t.cn_title} · ${isPaidTier ? tierLabel : t.pl_title}`}
+              title={isPaidTier ? tierLabel : undefined}
             >
-              <Diamond size={16} />
-              <span style={{ fontVariantNumeric: 'tabular-nums' }}>{coins}</span>
+              {plansEnabled && (
+                <>
+                  <Diamond size={16} />
+                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>{coins}</span>
+                </>
+              )}
+              {(plansAvailable || isPaidTier) && (
+                <>
+                  {plansEnabled && (
+                    <span
+                      className="w-px h-3.5"
+                      style={{ background: theme === 'dark' ? 'rgba(243,112,167,0.32)' : '#F1BFD8' }}
+                    />
+                  )}
+                  <Crown size={15} color={isPaidTier ? tierColor : undefined} />
+                </>
+              )}
             </button>
-            )}
-            {/* Вход в тарифы появляется, когда сервер разрешил пейволл и каталог не пуст:
-                кнопка, ведущая в пустую шторку, хуже отсутствующей. Но у того, кто уже
-                платит, бейдж тарифа показываем всегда — выключенный пейволл не повод
-                прятать от человека, что у него куплено. */}
-            {(plansAvailable || isPaidTier) && (
-              <button
-                onClick={() => setShowPlans('header')}
-                // У бесплатного тира — только корона: в шапке уже стоят чип алмазов и
-                // «Руководство», и подпись выдавливала последнюю кнопку за край экрана.
-                // У платящих название тарифа важнее компактности — показываем бейдж.
-                // Подпись тарифа убрана: с ней шапка не влезала на узких экранах и
-                // «Руководство» обрезалось краем. Корона одинаково понятна и на платном.
-                className="flex items-center justify-center w-8 h-8 rounded-full active:scale-[0.95] transition-all"
-                style={{
-                  background: isPaidTier
-                    ? (theme === 'dark' ? `${tierColor}28` : `${tierColor}1F`)
-                    : theme === 'dark' ? 'rgba(243,112,167,0.16)' : '#fdeef6',
-                  border: `1px solid ${isPaidTier ? `${tierColor}66` : theme === 'dark' ? 'rgba(243,112,167,0.32)' : '#F8D3E4'}`,
-                  color: isPaidTier ? tierColor : theme === 'dark' ? '#F5EAF0' : '#B03A72',
-                }}
-                aria-label={isPaidTier ? tierLabel : t.pl_title}
-                title={isPaidTier ? tierLabel : t.pl_title}
-              >
-                <Crown size={16} />
-              </button>
             )}
             {/* Profile icon — hidden inside the Flutter app (it has its own) */}
             {profileEnabled && !isFlutterWebView && (
@@ -2677,43 +2669,20 @@ export default function ClosetPage() {
         </div>
       )}
 
-      {/* ── Buy-diamonds sheet (from the header chip or a "not enough" gate) ── */}
+      {/* ── Покупки: алмазы и подписка одной шторкой с вкладками ──
+           Открывается и с чипа в шапке, и с любого гейта «не хватает алмазов»;
+           гейт всегда приземляется на вкладку алмазов, а тарифы — соседняя вкладка. */}
       {showPremiumGate && (
-        <CoinsSheet
+        <BillingSheet
           balance={coins}
           pricing={coinPricing}
           paymentOptions={paymentOptions}
-          onOpenPlans={
-            plansAvailable
-              ? () => {
-                  // Из шторки алмазов сразу в тарифы: закрываем текущую, чтобы не копить
-                  // два оверлея друг на друге.
-                  setShowPremiumGate(null);
-                  setShowPlans('coins_sheet');
-                }
-              : undefined
-          }
+          entitlements={entitlements}
+          plansTab={plansAvailable || isPaidTier}
+          initialTab="coins"
+          trigger={showPremiumGate}
           needMore={showPremiumGate !== 'browse'}
           dark={theme === 'dark'}
-          onClose={() => {
-            logAnalyticsEvent(Events.UPGRADE_MODAL_DISMISSED, {
-              [Params.TRIGGER]: showPremiumGate,
-              [Params.CURRENT_PLAN]: plan,
-            });
-            reportPurchaseFunnel('PAYWALL_DISMISSED', showPremiumGate ?? undefined);
-            setShowPremiumGate(null);
-            refreshCoins(); // баланс мог измениться (покупка/возврат)
-          }}
-        />
-      )}
-
-      {/* ── Шторка тарифов ── */}
-      {showPlans && entitlements && (
-        <PlansSheet
-          entitlements={entitlements}
-          dark={theme === 'dark'}
-          paymentOptions={paymentOptions}
-          trigger={showPlans}
           onPromoApplied={() => {
             // Цену со скидкой считает сервер — перечитываем каталог, иначе на карточке
             // останется прежняя сумма, а чекаут выставит другую.
@@ -2721,9 +2690,14 @@ export default function ClosetPage() {
             void refreshCoins();
           }}
           onClose={() => {
-            setShowPlans(null);
-            void refreshEntitlements();
-            void refreshCoins();
+            logAnalyticsEvent(Events.UPGRADE_MODAL_DISMISSED, {
+              [Params.TRIGGER]: showPremiumGate,
+              [Params.CURRENT_PLAN]: plan,
+            });
+            reportPurchaseFunnel('PAYWALL_DISMISSED', showPremiumGate ?? undefined);
+            setShowPremiumGate(null);
+            void refreshCoins(); // баланс мог измениться (покупка/возврат)
+            void refreshEntitlements(); // как и тариф, если платили за подписку
           }}
         />
       )}

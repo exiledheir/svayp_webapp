@@ -61,6 +61,10 @@ const HIDDEN_PROVIDERS: PaymentProvider[] = ['PAYLOV'];
  * уезжают в конец, а не в начало (indexOf вернул бы −1).
  */
 const PROVIDER_ORDER: PaymentProvider[] = ['CLICK', 'PAYME', 'UZUM', 'PAYLOV'];
+const providerRank = (p: PaymentProvider) => {
+  const i = PROVIDER_ORDER.indexOf(p);
+  return i === -1 ? PROVIDER_ORDER.length : i;
+};
 
 /**
  * Способы оплаты, которые реально показываем. Один список на все экраны покупки: пока
@@ -70,7 +74,7 @@ const PROVIDER_ORDER: PaymentProvider[] = ['CLICK', 'PAYME', 'UZUM', 'PAYLOV'];
 export function visiblePaymentProviders(options: PaymentOptions | null): PaymentProvider[] {
   return (options?.providers ?? [])
     .filter((p) => !HIDDEN_PROVIDERS.includes(p))
-    .sort((a, b) => PROVIDER_ORDER.indexOf(a) - PROVIDER_ORDER.indexOf(b));
+    .sort((a, b) => providerRank(a) - providerRank(b));
 }
 
 function unwrap<T>(res: { data: unknown }): T {
