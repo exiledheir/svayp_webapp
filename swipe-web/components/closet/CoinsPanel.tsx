@@ -225,10 +225,16 @@ export default function CoinsPanel({
       }
     : tierPrice;
 
-  function buyViaTelegram() {
-    const priceStr = `${fmt(price.total)} ${t.cn_currency}`;
-    const msg = t.cn_tg_msg.replace('{n}', String(qty)).replace('{price}', priceStr);
-    const url = `${paymentOptions?.telegramUrl || TG_ADMIN}?text=${encodeURIComponent(msg)}`;
+  /**
+   * Открыть чат с админом в Telegram — с пустым полем ввода.
+   *
+   * Заготовленный текст («хочу купить N алмазов, мой номер…») убран по продуктовому
+   * решению: он подставлялся и в ссылку «проблемы с оплатой», где человек идёт задать
+   * вопрос, а не сделать заказ, — и отправлялся не глядя. Состав заказа в ручном флоу
+   * теперь называет сам человек.
+   */
+  function openTelegramAdmin() {
+    const url = paymentOptions?.telegramUrl || TG_ADMIN;
     // Inside the Flutter WebView (esp. iOS WKWebView) window.open('_blank') is a
     // no-op — the tap appears to do nothing. A real top-frame navigation instead
     // fires the native navigation delegate, which intercepts the t.me link and
@@ -275,7 +281,7 @@ export default function CoinsPanel({
     if (onlineEnabled) {
       void buyOnline();
     } else {
-      buyViaTelegram();
+      openTelegramAdmin();
     }
   }
 
@@ -445,7 +451,8 @@ export default function CoinsPanel({
         <button
           onClick={() => {
             logAnalyticsEvent(Events.UPGRADE_CTA_TAPPED, { [Params.DESTINATION]: 'telegram_admin' });
-            buyViaTelegram();
+            // Без заготовленного текста: это обращение в поддержку, а не заказ.
+            openTelegramAdmin();
           }}
           className="w-full mt-3 py-2 text-[13px] font-semibold text-center active:opacity-60 transition-opacity"
           style={{ color: '#E0559A' }}

@@ -429,7 +429,6 @@ export interface Translations {
   cn_buy: string;
   cn_note: string;
   cn_currency: string;
-  cn_tg_msg: string;
   // Онлайн-оплата (WLCM: Payme/Click/Paylov/Uzum)
   cn_pay_method: string;
   cn_pay_error: string;
@@ -1345,7 +1344,6 @@ const en: Translations = {
   cn_buy: 'Buy {n} diamonds',
   cn_note: 'Diamonds are credited after we verify your payment — usually within a few minutes. We’ll confirm in Telegram.',
   cn_currency: 'UZS',
-  cn_tg_msg: 'I want to buy {n} diamonds ({price}). My phone: ',
   cn_pay_method: 'Payment method',
   cn_pay_error: 'Could not start the payment. Please try again.',
   cn_pay_provider_down: 'This payment method is unavailable right now. Please pick another one.',
@@ -2252,7 +2250,6 @@ const ru: Translations = {
   cn_buy: 'Купить {n} алмазов',
   cn_note: 'Алмазы зачислим сразу после проверки платежа — обычно за несколько минут. Подтвердим в Telegram.',
   cn_currency: 'сум',
-  cn_tg_msg: 'Хочу купить {n} алмазов ({price}). Мой номер: ',
   cn_pay_method: 'Способ оплаты',
   cn_pay_error: 'Не удалось начать оплату. Попробуйте ещё раз.',
   cn_pay_provider_down: 'Этот способ оплаты сейчас недоступен. Выберите другой.',
@@ -3158,7 +3155,6 @@ const uz: Translations = {
   cn_buy: '{n} ta olmos sotib olish',
   cn_note: 'Olmoslar to‘lov tekshirilgach zudlik bilan — odatda bir necha daqiqada — qo‘shiladi. Telegramda tasdiqlaymiz.',
   cn_currency: 'so‘m',
-  cn_tg_msg: '{n} ta olmos sotib olmoqchiman ({price}). Raqamim: ',
   cn_pay_method: 'To\'lov usuli',
   cn_pay_error: 'To\'lovni boshlab bo\'lmadi. Qayta urinib ko\'ring.',
   cn_pay_provider_down: 'Bu to\'lov usuli hozir ishlamayapti. Boshqasini tanlang.',
