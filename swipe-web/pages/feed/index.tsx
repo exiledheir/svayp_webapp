@@ -7,10 +7,11 @@ import { getFeed } from '@/lib/feed-api';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
 import { useRootBackGuard } from '@/lib/use-root-back-guard';
+import { NAV_INSET } from '@/lib/feed-layout';
 import type { FeedPost } from '@/types/feed';
 import FeedGuard from '@/components/feed/FeedGuard';
-import FeedCard from '@/components/feed/FeedCard';
-import CommentsSheet from '@/components/feed/CommentsSheet';
+import MasonryGrid from '@/components/feed/MasonryGrid';
+import PostActionsSheet from '@/components/feed/PostActionsSheet';
 import ClosetSectionTabs from '@/components/ClosetSectionTabs';
 import { getPageCache, setPageCache } from '@/lib/page-cache';
 
@@ -19,10 +20,9 @@ const PAGE_SIZE = 10;
 const FEED_CACHE_KEY = 'feed:posts';
 const FEED_CACHE_TTL_MS = 3 * 60_000;
 type FeedSnapshot = { posts: FeedPost[]; page: number; hasMore: boolean };
-// Bottom inset so content / FAB clear the native Flutter navbar (this page is a
-// WebView tab in the shell — like Closet/Market, it does not render the web
-// BottomNav, which would otherwise double up with the native bar).
-const NAV_INSET = 'calc(84px + env(safe-area-inset-bottom, 0px))';
+// Content bottom inset (NAV_INSET) clears the native Flutter navbar — this page
+// is a WebView tab in the shell and, like Closet/Market, doesn't render the web
+// BottomNav, which would otherwise double up with the native bar.
 // Publish FAB sits lower than the content inset — nearer the bottom edge (still
 // clears the phone's home-indicator safe area). Bump the px up to raise it.
 const FAB_BOTTOM = 'calc(24px + env(safe-area-inset-bottom, 0px))';
@@ -48,10 +48,10 @@ function FeedHome() {
   const [pull, setPull] = React.useState(0);
   const [refreshing, setRefreshing] = React.useState(false);
   const startY = React.useRef<number | null>(null);
-  // Comments sheet is owned here (not inside FeedCard) so it overlays the whole
-  // screen — the feed list is wrapped in a transform for pull-to-refresh, which
+  // The ⋯ actions sheet is owned here (not inside the tile) so it overlays the
+  // whole screen — the grid is wrapped in a transform for pull-to-refresh, which
   // would otherwise become the sheet's positioning context.
-  const [commentsPost, setCommentsPost] = React.useState<FeedPost | null>(null);
+  const [actionsPost, setActionsPost] = React.useState<FeedPost | null>(null);
 
   React.useEffect(() => {
     logAnalyticsEvent(Events.FEED_VIEWED);
@@ -156,9 +156,10 @@ function FeedHome() {
   }
   const offset = refreshing ? PULL_THRESHOLD : pull;
 
-  function handleLikeChange(postId: string, next: { isLiked: boolean; likesCount: number }) {
-    setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, isLiked: next.isLiked, likesCount: next.likesCount } : p)));
-  }
+  const openPost = React.useCallback(
+    (post: FeedPost) => router.push(`/feed/p/${post.id}?from=${encodeURIComponent(router.asPath)}`),
+    [router],
+  );
 
   return (
     <>
@@ -196,7 +197,7 @@ function FeedHome() {
           <ClosetSectionTabs active="feed" className="px-4 py-2" />
         </div>
 
-        {/* Feed list (pull down from the top to refresh) */}
+        {/* Feed grid (pull down from the top to refresh) */}
         <div className="relative flex-1 overflow-hidden">
           {/* Pull-to-refresh spinner, pinned to the visible top */}
           <div
@@ -223,24 +224,27 @@ function FeedHome() {
               className="min-h-full"
               style={{ transform: `translateY(${offset}px)`, transition: pull > 0 ? 'none' : 'transform 0.2s ease' }}
             >
-              {loading ? (
-                <div className="flex flex-col gap-2 p-3">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="rounded-xl bg-black/5 dark:bg-white/10 animate-pulse" style={{ height: 360 }} />
-                  ))}
-                </div>
-              ) : posts.length === 0 ? (
+              {/* Pinterest-style masonry: image-first tiles, no author / like /
+                  comment affordances on the grid (those live on the detail page). */}
+              {!loading && posts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center text-center px-10" style={{ minHeight: '60%' }}>
                   <p className="text-[15px] text-black/55 dark:text-white/55 mt-20">{t.feed_empty}</p>
                 </div>
               ) : (
-                <div className="flex flex-col gap-2" style={{ paddingBottom: NAV_INSET }}>
-                  {posts.map((post) => (
-                    <FeedCard key={post.id} post={post} onLikeChange={handleLikeChange} onOpenComments={setCommentsPost} />
-                  ))}
-                  {fetchingMore && (
-                    <div className="py-4 text-center text-[13px] text-black/40 dark:text-white/40">…</div>
-                  )}
+                <div style={{ paddingBottom: NAV_INSET }}>
+                  <MasonryGrid
+                    className="pt-2"
+                    posts={posts}
+                    loading={loading}
+                    trackImpressions
+                    onOpen={openPost}
+                    onMore={setActionsPost}
+                    footer={
+                      fetchingMore ? (
+                        <div className="py-4 text-center text-[13px] text-black/40 dark:text-white/40">…</div>
+                      ) : null
+                    }
+                  />
                 </div>
               )}
             </div>
@@ -257,13 +261,14 @@ function FeedHome() {
           <Plus size={24} strokeWidth={2.6} />
         </button>
 
-        {commentsPost && (
-          <CommentsSheet
-            postId={commentsPost.id}
-            onClose={() => setCommentsPost(null)}
-            onCountChange={(n) =>
-              setPosts((prev) => prev.map((p) => (p.id === commentsPost.id ? { ...p, commentsCount: n } : p)))
-            }
+        {/* ⋯ sheet lives at page level — outside the pull-to-refresh transform.
+            The snapshot effect above re-caches the filtered list automatically. */}
+        {actionsPost && (
+          <PostActionsSheet
+            post={actionsPost}
+            onClose={() => setActionsPost(null)}
+            onDeleted={(postId) => setPosts((prev) => prev.filter((p) => p.id !== postId))}
+            onHidden={(userId) => setPosts((prev) => prev.filter((p) => p.author.id !== userId))}
           />
         )}
       </div>

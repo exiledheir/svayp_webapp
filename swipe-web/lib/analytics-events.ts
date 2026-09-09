@@ -169,6 +169,8 @@ export const Events = {
   FEED_PUBLISH_FROM_CLOSET: 'feed_publish_from_closet',
   FEED_POST_IMPRESSION: 'feed_post_impression',
   FEED_SCROLL_DEPTH: 'feed_scroll_depth',
+  FEED_POST_SAVED: 'feed_post_saved',
+  FEED_POST_SHARED: 'feed_post_shared',
 } as const;
 
 export const Params = {

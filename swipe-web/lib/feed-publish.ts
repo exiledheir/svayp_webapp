@@ -7,8 +7,9 @@
 // Kept separate from lib/feed-api.ts so that the pure-HTTP client stays free of
 // the browser-only canvas dependency.
 
-import { captureCanvasSnapshot } from '@/lib/canvas-snapshot';
+import { captureCanvasSnapshot, SNAPSHOT_WIDTH, SNAPSHOT_HEIGHT } from '@/lib/canvas-snapshot';
 import { createPost, uploadFeedImage } from '@/lib/feed-api';
+import { measureImageDims } from '@/lib/img';
 import type { ClosetItem } from '@/lib/closet-storage';
 import type { SavedCanvasLayout } from '@/lib/closet-types';
 import type { CreatePostImageInput, FeedPost, FeedSourceType } from '@/types/feed';
@@ -62,11 +63,14 @@ export async function publishPost(
 
     if (s.sourceType === 'tryon') {
       if (!s.resultImageUrl) throw new FeedPublishError('Try-on has no result image', 'unknown');
+      // Natural size for the masonry tile; a failed measurement never blocks publish.
+      const dims = await measureImageDims(s.resultImageUrl);
       images.push({
         sourceType: 'tryon',
         position: i,
         imageUrl: s.resultImageUrl,
         sourceRefId: s.sourceRefId || undefined,
+        ...(dims ?? {}),
       });
     } else if (s.sourceType === 'library') {
       // Own photo: upload the ORIGINAL file through the same pipeline as boards
@@ -77,6 +81,7 @@ export async function publishPost(
         s.file ??
         (s.previewUrl ? await dataUrlToFile(s.previewUrl, `feed-library-${i}.jpg`) : null);
       if (!file) throw new FeedPublishError('Library photo missing', 'unknown');
+      const dims = await measureFile(file);
       let up;
       try {
         up = await uploadFeedImage(file, i);
@@ -92,6 +97,7 @@ export async function publishPost(
         position: i,
         imageId: up.feedImageId,
         sourceRefId: s.sourceRefId || undefined,
+        ...(dims ?? {}),
       });
     } else {
       // board | calendar → flat-lay PNG snapshot, uploaded through the pipeline
@@ -117,6 +123,9 @@ export async function publishPost(
         position: i,
         imageId: up.feedImageId,
         sourceRefId: s.sourceRefId || undefined,
+        // Snapshots are always rendered at the fixed 3:4 canvas size.
+        width: SNAPSHOT_WIDTH,
+        height: SNAPSHOT_HEIGHT,
       });
     }
 
@@ -134,6 +143,16 @@ export async function publishPost(
 /** Whether any selected source is a real-photo try-on (drives the privacy notice). */
 export function containsRealPhoto(sources: SelectedSource[]): boolean {
   return sources.some((s) => s.sourceType === 'tryon');
+}
+
+/** Natural size of a picked file (for the masonry tile). Null on failure. */
+async function measureFile(file: File | Blob): Promise<{ width: number; height: number } | null> {
+  const url = URL.createObjectURL(file);
+  try {
+    return await measureImageDims(url);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 /** Fallback: turn a cached data-URL preview back into a File for upload. */

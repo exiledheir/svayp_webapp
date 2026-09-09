@@ -511,6 +511,9 @@ export interface Translations {
   cl_in_feed: string;
   cl_looks_empty_cta: string;
   cl_cal_shuffle: string;
+  cl_cal_edit: string;
+  cl_cal_pick_title: string;
+  cl_cal_reset: string;
   cl_share_all_hint: string;
   cv_proc_removing: string;
   cv_proc_identifying: string;
@@ -836,6 +839,13 @@ export interface Translations {
   feed_bio: string;
   feed_save: string;
   feed_avatar: string;
+  // Pinterest-style grid / detail
+  feed_save_post: string;
+  feed_saved: string;
+  feed_tab_posts: string;
+  feed_tab_saved: string;
+  feed_saved_empty: string;
+  feed_more_to_explore: string;
 }
 
 const en: Translations = {
@@ -1092,6 +1102,12 @@ const en: Translations = {
   feed_bio: 'Bio',
   feed_save: 'Save',
   feed_avatar: 'Profile photo',
+  feed_save_post: 'Save',
+  feed_saved: 'Saved',
+  feed_tab_posts: 'Posts',
+  feed_tab_saved: 'Saved',
+  feed_saved_empty: 'Nothing saved yet',
+  feed_more_to_explore: 'More to explore',
   mk_publish_error: "Couldn't publish. Please try again.",
   mk_published_title: 'Listing under review',
   mk_published_body: "We'll review it and publish it soon. You can find it in My listings.",
@@ -1421,6 +1437,9 @@ const en: Translations = {
   cl_in_feed: 'In feed',
   cl_looks_empty_cta: 'Create a look',
   cl_cal_shuffle: 'Another look',
+  cl_cal_edit: 'Edit',
+  cl_cal_pick_title: 'Build the day’s look',
+  cl_cal_reset: 'Back to the AI pick',
   cl_share_all_hint: 'Tap a look to view it, or share it to the feed',
   cv_proc_removing: 'Removing background… ✂️',
   cv_proc_identifying: 'Identifying category… 🏷️',
@@ -1997,6 +2016,12 @@ const ru: Translations = {
   feed_bio: 'О себе',
   feed_save: 'Сохранить',
   feed_avatar: 'Фото профиля',
+  feed_save_post: 'Сохранить',
+  feed_saved: 'Сохранено',
+  feed_tab_posts: 'Образы',
+  feed_tab_saved: 'Сохранённые',
+  feed_saved_empty: 'Пока ничего не сохранено',
+  feed_more_to_explore: 'Ещё идеи',
   mk_publish_error: 'Не удалось опубликовать. Попробуйте ещё раз.',
   mk_published_title: 'Объявление на проверке',
   mk_published_body: 'Мы проверим его и скоро опубликуем. Объявление доступно в разделе «Мои объявления».',
@@ -2327,6 +2352,9 @@ const ru: Translations = {
   cl_in_feed: 'Уже в ленте',
   cl_looks_empty_cta: 'Создать образ',
   cl_cal_shuffle: 'Другой образ',
+  cl_cal_edit: 'Изменить',
+  cl_cal_pick_title: 'Соберите образ дня',
+  cl_cal_reset: 'Вернуть подбор AI',
   cl_share_all_hint: 'Нажмите на образ, чтобы открыть, или выложите его в ленту',
   cv_proc_removing: 'Удаление фона… ✂️',
   cv_proc_identifying: 'Определяем категорию… 🏷️',
@@ -2906,6 +2934,12 @@ const uz: Translations = {
   feed_bio: "O'zingiz haqingizda",
   feed_save: 'Saqlash',
   feed_avatar: 'Profil surati',
+  feed_save_post: 'Saqlash',
+  feed_saved: 'Saqlandi',
+  feed_tab_posts: 'Obrazlar',
+  feed_tab_saved: 'Saqlanganlar',
+  feed_saved_empty: "Hozircha saqlanganlar yo'q",
+  feed_more_to_explore: "Yana g'oyalar",
   mk_publish_error: "Joylab boʻlmadi. Qaytadan urinib koʻring.",
   mk_published_title: "E'lon tekshiruvda",
   mk_published_body: "Biz uni tekshirib, tez orada e'lon qilamiz. Uni «Mening e'lonlarim» bo'limida topishingiz mumkin.",
@@ -3232,6 +3266,9 @@ const uz: Translations = {
   cl_in_feed: 'Lentada joylandi',
   cl_looks_empty_cta: 'Obraz yaratish',
   cl_cal_shuffle: 'Boshqa obraz',
+  cl_cal_edit: "O'zgartirish",
+  cl_cal_pick_title: "Kunlik obrazni yig'ing",
+  cl_cal_reset: 'AI tanloviga qaytarish',
   cl_share_all_hint: "Obrazni ochish uchun bosing yoki lentaga joylang",
   cv_proc_removing: "Fon o'chirilmoqda… ✂️",
   cv_proc_identifying: 'Kategoriya aniqlanmoqda… 🏷️',

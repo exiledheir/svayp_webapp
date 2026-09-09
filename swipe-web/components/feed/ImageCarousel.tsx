@@ -14,6 +14,11 @@ interface Props {
   /** Instagram-style double-tap to like. Fires on every double-tap; the parent
    *  decides whether to actually like. A heart animation plays regardless. */
   onDoubleTapLike?: () => void;
+  /** Extra styles for the image frame (e.g. rounded bottom corners on the
+   *  Pinterest-style detail page). */
+  frameStyle?: React.CSSProperties;
+  /** Fires when the visible image changes (share uses it to pick the image). */
+  onIndexChange?: (index: number) => void;
 }
 
 const TYPE_ICON: Record<FeedSourceType, LucideIcon> = {
@@ -29,11 +34,14 @@ const TYPE_ICON: Record<FeedSourceType, LucideIcon> = {
  * source type (Board / Outfit / Calendar); multi-image posts get a chip row
  * below so viewers can see the mix and jump straight to an image.
  */
-export default function ImageCarousel({ images, alt, aspectRatio = '4/5', onDoubleTapLike }: Props) {
+export default function ImageCarousel({ images, alt, aspectRatio = '4/5', onDoubleTapLike, frameStyle, onIndexChange }: Props) {
   const { t } = useI18n();
   const [idx, setIdx] = React.useState(0);
   const scrollerRef = React.useRef<HTMLDivElement>(null);
   const list = images.length ? images : [];
+  const onIndexChangeRef = React.useRef(onIndexChange);
+  onIndexChangeRef.current = onIndexChange;
+  const lastIdxRef = React.useRef(0);
 
   // Double-tap → like (Instagram). A quick second tap within 300ms fires the
   // like and plays a heart burst; a single tap does nothing.
@@ -74,7 +82,13 @@ export default function ImageCarousel({ images, alt, aspectRatio = '4/5', onDoub
     requestAnimationFrame(() => {
       idxTicking.current = false;
       const el = scrollerRef.current;
-      if (el && el.clientWidth) setIdx(Math.round(el.scrollLeft / el.clientWidth));
+      if (!el || !el.clientWidth) return;
+      const next = Math.round(el.scrollLeft / el.clientWidth);
+      if (next !== lastIdxRef.current) {
+        lastIdxRef.current = next;
+        onIndexChangeRef.current?.(next);
+      }
+      setIdx(next);
     });
   }
   function scrollTo(i: number) {
@@ -84,7 +98,7 @@ export default function ImageCarousel({ images, alt, aspectRatio = '4/5', onDoub
 
   return (
     <div>
-      <div className="relative" style={{ aspectRatio, background: '#F7F7F8' }} onClick={handleTap}>
+      <div className="relative" style={{ aspectRatio, background: '#F7F7F8', ...frameStyle }} onClick={handleTap}>
         <div
           ref={scrollerRef}
           className="absolute inset-0 flex overflow-x-auto hide-scrollbar"

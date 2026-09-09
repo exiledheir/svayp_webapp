@@ -27,6 +27,7 @@ const FOLLOWERS_KEY = 'svayp_feed_followers'; // { [userId]: StoredFollower[] }
 const FOLLOW_SEEDED_KEY = 'svayp_feed_follow_seeded';
 const COMMENTED_KEY = 'svayp_feed_commented'; // string[] of post ids the user commented on
 const COMMENTS_KEY = 'svayp_feed_comments'; // { [postId]: FeedComment[] }
+const SAVED_KEY = 'svayp_feed_saved'; // string[] of post ids the user saved, newest-saved first
 
 /** Local-storage mode until the backend /feed/* endpoints exist. */
 export function isFeedLocalMode(): boolean {
@@ -57,6 +58,31 @@ function writePosts(posts: FeedPost[]): void {
       /* give up silently */
     }
   }
+}
+
+// ── saved (bookmarked) posts ──────────────────────────────────────────────────
+function readSaved(): string[] {
+  return readJSON<string[]>(SAVED_KEY, []);
+}
+
+function writeSaved(ids: string[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(SAVED_KEY, JSON.stringify(ids));
+  } catch {
+    /* ignore quota */
+  }
+}
+
+/** Stamp the per-user `isSaved` flag onto posts read from storage. Posts are
+ *  persisted without it (it's relationship state, like the backend will keep
+ *  it), so every getter runs its result through here. */
+function decorate(posts: FeedPost[]): FeedPost[] {
+  const saved = new Set(readSaved());
+  return posts.map((p) => ({ ...p, isSaved: saved.has(p.id) }));
+}
+function decorateOne(post: FeedPost): FeedPost {
+  return decorate([post])[0];
 }
 
 // ── current user ──────────────────────────────────────────────────────────────
@@ -99,7 +125,7 @@ function defaultProfile(): FeedProfile {
 // look). Bump SEED_VERSION whenever this demo content changes so existing local
 // testers pick it up — earlier demo posts (ids prefixed `seed_`) are replaced
 // while any real user-created posts are preserved.
-const SEED_VERSION = 'libas-look-v1';
+const SEED_VERSION = 'libas-look-v2';
 
 function seedPosts(): FeedPost[] {
   const createdAt = new Date(Date.now() - 20 * 60000).toISOString();
@@ -108,12 +134,13 @@ function seedPosts(): FeedPost[] {
       id: 'seed_libas_look',
       author: { id: 'u_libas_looks', username: 'libas_looks', displayName: 'LIBΛS Looks', avatarUrl: null },
       images: [
-        { id: 'seed_libas_look_0', sourceType: 'board', imageUrl: '/images/feed/look-1.jpg', position: 0, sourceRefId: null },
-        { id: 'seed_libas_look_1', sourceType: 'tryon', imageUrl: '/images/feed/look-2.jpg', position: 1, sourceRefId: null },
+        { id: 'seed_libas_look_0', sourceType: 'board', imageUrl: '/images/feed/look-1.jpg', position: 0, sourceRefId: null, width: 1024, height: 1280 },
+        { id: 'seed_libas_look_1', sourceType: 'tryon', imageUrl: '/images/feed/look-2.jpg', position: 1, sourceRefId: null, width: 1024, height: 1024 },
       ],
       caption: 'Джинсовая рубашка + широкие брюки 🤍',
       likesCount: 0,
       isLiked: false,
+      isSaved: false,
       commentsCount: 0,
       containsRealPhoto: true,
       status: 'active',
@@ -309,13 +336,29 @@ export async function getFeed(page = 0, size = 10): Promise<Page<FeedPost>> {
   const posts = readPosts()
     .filter((p) => p.status === 'active' && !hidden.includes(p.author.id))
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  return paginate(posts, page, size);
+  return paginate(decorate(posts), page, size);
 }
 
 export async function getPost(id: string): Promise<FeedPost> {
   const post = readPosts().find((p) => p.id === id);
   if (!post) throw new Error('Post not found');
-  return post;
+  return decorateOne(post);
+}
+
+/** "More to explore" under a post: other active posts, the ones sharing a source
+ *  type with the current post first (board ↔ board, try-on ↔ try-on …), then
+ *  newest. The live API will rank server-side; this is the local stand-in. */
+export async function getRelatedPosts(postId: string, size = 20): Promise<FeedPost[]> {
+  const hidden = readJSON<string[]>(HIDDEN_KEY, []);
+  const all = readPosts();
+  const current = all.find((p) => p.id === postId);
+  const currentTypes = new Set((current?.images ?? []).map((im) => im.sourceType));
+  const score = (p: FeedPost) => p.images.reduce((s, im) => s + (currentTypes.has(im.sourceType) ? 1 : 0), 0);
+  const posts = all
+    .filter((p) => p.id !== postId && p.status === 'active' && !hidden.includes(p.author.id))
+    .sort((a, b) => score(b) - score(a) || (a.createdAt < b.createdAt ? 1 : -1))
+    .slice(0, size);
+  return decorate(posts);
 }
 
 export async function createPost(body: CreatePostPayload): Promise<FeedPost> {
@@ -329,6 +372,8 @@ export async function createPost(body: CreatePostPayload): Promise<FeedPost> {
       imageUrl: im.imageUrl ?? im.imageId ?? '',
       position: im.position ?? i,
       sourceRefId: im.sourceRefId ?? null,
+      // Natural size measured at publish (drives the masonry tile height).
+      ...(isPositive(im.width) && isPositive(im.height) ? { width: im.width, height: im.height } : {}),
     }))
     .filter((im) => im.imageUrl);
 
@@ -339,6 +384,7 @@ export async function createPost(body: CreatePostPayload): Promise<FeedPost> {
     caption: body.caption ?? null,
     likesCount: 0,
     isLiked: false,
+    isSaved: false,
     commentsCount: 0,
     containsRealPhoto: images.some((im) => im.sourceType === 'tryon'),
     status: 'active',
@@ -352,21 +398,26 @@ export async function createPost(body: CreatePostPayload): Promise<FeedPost> {
   return post;
 }
 
+function isPositive(n: unknown): n is number {
+  return typeof n === 'number' && Number.isFinite(n) && n > 0;
+}
+
 export async function deletePost(id: string): Promise<void> {
   writePosts(readPosts().filter((p) => p.id !== id));
+  writeSaved(readSaved().filter((sid) => sid !== id));
 }
 
 export async function getMyPosts(page = 0, size = 21): Promise<Page<FeedPost>> {
   const uid = loadMyProfile().userId;
   const posts = readPosts().filter((p) => p.author.id === uid).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  return paginate(posts, page, size);
+  return paginate(decorate(posts), page, size);
 }
 
 export async function getUserPosts(userId: string, page = 0, size = 21): Promise<Page<FeedPost>> {
   const posts = readPosts()
     .filter((p) => p.author.id === userId && p.status === 'active')
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  return paginate(posts, page, size);
+  return paginate(decorate(posts), page, size);
 }
 
 /** Posts the current user has liked (newest first). */
@@ -374,7 +425,7 @@ export async function getLikedPosts(page = 0, size = 21): Promise<Page<FeedPost>
   const posts = readPosts()
     .filter((p) => p.isLiked && p.status === 'active')
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  return paginate(posts, page, size);
+  return paginate(decorate(posts), page, size);
 }
 
 /** Posts the current user has commented on. Comments aren't implemented yet, so
@@ -385,7 +436,26 @@ export async function getCommentedPosts(page = 0, size = 21): Promise<Page<FeedP
   const posts = readPosts()
     .filter((p) => ids.has(p.id) && p.status === 'active')
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  return paginate(posts, page, size);
+  return paginate(decorate(posts), page, size);
+}
+
+// ── Saved (Pinterest "Save") ─────────────────────────────────────────────────
+/** Posts the current user saved, newest-saved first (the Saved tab on the own profile). */
+export async function getSavedPosts(page = 0, size = 21): Promise<Page<FeedPost>> {
+  const byId = new Map(readPosts().map((p) => [p.id, p] as const));
+  const posts = readSaved()
+    .map((id) => byId.get(id))
+    .filter((p): p is FeedPost => !!p && p.status === 'active');
+  return paginate(decorate(posts), page, size);
+}
+
+export async function toggleSave(postId: string): Promise<{ isSaved: boolean }> {
+  const ids = readSaved();
+  const idx = ids.indexOf(postId);
+  if (idx >= 0) ids.splice(idx, 1);
+  else ids.unshift(postId);
+  writeSaved(ids);
+  return { isSaved: idx < 0 };
 }
 
 // ── Comments ────────────────────────────────────────────────────────────────

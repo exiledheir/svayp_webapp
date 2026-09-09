@@ -32,13 +32,10 @@ export default function ProfileHeader({ profile, onEdit, onFollowersClick, onFol
       {profile.bio && <p className="text-[13.5px] text-black/70 dark:text-white/70 mt-2 max-w-[280px]">{profile.bio}</p>}
 
       <div className="flex items-center gap-6 mt-4">
+        {/* Likes counter intentionally dropped (Pinterest-style: no accent on likes). */}
         <div>
           <div className="text-[18px] font-bold text-black dark:text-white">{formatCount(profile.postsCount)}</div>
           <div className="text-[12px] text-black/45 dark:text-white/45">{t.feed_profile_posts}</div>
-        </div>
-        <div>
-          <div className="text-[18px] font-bold text-black dark:text-white">{formatCount(profile.likesTotal)}</div>
-          <div className="text-[12px] text-black/45 dark:text-white/45">{t.feed_profile_likes}</div>
         </div>
         <button onClick={onFollowersClick} className="active:opacity-60" aria-label={t.feed_followers_title}>
           <div className="text-[18px] font-bold text-black dark:text-white">{formatCount(profile.followersCount)}</div>

@@ -28,6 +28,11 @@ import { useTheme } from '@/lib/theme';
 import { isInFlutterWebView } from '@/lib/flutter-bridge';
 import { shareImageBlob, fetchImageBlob } from '@/lib/share-image';
 import ShareSheet from '@/components/ShareSheet';
+import CalendarPickSheet, { type PickGroup } from '@/components/closet/CalendarPickSheet';
+import {
+  dayKey, hasDayPicks, loadCalendarPicks, saveCalendarPicks,
+  type CalendarPicks, type DayPicks, type DaySlot,
+} from '@/lib/calendar-picks';
 import GetStartedCard from '@/components/closet/GetStartedCard';
 import AddItemSheet from '@/components/closet/AddItemSheet';
 import UploadReviewSheet, { type ReviewBeautifyState } from '@/components/closet/UploadReviewSheet';
@@ -4102,6 +4107,27 @@ function pickItem(items: ClosetItem[], day: Date, offset = 0): ClosetItem | null
   return items[((dayIndex % items.length) + items.length) % items.length];
 }
 
+/**
+ * В какой слот образа дня попадает вещь. Тем же правилом карточка календаря
+ * раскладывает автоподбор, поэтому ручной выбор встаёт ровно туда же: платье —
+ * в «верх» (оно самостоятельный образ), платок — в свой слот рядом с остальными
+ * аксессуарами. Категории вне образа дня (например бельё) слота не получают.
+ */
+function slotForCategory(cat: ClosetCategory): DaySlot | null {
+  if (UPPER_CATS.includes(cat)) return 'upper';
+  if (LOWER_CATS.includes(cat)) return 'lower';
+  if (SHOES_CATS.includes(cat)) return 'shoes';
+  if (cat === 'shawl') return 'shawl';
+  if (ACC_CATS.includes(cat)) return 'acc';
+  return null;
+}
+
+/** Группа фильтра в шторке выбора: платок и сумка лежат в одной вкладке «аксессуары». */
+function groupForCategory(cat: ClosetCategory): PickGroup {
+  const slot = slotForCategory(cat);
+  return slot === 'shawl' || slot === null ? 'acc' : slot;
+}
+
 // ── Calendar tab: next-7-days outfit suggestions, window-sized cards ────────────
 // Вся неделя открыта всем (июль 2026): планов и замков на днях больше нет.
 function CalendarTab({
@@ -4118,6 +4144,29 @@ function CalendarTab({
   // Сдвиг подбора — свой у каждого дня, чтобы «другой образ» не сбрасывался при
   // переключении дат.
   const [shuffleByDay, setShuffleByDay] = useState<Record<number, number>>({});
+
+  // Ручные правки образа дня. Читаем в эффекте, а не в инициализаторе useState:
+  // localStorage нет при серверном рендере, и первый рендер обязан совпасть с ним.
+  const [picks, setPicks] = useState<CalendarPicks>({});
+  useEffect(() => { setPicks(loadCalendarPicks()); }, []);
+  const [pickingGroup, setPickingGroup] = useState<PickGroup | null>(null);
+
+  function updateDayPicks(key: string, patch: DayPicks) {
+    setPicks((prev) => {
+      const next = { ...prev, [key]: { ...prev[key], ...patch } };
+      saveCalendarPicks(next);
+      return next;
+    });
+  }
+
+  function resetDayPicks(key: string) {
+    setPicks((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      saveCalendarPicks(next);
+      return next;
+    });
+  }
   // Свайп по карточке листает дни — так же, как тап по строке недели.
   const swipeXRef = useRef<number | null>(null);
   // Куда делиться образом дня: в ленту или во внешние приложения.
@@ -4155,14 +4204,33 @@ function CalendarTab({
         // Разные множители сдвига — иначе «другой образ» листал бы все категории
         // синхронно и на коротких списках менял бы вид не всегда.
         const shuffle = shuffleByDay[selectedDayIdx] ?? 0;
-        const upper = pickItem(upperItems, selDay, shuffle);
+        const dayId = dayKey(selDay);
+        const dayPicks = picks[dayId] ?? {};
+        /**
+         * Слот образа: ручная правка важнее автоподбора.
+         *
+         * `null` в правках — «человек убрал вещь», и автоподбор её не возвращает,
+         * поэтому отличаем отсутствие ключа от null. Вещь могли удалить из гардероба
+         * уже после правки — тогда молча возвращаемся к подбору, иначе слот навсегда
+         * остался бы пустым без объяснения.
+         */
+        const slotItem = (slot: DaySlot, pool: ClosetItem[], offset: number): ClosetItem | null => {
+          if (slot in dayPicks) {
+            const id = dayPicks[slot];
+            if (id === null) return null;
+            const chosen = allItems.find((i) => i.id === id);
+            if (chosen) return chosen;
+          }
+          return pickItem(pool, selDay, offset);
+        };
+        const upper = slotItem('upper', upperItems, shuffle);
         // A dress/jumpsuit is a complete outfit on its own — never pair it with a
         // separate bottom (hard rule H1: no "dress + skirt/pants").
         const upperIsFullBody = !!upper && FULL_BODY_CATS.includes(upper.category);
-        const lower = upperIsFullBody ? null : pickItem(lowerItems, selDay, shuffle * 3);
-        const shoe = pickItem(shoeItems, selDay, shuffle * 5);
-        const shawl = pickItem(shawlItems, selDay, shuffle * 7);
-        const sideAcc = pickItem(sideAccItems, selDay, shuffle * 11);
+        const lower = upperIsFullBody ? null : slotItem('lower', lowerItems, shuffle * 3);
+        const shoe = slotItem('shoes', shoeItems, shuffle * 5);
+        const shawl = slotItem('shawl', shawlItems, shuffle * 7);
+        const sideAcc = slotItem('acc', sideAccItems, shuffle * 11);
         const selIsToday = selectedDayIdx === 0 && new Date().toDateString() === selDay.toDateString();
         const headerLabel = `${t.dayNames[selDay.getDay()]}, ${selDay.getDate()} ${t.monthNames[selDay.getMonth()]}`;
         // Главная колонка тянется на всю карточку, поэтому пустые слоты не
@@ -4174,6 +4242,28 @@ function CalendarTab({
         ].filter(Boolean) as { item: ClosetItem; grow: number }[]);
         const accPieces = [shawl, sideAcc].filter(Boolean) as ClosetItem[];
         const dayItems = [shawl, upper, lower, shoe, sideAcc].filter(Boolean) as ClosetItem[];
+        const selectedIds = dayItems.map((i) => i.id);
+
+        /** Тап по вещи в шторке: поставить её в свой слот либо убрать из образа. */
+        function toggleItem(item: ClosetItem) {
+          const slot = slotForCategory(item.category);
+          if (!slot) return;
+          const patch: DayPicks = {};
+          if (selectedIds.includes(item.id)) {
+            // Повторный тап по вещи из образа — «убрать». Пишем null, а не удаляем
+            // ключ: иначе автоподбор тут же вернул бы её на место.
+            patch[slot] = null;
+          } else {
+            patch[slot] = item.id;
+            // Платье само по себе полный образ (правило H1) — низ с ним не рисуется.
+            // Чистим слот явно, иначе выбранный ранее низ просто исчез бы без следа.
+            if (slot === 'upper' && FULL_BODY_CATS.includes(item.category)) patch.lower = null;
+            // И наоборот: выбирают низ поверх платья — платье уступает место.
+            if (slot === 'lower' && upperIsFullBody) patch.upper = null;
+          }
+          updateDayPicks(dayId, patch);
+        }
+
         return (
           <>
             {/* Неделя целиком, без горизонтальной прокрутки: семь равных ячеек
@@ -4254,19 +4344,34 @@ function CalendarTab({
                   <CalendarDays size={13} strokeWidth={2.4} />
                   {selIsToday ? t.today : headerLabel}
                 </span>
-                {dayItems.length > 0 && (
+                <span className="flex items-center gap-1.5">
+                  {/* «Собрать самому» рядом с «другим образом»: два пути к одному
+                      результату — довериться подбору или выбрать вещи руками. */}
                   <button
-                    onClick={() => setShuffleByDay((prev) => ({ ...prev, [selectedDayIdx]: (prev[selectedDayIdx] ?? 0) + 1 }))}
+                    onClick={() => setPickingGroup('upper')}
                     className="h-8 px-3 rounded-full flex items-center gap-1.5 text-[12px] font-bold whitespace-nowrap active:scale-[0.95] transition-transform"
                     style={{
                       background: dark ? 'rgba(255,255,255,0.10)' : 'rgba(20,16,20,0.06)',
                       color: dark ? '#f0f0f0' : '#141014',
                     }}
                   >
-                    <RefreshCw size={12} strokeWidth={2.6} />
-                    {t.cl_cal_shuffle}
+                    <Pencil size={12} strokeWidth={2.6} />
+                    {t.cl_cal_edit}
                   </button>
-                )}
+                  {dayItems.length > 0 && (
+                    <button
+                      onClick={() => setShuffleByDay((prev) => ({ ...prev, [selectedDayIdx]: (prev[selectedDayIdx] ?? 0) + 1 }))}
+                      className="h-8 px-3 rounded-full flex items-center gap-1.5 text-[12px] font-bold whitespace-nowrap active:scale-[0.95] transition-transform"
+                      style={{
+                        background: dark ? 'rgba(255,255,255,0.10)' : 'rgba(20,16,20,0.06)',
+                        color: dark ? '#f0f0f0' : '#141014',
+                      }}
+                    >
+                      <RefreshCw size={12} strokeWidth={2.6} />
+                      {t.cl_cal_shuffle}
+                    </button>
+                  )}
+                </span>
               </div>
 
               {/* Вещи дня: главная колонка + рейл аксессуаров справа */}
@@ -4275,24 +4380,35 @@ function CalendarTab({
                   <p className="text-[13px] font-medium" style={{ color: dark ? '#888' : '#9ca3af' }}>{t.addItemsFirst}</p>
                 </div>
               ) : (
+                /* Каждая вещь — кнопка: тап открывает шторку сразу на её группе.
+                   Это короткий путь «не нравится именно эта вещь» — не пересобирая
+                   весь образ «другим образом». */
                 <div className="flex-1 flex items-stretch gap-2 px-4 pt-14 pb-4 min-h-0">
                   <div className="flex-1 flex flex-col items-center justify-center min-h-0">
                     {mainPieces.map((p) => (
-                      <div key={p.item.id} className="relative w-full min-h-0" style={{ flex: `${p.grow} 1 0` }}>
+                      <button
+                        key={p.item.id}
+                        onClick={() => setPickingGroup(groupForCategory(p.item.category))}
+                        aria-label={t.cl_cal_edit}
+                        className="relative w-full min-h-0 active:scale-[0.97] transition-transform"
+                        style={{ flex: `${p.grow} 1 0` }}
+                      >
                         <Image src={p.item.imageData} alt={p.item.category} fill className="object-contain" unoptimized={needsUnoptimized(p.item.imageData)} />
-                      </div>
+                      </button>
                     ))}
                   </div>
                   {accPieces.length > 0 && (
                     <div className="w-16 shrink-0 flex flex-col justify-center gap-2">
                       {accPieces.map((a) => (
-                        <div
+                        <button
                           key={a.id}
-                          className="relative w-16 h-16 rounded-2xl overflow-hidden"
+                          onClick={() => setPickingGroup('acc')}
+                          aria-label={t.cl_cal_edit}
+                          className="relative w-16 h-16 rounded-2xl overflow-hidden active:scale-[0.95] transition-transform"
                           style={{ background: dark ? 'rgba(255,255,255,0.06)' : '#F6F6F7' }}
                         >
                           <Image src={a.imageData} alt={a.category} fill className="object-contain p-1.5" unoptimized={needsUnoptimized(a.imageData)} />
-                        </div>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -4331,6 +4447,27 @@ function CalendarTab({
                 </span>
               </button>
             </div>
+
+            {pickingGroup && (
+              <CalendarPickSheet
+                dayLabel={headerLabel}
+                dark={dark}
+                initialGroup={pickingGroup}
+                groups={{
+                  upper: upperItems,
+                  lower: lowerItems,
+                  shoes: shoeItems,
+                  // Платки и прочие аксессуары — одной вкладкой: слот всё равно
+                  // определяется по категории вещи, а не по выбору вкладки.
+                  acc: [...shawlItems, ...sideAccItems],
+                }}
+                selectedIds={selectedIds}
+                canReset={hasDayPicks(picks, dayId)}
+                onToggle={toggleItem}
+                onReset={() => { resetDayPicks(dayId); setPickingGroup(null); }}
+                onClose={() => setPickingGroup(null)}
+              />
+            )}
           </>
         );
       })()}

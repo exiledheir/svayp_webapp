@@ -1,14 +1,19 @@
 import React from 'react';
 import { useRouter } from 'next/router';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, LayoutGrid, Bookmark } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
-import { toggleFollow } from '@/lib/feed-api';
+import { toggleFollow, getSavedPosts } from '@/lib/feed-api';
 import { openDirectChat } from '@/lib/direct-chat';
+import { NAV_INSET } from '@/lib/feed-layout';
 import type { FeedPost, FeedProfile } from '@/types/feed';
 import ProfileHeader from '@/components/feed/ProfileHeader';
-import PostGrid from '@/components/feed/PostGrid';
+import MasonryGrid from '@/components/feed/MasonryGrid';
+import TabButton from '@/components/feed/TabButton';
+import PostActionsSheet from '@/components/feed/PostActionsSheet';
 import ProfileEditSheet from '@/components/feed/ProfileEditSheet';
 import FollowersSheet from '@/components/feed/FollowersSheet';
+
+type ProfileTab = 'posts' | 'saved';
 
 interface Props {
   profile: FeedProfile;
@@ -17,10 +22,15 @@ interface Props {
   /** Open the editor immediately on mount (e.g. first-time username setup). */
   startEditing?: boolean;
   onProfileUpdated?: (p: FeedProfile) => void;
+  /** A post was deleted from the ⋯ sheet (own profile). */
+  onPostDeleted?: (postId: string) => void;
+  /** The viewer hid this profile's author from the ⋯ sheet. */
+  onUserHidden?: (userId: string) => void;
 }
 
-/** Shared profile screen used by /feed/[username] and /feed/me. */
-export default function ProfileView({ profile, posts, loading, startEditing, onProfileUpdated }: Props) {
+/** Shared profile screen used by /feed/[username] and /feed/me. Own profile
+ *  gets a Pinterest-style Posts | Saved strip; others show just their posts. */
+export default function ProfileView({ profile, posts, loading, startEditing, onProfileUpdated, onPostDeleted, onUserHidden }: Props) {
   const router = useRouter();
   const { t } = useI18n();
   // Where "Back" returns to: the opener passes ?from=<path> (a post's author,
@@ -31,6 +41,21 @@ export default function ProfileView({ profile, posts, loading, startEditing, onP
   const [sheet, setSheet] = React.useState<null | 'followers' | 'following'>(null);
   const [followBusy, setFollowBusy] = React.useState(false);
   const [messageBusy, setMessageBusy] = React.useState(false);
+  const [tab, setTab] = React.useState<ProfileTab>('posts');
+  // Saved posts load lazily the first time the tab is opened (own profile only).
+  const [saved, setSaved] = React.useState<FeedPost[] | null>(null);
+  const [actionsPost, setActionsPost] = React.useState<FeedPost | null>(null);
+
+  React.useEffect(() => {
+    if (!profile.isOwn || tab !== 'saved' || saved !== null) return;
+    let cancelled = false;
+    getSavedPosts(0, 60)
+      .then((r) => !cancelled && setSaved(r.content))
+      .catch(() => !cancelled && setSaved([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [profile.isOwn, tab, saved]);
 
   // Open a direct chat in the native Flutter chat module (falls back to
   // /chat/{id} in a plain browser). Only reachable once you follow the user.
@@ -66,6 +91,9 @@ export default function ProfileView({ profile, posts, loading, startEditing, onP
     }
   }
 
+  const openPost = (p: FeedPost) => router.push(`/feed/p/${p.id}?from=${encodeURIComponent(router.asPath)}`);
+  const showSaved = profile.isOwn && tab === 'saved';
+
   return (
     <div className="phone-container flex flex-col bg-white dark:bg-[#111111]" style={{ height: '100dvh' }}>
       <div className="flex items-center gap-2 px-3 py-3 shrink-0 border-b border-black/5 dark:border-white/10">
@@ -78,7 +106,7 @@ export default function ProfileView({ profile, posts, loading, startEditing, onP
         <h1 className="text-[16px] font-bold text-black dark:text-white truncate">@{profile.username}</h1>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-6">
+      <div className="flex-1 overflow-y-auto" style={{ paddingBottom: NAV_INSET }}>
         <ProfileHeader
           profile={profile}
           onEdit={() => setEditing(true)}
@@ -89,18 +117,38 @@ export default function ProfileView({ profile, posts, loading, startEditing, onP
           followBusy={followBusy}
           messageBusy={messageBusy}
         />
-        <div className="mt-1">
-          {loading ? (
-            <div className="grid grid-cols-3 gap-0.5">
-              {Array.from({ length: 9 }).map((_, i) => (
-                <div key={i} className="bg-black/5 dark:bg-white/10 animate-pulse" style={{ aspectRatio: '3/4' }} />
-              ))}
-            </div>
-          ) : (
-            <PostGrid posts={posts} />
-          )}
-        </div>
+
+        {profile.isOwn && (
+          <div className="flex border-b border-black/5 dark:border-white/10">
+            <TabButton icon={<LayoutGrid size={16} />} label={t.feed_tab_posts} active={tab === 'posts'} onClick={() => setTab('posts')} />
+            <TabButton icon={<Bookmark size={16} />} label={t.feed_tab_saved} active={tab === 'saved'} onClick={() => setTab('saved')} />
+          </div>
+        )}
+
+        <MasonryGrid
+          className="pt-2"
+          posts={showSaved ? saved ?? [] : posts}
+          loading={showSaved ? saved === null : loading}
+          onOpen={openPost}
+          onMore={setActionsPost}
+          emptyHint={showSaved ? t.feed_saved_empty : t.feed_profile_empty}
+        />
       </div>
+
+      {actionsPost && (
+        <PostActionsSheet
+          post={actionsPost}
+          onClose={() => setActionsPost(null)}
+          onDeleted={(postId) => {
+            setSaved((s) => s?.filter((p) => p.id !== postId) ?? s);
+            onPostDeleted?.(postId);
+          }}
+          onHidden={(userId) => {
+            setSaved((s) => s?.filter((p) => p.author.id !== userId) ?? s);
+            onUserHidden?.(userId);
+          }}
+        />
+      )}
 
       {editing && profile.isOwn && (
         <ProfileEditSheet

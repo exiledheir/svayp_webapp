@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { isAuthenticated } from '@/lib/auth';
 import { getMyProfile, getMyPosts } from '@/lib/feed-api';
+import { clearPageCache } from '@/lib/page-cache';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events } from '@/lib/analytics-events';
 import type { FeedPost, FeedProfile } from '@/types/feed';
@@ -55,6 +56,12 @@ function FeedMyProfile() {
         loading={loading}
         startEditing={startEditing || !profile.username}
         onProfileUpdated={(p) => setProfile({ ...p, isOwn: true })}
+        onPostDeleted={(postId) => {
+          setPosts((prev) => prev.filter((p) => p.id !== postId));
+          setProfile((p) => (p ? { ...p, postsCount: Math.max(0, p.postsCount - 1) } : p));
+          // The cached feed snapshot still holds the deleted post — drop it.
+          clearPageCache('feed:posts');
+        }}
       />
     </>
   );

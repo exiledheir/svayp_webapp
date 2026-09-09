@@ -2,6 +2,7 @@ import React from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { getProfileByUsername, getUserPosts } from '@/lib/feed-api';
+import { clearPageCache } from '@/lib/page-cache';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events } from '@/lib/analytics-events';
 import type { FeedPost, FeedProfile } from '@/types/feed';
@@ -52,6 +53,11 @@ function FeedUserProfile() {
         posts={posts}
         loading={loading}
         onProfileUpdated={(p) => setProfile(p)}
+        onUserHidden={() => {
+          // Their posts are gone from the feed — drop the cached snapshot and leave.
+          clearPageCache('feed:posts');
+          router.replace('/feed');
+        }}
       />
     </>
   );

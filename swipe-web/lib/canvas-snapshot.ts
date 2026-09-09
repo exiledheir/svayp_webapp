@@ -3,16 +3,21 @@ import type { SavedCanvasLayout } from '@/lib/closet-types';
 import { saveImageToGallery } from '@/lib/flutter-bridge';
 import { shareImageBlob } from '@/lib/share-image';
 
+// Snapshot pixel size. Rendered at 3× the on-screen 3:4 geometry so the flat-lay
+// stays crisp when the feed shows it as a full-bleed poster (400×533 upscaled
+// looked blurry). PNG is lossless, so the only quality limit is the source item
+// images themselves. Exported so the feed publisher can record the natural size
+// of a board snapshot without re-measuring it.
+const SNAPSHOT_SCALE = 3;
+export const SNAPSHOT_WIDTH = 400 * SNAPSHOT_SCALE;
+export const SNAPSHOT_HEIGHT = 533 * SNAPSHOT_SCALE;
+
 /**
  * Render a flat-lay canvas layout to a PNG blob (used as the try-on snapshot input).
  * Mirrors the on-screen 3:4 canvas geometry (35% item width, % positions, scale).
  */
 export async function captureCanvasSnapshot(layout: SavedCanvasLayout, allItems: ClosetItem[]): Promise<Blob> {
-  // Render at 3× the on-screen 3:4 geometry so the flat-lay stays crisp when the
-  // feed shows it as a full-bleed poster (400×533 upscaled looked blurry). PNG is
-  // lossless, so the only quality limit is the source item images themselves.
-  const SCALE = 3;
-  const W = 400 * SCALE, H = 533 * SCALE;
+  const W = SNAPSHOT_WIDTH, H = SNAPSHOT_HEIGHT;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;

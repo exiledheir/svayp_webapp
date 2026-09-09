@@ -12,13 +12,16 @@ interface Props {
   /** Notify parent so the post list/detail stays in sync. */
   onChange?: (next: { isLiked: boolean; likesCount: number }) => void;
   size?: number;
+  /** De-emphasized variant (Pinterest detail page): smaller heart, quiet count. */
+  muted?: boolean;
 }
 
 /**
  * Optimistic like toggle: flips immediately, calls the API, reconciles to the
  * server's authoritative count, reverts on failure.
  */
-export default function LikeButton({ postId, liked, count, onChange, size = 24 }: Props) {
+export default function LikeButton({ postId, liked, count, onChange, size, muted }: Props) {
+  const iconSize = size ?? (muted ? 22 : 24);
   const [state, setState] = React.useState({ liked, count });
   const busy = React.useRef(false);
 
@@ -51,14 +54,20 @@ export default function LikeButton({ postId, liked, count, onChange, size = 24 }
   return (
     <button className="flex items-center gap-1.5" onClick={handleClick} aria-label="Like">
       <Heart
-        size={size}
+        size={iconSize}
         strokeWidth={2}
         fill={state.liked ? '#F370A7' : 'none'}
         color={state.liked ? '#F370A7' : 'currentColor'}
         className="text-black dark:text-white transition-transform active:scale-90"
       />
       {state.count > 0 && (
-        <span className="text-[14px] font-semibold text-black dark:text-white tabular-nums">
+        <span
+          className={
+            muted
+              ? 'text-[13px] font-medium text-black/50 dark:text-white/50 tabular-nums'
+              : 'text-[14px] font-semibold text-black dark:text-white tabular-nums'
+          }
+        >
           {formatCount(state.count)}
         </span>
       )}

@@ -6,6 +6,12 @@
 // Backend contract (see the Feed plan §B): every response wrapped { data },
 // lists are Spring pages { content, totalElements, totalPages, number, size }.
 // Conventions mirror lib/market-api.ts exactly.
+//
+// Pinterest-style redesign additions to the contract (not in the original plan):
+//   POST /feed/posts/{id}/toggle-save  → { isSaved }        (bookmark, private)
+//   GET  /feed/posts/saved             → Page<FeedPost>     (newest-saved first)
+//   GET  /feed/posts/{id}/related      → Page<FeedPost>     ("More to explore")
+//   FeedPostImage.width / .height      → natural px size from the upload pipeline
 
 import { api } from '@/lib/api';
 import { watchWithSse } from '@/lib/sse-client';
@@ -101,6 +107,18 @@ export async function getCommentedPosts(page = 0, size = 21): Promise<Page<FeedP
   return asPage<FeedPost>(await api.get('/feed/posts/commented', { params: { page, size } }));
 }
 
+/** Posts the current user saved (the Saved tab on the own profile), newest-saved first. */
+export async function getSavedPosts(page = 0, size = 21): Promise<Page<FeedPost>> {
+  if (isFeedLocalMode()) return local.getSavedPosts(page, size);
+  return asPage<FeedPost>(await api.get('/feed/posts/saved', { params: { page, size } }));
+}
+
+/** "More to explore" under a post detail — related posts, excluding the post itself. */
+export async function getRelatedPosts(postId: string, size = 20): Promise<FeedPost[]> {
+  if (isFeedLocalMode()) return local.getRelatedPosts(postId, size);
+  return asPage<FeedPost>(await api.get(`/feed/posts/${postId}/related`, { params: { size } })).content;
+}
+
 // ── Comments ─────────────────────────────────────────────────────────────────
 export async function getComments(postId: string, page = 0, size = 50): Promise<Page<FeedComment>> {
   if (isFeedLocalMode()) return local.getComments(postId, page, size);
@@ -143,6 +161,13 @@ export async function toggleLike(postId: string): Promise<{ isLiked: boolean; li
   return unwrap<{ isLiked: boolean; likesCount: number }>(
     await api.post(`/feed/posts/${postId}/toggle-like`),
   );
+}
+
+// ── Save (bookmark) ──────────────────────────────────────────────────────────
+// Private per-user bookmark — the Pinterest "Save". No public count.
+export async function toggleSave(postId: string): Promise<{ isSaved: boolean }> {
+  if (isFeedLocalMode()) return local.toggleSave(postId);
+  return unwrap<{ isSaved: boolean }>(await api.post(`/feed/posts/${postId}/toggle-save`));
 }
 
 // ── Moderation backstop ──────────────────────────────────────────────────────

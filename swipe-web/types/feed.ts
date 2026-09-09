@@ -30,6 +30,12 @@ export interface FeedPostImage {
   imageUrl: string; // snapshot URL (board/calendar) or resultImageUrl (tryon)
   position: number; // 0-based carousel order; 0 = cover
   sourceRefId?: string | null; // canvasId / suggestionId / tryOnJobId (provenance)
+  // Natural pixel size. BACKEND CONTRACT: the upload pipeline / post DTO should
+  // return these so the masonry grid can reserve each tile's height before the
+  // image loads (no layout shift). Optional — older posts fall back to a
+  // per-source default aspect (see lib/feed-layout.ts).
+  width?: number;
+  height?: number;
 }
 
 export interface FeedPost {
@@ -39,6 +45,7 @@ export interface FeedPost {
   caption: string | null; // ≤150 chars
   likesCount: number;
   isLiked: boolean; // resolved for the current user
+  isSaved: boolean; // bookmarked by the current user (private; Pinterest "Save")
   commentsCount: number; // number of comments on the post
   containsRealPhoto: boolean; // true if any image is a try-on (real photo)
   status: FeedPostStatus;
@@ -89,6 +96,8 @@ export interface CreatePostImageInput {
   imageId?: string; // board/calendar (uploaded snapshot id)
   imageUrl?: string; // tryon (resultImageUrl referenced directly)
   sourceRefId?: string; // canvasId / suggestionId / tryOnJobId
+  width?: number; // natural px size, measured client-side at publish (see FeedPostImage)
+  height?: number;
 }
 
 export interface CreatePostPayload {

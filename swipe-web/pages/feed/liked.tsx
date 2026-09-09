@@ -4,9 +4,13 @@ import { useRouter } from 'next/router';
 import { ChevronLeft, Heart, MessageCircle } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { getLikedPosts, getCommentedPosts } from '@/lib/feed-api';
+import { NAV_INSET } from '@/lib/feed-layout';
+import { clearPageCache } from '@/lib/page-cache';
 import type { FeedPost } from '@/types/feed';
 import FeedGuard from '@/components/feed/FeedGuard';
-import PostGrid from '@/components/feed/PostGrid';
+import MasonryGrid from '@/components/feed/MasonryGrid';
+import TabButton from '@/components/feed/TabButton';
+import PostActionsSheet from '@/components/feed/PostActionsSheet';
 
 type Tab = 'liked' | 'commented';
 
@@ -16,6 +20,7 @@ function FeedLiked() {
   const [tab, setTab] = React.useState<Tab>('liked');
   const [liked, setLiked] = React.useState<FeedPost[] | null>(null);
   const [commented, setCommented] = React.useState<FeedPost[] | null>(null);
+  const [actionsPost, setActionsPost] = React.useState<FeedPost | null>(null);
 
   React.useEffect(() => {
     getLikedPosts(0, 60)
@@ -28,6 +33,14 @@ function FeedLiked() {
 
   const posts = tab === 'liked' ? liked : commented;
   const loading = posts === null;
+
+  const openPost = (p: FeedPost) => router.push(`/feed/p/${p.id}?from=${encodeURIComponent(router.asPath)}`);
+  // Drop a post from both lists (delete) or every post by an author (hide).
+  function dropWhere(pred: (p: FeedPost) => boolean) {
+    setLiked((l) => l?.filter((p) => !pred(p)) ?? l);
+    setCommented((c) => c?.filter((p) => !pred(p)) ?? c);
+    clearPageCache('feed:posts');
+  }
 
   return (
     <>
@@ -50,34 +63,27 @@ function FeedLiked() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto">
-          {loading ? (
-            <div className="grid grid-cols-3 gap-0.5 p-0.5">
-              {Array.from({ length: 9 }).map((_, i) => (
-                <div key={i} className="bg-black/5 dark:bg-white/10 animate-pulse" style={{ aspectRatio: '3/4' }} />
-              ))}
-            </div>
-          ) : (
-            <PostGrid posts={posts ?? []} emptyHint={tab === 'liked' ? t.feed_liked_empty : t.feed_commented_empty} />
-          )}
+        <div className="flex-1 overflow-y-auto" style={{ paddingBottom: NAV_INSET }}>
+          <MasonryGrid
+            className="pt-2"
+            posts={posts ?? []}
+            loading={loading}
+            onOpen={openPost}
+            onMore={setActionsPost}
+            emptyHint={tab === 'liked' ? t.feed_liked_empty : t.feed_commented_empty}
+          />
         </div>
+
+        {actionsPost && (
+          <PostActionsSheet
+            post={actionsPost}
+            onClose={() => setActionsPost(null)}
+            onDeleted={(postId) => dropWhere((p) => p.id === postId)}
+            onHidden={(userId) => dropWhere((p) => p.author.id === userId)}
+          />
+        )}
       </div>
     </>
-  );
-}
-
-function TabButton({ icon, label, active, onClick }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-[14px] font-semibold border-b-2 transition-colors ${
-        active ? 'text-black dark:text-white' : 'text-black/40 dark:text-white/40 border-transparent'
-      }`}
-      style={active ? { borderColor: '#F370A7' } : undefined}
-    >
-      {icon}
-      {label}
-    </button>
   );
 }
 
