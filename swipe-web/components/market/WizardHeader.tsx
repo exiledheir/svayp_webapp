@@ -15,7 +15,7 @@ export default function WizardHeader({ step, totalSteps, onBack }: Props) {
   const dots = Array.from({ length: totalSteps }, (_, i) => i);
 
   return (
-    <div className="shrink-0" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0.5rem))' }}>
+    <div className="shrink-0" style={{ paddingTop: 'max(0.5rem, var(--safe-top))' }}>
       <div className="flex items-center px-3 py-2">
         <button onClick={onBack} aria-label="Back" className="w-10 h-10 flex items-center justify-center">
           <ArrowLeft size={22} className="text-black dark:text-white" />

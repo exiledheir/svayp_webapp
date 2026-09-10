@@ -2222,7 +2222,7 @@ export default function ClosetPage() {
       {/* Header — flat style, matching the Market page (no glass border box) */}
       <header
         className="shrink-0 flex items-center justify-between px-4 pb-2 bg-white dark:bg-[#111111]"
-        style={{ paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))' }}
+        style={{ paddingTop: 'calc(12px + var(--safe-top))' }}
       >
         {/* Left: section name */}
         <h1 className="text-[26px] font-bold tracking-[-0.5px] text-black dark:text-white shrink-0">{t.closetTitle}</h1>

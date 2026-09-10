@@ -105,7 +105,7 @@ export default function ClosetGuide({ open, onClose }: Props) {
       {/* Header: title + counter · video · close */}
       <header
         className="shrink-0 flex items-center justify-between gap-3 px-4"
-        style={{ paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))', paddingBottom: 10 }}
+        style={{ paddingTop: 'calc(12px + var(--safe-top))', paddingBottom: 10 }}
       >
         <div className="min-w-0 flex items-baseline gap-2">
           <h2 className="text-[19px] font-extrabold text-black dark:text-white leading-tight">{strings.guide}</h2>
@@ -234,7 +234,7 @@ export default function ClosetGuide({ open, onClose }: Props) {
             onClick={() => setVideoOpen(false)}
             aria-label={strings.closeLabel}
             className="absolute w-10 h-10 rounded-full flex items-center justify-center bg-white/15 text-white active:scale-[0.95] transition-transform"
-            style={{ top: 'calc(12px + env(safe-area-inset-top, 0px))', right: 12 }}
+            style={{ top: 'calc(12px + var(--safe-top))', right: 12 }}
           >
             <X size={20} />
           </button>

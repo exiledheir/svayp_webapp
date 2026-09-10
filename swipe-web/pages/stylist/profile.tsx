@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { ArrowLeft, Loader2, Pencil, Check, X } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { useI18n } from '@/lib/i18n';
+import { stylistTheme } from '@/lib/stylist-theme';
 import { getStylistStrings } from '@/lib/stylist-strings';
 import {
   fetchStyleProfile,
@@ -53,11 +54,7 @@ export default function StyleProfilePage() {
     }
   }, [S]);
 
-  const bg = dark ? '#0F0F0F' : '#FAFAF8';
-  const ink = dark ? '#FAFAF8' : '#0A0A0A';
-  const muted = dark ? '#9B9B9B' : '#6B6B6B';
-  const card = dark ? '#1A1A1A' : '#F5F5F3';
-  const line = dark ? '#2D2D2D' : '#E5E5E5';
+  const { bg, ink, muted, card, line, accent } = stylistTheme(dark);
 
   if (loading) {
     return (
@@ -172,14 +169,14 @@ export default function StyleProfilePage() {
                 <span className="text-[13px]" style={{ color: muted }}>
                   {S.profileFilled}
                 </span>
-                <span className="text-[15px] font-bold" style={{ color: '#C8A882' }}>
+                <span className="text-[15px] font-bold" style={{ color: accent }}>
                   {profile.completeness}%
                 </span>
               </div>
               <div className="h-1.5 rounded-full overflow-hidden" style={{ background: card }}>
                 <div
                   className="h-full rounded-full transition-all"
-                  style={{ width: `${profile.completeness}%`, background: '#C8A882' }}
+                  style={{ width: `${profile.completeness}%`, background: accent }}
                 />
               </div>
               <p className="text-[12px] mt-2 leading-snug" style={{ color: muted }}>

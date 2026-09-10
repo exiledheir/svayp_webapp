@@ -31,7 +31,7 @@ export default function PhotoTipsSheet({ open, kind, onClose, position = 'absolu
       {/* Header — back arrow + (truncated) title */}
       <header
         className="shrink-0 flex items-center gap-1 px-2 border-b border-black/5 dark:border-white/10"
-        style={{ paddingTop: 'calc(8px + env(safe-area-inset-top, 0px))', paddingBottom: 8 }}
+        style={{ paddingTop: 'calc(8px + var(--safe-top))', paddingBottom: 8 }}
       >
         <button
           onClick={onClose}

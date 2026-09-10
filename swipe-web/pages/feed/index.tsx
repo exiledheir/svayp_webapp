@@ -178,7 +178,7 @@ function FeedHome() {
             border), big title on the left, bare icons on the right, chat last. */}
         <header
           className="shrink-0 flex items-center justify-between px-4 pb-2"
-          style={{ paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))' }}
+          style={{ paddingTop: 'calc(12px + var(--safe-top))' }}
         >
           <h1 className="text-[26px] font-bold tracking-[-0.5px] text-black dark:text-white shrink-0">
             {t.feed_title}

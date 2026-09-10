@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Top inset for content that must clear the status bar / notch ────────────
+   Use `var(--safe-top)` instead of `env(safe-area-inset-top)` anywhere a header
+   or overlay sits at the top of the screen.
+
+   Inside the Flutter app the WebView is already placed below the status bar by
+   a native SafeArea, so adding env() again counts the status bar TWICE and
+   pushes every title down by ~28px — which is why the web headers used to sit
+   noticeably lower than the native Discover header. `native-shell` is set on
+   <html> from _app.tsx when running in the app, and zeroes the inset there. In
+   a browser or the Telegram Mini App the real inset still applies. */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+html.native-shell {
+  --safe-top: 0px;
+}
+
 html,
 body {
   height: 100%;

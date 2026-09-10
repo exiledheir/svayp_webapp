@@ -36,7 +36,7 @@ function LikedListingsPageInner() {
         {/* Header */}
         <div
           className="shrink-0 flex items-center gap-2 px-3 py-3"
-          style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))', borderBottom: '0.5px solid rgba(128,128,128,0.18)' }}
+          style={{ paddingTop: 'max(0.75rem, var(--safe-top))', borderBottom: '0.5px solid rgba(128,128,128,0.18)' }}
         >
           <button onClick={() => router.push('/market')} aria-label="Back" className="w-10 h-10 flex items-center justify-center">
             <ArrowLeft size={22} className="text-black dark:text-white" />

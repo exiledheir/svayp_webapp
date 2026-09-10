@@ -5,7 +5,7 @@ import type { AppProps } from 'next/app';
 import { useRouter } from 'next/router';
 import { isAuthenticated, saveTokens, getRefreshFromCloud, getUser, saveUser } from '@/lib/auth';
 import { restoreOnboardingFromCloud } from '@/lib/onboarding-storage';
-import { isShellTab } from '@/lib/flutter-bridge';
+import { isShellTab, isInFlutterWebView } from '@/lib/flutter-bridge';
 import { I18nProvider } from '@/lib/i18n';
 import { ThemeProvider } from '@/lib/theme';
 import { FeatureFlagsProvider } from '@/lib/feature-flags-context';
@@ -117,6 +117,13 @@ export default function App({ Component, pageProps }: AppProps) {
     // Persist the shell's "this page is a bottom-bar tab" marker (`?nav=tab`)
     // before the URL is cleaned below; pages read it back via isShellTab().
     isShellTab();
+    // In the app the native SafeArea has already inset this WebView below the
+    // status bar, so --safe-top drops to 0 and headers stop being pushed down
+    // by a second status bar. Set before the first render (nothing paints until
+    // `ready`), so no header ever flashes at the wrong offset.
+    if (isInFlutterWebView()) {
+      document.documentElement.classList.add('native-shell');
+    }
     const token = params.get('auth_token');
     const refresh = params.get('refresh_token');
     if (token || params.has('nav')) {

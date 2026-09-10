@@ -753,7 +753,7 @@ export default function ClosetSetupPage() {
       {toast && (
         <div
           className="fixed left-1/2 -translate-x-1/2 z-[90] px-4 py-2.5 rounded-full text-white text-[13px] font-semibold shadow-lg text-center"
-          style={{ top: 'calc(12px + env(safe-area-inset-top, 0px))', background: '#101014', maxWidth: '90vw' }}
+          style={{ top: 'calc(12px + var(--safe-top))', background: '#101014', maxWidth: '90vw' }}
         >
           {toast}
         </div>
@@ -762,7 +762,7 @@ export default function ClosetSetupPage() {
       {/* ── Scrolling body ── */}
       <div
         className="flex-1 min-h-0 overflow-y-auto flex flex-col"
-        style={{ padding: 'calc(6px + env(safe-area-inset-top, 0px)) var(--su-px) 0' }}
+        style={{ padding: 'calc(6px + var(--safe-top)) var(--su-px) 0' }}
       >
         <h1
           style={{
@@ -935,7 +935,7 @@ export default function ClosetSetupPage() {
           className="fixed inset-0 z-[86] flex flex-col su-rise"
           style={{
             background: '#fff',
-            padding: 'calc(clamp(20px, 6dvh, 52px) + env(safe-area-inset-top, 0px)) var(--su-px) calc(var(--su-gap-lg) + env(safe-area-inset-bottom, 0px))',
+            padding: 'calc(clamp(20px, 6dvh, 52px) + var(--safe-top)) var(--su-px) calc(var(--su-gap-lg) + env(safe-area-inset-bottom, 0px))',
           }}
         >
           <h2

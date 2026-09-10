@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import NurOnboarding from '@/components/stylist/NurOnboarding';
+import NurMark from '@/components/stylist/NurMark';
 import {
   ArrowLeft,
   Send,
   Loader2,
-  Sparkles,
   ImagePlus,
   X,
   UserRound,
@@ -19,6 +19,7 @@ import { isShellTab } from '@/lib/flutter-bridge';
 import { useRootBackGuard } from '@/lib/use-root-back-guard';
 import { useOverlayBackClose } from '@/lib/use-overlay-back-close';
 import { getStylistStrings } from '@/lib/stylist-strings';
+import { stylistTheme } from '@/lib/stylist-theme';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
 import { uploadModelPhoto } from '@/lib/wardrobe-api';
@@ -686,11 +687,12 @@ export default function StylistPage() {
     [locale, S],
   );
 
-  const bg = dark ? '#0F0F0F' : '#FAFAF8';
-  const ink = dark ? '#FAFAF8' : '#0A0A0A';
-  const muted = dark ? '#9B9B9B' : '#6B6B6B';
-  const card = dark ? '#1A1A1A' : '#F5F5F3';
-  const line = dark ? '#2D2D2D' : '#E5E5E5';
+  const { bg, ink, muted, card, line, accent, accentWash, accentInk, accentGradient } =
+    stylistTheme(dark);
+  // Send is the page's primary action, so it carries the pink the app gives
+  // every primary action; greyed out while there is nothing to send.
+  const canSend =
+    (draft.trim().length > 0 || attachments.length > 0) && !sending && !uploading;
 
   if (checking) {
     return (
@@ -723,15 +725,17 @@ export default function StylistPage() {
     // возвращаться некуда, поэтому кнопки нет.
     return (
       <div className="flex flex-col items-center justify-center min-h-screen px-8 text-center" style={{ background: bg }}>
+        {/* Same pink gradient tile the closet uses for its AI moments, so the
+            announcement reads as part of the app rather than a stray screen. */}
         <div
-          className="w-16 h-16 rounded-full flex items-center justify-center"
-          style={{ background: '#141014', boxShadow: '0 8px 24px rgba(200,168,130,0.28)' }}
+          className="w-16 h-16 rounded-2xl flex items-center justify-center"
+          style={{ background: accentGradient, boxShadow: '0 8px 24px rgba(243,112,167,0.28)' }}
         >
-          <Sparkles size={26} strokeWidth={2.2} style={{ color: '#C8A882' }} />
+          <NurMark size={30} color="#fff" />
         </div>
         <span
-          className="mt-4 text-[10px] font-bold uppercase px-2 py-0.5 rounded"
-          style={{ background: '#C8A88222', color: '#C8A882', letterSpacing: '0.5px' }}
+          className="mt-4 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+          style={{ background: accentWash, color: accentInk, letterSpacing: '0.5px' }}
         >
           {S.comingSoon}
         </span>
@@ -756,10 +760,12 @@ export default function StylistPage() {
 
   return (
     <div className="flex flex-col min-h-screen" style={{ background: bg }}>
-      {/* Шапка */}
+      {/* Шапка. Та же форма, что у Гардероба / Ленты / Маркета: без рамки и
+          подложки, крупный заголовок слева, голые иконки справа. Sticky —
+          лента уезжает под неё, фон непрозрачный. */}
       <header
-        className="sticky top-0 z-10 flex items-center gap-3 px-4 h-14"
-        style={{ background: bg, borderBottom: `1px solid ${line}` }}
+        className="sticky top-0 z-10 flex items-center gap-2.5 px-4 pb-2"
+        style={{ background: bg, paddingTop: 'calc(12px + var(--safe-top))' }}
       >
         {/* push, а не back(): внутри WebView история может быть пустой — тогда back()
             молча ничего не делает, и кнопка выглядит сломанной. Во вкладке стрелки
@@ -768,53 +774,56 @@ export default function StylistPage() {
           <button
             onClick={() => router.push('/closet')}
             aria-label={S.goBack}
-            className="active:scale-95 transition-transform"
+            className="shrink-0 active:opacity-60 transition-opacity"
           >
-            <ArrowLeft size={20} style={{ color: ink }} />
+            <ArrowLeft size={22} style={{ color: ink }} />
           </button>
         )}
-        <div className="flex items-center gap-2">
-          <span className="text-[16px] font-bold" style={{ color: ink }}>
+        <div className="flex items-baseline gap-2 min-w-0">
+          <h1
+            className="text-[26px] font-bold tracking-[-0.5px] truncate"
+            style={{ color: ink }}
+          >
             {S.title}
-          </span>
+          </h1>
           {beta && (
             <span
-              className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded"
-              style={{ background: '#C8A88222', color: '#C8A882', letterSpacing: '0.5px' }}
+              className="shrink-0 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full"
+              style={{ background: accentWash, color: accentInk, letterSpacing: '0.5px' }}
             >
               {S.beta}
             </span>
           )}
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1.5">
           <button
             onClick={newThread}
             aria-label={S.newChat}
             title={S.newChat}
-            className="w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition-transform"
-            style={{ background: card, color: muted, border: `1px solid ${line}` }}
+            className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center active:opacity-60 transition-opacity"
+            style={{ color: ink }}
           >
-            <MessageSquarePlus size={15} />
+            <MessageSquarePlus size={22} strokeWidth={1.9} />
           </button>
           <button
             onClick={openThreads}
             aria-label={S.chatList}
             title={S.chatList}
-            className="w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition-transform"
-            style={{ background: card, color: muted, border: `1px solid ${line}` }}
+            className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center active:opacity-60 transition-opacity"
+            style={{ color: ink }}
           >
-            <History size={15} />
+            <History size={22} strokeWidth={1.9} />
           </button>
           {/* Вход в профиль — по ТЗ 3.4 он живёт в шапке чата: онбординга нет, и это
               единственное место, где видно, что Nur о тебе знает. */}
           <button
             onClick={() => router.push('/stylist/profile')}
             aria-label={S.profileTitle}
-            className="w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition-transform"
-            style={{ background: card, color: muted, border: `1px solid ${line}` }}
+            className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center active:opacity-60 transition-opacity"
+            style={{ color: ink }}
           >
-            <UserRound size={15} />
+            <UserRound size={22} strokeWidth={1.9} />
           </button>
         </div>
       </header>
@@ -828,9 +837,9 @@ export default function StylistPage() {
             style={{ borderBottom: `1px solid ${line}` }}
           >
             <button onClick={() => setShowThreads(false)} aria-label={S.goBack}>
-              <ArrowLeft size={20} style={{ color: ink }} />
+              <ArrowLeft size={22} style={{ color: ink }} />
             </button>
-            <span className="text-[16px] font-bold" style={{ color: ink }}>
+            <span className="text-[20px] font-bold tracking-[-0.3px]" style={{ color: ink }}>
               {S.chatList}
             </span>
             <button
@@ -933,11 +942,11 @@ export default function StylistPage() {
       {/* Лента */}
       <main className="flex-1 px-4 py-4 flex flex-col gap-3">
         {messages.length === 0 && (
-          <div className="mt-6">
-            <p className="text-[15px] font-semibold" style={{ color: ink }}>
+          <div className="mt-4">
+            <p className="text-[17px] font-bold tracking-[-0.2px]" style={{ color: ink }}>
               {S.greeting}
             </p>
-            <p className="mt-1 text-[13px]" style={{ color: muted }}>
+            <p className="mt-1.5 text-[13.5px] leading-relaxed" style={{ color: muted }}>
               {S.greetingHint}
             </p>
             <div className="mt-5 flex flex-col gap-2">
@@ -953,8 +962,8 @@ export default function StylistPage() {
                       send(chip);
                     }
                   }}
-                  className="text-left px-4 py-3 rounded-2xl text-[14px] active:scale-[0.99] transition-transform"
-                  style={{ background: card, color: ink, border: `1px solid ${line}` }}
+                  className="text-left px-4 py-3.5 rounded-2xl text-[14px] font-medium active:scale-[0.99] transition-transform"
+                  style={{ background: card, color: ink }}
                 >
                   {chip}
                 </button>
@@ -1513,10 +1522,10 @@ export default function StylistPage() {
             onClick={() => fileRef.current?.click()}
             disabled={uploading || sending}
             aria-label={S.attachPhoto}
-            className="flex items-center justify-center w-10 h-10 rounded-full shrink-0 active:scale-95 transition-transform disabled:opacity-40"
-            style={{ background: card, color: ink, border: `1px solid ${line}` }}
+            className="flex items-center justify-center w-11 h-11 rounded-full shrink-0 active:scale-95 transition-transform disabled:opacity-40"
+            style={{ background: card, color: ink }}
           >
-            {uploading ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
+            {uploading ? <Loader2 size={18} className="animate-spin" /> : <ImagePlus size={18} />}
           </button>
           <textarea
             value={draft}
@@ -1529,17 +1538,20 @@ export default function StylistPage() {
             }}
             rows={1}
             placeholder={S.inputPlaceholder}
-            className="flex-1 resize-none px-4 py-2.5 rounded-2xl text-[14px] outline-none"
-            style={{ background: card, color: ink, border: `1px solid ${line}`, maxHeight: 120 }}
+            className="flex-1 resize-none px-4 py-3 rounded-2xl text-[14px] outline-none placeholder:opacity-60"
+            style={{ background: card, color: ink, maxHeight: 120 }}
           />
           <button
             onClick={() => send(draft)}
-            disabled={(!draft.trim() && attachments.length === 0) || sending || uploading}
+            disabled={!canSend}
             aria-label={S.send}
-            className="flex items-center justify-center w-10 h-10 rounded-full active:scale-95 transition-transform disabled:opacity-40"
-            style={{ background: ink, color: bg }}
+            className="flex items-center justify-center w-11 h-11 rounded-full shrink-0 active:scale-95 transition-transform"
+            style={{
+              background: canSend ? accent : card,
+              color: canSend ? '#fff' : muted,
+            }}
           >
-            {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+            {sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
           </button>
         </div>
       </footer>

@@ -42,7 +42,7 @@ function MarketOnboardingPageInner() {
 
       <div className="phone-container flex flex-col bg-white dark:bg-[#111111]" style={{ height: '100dvh' }}>
         {/* Top: skip */}
-        <div className="shrink-0 flex justify-end px-5 pt-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 1rem))' }}>
+        <div className="shrink-0 flex justify-end px-5 pt-4" style={{ paddingTop: 'max(1rem, var(--safe-top))' }}>
           <button onClick={() => router.replace('/market')} className="text-[14px] font-medium text-black/40 dark:text-white/40 active:opacity-60">
             {t.mk_promote_skip}
           </button>

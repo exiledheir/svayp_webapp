@@ -224,7 +224,7 @@ export default function OnboardingPage() {
       )}
 
       {/* Top bar: progress + skip */}
-      <div className="relative z-10 flex-none flex items-center justify-between px-5 pt-4 pb-1" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 1rem))' }}>
+      <div className="relative z-10 flex-none flex items-center justify-between px-5 pt-4 pb-1" style={{ paddingTop: 'max(1rem, var(--safe-top))' }}>
         <div className="flex gap-1.5">
           {PROGRESS_STEPS.map((s) => {
             // Second-item steps (ADD_LOWER / ADD_SHOES) share the ADD_UPPER dot.

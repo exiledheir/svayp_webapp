@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Camera, Loader2, Sparkles } from 'lucide-react';
+import { Camera, Loader2 } from 'lucide-react';
+import NurMark from './NurMark';
 import { editStyleProfileField } from '../../lib/stylist';
 import { uploadModelPhoto } from '../../lib/wardrobe-api';
 import type { StylistStrings } from '../../lib/stylist-strings';
+import { stylistTheme } from '../../lib/stylist-theme';
 
 /**
  * Знакомство с Nur — первый экран стилиста.
@@ -60,12 +62,7 @@ interface Props {
 }
 
 export default function NurOnboarding({ S, dark, onFinish }: Props) {
-  const bg = dark ? '#0F0F0F' : '#FAFAF8';
-  const ink = dark ? '#FAFAF8' : '#0A0A0A';
-  const muted = dark ? '#9B9B9B' : '#6B6B6B';
-  const card = dark ? '#1A1A1A' : '#F5F5F3';
-  const line = dark ? '#2D2D2D' : '#E5E5E5';
-  const accent = '#C8A882';
+  const { bg, ink, muted, card, line, accent } = stylistTheme(dark);
 
   /** -1 — приветствие, 0 — фото, дальше вопросы по одному. */
   const [step, setStep] = useState(-1);
@@ -190,7 +187,7 @@ export default function NurOnboarding({ S, dark, onFinish }: Props) {
               className="nur-mark relative w-24 h-24 rounded-full flex items-center justify-center"
               style={{ background: ink }}
             >
-              <Sparkles size={30} color={accent} />
+              <NurMark size={34} color={accent} />
             </div>
           </div>
 

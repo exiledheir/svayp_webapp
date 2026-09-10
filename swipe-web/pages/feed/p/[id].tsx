@@ -21,7 +21,7 @@ import CommentsSheet from '@/components/feed/CommentsSheet';
 import PostActionsSheet from '@/components/feed/PostActionsSheet';
 
 // Floating back button sits over the image, below the status bar.
-const BACK_TOP = 'calc(12px + env(safe-area-inset-top, 0px))';
+const BACK_TOP = 'calc(12px + var(--safe-top))';
 // The hero carousel gets rounded bottom corners over the page background.
 const HERO_RADIUS = '0 0 24px 24px';
 

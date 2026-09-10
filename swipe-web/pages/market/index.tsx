@@ -276,7 +276,7 @@ export default function MarketFeedPage() {
         {/* ── Header: title + My listings (one line) ── */}
         <header
           className="shrink-0 flex items-center justify-between px-4 pb-2"
-          style={{ paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))' }}
+          style={{ paddingTop: 'calc(12px + var(--safe-top))' }}
         >
           <h1 className="text-[26px] font-bold tracking-[-0.5px] text-black dark:text-white">
             {t.marketTitle}

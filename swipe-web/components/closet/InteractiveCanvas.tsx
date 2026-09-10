@@ -715,7 +715,7 @@ export default function InteractiveCanvas({
       {/* Header — onboarding shows a top instruction banner (no chrome);
           the closet keeps the close button + title. */}
       {alwaysShowHint ? (
-        <header className="shrink-0 px-6 pt-4 pb-3" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top, 1rem))' }}>
+        <header className="shrink-0 px-6 pt-4 pb-3" style={{ paddingTop: 'max(1rem, var(--safe-top))' }}>
           <h2 className="text-[22px] font-black tracking-tight text-gray-900 leading-tight">{t.ob_edit_title}</h2>
           <p
             key={demo.active ? demo.text : 'body'}
