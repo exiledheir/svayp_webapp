@@ -52,6 +52,8 @@ export interface StylistStrings {
 
   unavailableTitle: string;
   unavailableText: string;
+  /** Chip on the "not available yet" screen — the Nur tab is visible to everyone. */
+  comingSoon: string;
   goBack: string;
 
   starters: string[];
@@ -121,6 +123,7 @@ const RU: StylistStrings = {
 
   unavailableTitle: 'Nur пока недоступна',
   unavailableText: 'Стилист открыт ограниченному кругу. Мы включим его для всех чуть позже.',
+  comingSoon: 'Скоро',
   goBack: 'Вернуться',
 
   starters: [
@@ -209,6 +212,7 @@ const UZ: StylistStrings = {
 
   unavailableTitle: 'Nur hozircha mavjud emas',
   unavailableText: 'Stilist cheklangan doiraga ochilgan. Tez orada hamma uchun yoqamiz.',
+  comingSoon: 'Tez orada',
   goBack: 'Orqaga',
 
   starters: [
@@ -296,6 +300,7 @@ const EN: StylistStrings = {
 
   unavailableTitle: 'Nur isn’t available yet',
   unavailableText: 'The stylist is open to a limited group. We’ll turn it on for everyone soon.',
+  comingSoon: 'Coming soon',
   goBack: 'Go back',
 
   starters: [

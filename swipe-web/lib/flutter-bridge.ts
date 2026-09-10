@@ -19,6 +19,7 @@ export type BridgeMessageType =
   | 'save_image'
   | 'share_image'
   | 'open_chat'
+  | 'open_chat_list'
   | 'open_external';
 
 export interface AuthCompletePayload {
@@ -146,6 +147,15 @@ export interface OpenChatPayload {
   chatId: string;
 }
 
+/**
+ * Sent when the user taps the paper-plane icon in a web header (closet / feed /
+ * market). Chat is no longer a bottom tab; the chat list is native, so the shell
+ * pushes its ChatListScreen on top of the WebView.
+ */
+export interface OpenChatListPayload {
+  type: 'open_chat_list';
+}
+
 export type BridgePayload =
   | AuthCompletePayload
   | OnboardingCompletePayload
@@ -158,7 +168,8 @@ export type BridgePayload =
   | SetThemePayload
   | SaveImagePayload
   | ShareImagePayload
-  | OpenChatPayload;
+  | OpenChatPayload
+  | OpenChatListPayload;
 
 type FlutterBridgeChannel = {
   postMessage: (message: string) => void;
@@ -199,6 +210,31 @@ export function isInFlutterWebView(): boolean {
   return false;
 }
 
+const SHELL_TAB_STORAGE_KEY = 'svayp_shell_tab';
+
+/**
+ * True when this page is a bottom-bar TAB of the native shell (as opposed to a
+ * pushed WebView page, an old app build, or a browser).
+ *
+ * The shell loads every tab URL with `?nav=tab`; the flag is persisted per
+ * WebView (sessionStorage) so pushed pages and same-WebView navigations keep it.
+ * Old app builds (no param) and browsers return false and keep the in-page nav
+ * that the bar now replaces (closet Nur FAB, "Lenta" pill, feed strip) — so the
+ * web can deploy before or after the app without stranding either build.
+ */
+export function isShellTab(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    if (new URLSearchParams(window.location.search).get('nav') === 'tab') {
+      sessionStorage.setItem(SHELL_TAB_STORAGE_KEY, '1');
+      return true;
+    }
+    return sessionStorage.getItem(SHELL_TAB_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 /** Send a typed message to the Flutter host. Safe to call in any environment. */
 export function sendToFlutter(payload: BridgePayload): void {
   const channel = getChannel();
@@ -232,6 +268,18 @@ export function openNativeChat(chatId: string): boolean {
   const channel = getChannel();
   if (!channel) return false;
   channel.postMessage(JSON.stringify({ type: 'open_chat', chatId }));
+  return true;
+}
+
+/**
+ * Open the native chat LIST (Chat left the app's bottom bar; the web headers
+ * carry the entry point). Returns true when delivered to the Flutter host;
+ * false in a plain browser, where the caller falls back to /chat.
+ */
+export function openNativeChatList(): boolean {
+  const channel = getChannel();
+  if (!channel) return false;
+  channel.postMessage(JSON.stringify({ type: 'open_chat_list' }));
   return true;
 }
 

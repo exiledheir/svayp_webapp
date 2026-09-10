@@ -5,6 +5,7 @@ import type { AppProps } from 'next/app';
 import { useRouter } from 'next/router';
 import { isAuthenticated, saveTokens, getRefreshFromCloud, getUser, saveUser } from '@/lib/auth';
 import { restoreOnboardingFromCloud } from '@/lib/onboarding-storage';
+import { isShellTab } from '@/lib/flutter-bridge';
 import { I18nProvider } from '@/lib/i18n';
 import { ThemeProvider } from '@/lib/theme';
 import { FeatureFlagsProvider } from '@/lib/feature-flags-context';
@@ -113,14 +114,21 @@ export default function App({ Component, pageProps }: AppProps) {
     // store them in localStorage before the auth guard runs. This ensures the
     // web app is authenticated on first load without a JS injection timing race.
     const params = new URLSearchParams(window.location.search);
+    // Persist the shell's "this page is a bottom-bar tab" marker (`?nav=tab`)
+    // before the URL is cleaned below; pages read it back via isShellTab().
+    isShellTab();
     const token = params.get('auth_token');
     const refresh = params.get('refresh_token');
-    if (token) {
-      localStorage.setItem('auth_token', token);
-      if (refresh) localStorage.setItem('refresh_token', refresh);
-      // Strip the tokens from the URL so they are never visible or bookmarked.
+    if (token || params.has('nav')) {
+      if (token) {
+        localStorage.setItem('auth_token', token);
+        if (refresh) localStorage.setItem('refresh_token', refresh);
+      }
+      // Strip the tokens (never visible or bookmarked) and the shell marker
+      // (keeps page-view paths clean) from the URL.
       params.delete('auth_token');
       params.delete('refresh_token');
+      params.delete('nav');
       const newSearch = params.toString();
       const cleanUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
       window.history.replaceState({}, '', cleanUrl);

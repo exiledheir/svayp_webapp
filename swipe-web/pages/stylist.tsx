@@ -15,6 +15,9 @@ import {
 } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { useI18n } from '@/lib/i18n';
+import { isShellTab } from '@/lib/flutter-bridge';
+import { useRootBackGuard } from '@/lib/use-root-back-guard';
+import { useOverlayBackClose } from '@/lib/use-overlay-back-close';
 import { getStylistStrings } from '@/lib/stylist-strings';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
@@ -227,6 +230,19 @@ export default function StylistPage() {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
+  // ── Режим вкладки ────────────────────────────────────────────────────────
+  // Эта страница — вкладка «Nur» нижнего бара нового приложения (/stylist?nav=tab):
+  // стрелки «назад» нет (она увела бы вебвью вкладки на /closet), системный Back
+  // перехватывается, чтобы оболочка переключила вкладку, а не вышла из вебвью, и
+  // экрану «недоступно» некуда возвращаться. Флаг живёт в sessionStorage вебвью,
+  // поэтому переход в /stylist/profile и обратно его не теряет.
+  const [tabMode, setTabMode] = useState(false);
+  useEffect(() => { setTabMode(isShellTab()); }, []);
+  useRootBackGuard(tabMode);
+  // Оверлеи закрываются системным Back вместо переключения вкладки.
+  useOverlayBackClose(showThreads, () => setShowThreads(false));
+  useOverlayBackClose(zoomed !== null, () => setZoomed(null));
+
   // ── Доступ и история ─────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
@@ -238,7 +254,10 @@ export default function StylistPage() {
       setChecking(false);
       if (!access.available) return;
 
-      logAnalyticsEvent(Events.STYLIST_CHAT_OPENED, { [Params.SOURCE]: 'closet_header' });
+      // isShellTab() напрямую: state из эффекта выше это замыкание ещё не видит.
+      logAnalyticsEvent(Events.STYLIST_CHAT_OPENED, {
+        [Params.SOURCE]: isShellTab() ? 'nav_tab' : 'closet_header',
+      });
       let hasHistory = false;
       try {
         const id = await fetchStylistThread();
@@ -699,22 +718,38 @@ export default function StylistPage() {
   }
 
   if (!allowed) {
+    // «Скоро»: вкладка Nur видна всем, а сервер открыл стилиста не каждому —
+    // экран должен выглядеть как анонс, а не как ошибка. В режиме вкладки
+    // возвращаться некуда, поэтому кнопки нет.
     return (
       <div className="flex flex-col items-center justify-center min-h-screen px-8 text-center" style={{ background: bg }}>
-        <Sparkles size={28} style={{ color: '#C8A882' }} />
-        <p className="mt-4 text-[15px] font-semibold" style={{ color: ink }}>
+        <div
+          className="w-16 h-16 rounded-full flex items-center justify-center"
+          style={{ background: '#141014', boxShadow: '0 8px 24px rgba(200,168,130,0.28)' }}
+        >
+          <Sparkles size={26} strokeWidth={2.2} style={{ color: '#C8A882' }} />
+        </div>
+        <span
+          className="mt-4 text-[10px] font-bold uppercase px-2 py-0.5 rounded"
+          style={{ background: '#C8A88222', color: '#C8A882', letterSpacing: '0.5px' }}
+        >
+          {S.comingSoon}
+        </span>
+        <p className="mt-3 text-[17px] font-bold" style={{ color: ink }}>
           {S.unavailableTitle}
         </p>
-        <p className="mt-2 text-[13px]" style={{ color: muted }}>
+        <p className="mt-2 text-[13px] leading-relaxed" style={{ color: muted }}>
           {S.unavailableText}
         </p>
-        <button
-          onClick={() => router.push('/closet')}
-          className="mt-6 px-5 h-10 rounded-full text-[13px] font-bold"
-          style={{ background: ink, color: bg }}
-        >
-          {S.goBack}
-        </button>
+        {!tabMode && (
+          <button
+            onClick={() => router.push('/closet')}
+            className="mt-6 px-5 h-10 rounded-full text-[13px] font-bold"
+            style={{ background: ink, color: bg }}
+          >
+            {S.goBack}
+          </button>
+        )}
       </div>
     );
   }
@@ -727,14 +762,17 @@ export default function StylistPage() {
         style={{ background: bg, borderBottom: `1px solid ${line}` }}
       >
         {/* push, а не back(): внутри WebView история может быть пустой — тогда back()
-            молча ничего не делает, и кнопка выглядит сломанной. */}
-        <button
-          onClick={() => router.push('/closet')}
-          aria-label={S.goBack}
-          className="active:scale-95 transition-transform"
-        >
-          <ArrowLeft size={20} style={{ color: ink }} />
-        </button>
+            молча ничего не делает, и кнопка выглядит сломанной. Во вкладке стрелки
+            нет: она увела бы вебвью вкладки Nur на гардероб. */}
+        {!tabMode && (
+          <button
+            onClick={() => router.push('/closet')}
+            aria-label={S.goBack}
+            className="active:scale-95 transition-transform"
+          >
+            <ArrowLeft size={20} style={{ color: ink }} />
+          </button>
+        )}
         <div className="flex items-center gap-2">
           <span className="text-[16px] font-bold" style={{ color: ink }}>
             {S.title}

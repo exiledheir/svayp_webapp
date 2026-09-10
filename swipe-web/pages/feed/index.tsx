@@ -7,12 +7,14 @@ import { getFeed } from '@/lib/feed-api';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
 import { useRootBackGuard } from '@/lib/use-root-back-guard';
+import { isShellTab } from '@/lib/flutter-bridge';
 import { NAV_INSET } from '@/lib/feed-layout';
 import type { FeedPost } from '@/types/feed';
 import FeedGuard from '@/components/feed/FeedGuard';
 import MasonryGrid from '@/components/feed/MasonryGrid';
 import PostActionsSheet from '@/components/feed/PostActionsSheet';
 import ClosetSectionTabs from '@/components/ClosetSectionTabs';
+import NativeChatButton from '@/components/NativeChatButton';
 import { getPageCache, setPageCache } from '@/lib/page-cache';
 
 const PAGE_SIZE = 10;
@@ -39,6 +41,11 @@ function FeedHome() {
   // handled as an in-page popstate instead of exiting the WebView (matches
   // Closet/Market). Prevents the black-screen-on-back at the feed root.
   useRootBackGuard();
+  // Bottom-bar tab of the new native shell: the closet strip below the header
+  // would steer THIS WebView to /closet (the closet has its own tab now), and
+  // the header carries the chat entry point. Resolved after mount for hydration.
+  const [shellTab, setShellTab] = React.useState(false);
+  React.useEffect(() => { setShellTab(isShellTab()); }, []);
 
   const [posts, setPosts] = React.useState<FeedPost[]>([]);
   const [page, setPage] = React.useState(0);
@@ -167,35 +174,44 @@ function FeedHome() {
         <title>{t.feed_title} · LIBΛS</title>
       </Head>
       <div className="phone-container flex flex-col bg-[#fafafa] dark:bg-[#111111]" style={{ height: '100dvh' }}>
-        {/* Header */}
-        <div className="flex items-center px-4 py-3 shrink-0 bg-white dark:bg-[#1c1c1e] border-b border-black/5 dark:border-white/10">
-          <h1 className="text-[18px] font-extrabold text-black dark:text-white">
-            LIB<span style={{ color: '#F370A7' }}>Λ</span>S · {t.feed_title}
+        {/* Header — same shape as Closet / Market / Discover: flat (no bar, no
+            border), big title on the left, bare icons on the right, chat last. */}
+        <header
+          className="shrink-0 flex items-center justify-between px-4 pb-2"
+          style={{ paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))' }}
+        >
+          <h1 className="text-[26px] font-bold tracking-[-0.5px] text-black dark:text-white shrink-0">
+            {t.feed_title}
           </h1>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => router.push('/feed/liked')}
-              className="w-9 h-9 rounded-full flex items-center justify-center bg-black/5 dark:bg-white/10 text-black dark:text-white"
+              className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center active:opacity-60 transition-opacity text-black dark:text-white"
               aria-label={t.feed_activity_title}
             >
-              <Heart size={18} />
+              <Heart size={22} strokeWidth={1.9} />
             </button>
             <button
               onClick={() => router.push('/feed/me')}
-              className="w-9 h-9 rounded-full flex items-center justify-center bg-black/5 dark:bg-white/10 text-black dark:text-white"
+              className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center active:opacity-60 transition-opacity text-black dark:text-white"
               aria-label={t.feed_go_to_profile}
             >
-              <User size={18} />
+              <User size={22} strokeWidth={1.9} />
             </button>
+            {shellTab && <NativeChatButton />}
           </div>
-        </div>
+        </header>
 
         {/* Sub-tabs (Boards · Outfits · Calendar · Feed) — same strip as the
             Closet page so the other tabs stay reachable while viewing the Feed;
-            tapping one routes back to /closet on that tab. */}
-        <div className="shrink-0 bg-white dark:bg-[#1c1c1e] border-b border-black/5 dark:border-white/10">
-          <ClosetSectionTabs active="feed" className="px-4 py-2" />
-        </div>
+            tapping one routes back to /closet on that tab. Not in the native
+            shell: there the closet is its own bottom tab, and routing this
+            WebView to /closet would show the closet inside the Feed tab. */}
+        {!shellTab && (
+          <div className="shrink-0 bg-white dark:bg-[#1c1c1e] border-b border-black/5 dark:border-white/10">
+            <ClosetSectionTabs active="feed" className="px-4 py-2" />
+          </div>
+        )}
 
         {/* Feed grid (pull down from the top to refresh) */}
         <div className="relative flex-1 overflow-hidden">

@@ -19,10 +19,12 @@ import { useEffect } from 'react';
  * it and did nothing. Cloning the live state keeps the entry a valid Next route.
  *
  * Use only on genuine root/entry pages where Back should not leave the app.
+ * Pages that are a tab root only sometimes (e.g. /stylist, which is the Nur
+ * tab in the native shell but a pushed page elsewhere) pass `enabled`.
  */
-export function useRootBackGuard(): void {
+export function useRootBackGuard(enabled = true): void {
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (!enabled || typeof window === 'undefined') return;
     // Marker read by the native shell's Back handler: while a tab-root page is
     // mounted (and no overlay is open — see use-overlay-back-close), Back should
     // fall through to native tab-switch / app-exit instead of history.back().
@@ -35,5 +37,5 @@ export function useRootBackGuard(): void {
       (window as unknown as { __svaypTabRoot?: boolean }).__svaypTabRoot = false;
       window.removeEventListener('popstate', onPopState);
     };
-  }, []);
+  }, [enabled]);
 }

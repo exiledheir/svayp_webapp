@@ -25,7 +25,8 @@ import { fetchStylistAccess } from '@/lib/stylist';
 import { reportPurchaseFunnel } from '@/lib/purchase-funnel';
 import { Events, Params } from '@/lib/analytics-events';
 import { useTheme } from '@/lib/theme';
-import { isInFlutterWebView } from '@/lib/flutter-bridge';
+import { isInFlutterWebView, isShellTab } from '@/lib/flutter-bridge';
+import NativeChatButton from '@/components/NativeChatButton';
 import { shareImageBlob, fetchImageBlob } from '@/lib/share-image';
 import ShareSheet from '@/components/ShareSheet';
 import CalendarPickSheet, { type PickGroup } from '@/components/closet/CalendarPickSheet';
@@ -224,6 +225,12 @@ export default function ClosetPage() {
   // to avoid a hydration mismatch (server always renders the browser variant).
   const [isFlutterWebView, setIsFlutterWebView] = useState(false);
   useEffect(() => { setIsFlutterWebView(isInFlutterWebView()); }, []);
+  // This page is a bottom-bar tab of the NEW native shell (Garderob · Lenta ·
+  // Nur · LIBΛS · Bozor). The bar owns the Feed and Nur entry points and the
+  // header owns chat, so the in-page duplicates are hidden. Old app builds and
+  // browsers keep them (see isShellTab). Resolved after mount for hydration.
+  const [shellTab, setShellTab] = useState(false);
+  useEffect(() => { setShellTab(isShellTab()); }, []);
 
   useEffect(() => {
     // Immediately show whatever is in localStorage (prevents flicker)
@@ -1501,6 +1508,9 @@ export default function ClosetPage() {
   // Ошибка запроса трактуется как «недоступно» внутри fetchStylistAccess, поэтому
   // сбой сети просто не покажет кнопку и не сломает гардероб.
   useEffect(() => {
+    // In the new shell Nur has its own bottom tab: no button here, so neither
+    // the access check nor the "entry shown" event should fire from the closet.
+    if (isShellTab()) return;
     let cancelled = false;
     fetchStylistAccess().then((a) => {
       if (cancelled || !a.available) return;
@@ -2231,7 +2241,7 @@ export default function ClosetPage() {
             {plansEnabled && (
             <button
               onClick={() => setShowPremiumGate('browse')}
-              className="flex items-center gap-1.5 px-2.5 h-8 rounded-full text-[13px] font-extrabold active:scale-[0.95] transition-all"
+              className="flex items-center gap-1.5 px-2.5 h-9 rounded-full text-[13px] font-extrabold active:scale-[0.95] transition-all"
               style={{
                 background: theme === 'dark' ? 'rgba(243,112,167,0.16)' : '#fdeef6',
                 border: `1px solid ${theme === 'dark' ? 'rgba(243,112,167,0.32)' : '#F8D3E4'}`,
@@ -2273,23 +2283,30 @@ export default function ClosetPage() {
                 </span>
               </button>
             )}
-            {/* Catchy guide entry point — last item on the right */}
+            {/* Catchy guide entry point. In the shell the header also holds the
+                chat icon and was already tight on narrow screens, so the guide
+                collapses to its icon there (the pulsing dot keeps it noticeable). */}
             <button
               onClick={() => { setShowGuide(true); logAnalyticsEvent(Events.CLOSET_GUIDE_OPENED); }}
-              className="relative shrink-0 flex items-center gap-1 pl-2 pr-2.5 h-8 rounded-full active:scale-[0.95] transition-transform shadow-sm"
+              className={`relative shrink-0 flex items-center ${shellTab ? 'w-9 justify-center' : 'gap-1 pl-2.5 pr-3'} h-9 rounded-full active:scale-[0.95] transition-transform shadow-sm`}
               // Розовый в гардеробе оставлен только за «добавить вещь» и Beautify —
               // остальные действия чёрные, иначе розовым подсвечено всё сразу.
               style={{ background: '#141014' }}
               aria-label={getGuideStrings(locale).guide}
             >
-              <BookOpen size={12} strokeWidth={2.4} color="#fff" />
-              <span className="text-[11px] font-bold text-white whitespace-nowrap">{getGuideStrings(locale).guide}</span>
+              <BookOpen size={shellTab ? 14 : 12} strokeWidth={2.4} color="#fff" />
+              {!shellTab && (
+                <span className="text-[11px] font-bold text-white whitespace-nowrap">{getGuideStrings(locale).guide}</span>
+              )}
               {/* Pulsing dot to draw the eye on first visits */}
               <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: '#141014' }} />
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 border-2 border-white" style={{ background: '#141014' }} />
               </span>
             </button>
+            {/* Chat left the native bottom bar — the header carries it now, and
+                it is the LAST icon on every screen (Feed / Market / Discover). */}
+            {shellTab && <NativeChatButton />}
           </div>
       </header>
 
@@ -2773,8 +2790,11 @@ export default function ClosetPage() {
             Стоит здесь, а не в шапке: шапка уже переполнена — алмазы, тариф и «Руководство»
             не влезают на узких экранах, и «Руководство» обрезается краем. Ещё одна кнопка
             там сделала бы хуже. Внизу справа есть место, и для флагманской фичи заметная
-            кнопка честнее иконки, зажатой в углу. */}
-        {stylistAvailable && (
+            кнопка честнее иконки, зажатой в углу.
+
+            В новой оболочке приложения у Nur есть своя вкладка в нижнем баре — там
+            кнопка не нужна (и stylistAvailable там не запрашивается). */}
+        {stylistAvailable && !shellTab && (
           <button
             onClick={() => {
               logAnalyticsEvent(Events.STYLIST_ENTRY_TAPPED, { [Params.SOURCE]: 'closet_fab' });

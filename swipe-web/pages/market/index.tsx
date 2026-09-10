@@ -12,6 +12,8 @@ import type { MarketListing } from '@/types/market';
 import { useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
 import { useRootBackGuard } from '@/lib/use-root-back-guard';
+import { isShellTab } from '@/lib/flutter-bridge';
+import NativeChatButton from '@/components/NativeChatButton';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events } from '@/lib/analytics-events';
 import { openSupportChat } from '@/lib/support-chat';
@@ -54,6 +56,10 @@ export default function MarketFeedPage() {
 
   // Root tab page — trap Back so it doesn't exit to a blank WebView screen.
   useRootBackGuard();
+  // Bottom-bar tab of the new native shell: the header carries the chat entry
+  // point (Chat left the bar). Resolved after mount for hydration.
+  const [shellTab, setShellTab] = useState(false);
+  useEffect(() => { setShellTab(isShellTab()); }, []);
 
   useEffect(() => {
     logAnalyticsEvent(Events.MARKET_FEED_VIEWED);
@@ -275,14 +281,15 @@ export default function MarketFeedPage() {
           <h1 className="text-[26px] font-bold tracking-[-0.5px] text-black dark:text-white">
             {t.marketTitle}
           </h1>
-          <div className="flex items-center gap-2">
+          {/* Right cluster — shared header pattern: screen-scoped actions
+              first, chat always last (see MainTopBar / Closet / Feed). */}
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => router.push('/market/liked')}
-              className="w-9 h-9 flex items-center justify-center rounded-full active:opacity-80"
-              style={{ border: isDark ? '1px solid rgba(255,255,255,0.18)' : '1px solid rgba(0,0,0,0.13)' }}
+              className="w-9 h-9 shrink-0 flex items-center justify-center rounded-full active:opacity-60 transition-opacity"
               aria-label={t.mk_liked_title}
             >
-              <Heart size={17} strokeWidth={1.9} className="text-black dark:text-white" />
+              <Heart size={22} strokeWidth={1.9} className="text-black dark:text-white" />
             </button>
             <button
               onClick={() => router.push('/market/mine')}
@@ -292,6 +299,7 @@ export default function MarketFeedPage() {
               <User size={15} strokeWidth={1.9} className="text-black dark:text-white" />
               <span className="text-[13px] font-semibold text-black dark:text-white">{t.mk_my_listings}</span>
             </button>
+            {shellTab && <NativeChatButton />}
           </div>
         </header>
 
