@@ -39,7 +39,10 @@ USER nextjs
 
 EXPOSE 3000
 
+# Адрес именно 127.0.0.1: «localhost» внутри контейнера резолвится в ::1, где Next
+# не слушает, и проба вечно падала с «connection refused» — контейнер работал, а
+# докер показывал unhealthy.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-  CMD wget -qO- http://localhost:3000/ || exit 1
+  CMD wget -qO- http://127.0.0.1:3000/ || exit 1
 
 CMD ["node", "server.js"]
