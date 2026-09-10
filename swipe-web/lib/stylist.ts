@@ -108,6 +108,8 @@ export interface StylistAnswer {
   constraints?: string | null;
   coinsSpent: number;
   chargedSource: ChargedSource;
+  /** Nur ждёт вещь — фото или выбор из гардероба. Пока ждёт, подсказки не показываем. */
+  awaitingItem?: boolean;
 }
 
 /**

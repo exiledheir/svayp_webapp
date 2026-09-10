@@ -110,7 +110,7 @@ const RU: StylistStrings = {
   whatWasWrong: 'Что именно не подошло?',
   constraintsApplied: (list) => `Не предлагаю: ${list} · изменить`,
   savePartial: (n) =>
-    `На доску попадут только твои вещи. ${n} ${n === 1 ? 'позицию' : 'позиции'} нужно сначала добавить в гардероб: выбери фото под вещью и нажми «Взять эту вещь».`,
+    `${n === 1 ? 'Одна вещь' : `${n} вещи`} здесь из интернета — добавлю ${n === 1 ? 'её' : 'их'} в твой гардероб при сохранении. Хочешь другое фото — выбери его выше.`,
   uploading: 'Загружаю…',
   takeThisItem: 'Взять эту вещь',
   addingItem: 'Добавляю в гардероб…',
@@ -198,7 +198,7 @@ const UZ: StylistStrings = {
   whatWasWrong: 'Aynan nima to‘g‘ri kelmadi?',
   constraintsApplied: (list) => `Taklif qilmayman: ${list} · o‘zgartirish`,
   savePartial: (n) =>
-    `Doskaga faqat sizning kiyimlaringiz tushadi. ${n} ta pozitsiyani avval garderobga qo‘shing: rasmni tanlab, «Bu kiyimni olish» tugmasini bosing.`,
+    `Bu yerda ${n} ta kiyim internetdan — saqlashda ularni garderobingizga qo‘shaman. Boshqa rasm kerak bo‘lsa, yuqoridan tanlang.`,
   uploading: 'Yuklanmoqda…',
   takeThisItem: 'Bu kiyimni olish',
   addingItem: 'Garderobga qo‘shilmoqda…',
@@ -285,7 +285,7 @@ const EN: StylistStrings = {
   whatWasWrong: 'What exactly didn’t work?',
   constraintsApplied: (list) => `Not suggesting: ${list} · change`,
   savePartial: (n) =>
-    `Only your own pieces go to the board. ${n} ${n === 1 ? 'item' : 'items'} must be added to your wardrobe first: pick a photo below the piece and tap “Take this piece”.`,
+    `${n === 1 ? 'One piece' : `${n} pieces`} here come from the web — I'll add ${n === 1 ? 'it' : 'them'} to your wardrobe when saving. Want a different photo? Pick one above.`,
   uploading: 'Uploading…',
   takeThisItem: 'Take this piece',
   addingItem: 'Adding to wardrobe…',

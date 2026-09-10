@@ -129,7 +129,13 @@ function parseAnswer(text: string): AnswerBlock[] {
  * ложится в поле ввода — отправка одним касанием после выбора.
  */
 function chipNeedsPhoto(text: string): boolean {
-  return /\bэт(?:а|у|о|и|ой|им|ому|ими|их)\b|скинь фото|мой образ\b/i.test(text);
+  // Три языка: на узбекском чип «Shu kiyim atrofida obraz yig'» уходил текстом без фото,
+  // и Nur собирала образ вокруг вещи, которой не видела.
+  return (
+    /\bэт(?:а|у|о|и|ой|им|ому|ими|их)\b|скинь фото|мой образ\b/i.test(text) ||
+    /\b(?:shu|bu)\s+(?:kiyim|obraz|yubka|ko[’'`ʼ]?ylak)|suratini yubor|rasm(?:ini)? yubor|mening obrazim/i.test(text) ||
+    /\b(?:this|these)\s+(?:piece|item|outfit|look|dress|skirt|shirt|blouse|trousers|jeans|shoes)\b|send a .* photo|my outfit\b/i.test(text)
+  );
 }
 
 
@@ -176,6 +182,8 @@ export default function StylistPage() {
     previews?: string[];
     followups?: string[];
     constraints?: string | null;
+    /** Nur ждёт фото или выбор вещи: пока ждёт, подсказки с другими темами прячем. */
+    awaitingItem?: boolean;
   };
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
@@ -333,6 +341,73 @@ export default function StylistPage() {
   }, [S]);
 
   /**
+   * Забрать выбранный пример из интернета в гардероб.
+   *
+   * <p>Раньше эти позиции нельзя было ни выбрать, ни сохранить: доска состоит из вещей
+   * пользователя, и каталожный слот при сохранении просто исчезал. Теперь фото скачивается
+   * к нам, проходит обычную обработку вещи и встаёт в тот же слот — образ сохраняется целиком.
+   *
+   * <p>Ждём готовности здесь, а не после нажатия «Сохранить образ»: доска не примет вещь,
+   * пока пайплайн не закончил, и человек получил бы отказ на ровном месте.
+   */
+  const takeReference = useCallback(
+    async (messageId: string, outfitIndex: number, slotIndex: number, imageUrl: string) => {
+      const key = `${messageId}-${outfitIndex}-${slotIndex}`;
+      setImportingSlot((prev) => ({ ...prev, [key]: true }));
+      setImportErrors((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      try {
+        const { uploadJobId } = await importStylistReference(messageId, outfitIndex, slotIndex, imageUrl);
+        const ready = await waitForItemReady(uploadJobId);
+        if (!ready) {
+          setImportErrors((prev) => ({ ...prev, [key]: S.itemAddFailed }));
+          return false;
+        }
+        // Слот перерисовываем сами: история не перезапрашивается, а метка «есть у тебя»
+        // должна появиться сразу — иначе выглядит, будто ничего не произошло.
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== messageId || !m.outfits) return m;
+            return {
+              ...m,
+              outfits: m.outfits.map((o, oi) =>
+                oi !== outfitIndex
+                  ? o
+                  : {
+                      ...o,
+                      slots: o.slots.map((sl, si) =>
+                        si !== slotIndex ? sl : { ...sl, source: 'WARDROBE' as const, imageUrl },
+                      ),
+                    },
+              ),
+            };
+          }),
+        );
+        return true;
+      } catch (e: unknown) {
+        const data = (e as { response?: { data?: { code?: string; error?: { code?: string } } } })
+          ?.response?.data;
+        const code = data?.error?.code ?? data?.code;
+        setImportErrors((prev) => ({
+          ...prev,
+          [key]: code === 'QUOTA_EXCEEDED' ? S.itemQuotaFull : S.itemAddFailed,
+        }));
+        return false;
+      } finally {
+        setImportingSlot((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+      }
+    },
+    [S],
+  );
+
+  /**
    * Сохранить образ в гардероб. После успеха кнопка меняется на переход к доскам —
    * там образ живёт как обычный и оттуда же запускается примерка.
    */
@@ -357,6 +432,22 @@ export default function StylistPage() {
         return next;
       });
       try {
+        // Интернет-позиции доска не принимает — она состоит из вещей человека. Раньше
+        // это кончалось отказом «в образе нет твоих вещей», и человек оставался с
+        // подсказкой про кнопку, которую ещё надо найти. Теперь такие вещи забираем
+        // сами: одна кнопка «Сохранить образ» делает всё, что нужно.
+        const missing = outfit.slots
+          .map((sl, si) => ({ sl, si }))
+          .filter(({ sl }) => sl.source === 'CATALOG' && (sl.references?.length ?? 0) > 0);
+
+        for (const { sl, si } of missing) {
+          const chosen = pickedRef[`${messageId}-${index}-${si}`] || sl.references?.[0]?.thumbnailUrl;
+          if (!chosen) continue;
+          const ok = await takeReference(messageId, index, si, chosen);
+          // Одна не добралась — не повод терять остальные: сохраняем что получилось.
+          if (!ok) break;
+        }
+
         const canvasId = await saveStylistOutfit(messageId, index, outfit.title);
         setSavedOutfits((prev) => ({ ...prev, [key]: canvasId }));
         logAnalyticsEvent(Events.STYLIST_OUTFIT_SAVED, { [Params.SOURCE]: 'chat' });
@@ -373,73 +464,9 @@ export default function StylistPage() {
         setSavingOutfit(null);
       }
     },
-    [saveErrorText],
+    [saveErrorText, takeReference, pickedRef],
   );
 
-  /**
-   * Забрать выбранный пример из интернета в гардероб.
-   *
-   * <p>Раньше эти позиции нельзя было ни выбрать, ни сохранить: доска состоит из вещей
-   * пользователя, и каталожный слот при сохранении просто исчезал. Теперь фото скачивается
-   * к нам, проходит обычную обработку вещи и встаёт в тот же слот — образ сохраняется целиком.
-   *
-   * <p>Ждём готовности здесь, а не после нажатия «Сохранить образ»: доска не примет вещь,
-   * пока пайплайн не закончил, и человек получил бы отказ на ровном месте.
-   */
-  const takeReference = useCallback(
-    async (messageId: string, outfitIndex: number, slotIndex: number, imageUrl: string) => {
-      const key = `${messageId}-${outfitIndex}-${slotIndex}`;
-      setImportingSlot((prev) => ({ ...prev, [key]: true }));
-      setImportErrors((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-      try {
-        const { uploadJobId } = await importStylistReference(messageId, outfitIndex, slotIndex, imageUrl);
-        const ready = await waitForItemReady(uploadJobId);
-        if (!ready) {
-          setImportErrors((prev) => ({ ...prev, [key]: S.itemAddFailed }));
-          return;
-        }
-        // Слот перерисовываем сами: история не перезапрашивается, а метка «есть у тебя»
-        // должна появиться сразу — иначе выглядит, будто ничего не произошло.
-        setMessages((prev) =>
-          prev.map((m) => {
-            if (m.id !== messageId || !m.outfits) return m;
-            return {
-              ...m,
-              outfits: m.outfits.map((o, oi) =>
-                oi !== outfitIndex
-                  ? o
-                  : {
-                      ...o,
-                      slots: o.slots.map((sl, si) =>
-                        si !== slotIndex ? sl : { ...sl, source: 'WARDROBE' as const, imageUrl },
-                      ),
-                    },
-              ),
-            };
-          }),
-        );
-      } catch (e: unknown) {
-        const data = (e as { response?: { data?: { code?: string; error?: { code?: string } } } })
-          ?.response?.data;
-        const code = data?.error?.code ?? data?.code;
-        setImportErrors((prev) => ({
-          ...prev,
-          [key]: code === 'QUOTA_EXCEEDED' ? S.itemQuotaFull : S.itemAddFailed,
-        }));
-      } finally {
-        setImportingSlot((prev) => {
-          const next = { ...prev };
-          delete next[key];
-          return next;
-        });
-      }
-    },
-    [S],
-  );
 
   /**
    * Оценить ответ. Вердикт запоминаем сразу, не дожидаясь сервера: кнопка должна
@@ -572,6 +599,7 @@ export default function StylistPage() {
             shopping: answer.shopping ?? [],
             followups: answer.followups ?? [],
             constraints: answer.constraints ?? null,
+            awaitingItem: answer.awaitingItem ?? false,
             coinsSpent: answer.coinsSpent,
             createdAt: new Date().toISOString(),
           },
@@ -962,11 +990,15 @@ export default function StylistPage() {
               </div>
             )}
 
-            {/* Follow-up чипы только под ПОСЛЕДНИМ ответом и только если в нём нет
-                своих вариантов выбора: под каждым ответом они превращались в шум,
-                а рядом с готовыми вариантами спорили с ними за внимание. */}
+            {/* Follow-up чипы только под ПОСЛЕДНИМ ответом и только если разговор
+                действительно закончен. Под «жду фото юбки» они звали в другие темы —
+                человек ещё не сделал начатое, а ему уже предлагают три новых вопроса.
+                Под карточками их тоже нет: там своё действие — «Сохранить образ». */}
             {m.role === 'ASSISTANT' &&
               m.id === messages[messages.length - 1]?.id &&
+              !m.awaitingItem &&
+              (!m.outfits || m.outfits.length === 0) &&
+              (!m.shopping || m.shopping.length === 0) &&
               parseAnswer(stripMarkdown(m.content ?? '')).every((b) => b.kind === 'text') &&
               m.followups &&
               m.followups.length > 0 &&
@@ -1210,18 +1242,25 @@ export default function StylistPage() {
                                 ))}
                           </div>
 
-                          {/* Действие появляется только после выбора: кнопка «взять» без
-                              выбранного фото непонятно к чему относится, их тут три. */}
-                          {(picked || busy) && (
-                            <button
-                              onClick={() => picked && takeReference(m.id, idx, si, picked)}
+                          {/* Кнопка видна сразу. Раньше она появлялась только после тапа
+                              по фото, и человек читал подсказку «выбери фото и нажми
+                              „Взять эту вещь“», не видя никакой кнопки. Без выбора берём
+                              первое фото — оно же первое и по релевантности. */}
+                          <button
+                              onClick={() =>
+                                takeReference(
+                                  m.id,
+                                  idx,
+                                  si,
+                                  picked || (slot.references ?? [])[0]?.thumbnailUrl || '',
+                                )
+                              }
                               disabled={busy}
                               className="mt-2 w-full h-9 rounded-full text-[13px] font-bold active:scale-[0.98] transition-transform disabled:opacity-60"
                               style={{ background: ink, color: bg }}
                             >
                               {busy ? S.addingItem : S.takeThisItem}
-                            </button>
-                          )}
+                          </button>
                           {importErrors[slotKey] && (
                             <p className="mt-1.5 text-[12px] leading-snug" style={{ color: '#B4443C' }}>
                               {importErrors[slotKey]}
@@ -1264,7 +1303,13 @@ export default function StylistPage() {
                       className="w-full h-9 rounded-full text-[13px] font-bold active:scale-[0.98] transition-transform disabled:opacity-50"
                       style={{ background: ink, color: bg }}
                     >
-                      {savingOutfit === `${m.id}-${idx}` ? S.saving : S.saveOutfit}
+                      {savingOutfit === `${m.id}-${idx}`
+                        ? // Добор вещей из интернета занимает секунды — говорим, что
+                          // именно происходит, иначе «Сохраняю…» выглядит зависшим.
+                          Object.keys(importingSlot).some((k) => k.startsWith(`${m.id}-${idx}-`))
+                          ? S.addingItem
+                          : S.saving
+                        : S.saveOutfit}
                     </button>
                   )}
                   {/* Отказ — здесь же, под кнопкой: в конце ленты его никто не видел. */}
