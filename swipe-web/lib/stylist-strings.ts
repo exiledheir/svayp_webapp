@@ -72,6 +72,8 @@ export interface StylistStrings {
   errorGeneric: string;
   /** Ответа нет дольше, чем сервер вообще может думать: точки не должны крутиться вечно. */
   errorTimeout: string;
+  /** Модель перегружена (429): говорим прямо и сразу, а не общим «не получилось». */
+  errorBusy: string;
   errorPhoto: string;
   errorCoins: string;
   errorSaveOutfit: string;
@@ -147,6 +149,7 @@ const RU: StylistStrings = {
 
   errorGeneric: 'Не получилось ответить. Попробуй ещё раз',
   errorTimeout: 'Nur думает слишком долго. Попробуй ещё раз',
+  errorBusy: 'Nur сейчас перегружена — попробуй через минуту',
   errorPhoto: 'Не получилось загрузить фото. Попробуй ещё раз',
   errorCoins: 'Не хватает монет на это действие',
   errorSaveOutfit: 'Не получилось сохранить образ',
@@ -281,6 +284,7 @@ const UZ: StylistStrings = {
 
   errorGeneric: 'Javob bera olmadim. Yana urinib ko‘ring',
   errorTimeout: 'Nur juda uzoq o‘ylayapti. Yana urinib ko‘ring',
+  errorBusy: 'Nur hozir band — bir daqiqadan keyin urinib ko‘ring',
   errorPhoto: 'Suratni yuklab bo‘lmadi. Yana urinib ko‘ring',
   errorCoins: 'Bu amal uchun tanga yetarli emas',
   errorSaveOutfit: 'Obrazni saqlab bo‘lmadi',
@@ -418,6 +422,7 @@ const EN: StylistStrings = {
 
   errorGeneric: 'Couldn’t answer. Please try again',
   errorTimeout: 'Nur is taking too long. Please try again',
+  errorBusy: 'Nur is busy right now — try again in a minute',
   errorPhoto: 'Couldn’t upload the photo. Please try again',
   errorCoins: 'Not enough coins for this action',
   errorSaveOutfit: 'Couldn’t save the outfit',

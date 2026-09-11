@@ -704,7 +704,13 @@ export default function StylistPage() {
         const timedOut =
           e instanceof StylistTimeoutError || (e as { code?: string })?.code === 'ECONNABORTED';
         setError(
-          timedOut ? S.errorTimeout : code === 'INSUFFICIENT_COINS' ? S.errorCoins : S.errorGeneric,
+          timedOut
+            ? S.errorTimeout
+            : code === 'INSUFFICIENT_COINS'
+              ? S.errorCoins
+              : code === 'STYLIST_BUSY'
+                ? S.errorBusy
+                : S.errorGeneric,
         );
         setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
         setDraft(body);
