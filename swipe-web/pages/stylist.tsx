@@ -37,7 +37,6 @@ import {
   saveStylistOutfit,
   importStylistReference,
   waitForItemReady,
-  SLOT_LABELS,
   type StylistOutfitCard,
   FEEDBACK_REASONS,
   type FeedbackReason,
@@ -46,6 +45,7 @@ import {
   fetchStyleProfile,
   streamStylistMessage,
   StreamUnsupportedError,
+  StylistTimeoutError,
 } from '@/lib/stylist';
 
 /**
@@ -132,6 +132,32 @@ function parseAnswer(text: string): AnswerBlock[] {
  * и человек делал лишний круг. Теперь такой чип сразу открывает выбор фото, а текст
  * ложится в поле ввода — отправка одним касанием после выбора.
  */
+/**
+ * Какой разговор открыт — переживает перезагрузку вебвью.
+ *
+ * <p>Раньше после F5 открывался «активный» тред сервера — самый свежий, а не тот, где
+ * человек только что был. Хранилище может быть недоступно (приватный режим, запрет
+ * данных сайта), поэтому каждое обращение в try: без него чат просто откроет свежий тред.
+ */
+const THREAD_KEY = 'nur_thread_id';
+
+function rememberThread(id: string | null) {
+  try {
+    if (id) localStorage.setItem(THREAD_KEY, id);
+    else localStorage.removeItem(THREAD_KEY);
+  } catch {
+    // Хранилище недоступно — теряем только удобство, не данные.
+  }
+}
+
+function rememberedThread(): string | null {
+  try {
+    return localStorage.getItem(THREAD_KEY);
+  } catch {
+    return null;
+  }
+}
+
 function chipNeedsPhoto(text: string): boolean {
   // Три языка: на узбекском чип «Shu kiyim atrofida obraz yig'» уходил текстом без фото,
   // и Nur собирала образ вокруг вещи, которой не видела.
@@ -257,16 +283,29 @@ export default function StylistPage() {
 
       // isShellTab() напрямую: state из эффекта выше это замыкание ещё не видит.
       logAnalyticsEvent(Events.STYLIST_CHAT_OPENED, {
-        [Params.SOURCE]: isShellTab() ? 'nav_tab' : 'closet_header',
+        [Params.SOURCE]: isShellTab() ? 'nav_tab' : 'closet_fab',
       });
       let hasHistory = false;
       try {
-        const id = await fetchStylistThread();
+        // Сначала тот разговор, где человек был; серверный «активный» — только если
+        // своего нет или он удалён с другого устройства.
+        let id: string | null = rememberedThread();
+        let history: Awaited<ReturnType<typeof fetchStylistHistory>> | null = null;
+        if (id) {
+          try {
+            history = await fetchStylistHistory(id);
+          } catch {
+            id = null;
+          }
+        }
+        if (!id) {
+          id = await fetchStylistThread();
+          history = await fetchStylistHistory(id);
+        }
         if (cancelled) return;
         setThreadId(id);
-        const history = await fetchStylistHistory(id);
-        if (!cancelled) setMessages(history);
-        hasHistory = history.length > 0;
+        if (!cancelled) setMessages(history ?? []);
+        hasHistory = (history ?? []).length > 0;
       } catch {
         // История не критична: пустой тред — рабочее состояние, чат откроется чистым.
       }
@@ -330,6 +369,32 @@ export default function StylistPage() {
     }
   }, [S]);
 
+  // Открытый разговор переживает перезагрузку. Пустое значение не пишем: эффект
+  // срабатывает и на первом рендере, когда тред ещё не загружен, и стёр бы
+  // запомненный раньше, чем его успеют прочитать.
+  useEffect(() => {
+    if (threadId) rememberThread(threadId);
+  }, [threadId]);
+
+  /**
+   * Тред для отправки. Пустой threadId значит «новый разговор» — и его надо создать.
+   *
+   * <p>Раньше пустой уходил на сервер как есть, а сервер без threadId берёт самый
+   * свежий тред пользователя. После удаления открытого чата следующее сообщение падало
+   * в чужой, давно закрытый разговор — вместе с его историей в контексте модели.
+   */
+  const ensureThread = useCallback(async (): Promise<string | undefined> => {
+    if (threadId) return threadId;
+    try {
+      const id = await startStylistThread();
+      setThreadId(id);
+      return id;
+    } catch {
+      // Не создался — отправляем без треда: сервер откроет свой, как было раньше.
+      return undefined;
+    }
+  }, [threadId]);
+
   const removeThread = useCallback(
     async (id: string) => {
       try {
@@ -338,6 +403,7 @@ export default function StylistPage() {
         // Удалили тот, что открыт — показываем пустой чат, а не чужую переписку.
         if (id === threadId) {
           setThreadId(null);
+          rememberThread(null);
           setMessages([]);
         }
       } catch {
@@ -352,6 +418,7 @@ export default function StylistPage() {
       await clearStylistHistory();
       setThreads([]);
       setThreadId(null);
+      rememberThread(null);
       setMessages([]);
       setConfirmClear(false);
       setShowThreads(false);
@@ -559,6 +626,7 @@ export default function StylistPage() {
       const streamId = `stream-${Date.now()}`;
 
       try {
+        const tid = await ensureThread();
         let answer: StylistAnswer;
         // Поток пробуем только для текста: у сборки образа и списка покупок ответ —
         // структура, её нечем показывать по кускам, и бэкенд отвечает на такое 409.
@@ -566,7 +634,7 @@ export default function StylistPage() {
           try {
             let acc = '';
             answer = await streamStylistMessage(
-              { text: body, locale, threadId: threadId ?? undefined },
+              { text: body, locale, threadId: tid },
               (piece) => {
                 acc += piece;
                 setMessages((prev) => {
@@ -592,7 +660,7 @@ export default function StylistPage() {
           } catch (streamError) {
             setMessages((prev) => prev.filter((m) => m.id !== streamId));
             if (!(streamError instanceof StreamUnsupportedError)) throw streamError;
-            answer = await sendStylistMessage({ text: body, locale, threadId: threadId ?? undefined });
+            answer = await sendStylistMessage({ text: body, locale, threadId: tid });
           }
         } else {
           answer = await sendStylistMessage({
@@ -604,7 +672,7 @@ export default function StylistPage() {
             // Nur обязана отвечать на языке приложения: узбекоязычному пользователю
             // русский ответ бесполезен.
             locale,
-            threadId: threadId ?? undefined,
+            threadId: tid,
           });
         }
         setThreadId(answer.threadId);
@@ -626,18 +694,26 @@ export default function StylistPage() {
         ]);
         logAnalyticsEvent(Events.STYLIST_ANSWER_SHOWN, { [Params.SOURCE]: answer.chargedSource });
       } catch (e: unknown) {
-        // Реплику оставляем на экране. На сервере её нет: при сбое генерации транзакция
-        // откатывается целиком, чтобы в истории не оседали вопросы без ответов. Значит
-        // единственная копия написанного — эта, и стирать её нельзя.
+        // На сервере реплики нет: при сбое генерации транзакция откатывается целиком,
+        // чтобы в истории не оседали вопросы без ответов. Единственная копия написанного —
+        // у нас, поэтому возвращаем её в поле ввода вместе с фото: одно нажатие — и
+        // повтор. Раньше поле очищалось до отправки, и текст приходилось набирать заново.
         const data = (e as { response?: { data?: { code?: string; error?: { code?: string } } } })
           ?.response?.data;
         const code = data?.error?.code ?? data?.code;
-        setError(code === 'INSUFFICIENT_COINS' ? S.errorCoins : S.errorGeneric);
+        const timedOut =
+          e instanceof StylistTimeoutError || (e as { code?: string })?.code === 'ECONNABORTED';
+        setError(
+          timedOut ? S.errorTimeout : code === 'INSUFFICIENT_COINS' ? S.errorCoins : S.errorGeneric,
+        );
+        setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+        setDraft(body);
+        setAttachments(keys.map((key, i) => ({ key, preview: previews[i] })));
       } finally {
         setSending(false);
       }
     },
-    [sending, threadId, attachments, locale, S],
+    [sending, attachments, locale, S, ensureThread],
   );
 
   /**
@@ -662,7 +738,8 @@ export default function StylistPage() {
         },
       ]);
       try {
-        const answer = await sendStylistMessage({ imageKeys: [key], locale });
+        const tid = await ensureThread();
+        const answer = await sendStylistMessage({ imageKeys: [key], locale, threadId: tid });
         setThreadId(answer.threadId);
         setMessages((prev) => [
           ...prev,
@@ -674,17 +751,21 @@ export default function StylistPage() {
             outfits: answer.outfits ?? [],
             shopping: answer.shopping ?? [],
             followups: answer.followups ?? [],
+            constraints: answer.constraints ?? null,
+            awaitingItem: answer.awaitingItem ?? false,
             coinsSpent: answer.coinsSpent,
             createdAt: new Date().toISOString(),
           },
         ]);
-      } catch {
-        setError(S.errorGeneric);
+      } catch (e: unknown) {
+        const timedOut =
+          e instanceof StylistTimeoutError || (e as { code?: string })?.code === 'ECONNABORTED';
+        setError(timedOut ? S.errorTimeout : S.errorGeneric);
       } finally {
         setSending(false);
       }
     },
-    [locale, S],
+    [locale, S, ensureThread],
   );
 
   const { bg, ink, muted, card, line, accent, accentWash, accentInk, accentGradient } =
@@ -950,11 +1031,15 @@ export default function StylistPage() {
               {S.greetingHint}
             </p>
             <div className="mt-5 flex flex-col gap-2">
-              {S.starters.map((chip) => (
+              {S.starters.map((chip, chipIndex) => (
                 <button
                   key={chip}
                   onClick={() => {
-                    logAnalyticsEvent(Events.STYLIST_STARTER_CHIP_TAPPED, { [Params.SOURCE]: chip });
+                    // Номер, а не текст: текст чипа на трёх языках разный, и одна
+                    // подсказка распадалась в дашборде на три строки.
+                    logAnalyticsEvent(Events.STYLIST_STARTER_CHIP_TAPPED, {
+                      [Params.SOURCE]: `starter_${chipIndex}`,
+                    });
                     if (chipNeedsPhoto(chip)) {
                       setDraft(chip);
                       fileRef.current?.click();
@@ -1198,7 +1283,7 @@ export default function StylistPage() {
                           className="text-[10px] font-bold uppercase"
                           style={{ color: muted, letterSpacing: '0.5px' }}
                         >
-                          {SLOT_LABELS[slot.role] ?? slot.role}
+                          {S.slotLabels[slot.role] ?? slot.role}
                         </p>
                         <p className="text-[13px] leading-snug" style={{ color: ink }}>
                           {slot.description}

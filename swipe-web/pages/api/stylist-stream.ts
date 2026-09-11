@@ -72,8 +72,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // 409 «поток не поддерживается» пробрасываем как есть: клиент по нему уходит
       // на обычную ручку, а не показывает ошибку.
       if (proxyRes.statusCode !== 200) {
-        res.status(proxyRes.statusCode ?? 502).end();
-        proxyRes.resume();
+        // Тело ошибки пробрасываем: в нём код бэкенда. Без него 402 «не хватает монет»
+        // превращался у пользователя в общее «не получилось ответить».
+        const chunks: Buffer[] = [];
+        proxyRes.on('data', (c: Buffer) => chunks.push(c));
+        proxyRes.on('end', () => {
+          res.status(proxyRes.statusCode ?? 502);
+          const type = proxyRes.headers['content-type'];
+          if (type) res.setHeader('Content-Type', type);
+          res.end(Buffer.concat(chunks));
+        });
         return;
       }
 

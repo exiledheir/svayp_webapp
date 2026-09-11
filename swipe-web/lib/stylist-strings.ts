@@ -10,6 +10,52 @@ import type { FeedbackReason } from './stylist';
  *
  * Узбекский — латиница: так пишет остальное приложение.
  */
+/**
+ * Вопрос знакомства.
+ *
+ * <p>У варианта есть подпись и значение. Подпись переводится, значение — нет: оно
+ * пишется в профиль и читается бэкендом как есть. `isModest` на сервере сравнивает
+ * закрытость со строкой «без ограничений», и узбекское «Cheklovsiz» в профиле
+ * включило бы закрытый стиль человеку, который просил обратного.
+ */
+export interface OnboardingStep {
+  field: 'style' | 'modesty' | 'lifestyle' | 'height_range';
+  question: string;
+  hint?: string;
+  /** value = null — «не знаю»: поле не пишем вовсе. */
+  options: { label: string; value: string | null }[];
+}
+
+export interface OnboardingStrings {
+  hello: string;
+  tagline: string;
+  showYourself: string;
+  photoPitch: string;
+  pickPhoto: string;
+  later: string;
+  skip: string;
+  stepOf: (step: number, total: number) => string;
+  steps: OnboardingStep[];
+}
+
+/** Значения профиля — единые для всех языков: их читает бэкенд. */
+const STYLE_VALUES = ['Минимализм', 'Классика', 'Casual', 'Романтичный', 'Спортивный'];
+const MODESTY_VALUES = ['Закрытая одежда', 'Умеренно', 'Без ограничений'];
+const LIFESTYLE_VALUES = ['Офис', 'Учёба', 'Дома и прогулки', 'Много встреч', 'Творческая работа'];
+const HEIGHT_VALUES = ['до 160 см', '160–170 см', '170–180 см', 'выше 180 см'];
+
+/** Склеить переведённые подписи с общими значениями; последний вариант «не знаю» — null. */
+function withValues(labels: string[], values: string[], unknown?: string) {
+  const out: { label: string; value: string | null }[] = labels.map((label, i) => ({
+    label,
+    value: values[i],
+  }));
+  if (unknown) out.push({ label: unknown, value: null });
+  return out;
+}
+
+export type SlotLabels = Record<'TOP' | 'BOTTOM' | 'SHOES' | 'OUTER' | 'ACCESSORY' | 'HEADSCARF', string>;
+
 export interface StylistStrings {
   title: string;
   beta: string;
@@ -24,6 +70,8 @@ export interface StylistStrings {
   photoMany: (n: number) => string;
 
   errorGeneric: string;
+  /** Ответа нет дольше, чем сервер вообще может думать: точки не должны крутиться вечно. */
+  errorTimeout: string;
   errorPhoto: string;
   errorCoins: string;
   errorSaveOutfit: string;
@@ -48,6 +96,10 @@ export interface StylistStrings {
   itemAdded: string;
   itemAddFailed: string;
   itemQuotaFull: string;
+  /** Подписи ролей в карточке образа: раньше были только по-русски на всех языках. */
+  slotLabels: SlotLabels;
+  /** Знакомство целиком: раньше экран был по-русски и у узбекских, и у английских пользователей. */
+  onboarding: OnboardingStrings;
   openSource: string;
 
   unavailableTitle: string;
@@ -94,6 +146,7 @@ const RU: StylistStrings = {
   photoMany: (n) => `📷 ${n} фото`,
 
   errorGeneric: 'Не получилось ответить. Попробуй ещё раз',
+  errorTimeout: 'Nur думает слишком долго. Попробуй ещё раз',
   errorPhoto: 'Не получилось загрузить фото. Попробуй ещё раз',
   errorCoins: 'Не хватает монет на это действие',
   errorSaveOutfit: 'Не получилось сохранить образ',
@@ -119,6 +172,50 @@ const RU: StylistStrings = {
   itemAdded: '🟢 добавлено в гардероб',
   itemAddFailed: 'Не получилось добавить это фото. Попробуй другое.',
   itemQuotaFull: 'В гардеробе кончилось место — освободи его или расширь тариф.',
+  slotLabels: {
+    TOP: 'Верх',
+    BOTTOM: 'Низ',
+    OUTER: 'Верхний слой',
+    SHOES: 'Обувь',
+    HEADSCARF: 'Платок',
+    ACCESSORY: 'Аксессуары',
+  },
+  onboarding: {
+    hello: 'Привет, я Nur',
+    tagline: 'Твой личный стилист. «Nur» значит «свет» — помогу увидеть, что тебе идёт.',
+    showYourself: 'Покажи себя',
+    photoPitch:
+      'По фото в полный рост я определю цветотип, пропорции и подберу оттенки — советы станут точными, а не общими. Фото видно только тебе.',
+    pickPhoto: 'Выбрать или снять фото',
+    later: 'Позже',
+    skip: 'Пропустить',
+    stepOf: (step, total) => `Шаг ${step} из ${total}`,
+    steps: [
+      {
+        field: 'style',
+        question: 'Какой стиль тебе ближе?',
+        hint: 'Можно поменять в любой момент',
+        options: withValues(STYLE_VALUES, STYLE_VALUES, 'Пока не знаю'),
+      },
+      {
+        field: 'modesty',
+        question: 'Есть ли пожелания по закрытости?',
+        options: withValues(MODESTY_VALUES, MODESTY_VALUES),
+      },
+      {
+        field: 'lifestyle',
+        question: 'Где ты бываешь чаще всего?',
+        hint: 'От этого зависит, что попадёт в образы',
+        options: withValues(LIFESTYLE_VALUES, LIFESTYLE_VALUES),
+      },
+      {
+        field: 'height_range',
+        question: 'Твой рост?',
+        hint: 'Нужен для пропорций — цифры спрашивать не буду',
+        options: withValues(HEIGHT_VALUES, HEIGHT_VALUES),
+      },
+    ],
+  },
   openSource: 'Открыть источник',
 
   unavailableTitle: 'Nur пока недоступна',
@@ -183,6 +280,7 @@ const UZ: StylistStrings = {
   photoMany: (n) => `📷 ${n} ta surat`,
 
   errorGeneric: 'Javob bera olmadim. Yana urinib ko‘ring',
+  errorTimeout: 'Nur juda uzoq o‘ylayapti. Yana urinib ko‘ring',
   errorPhoto: 'Suratni yuklab bo‘lmadi. Yana urinib ko‘ring',
   errorCoins: 'Bu amal uchun tanga yetarli emas',
   errorSaveOutfit: 'Obrazni saqlab bo‘lmadi',
@@ -208,6 +306,54 @@ const UZ: StylistStrings = {
   itemAdded: '🟢 garderobga qo‘shildi',
   itemAddFailed: 'Bu rasmni qo‘shib bo‘lmadi. Boshqasini tanlang.',
   itemQuotaFull: 'Garderobda joy tugadi — joy bo‘shating yoki tarifni kengaytiring.',
+  slotLabels: {
+    TOP: 'Ust',
+    BOTTOM: 'Past',
+    OUTER: 'Ustki kiyim',
+    SHOES: 'Poyabzal',
+    HEADSCARF: 'Ro‘mol',
+    ACCESSORY: 'Aksessuarlar',
+  },
+  onboarding: {
+    hello: 'Salom, men Nur',
+    tagline: 'Shaxsiy stilistingiz. «Nur» — yorug‘lik degani: sizga nima yarashishini ko‘rishga yordam beraman.',
+    showYourself: 'O‘zingizni ko‘rsating',
+    photoPitch:
+      'To‘liq bo‘yli rasmingizdan rang tipingiz va proporsiyalaringizni aniqlayman, mos ranglarni tanlayman — maslahatlar umumiy emas, aniq bo‘ladi. Rasmni faqat siz ko‘rasiz.',
+    pickPhoto: 'Rasm tanlash yoki suratga olish',
+    later: 'Keyinroq',
+    skip: 'O‘tkazib yuborish',
+    stepOf: (step, total) => `${step}-qadam, jami ${total}`,
+    steps: [
+      {
+        field: 'style',
+        question: 'Qaysi uslub sizga yaqinroq?',
+        hint: 'Istalgan vaqtda o‘zgartirish mumkin',
+        options: withValues(
+          ['Minimalizm', 'Klassika', 'Casual', 'Romantik', 'Sport uslubi'],
+          STYLE_VALUES,
+          'Hozircha bilmayman',
+        ),
+      },
+      {
+        field: 'modesty',
+        question: 'Kiyim yopiqligi bo‘yicha istaklaringiz bormi?',
+        options: withValues(['Yopiq kiyim', 'O‘rtacha', 'Cheklovsiz'], MODESTY_VALUES),
+      },
+      {
+        field: 'lifestyle',
+        question: 'Ko‘pincha qayerda bo‘lasiz?',
+        hint: 'Obrazlarga nima tushishi shunga bog‘liq',
+        options: withValues(['Ofis', 'O‘qish', 'Uy va sayr', 'Ko‘p uchrashuvlar', 'Ijodiy ish'], LIFESTYLE_VALUES),
+      },
+      {
+        field: 'height_range',
+        question: 'Bo‘yingiz qancha?',
+        hint: 'Proporsiyalar uchun kerak — aniq raqam so‘ramayman',
+        options: withValues(['160 sm gacha', '160–170 sm', '170–180 sm', '180 sm dan baland'], HEIGHT_VALUES),
+      },
+    ],
+  },
   openSource: 'Manbani ochish',
 
   unavailableTitle: 'Nur hozircha mavjud emas',
@@ -271,6 +417,7 @@ const EN: StylistStrings = {
   photoMany: (n) => `📷 ${n} photos`,
 
   errorGeneric: 'Couldn’t answer. Please try again',
+  errorTimeout: 'Nur is taking too long. Please try again',
   errorPhoto: 'Couldn’t upload the photo. Please try again',
   errorCoins: 'Not enough coins for this action',
   errorSaveOutfit: 'Couldn’t save the outfit',
@@ -296,6 +443,50 @@ const EN: StylistStrings = {
   itemAdded: '🟢 added to wardrobe',
   itemAddFailed: 'Couldn’t add this photo. Try another one.',
   itemQuotaFull: 'Your wardrobe is full — free up space or upgrade your plan.',
+  slotLabels: {
+    TOP: 'Top',
+    BOTTOM: 'Bottom',
+    OUTER: 'Outer layer',
+    SHOES: 'Shoes',
+    HEADSCARF: 'Headscarf',
+    ACCESSORY: 'Accessories',
+  },
+  onboarding: {
+    hello: 'Hi, I’m Nur',
+    tagline: 'Your personal stylist. “Nur” means “light” — I’ll help you see what suits you.',
+    showYourself: 'Show me you',
+    photoPitch:
+      'From a full-length photo I’ll work out your colour type and proportions and pick your shades — so the advice gets specific, not generic. Only you can see the photo.',
+    pickPhoto: 'Choose or take a photo',
+    later: 'Later',
+    skip: 'Skip',
+    stepOf: (step, total) => `Step ${step} of ${total}`,
+    steps: [
+      {
+        field: 'style',
+        question: 'Which style feels most like you?',
+        hint: 'You can change it any time',
+        options: withValues(['Minimalism', 'Classic', 'Casual', 'Romantic', 'Sporty'], STYLE_VALUES, 'Not sure yet'),
+      },
+      {
+        field: 'modesty',
+        question: 'Any preferences on coverage?',
+        options: withValues(['Modest, covered', 'Moderate', 'No restrictions'], MODESTY_VALUES),
+      },
+      {
+        field: 'lifestyle',
+        question: 'Where do you spend most of your time?',
+        hint: 'This shapes what goes into your outfits',
+        options: withValues(['Office', 'Studies', 'Home and walks', 'Lots of meetings', 'Creative work'], LIFESTYLE_VALUES),
+      },
+      {
+        field: 'height_range',
+        question: 'Your height?',
+        hint: 'Needed for proportions — I won’t ask for exact numbers',
+        options: withValues(['under 160 cm', '160–170 cm', '170–180 cm', 'over 180 cm'], HEIGHT_VALUES),
+      },
+    ],
+  },
   openSource: 'Open source',
 
   unavailableTitle: 'Nur isn’t available yet',

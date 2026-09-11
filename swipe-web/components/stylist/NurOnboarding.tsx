@@ -20,40 +20,6 @@ import { stylistTheme } from '../../lib/stylist-theme';
  * в анкету, и человек уходит, не дойдя до чата.
  */
 
-/** Один вопрос знакомства: поле профиля и варианты ответа. */
-interface Step {
-  field: string;
-  question: string;
-  hint?: string;
-  options: string[];
-}
-
-const STEPS: Step[] = [
-  {
-    field: 'style',
-    question: 'Какой стиль тебе ближе?',
-    hint: 'Можно поменять в любой момент',
-    options: ['Минимализм', 'Классика', 'Casual', 'Романтичный', 'Спортивный', 'Пока не знаю'],
-  },
-  {
-    field: 'modesty',
-    question: 'Есть ли пожелания по закрытости?',
-    options: ['Закрытая одежда', 'Умеренно', 'Без ограничений'],
-  },
-  {
-    field: 'lifestyle',
-    question: 'Где ты бываешь чаще всего?',
-    hint: 'От этого зависит, что попадёт в образы',
-    options: ['Офис', 'Учёба', 'Дома и прогулки', 'Много встреч', 'Творческая работа'],
-  },
-  {
-    field: 'height_range',
-    question: 'Твой рост?',
-    hint: 'Нужен для пропорций — цифры спрашивать не буду',
-    options: ['до 160 см', '160–170 см', '170–180 см', 'выше 180 см'],
-  },
-];
-
 interface Props {
   S: StylistStrings;
   dark: boolean;
@@ -62,6 +28,10 @@ interface Props {
 }
 
 export default function NurOnboarding({ S, dark, onFinish }: Props) {
+  // Вопросы и подписи — из строк локали: раньше экран был целиком по-русски и у
+  // узбекских, и у английских пользователей, хотя всё приложение уже на их языке.
+  const O = S.onboarding;
+  const STEPS = O.steps;
   const { bg, ink, muted, card, line, accent } = stylistTheme(dark);
 
   /** -1 — приветствие, 0 — фото, дальше вопросы по одному. */
@@ -115,7 +85,7 @@ export default function NurOnboarding({ S, dark, onFinish }: Props) {
 
   useEffect(() => {
     if (step > STEPS.length) onFinish(photoKey);
-  }, [step, photoKey, onFinish]);
+  }, [step, photoKey, onFinish, STEPS.length]);
 
   const current = step >= 1 && step <= STEPS.length ? STEPS[step - 1] : null;
 
@@ -200,13 +170,13 @@ export default function NurOnboarding({ S, dark, onFinish }: Props) {
               animationDelay: '260ms',
             }}
           >
-            Привет, я Nur
+            {O.hello}
           </h1>
           <p
             className="nur-line text-[16px] leading-6 max-w-[300px]"
             style={{ color: muted, animationDelay: '520ms' }}
           >
-            Твой личный стилист. «Nur» значит «свет» — помогу увидеть, что тебе идёт.
+            {O.tagline}
           </p>
         </div>
       )}
@@ -219,11 +189,10 @@ export default function NurOnboarding({ S, dark, onFinish }: Props) {
               className="text-[28px] leading-9 mb-3"
               style={{ fontFamily: "'Instrument Serif', Georgia, serif", color: ink }}
             >
-              Покажи себя
+              {O.showYourself}
             </h2>
             <p className="text-[15px] leading-6 mb-8" style={{ color: muted }}>
-              По фото в полный рост я определю цветотип, пропорции и подберу оттенки — советы
-              станут точными, а не общими. Фото видно только тебе.
+              {O.photoPitch}
             </p>
 
             <input
@@ -247,14 +216,14 @@ export default function NurOnboarding({ S, dark, onFinish }: Props) {
               ) : (
                 <Camera size={17} />
               )}
-              {uploading ? S.uploading : 'Выбрать или снять фото'}
+              {uploading ? S.uploading : O.pickPhoto}
             </button>
             <button
               onClick={() => setStep(1)}
               className="w-full h-11 mt-2 text-[14px]"
               style={{ color: muted }}
             >
-              Позже
+              {O.later}
             </button>
           </div>
         </div>
@@ -268,7 +237,7 @@ export default function NurOnboarding({ S, dark, onFinish }: Props) {
               className="text-[11px] font-bold uppercase mb-3"
               style={{ color: accent, letterSpacing: '0.5px' }}
             >
-              Шаг {step} из {STEPS.length}
+              {O.stepOf(step, STEPS.length)}
             </p>
             <h2
               className="text-[26px] leading-8 mb-1"
@@ -285,13 +254,15 @@ export default function NurOnboarding({ S, dark, onFinish }: Props) {
             <div className="flex flex-col gap-2 mt-4">
               {current.options.map((opt) => (
                 <button
-                  key={opt}
-                  onClick={() => answer(current.field, opt === 'Пока не знаю' ? null : opt)}
+                  key={opt.label}
+                  // В профиль уходит значение, а не подпись: подпись переведена, а бэкенд
+                  // читает значение как есть (закрытость сравнивается с «без ограничений»).
+                  onClick={() => answer(current.field, opt.value)}
                   disabled={saving}
                   className="w-full text-left px-4 py-3 rounded-2xl text-[15px] active:scale-[0.99] transition-transform disabled:opacity-60"
                   style={{ background: card, color: ink, border: `1px solid ${line}` }}
                 >
-                  {opt}
+                  {opt.label}
                 </button>
               ))}
             </div>
@@ -301,7 +272,7 @@ export default function NurOnboarding({ S, dark, onFinish }: Props) {
               className="w-full h-11 mt-3 text-[14px]"
               style={{ color: muted }}
             >
-              Пропустить
+              {O.skip}
             </button>
           </div>
         </div>

@@ -276,9 +276,34 @@ export async function sendStylistMessage(payload: {
   /** Язык ответа Nur. Берётся из текущей локали приложения. */
   locale?: string;
 }): Promise<StylistAnswer> {
-  const res = await api.post('/stylist/messages', payload);
+  // Потолок ожидания. Без него при зависшем бэкенде точки «печатает» крутились вечно.
+  // Запас над серверным пределом: у модели 180 с, а сборка образа может сходить к ней
+  // дважды (повтор при ответе прозой) — обрывать живой запрос раньше нельзя.
+  const res = await api.post('/stylist/messages', payload, { timeout: SEND_TIMEOUT_MS });
   return unwrap<StylistAnswer>(res);
 }
+
+const SEND_TIMEOUT_MS = 240_000;
+const STREAM_TIMEOUT_MS = 200_000;
+
+/**
+ * Ошибка потока в той же форме, что у axios: `{ response: { status, data } }`.
+ *
+ * <p>Раньше поток бросал голое `stream failed: 402`, и экран показывал общий «не
+ * получилось ответить» там, где человеку надо сказать «не хватает монет». Код ошибки
+ * был у бэкенда — его просто некому было прочитать.
+ */
+export class StylistHttpError extends Error {
+  response: { status: number; data: unknown };
+
+  constructor(status: number, data: unknown) {
+    super(`stylist request failed: ${status}`);
+    this.response = { status, data };
+  }
+}
+
+/** Ответа нет дольше, чем сервер вообще может думать. */
+export class StylistTimeoutError extends Error {}
 
 /**
  * Потоковый ответ Nur.
@@ -301,18 +326,40 @@ export async function streamStylistMessage(
 ): Promise<StylistAnswer> {
   // Не через `/proxy/*`: тот путь — rewrites Next, и он копит SSE в буфере, отдавая
   // весь ответ одним куском в конце. Отдельный роут форвардит поток по частям.
-  const res = await fetch('/api/stylist-stream', {
-    method: 'POST',
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), STREAM_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch('/api/stylist-stream', {
+      method: 'POST',
+      signal: abort.signal,
     headers: {
       'Content-Type': 'application/json',
       Accept: 'text/event-stream',
       ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
     },
-    body: JSON.stringify(payload),
-  });
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    clearTimeout(timer);
+    if (abort.signal.aborted) throw new StylistTimeoutError('stream timed out');
+    throw e;
+  }
 
-  if (res.status === 409) throw new StreamUnsupportedError('stream unsupported');
-  if (!res.ok || !res.body) throw new Error(`stream failed: ${res.status}`);
+  if (res.status === 409) {
+    clearTimeout(timer);
+    throw new StreamUnsupportedError('stream unsupported');
+  }
+  if (!res.ok || !res.body) {
+    clearTimeout(timer);
+    let data: unknown = null;
+    try {
+      data = await res.json();
+    } catch {
+      // Тела нет — останется только статус, но и по нему экран поймёт больше, чем раньше.
+    }
+    throw new StylistHttpError(res.status, data);
+  }
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -341,7 +388,15 @@ export async function streamStylistMessage(
   };
 
   for (;;) {
-    const { value, done: finished } = await reader.read();
+    let chunk: ReadableStreamReadResult<Uint8Array>;
+    try {
+      chunk = await reader.read();
+    } catch (e) {
+      clearTimeout(timer);
+      if (abort.signal.aborted) throw new StylistTimeoutError('stream timed out');
+      throw e;
+    }
+    const { value, done: finished } = chunk;
     if (finished) break;
     buffer += decoder.decode(value, { stream: true });
     let sep = buffer.indexOf('\n\n');
@@ -351,6 +406,7 @@ export async function streamStylistMessage(
       sep = buffer.indexOf('\n\n');
     }
   }
+  clearTimeout(timer);
   if (buffer.trim()) handleFrame(buffer);
 
   if (failure) throw new Error(failure);
