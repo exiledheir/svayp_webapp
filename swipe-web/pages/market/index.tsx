@@ -5,9 +5,10 @@ import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { Plus, User, Search, Heart, MessageCircle } from 'lucide-react';
 import MarketFeedCard from '@/components/market/MarketFeedCard';
+import CategoryRail from '@/components/market/CategoryRail';
 import { isMarketOnboardingComplete } from '@/lib/market-storage';
 import { getFeed as apiGetFeed, type ListingCard } from '@/lib/market-api';
-import { MARKET_CATEGORIES, categoryLabel } from '@/lib/market-attributes';
+import { browseGroupKeys } from '@/lib/market-attributes';
 import type { MarketListing } from '@/types/market';
 import { useI18n } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
@@ -47,7 +48,9 @@ export default function MarketFeedPage() {
   const [nextPage, setNextPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [fetchingMore, setFetchingMore] = useState(false);
-  const [category, setCategory] = useState<string | null>(null);
+  // Browse-group id (see MARKET_BROWSE_GROUPS), null = every category. A group
+  // filters on the several taxonomy keys it covers, not on one.
+  const [group, setGroup] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   // Debounced mirror of `search` — the feed refetches 350 ms after typing
   // stops instead of firing GET /marketplace/listings on every keystroke.
@@ -70,7 +73,7 @@ export default function MarketFeedPage() {
     return () => clearTimeout(id);
   }, [search]);
 
-  const cacheKey = `market:feed:${category ?? 'all'}:${debouncedSearch.trim()}`;
+  const cacheKey = `market:feed:${group ?? 'all'}:${debouncedSearch.trim()}`;
   // Scroll offset lives beside the feed snapshot (same TTL) so "listing → back"
   // returns the user to where they scrolled to, not to the top of the grid.
   const scrollKey = `${cacheKey}:scroll`;
@@ -93,7 +96,7 @@ export default function MarketFeedPage() {
     // Live backend feed (GET /marketplace/listings) — first page.
     try {
       const page = await apiGetFeed({
-        category: category ? [category] : undefined,
+        category: browseGroupKeys(group),
         q: debouncedSearch.trim() || undefined,
       });
       const list = page.content.map(cardToListing);
@@ -106,7 +109,7 @@ export default function MarketFeedPage() {
       setListings([]);
       setHasMore(false);
     }
-  }, [category, debouncedSearch, cacheKey, scrollKey]);
+  }, [group, debouncedSearch, cacheKey, scrollKey]);
 
   useEffect(() => { loadFeed(); }, [loadFeed]);
 
@@ -116,7 +119,7 @@ export default function MarketFeedPage() {
     setFetchingMore(true);
     try {
       const page = await apiGetFeed({
-        category: category ? [category] : undefined,
+        category: browseGroupKeys(group),
         q: debouncedSearch.trim() || undefined,
         page: nextPage,
       });
@@ -133,7 +136,7 @@ export default function MarketFeedPage() {
     } finally {
       setFetchingMore(false);
     }
-  }, [fetchingMore, hasMore, category, debouncedSearch, nextPage, cacheKey]);
+  }, [fetchingMore, hasMore, group, debouncedSearch, nextPage, cacheKey]);
 
   // Infinite scroll: load the next page as the grid nears the bottom. Batched in
   // rAF so reading scroll geometry doesn't force a reflow on every scroll event.
@@ -407,24 +410,14 @@ export default function MarketFeedPage() {
             ))}
           </div>
 
-          {/* Categories — horizontal scroll */}
-          <div className="hide-scrollbar flex gap-2 overflow-x-auto px-4 pb-3">
-            <CategoryChip
-              label={t.mk_all_categories}
-              active={category === null}
-              isDark={isDark}
-              onClick={() => setCategory(null)}
-            />
-            {MARKET_CATEGORIES.map((cat) => (
-              <CategoryChip
-                key={cat.key}
-                label={categoryLabel(cat.key, locale)}
-                active={category === cat.key}
-                isDark={isDark}
-                onClick={() => setCategory(cat.key)}
-              />
-            ))}
-          </div>
+          {/* Categories — horizontal rail of illustrated discs */}
+          <CategoryRail
+            value={group}
+            onChange={setGroup}
+            allLabel={t.mk_all_categories}
+            locale={locale}
+            isDark={isDark}
+          />
 
           {/* Listings grid */}
           {listings.length === 0 ? (
@@ -484,34 +477,4 @@ function cardToListing(c: ListingCard): MarketListing {
     location: { region: c.region ?? undefined },
     postedAt: c.postedAt,
   } as MarketListing;
-}
-
-function CategoryChip({
-  label,
-  active,
-  isDark,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  isDark: boolean;
-  onClick: () => void;
-}) {
-  const activeBg = isDark ? '#fff' : '#000';
-  const activeText = isDark ? '#000' : '#fff';
-  const idleText = isDark ? '#fff' : '#000';
-  const idleBorder = isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.13)';
-  return (
-    <button
-      onClick={onClick}
-      className="shrink-0 h-9 px-4 rounded-full text-[13px] font-semibold whitespace-nowrap active:opacity-80"
-      style={{
-        background: active ? activeBg : 'transparent',
-        color: active ? activeText : idleText,
-        border: active ? '1px solid transparent' : `1px solid ${idleBorder}`,
-      }}
-    >
-      {label}
-    </button>
-  );
 }

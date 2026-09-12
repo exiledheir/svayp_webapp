@@ -110,11 +110,11 @@ const STEPS: Record<Locale, GuideStep[]> = {
     },
     {
       illustration: 'beautify',
-      eyebrow: 'Beautify',
+      eyebrow: "Do'kondagidek",
       title: "Rasmlar do'kondagidek",
       bullets: [
         "Har bir yangi kiyimning kategoriyasini tekshiring, AI adashgan bo'lsa — to'g'rilang.",
-        "Beautify rasmni tozalaydi: fonni olib, studiya sifatiga keltiradi. «Oldin» va «keyin»ni solishtirib, yoqqanini qoldiring.",
+        "Fonni olib tashlaymiz va kiyimni do'konlarda suratga olinganidek joylashtiramiz. «Oldin» va «keyin»ni solishtirib, yoqqanini qoldiring.",
         'Har bir rasm uchun bir necha olmos turadi.',
       ],
     },
@@ -172,7 +172,7 @@ const STEPS: Record<Locale, GuideStep[]> = {
       eyebrow: 'Olmoslar · Premium',
       title: "AI amallari qanday to'lanadi",
       bullets: [
-        "Olmoslar kiyib ko'rish, Beautify va obraz yaratishga sarflanadi — narx har bir tugmada ko'rinadi.",
+        "Olmoslar kiyib ko'rish, do'kondagidek suratlar va obraz yaratishga sarflanadi — narx har bir tugmada ko'rinadi.",
         "Balansni to'ldirish — yuqoridagi olmos tugmasi orqali.",
         "Premium bir martalik to'ldirish o'rniga oylik limit beradi — «Premium» bo'limi.",
       ],
@@ -191,11 +191,11 @@ const STEPS: Record<Locale, GuideStep[]> = {
     },
     {
       illustration: 'beautify',
-      eyebrow: 'Beautify',
+      eyebrow: 'Как в магазине',
       title: 'Фото как в магазине',
       bullets: [
         'Проверьте категорию каждой новой вещи и поправьте, если ИИ ошибся.',
-        'Beautify очищает фото: убирает фон и делает студийный кадр. Сравните «до» и «после» и оставьте то, что нравится.',
+        'Убираем фон и раскладываем вещь так, как её снимают в магазине. Сравните «до» и «после» и оставьте то, что нравится.',
         'Стоит несколько алмазов за фото.',
       ],
     },
@@ -253,7 +253,7 @@ const STEPS: Record<Locale, GuideStep[]> = {
       eyebrow: 'Алмазы · Премиум',
       title: 'Как оплачиваются действия ИИ',
       bullets: [
-        'Алмазы тратятся на примерки, Beautify и генерацию образов — цена видна на каждой кнопке.',
+        'Алмазы тратятся на примерки, фото как в магазине и генерацию образов — цена видна на каждой кнопке.',
         'Пополнить баланс — по кнопке с алмазом в шапке.',
         'Премиум даёт месячные лимиты вместо разовых пополнений — вкладка «Премиум».',
       ],
@@ -272,11 +272,11 @@ const STEPS: Record<Locale, GuideStep[]> = {
     },
     {
       illustration: 'beautify',
-      eyebrow: 'Beautify',
+      eyebrow: 'Shop photo',
       title: 'Photos that look like a shop',
       bullets: [
         'Check the category of each new item and fix it if the AI got it wrong.',
-        'Beautify cleans up a photo — background gone, studio look. Compare before and after and keep the one you like.',
+        'We remove the background and lay the piece out the way shops photograph theirs. Compare before and after and keep the one you like.',
         'It costs a few diamonds per photo.',
       ],
     },
@@ -334,7 +334,7 @@ const STEPS: Record<Locale, GuideStep[]> = {
       eyebrow: 'Diamonds · Premium',
       title: 'How AI actions are paid for',
       bullets: [
-        'Diamonds pay for try-ons, Beautify and outfit generation — the price is shown on each button.',
+        'Diamonds pay for try-ons, shop photos and outfit generation — the price is shown on each button.',
         'Tap the diamond pill in the header to top up.',
         'Premium gives monthly limits instead of one-off top-ups — see the Premium tab.',
       ],

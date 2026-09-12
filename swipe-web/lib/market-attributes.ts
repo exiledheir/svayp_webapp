@@ -190,6 +190,77 @@ export function categoryParentLabel(cat: MarketCategory | undefined, locale: Loc
   return cat ? taxLabel(cat.parentKey, locale) : '';
 }
 
+// ── Browse groups ───────────────────────────────────────────────────────────
+// Posting a listing asks for one of the 28 precise categories above; browsing
+// them one-by-one is a long scroll, so the feed's category rail offers a
+// shorter illustrated set. A group filters on every key it covers — the feed
+// takes `category` as a string[] — and each of the 28 keys belongs to exactly
+// one group, so nothing becomes unbrowsable.
+//
+// `labelKey` is deliberately a taxonomy value the group already contains: the
+// group's name then resolves through taxLabel() in en/ru/uz like any other
+// category, with no rail-specific strings to translate.
+
+export interface MarketBrowseGroup {
+  id: string; // stable id — also the artwork filename (see market-category-images)
+  labelKey: string; // taxonomy value whose localized label names the group
+  keys: string[]; // categories this group filters on
+  /**
+   * No cut-out photo for this group — the rail draws its line icon instead.
+   * Set deliberately, so the rail doesn't request a file that isn't coming.
+   * To give the group artwork: drop `<id>.webp` into
+   * public/images/market/categories/ and delete this flag.
+   */
+  iconOnly?: boolean;
+}
+
+export const MARKET_BROWSE_GROUPS: MarketBrowseGroup[] = [
+  { id: 'tops', labelKey: 'TOPS', keys: ['TSHIRTS_TOPS', 'SHIRTS_BLOUSES', 'SWEATERS_KNITS'] },
+  { id: 'dresses', labelKey: 'DRESSES_SETS', keys: ['DRESSES', 'SETS'] },
+  {
+    id: 'bottoms',
+    labelKey: 'BOTTOMS',
+    keys: ['TROUSERS_JEANS', 'SKIRTS', 'SHORTS', 'LEGGINGS_TRIKO'],
+  },
+  { id: 'outerwear', labelKey: 'OUTERWEAR', keys: ['JACKET', 'COAT', 'PUFFER', 'TRENCH'] },
+  {
+    id: 'shoes',
+    labelKey: 'FOOTWEAR',
+    keys: ['PUMPS', 'SNEAKERS', 'HEELS', 'ANKLE_BOOTS', 'SANDALS', 'HIGH_BOOTS', 'FLATS'],
+  },
+  { id: 'bags', labelKey: 'BAGS', keys: ['BAGS'] },
+  { id: 'hijab', labelKey: 'HEADSCARF_HIJAB', keys: ['HEADSCARF_HIJAB', 'SCARF', 'HEADWEAR'] },
+  { id: 'jewelry', labelKey: 'JEWELRY', keys: ['JEWELRY'] },
+  // Glasses and belts have too little in common to photograph as one thing —
+  // this group wears an icon rather than a misleading hero product.
+  { id: 'accessories', labelKey: 'ACCESSORIES', keys: ['GLASSES', 'BELT'], iconOnly: true },
+  { id: 'underwear', labelKey: 'UNDERWEAR', keys: ['UNDERWEAR'] },
+];
+
+/** Categories a browse group filters on; undefined (= no filter) for "all". */
+export function browseGroupKeys(id: string | null): string[] | undefined {
+  if (!id) return undefined;
+  return MARKET_BROWSE_GROUPS.find((g) => g.id === id)?.keys;
+}
+
+/** Localized name of a browse group (borrowed from the taxonomy). */
+export function browseGroupLabel(group: MarketBrowseGroup, locale: Locale): string {
+  return taxLabel(group.labelKey, locale);
+}
+
+// A category added to the taxonomy but not to a group would be postable and
+// then unreachable from the rail — silent and easy to miss, so say so in dev.
+if (process.env.NODE_ENV !== 'production') {
+  const grouped = new Set(MARKET_BROWSE_GROUPS.flatMap((g) => g.keys));
+  const orphans = MARKET_CATEGORIES.filter((c) => !grouped.has(c.key)).map((c) => c.key);
+  if (orphans.length) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[market] categories missing from MARKET_BROWSE_GROUPS (unbrowsable): ${orphans.join(', ')}`,
+    );
+  }
+}
+
 // ── Meeting-place regions (UZ) ───────────────────────────────────────────────
 // The listing's meeting place is just the seller's region (no precise address /
 // map). Stored as a stable key; names are localized at render time.

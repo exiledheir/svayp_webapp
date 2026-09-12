@@ -4065,7 +4065,7 @@ function ClothingItemCard({ item, onTap, isProcessing, startedAt, onRemove, beau
           onClick={(e) => { e.stopPropagation(); onBeautify(); }}
           className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full flex items-center justify-center active:scale-90 transition-transform"
           style={{ background: '#F370A7', boxShadow: '0 2px 6px -1px rgba(243,112,167,0.55)' }}
-          aria-label="Beautify"
+          aria-label={t.cv_bt_button}
         >
           <Sparkles size={14} className="text-white" />
         </button>
