@@ -156,21 +156,45 @@ export default function MarketFeedPage() {
 
   // ── Pull-to-refresh ─────────────────────────────────────────────────────────
   const mainScrollRef = useRef<HTMLElement>(null);
-  const pullStartYRef = useRef<number | null>(null);
+  const pullStartRef = useRef<{ x: number; y: number } | null>(null);
+  // A touch is committed to one axis once it moves decisively, and a horizontal
+  // one never becomes a pull — otherwise the non-passive listener below cancels
+  // the category rail's pan on the drift every sideways swipe carries.
+  const pullAxisRef = useRef<'undecided' | 'vertical' | 'horizontal'>('undecided');
   const [pullDistance, setPullDistance] = useState(0);
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
   const PULL_THRESHOLD = 72;
+  const AXIS_LOCK_PX = 8;
 
   function handlePullTouchStart(e: React.TouchEvent<HTMLElement>) {
+    pullAxisRef.current = 'undecided';
+    pullStartRef.current = null;
+    // A drag beginning inside a horizontal rail belongs to that rail outright.
+    if ((e.target as Element | null)?.closest?.('[data-hscroll]')) return;
     if (mainScrollRef.current && mainScrollRef.current.scrollTop === 0) {
-      pullStartYRef.current = e.touches[0].clientY;
+      pullStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     }
   }
 
+  /** Downward distance of a vertical pull gesture, or null if it isn't one. */
+  const resolvePullDy = useCallback((touch: Touch | React.Touch): number | null => {
+    const start = pullStartRef.current;
+    if (!start) return null;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (pullAxisRef.current === 'undecided') {
+      // Hold off until the finger has clearly moved: the first pixels of any
+      // swipe are too noisy to tell a pull from a sideways flick.
+      if (Math.abs(dx) < AXIS_LOCK_PX && Math.abs(dy) < AXIS_LOCK_PX) return null;
+      pullAxisRef.current = Math.abs(dy) > Math.abs(dx) ? 'vertical' : 'horizontal';
+    }
+    return pullAxisRef.current === 'vertical' ? dy : null;
+  }, []);
+
   function handlePullTouchMove(e: React.TouchEvent<HTMLElement>) {
-    if (pullStartYRef.current === null || isPullRefreshing) return;
-    const dy = e.touches[0].clientY - pullStartYRef.current;
-    if (dy > 0 && mainScrollRef.current && mainScrollRef.current.scrollTop === 0) {
+    if (isPullRefreshing) return;
+    const dy = resolvePullDy(e.touches[0]);
+    if (dy !== null && dy > 0 && mainScrollRef.current && mainScrollRef.current.scrollTop === 0) {
       setPullDistance(Math.min(dy * 0.45, PULL_THRESHOLD + 20)); // resist so it doesn't pull 1:1
     } else {
       setPullDistance(0);
@@ -188,23 +212,26 @@ export default function MarketFeedPage() {
     } else {
       setPullDistance(0);
     }
-    pullStartYRef.current = null;
+    pullStartRef.current = null;
+    pullAxisRef.current = 'undecided';
   }
 
   // React's onTouchMove is passive and can't preventDefault, so inside the native
   // WebView the OS overscroll swallows the drag. Claim the gesture with a
-  // non-passive listener while pulling at the very top.
+  // non-passive listener while pulling at the very top — but only once it has
+  // locked to the vertical axis, since preventDefault here would otherwise stop
+  // the browser ever starting a horizontal pan in the category rail.
   useEffect(() => {
     const el = mainScrollRef.current;
     if (!el) return;
     const onMove = (e: TouchEvent) => {
-      if (pullStartYRef.current === null || el.scrollTop > 0) return;
-      const dy = e.touches[0].clientY - pullStartYRef.current;
-      if (dy > 0) e.preventDefault();
+      if (el.scrollTop > 0) return;
+      const dy = resolvePullDy(e.touches[0]);
+      if (dy !== null && dy > 0) e.preventDefault();
     };
     el.addEventListener('touchmove', onMove, { passive: false });
     return () => el.removeEventListener('touchmove', onMove);
-  }, []);
+  }, [resolvePullDy]);
 
   // ── Scroll restore ──────────────────────────────────────────────────────────
   // Apply the remembered offset once the restored grid is in the DOM but before
@@ -352,7 +379,11 @@ export default function MarketFeedPage() {
           </div>
 
           {/* CTA banners — sell entry + contact support */}
-          <div className="hide-scrollbar flex gap-3 overflow-x-auto px-4 pt-1 pb-3" style={{ scrollSnapType: 'x mandatory' }}>
+          <div
+            className="hide-scrollbar flex gap-3 overflow-x-auto px-4 pt-1 pb-3"
+            data-hscroll
+            style={{ scrollSnapType: 'x mandatory', overscrollBehaviorX: 'contain' }}
+          >
             {banners.map((b, i) => (
               <div
                 key={i}

@@ -32,9 +32,18 @@ export default function CategoryRail({ value, onChange, allLabel, locale, isDark
   return (
     <div
       className="hide-scrollbar flex gap-0.5 overflow-x-auto pb-3 pt-1.5"
-      // Extra side padding over the page's px-4 so the selected ring never gets
-      // clipped by the scroll container at either end.
-      style={{ paddingLeft: 12, paddingRight: 12 }}
+      // Marks this as a horizontal scroller: the feed's pull-to-refresh skips
+      // touches that start here rather than cancelling the pan.
+      data-hscroll
+      style={{
+        // Extra side padding over the page's px-4 so the selected ring never
+        // gets clipped by the scroll container at either end.
+        paddingLeft: 12,
+        paddingRight: 12,
+        // Don't hand the drag to the feed on reaching either end — that chain
+        // is what made scrolling back from the last category feel stuck.
+        overscrollBehaviorX: 'contain',
+      }}
     >
       <CategoryBubble
         label={allLabel}
