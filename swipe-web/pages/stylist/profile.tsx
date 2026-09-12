@@ -71,7 +71,7 @@ export default function StyleProfilePage() {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold uppercase" style={{ color: muted, letterSpacing: '0.5px' }}>
-              {f.label}
+              {S.profileFields[f.key] ?? f.label}
             </p>
 
             {isEditing ? (
@@ -130,7 +130,7 @@ export default function StyleProfilePage() {
                 setEditing(f.key);
                 setDraft(f.value ?? '');
               }}
-              aria-label={S.editField(f.label)}
+              aria-label={S.editField(S.profileFields[f.key] ?? f.label)}
               className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 active:scale-95 transition-transform"
               style={{ background: card, color: muted, border: `1px solid ${line}` }}
             >
@@ -180,7 +180,7 @@ export default function StyleProfilePage() {
                 />
               </div>
               <p className="text-[12px] mt-2 leading-snug" style={{ color: muted }}>
-                {profile.nextHint}
+                {(profile.nextHintCode && S.profileHints[profile.nextHintCode]) ?? profile.nextHint}
               </p>
             </div>
 

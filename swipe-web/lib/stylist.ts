@@ -440,6 +440,8 @@ export interface StyleProfile {
   fields: ProfileField[];
   completeness: number;
   nextHint: string;
+  // Код подсказки: текст с бэкенда только русский, переводим по коду.
+  nextHintCode?: 'PHOTO' | 'LIFESTYLE' | 'DONE' | null;
 }
 
 export async function fetchStyleProfile(): Promise<StyleProfile> {

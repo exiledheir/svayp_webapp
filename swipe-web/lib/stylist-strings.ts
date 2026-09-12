@@ -74,6 +74,9 @@ export interface StylistStrings {
   errorTimeout: string;
   /** Модель перегружена (429): говорим прямо и сразу, а не общим «не получилось». */
   errorBusy: string;
+  errorFiltered: string;
+  profileFields: Record<string, string>;
+  profileHints: Record<string, string>;
   errorPhoto: string;
   errorCoins: string;
   errorSaveOutfit: string;
@@ -150,6 +153,23 @@ const RU: StylistStrings = {
   errorGeneric: 'Не получилось ответить. Попробуй ещё раз',
   errorTimeout: 'Nur думает слишком долго. Попробуй ещё раз',
   errorBusy: 'Nur сейчас перегружена — попробуй через минуту',
+  errorFiltered: 'Не смогла ответить на это сообщение — перефразируй, пожалуйста',
+  profileFields: {
+    name: 'Имя',
+    age: 'Возраст',
+    body_shape: 'Тип фигуры',
+    colortype: 'Цветотип',
+    style: 'Стиль',
+    modesty: 'Ограничения',
+    lifestyle: 'Образ жизни',
+    height_range: 'Рост',
+    avoid: 'Не предлагать',
+  },
+  profileHints: {
+    PHOTO: 'Пришли Nur фото в полный рост — она определит цветотип и фигуру, и советы станут точнее',
+    LIFESTYLE: 'Расскажи Nur про свой обычный день — она подберёт образы под него, а не наугад',
+    DONE: 'Профиль собран. Если что-то не так — поправь, Nur учтёт это в следующих ответах',
+  },
   errorPhoto: 'Не получилось загрузить фото. Попробуй ещё раз',
   errorCoins: 'Не хватает монет на это действие',
   errorSaveOutfit: 'Не получилось сохранить образ',
@@ -271,9 +291,9 @@ const RU: StylistStrings = {
 const UZ: StylistStrings = {
   title: 'Nur',
   beta: 'beta',
-  greeting: 'Salom! Men Nur, sizning stilistingizman ✨',
+  greeting: 'Salom! Men Nur, sening stilistingman ✨',
   greetingHint:
-    'Uslub haqida istalgan narsani so‘rang — yoki kiyim suratini yuboring, men uning atrofida obraz yig‘aman.',
+    'Uslub haqida istalgan narsani so‘ra — yoki kiyim suratini yubor, men uning atrofida obraz yig‘aman.',
   inputPlaceholder: 'Nur’ga yozing…',
   thinking: 'Ustida ishlayapman…',
   send: 'Yuborish',
@@ -285,6 +305,23 @@ const UZ: StylistStrings = {
   errorGeneric: 'Javob bera olmadim. Yana urinib ko‘ring',
   errorTimeout: 'Nur juda uzoq o‘ylayapti. Yana urinib ko‘ring',
   errorBusy: 'Nur hozir band — bir daqiqadan keyin urinib ko‘ring',
+  errorFiltered: 'Bu xabarga javob bera olmadim — iltimos, boshqacha yozib ko‘ring',
+  profileFields: {
+    name: 'Ism',
+    age: 'Yosh',
+    body_shape: 'Qomat turi',
+    colortype: 'Rang tipi',
+    style: 'Uslub',
+    modesty: 'Cheklovlar',
+    lifestyle: 'Turmush tarzi',
+    height_range: 'Bo‘y',
+    avoid: 'Taklif qilmaslik',
+  },
+  profileHints: {
+    PHOTO: 'Nurga to‘liq bo‘yli surat yubor — u rang tipi va qomatni aniqlaydi, maslahatlar aniqroq bo‘ladi',
+    LIFESTYLE: 'Nurga oddiy kuning qanday o‘tishini ayt — obrazlarni taxminan emas, shunga qarab tanlaydi',
+    DONE: 'Profil to‘ldirildi. Biror narsa to‘g‘ri bo‘lmasa — tuzat, Nur keyingi javoblarda hisobga oladi',
+  },
   errorPhoto: 'Suratni yuklab bo‘lmadi. Yana urinib ko‘ring',
   errorCoins: 'Bu amal uchun tanga yetarli emas',
   errorSaveOutfit: 'Obrazni saqlab bo‘lmadi',
@@ -366,11 +403,11 @@ const UZ: StylistStrings = {
   goBack: 'Orqaga',
 
   starters: [
-    'Uslubimni aniqlashga yordam bering',
-    'Shu kiyim atrofida obraz yig‘ing',
+    'Uslubimni aniqlashga yordam ber',
+    'Shu kiyim atrofida obraz yig‘',
     'Menga qanday fason mos keladi?',
     'Bu ko‘ylak ostiga nima kiyay?',
-    'Obrazimni baholang',
+    'Obrazimni baholab ber',
     'Garderobimda nima yetishmayapti?',
   ],
   feedbackReasons: [
@@ -423,6 +460,23 @@ const EN: StylistStrings = {
   errorGeneric: 'Couldn’t answer. Please try again',
   errorTimeout: 'Nur is taking too long. Please try again',
   errorBusy: 'Nur is busy right now — try again in a minute',
+  errorFiltered: 'I couldn’t answer that message — could you rephrase it?',
+  profileFields: {
+    name: 'Name',
+    age: 'Age',
+    body_shape: 'Body shape',
+    colortype: 'Colour type',
+    style: 'Style',
+    modesty: 'Coverage',
+    lifestyle: 'Lifestyle',
+    height_range: 'Height',
+    avoid: 'Never suggest',
+  },
+  profileHints: {
+    PHOTO: 'Send Nur a full-length photo — she’ll work out your colour type and shape, and the advice gets sharper',
+    LIFESTYLE: 'Tell Nur about your usual day — she’ll build outfits for it instead of guessing',
+    DONE: 'Profile is complete. If something looks off, fix it and Nur will use that next time',
+  },
   errorPhoto: 'Couldn’t upload the photo. Please try again',
   errorCoins: 'Not enough coins for this action',
   errorSaveOutfit: 'Couldn’t save the outfit',

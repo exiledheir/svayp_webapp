@@ -199,6 +199,21 @@ export default function StylistPage() {
   const { theme } = useTheme();
   const { locale } = useI18n();
   const S = getStylistStrings(locale);
+  // Один перевод кода ошибки на оба пути отправки: путь с фото показывал общее
+  // «не получилось» даже на нехватку монет и перегрузку. StylistHttpError несёт тело
+  // ответа в response.data — так же, как axios, поэтому разбор общий.
+  const errorText = (e: unknown): string => {
+    if (e instanceof StylistTimeoutError || (e as { code?: string })?.code === 'ECONNABORTED') {
+      return S.errorTimeout;
+    }
+    const data = (e as { response?: { data?: { code?: string; error?: { code?: string } } } })
+      ?.response?.data;
+    const code = data?.error?.code ?? data?.code;
+    if (code === 'INSUFFICIENT_COINS') return S.errorCoins;
+    if (code === 'STYLIST_BUSY') return S.errorBusy;
+    if (code === 'STYLIST_CONTENT_FILTERED') return S.errorFiltered;
+    return S.errorGeneric;
+  };
   const dark = theme === 'dark';
 
   const [checking, setChecking] = useState(true);
@@ -698,20 +713,7 @@ export default function StylistPage() {
         // чтобы в истории не оседали вопросы без ответов. Единственная копия написанного —
         // у нас, поэтому возвращаем её в поле ввода вместе с фото: одно нажатие — и
         // повтор. Раньше поле очищалось до отправки, и текст приходилось набирать заново.
-        const data = (e as { response?: { data?: { code?: string; error?: { code?: string } } } })
-          ?.response?.data;
-        const code = data?.error?.code ?? data?.code;
-        const timedOut =
-          e instanceof StylistTimeoutError || (e as { code?: string })?.code === 'ECONNABORTED';
-        setError(
-          timedOut
-            ? S.errorTimeout
-            : code === 'INSUFFICIENT_COINS'
-              ? S.errorCoins
-              : code === 'STYLIST_BUSY'
-                ? S.errorBusy
-                : S.errorGeneric,
-        );
+        setError(errorText(e));
         setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
         setDraft(body);
         setAttachments(keys.map((key, i) => ({ key, preview: previews[i] })));
@@ -764,9 +766,7 @@ export default function StylistPage() {
           },
         ]);
       } catch (e: unknown) {
-        const timedOut =
-          e instanceof StylistTimeoutError || (e as { code?: string })?.code === 'ECONNABORTED';
-        setError(timedOut ? S.errorTimeout : S.errorGeneric);
+        setError(errorText(e));
       } finally {
         setSending(false);
       }
