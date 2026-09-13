@@ -1,5 +1,5 @@
 /**
- * Nur's colours — the app's own tokens, not a palette of its own.
+ * Luna's colours — the app's own tokens, not a palette of its own.
  *
  * The stylist screens used to run a warm cream-and-gold scheme (#FAFAF8 ground,
  * #C8A882 accent) that read as a different product the moment you arrived from

@@ -10,8 +10,13 @@ interface Props {
 
 /**
  * Lightweight DOM preview of a flat-lay outfit. Mirrors the canvas-snapshot
- * geometry (3:4 frame, item width 35%, % positions, scale) so the picker /
- * compose preview matches what captureCanvasSnapshot will render on publish.
+ * geometry (3:4 frame, SQUARE item box 35% of the frame width, % positions,
+ * scale, picture contained inside the box) so the picker / compose preview
+ * matches both the editor and what captureCanvasSnapshot renders on publish.
+ *
+ * The square box is load-bearing: without `aspectRatio`, an <img> sized only by
+ * width takes its own natural height, so tall items previewed larger than the
+ * editor ever drew them.
  *
  * Images load DIRECTLY (no image proxy). This is a plain DOM <img>, not a
  * canvas, so there's no cross-origin taint to avoid — and the wardrobe blob
@@ -38,6 +43,7 @@ export default function OutfitThumb({ layout, items, className = '' }: Props) {
               left: `${entry.x}%`,
               top: `${entry.y}%`,
               width: '35%',
+              aspectRatio: '1',
               transform: `scale(${entry.scale})`,
               transformOrigin: 'center',
               zIndex: entry.zIndex,

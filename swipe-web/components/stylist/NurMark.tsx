@@ -1,7 +1,7 @@
 import React from 'react';
 
 /**
- * Nur's mark — the voice-bars glyph, identical to the AI Stylist tab in the
+ * Luna's mark — the voice-bars glyph, identical to the AI Stylist tab in the
  * app's bottom bar, so the tab and the screens it opens carry one icon.
  *
  * Drawn inline rather than taken from lucide: this is Material's `graphic_eq`,
@@ -9,7 +9,7 @@ import React from 'react';
  * tall · tallest · tall · short). Lucide's nearest equivalent, AudioLines, has
  * six strokes on an asymmetric profile, so it reads as a different mark.
  */
-export default function NurMark({
+export default function LunaMark({
   size = 26,
   color = 'currentColor',
   className,

@@ -25,7 +25,7 @@ import { fetchStylistAccess } from '@/lib/stylist';
 import { reportPurchaseFunnel } from '@/lib/purchase-funnel';
 import { Events, Params } from '@/lib/analytics-events';
 import { useTheme } from '@/lib/theme';
-import { isInFlutterWebView, isShellTab } from '@/lib/flutter-bridge';
+import { isInFlutterWebView, isShellTab, openNativeTab } from '@/lib/flutter-bridge';
 import NativeChatButton from '@/components/NativeChatButton';
 import { shareImageBlob, fetchImageBlob } from '@/lib/share-image';
 import ShareSheet from '@/components/ShareSheet';
@@ -226,7 +226,7 @@ export default function ClosetPage() {
   const [isFlutterWebView, setIsFlutterWebView] = useState(false);
   useEffect(() => { setIsFlutterWebView(isInFlutterWebView()); }, []);
   // This page is a bottom-bar tab of the NEW native shell (Garderob · Lenta ·
-  // Nur · LIBΛS · Bozor). The bar owns the Feed and Nur entry points and the
+  // Luna · LIBΛS · Bozor). The bar owns the Feed and Luna entry points and the
   // header owns chat, so the in-page duplicates are hidden. Old app builds and
   // browsers keep them (see isShellTab). Resolved after mount for hydration.
   const [shellTab, setShellTab] = useState(false);
@@ -1508,7 +1508,7 @@ export default function ClosetPage() {
   // Ошибка запроса трактуется как «недоступно» внутри fetchStylistAccess, поэтому
   // сбой сети просто не покажет кнопку и не сломает гардероб.
   useEffect(() => {
-    // In the new shell Nur has its own bottom tab: no button here, so neither
+    // In the new shell Luna has its own bottom tab: no button here, so neither
     // the access check nor the "entry shown" event should fire from the closet.
     if (isShellTab()) return;
     let cancelled = false;
@@ -2784,7 +2784,7 @@ export default function ClosetPage() {
 
       {/* ── Floating Add Button ── */}
       <div className="absolute right-5 z-50 flex flex-col items-end gap-3" style={{ bottom: '20px' }}>
-        {/* AI-стилист Nur. Виден только тем, кому его открыл сервер (флаги feature.stylist.*
+        {/* AI-стилист Luna. Виден только тем, кому его открыл сервер (флаги feature.stylist.*
             + вайтлист беты) — состава беты на клиенте нет.
 
             Стоит здесь, а не в шапке: шапка уже переполнена — алмазы, тариф и «Руководство»
@@ -2792,7 +2792,7 @@ export default function ClosetPage() {
             там сделала бы хуже. Внизу справа есть место, и для флагманской фичи заметная
             кнопка честнее иконки, зажатой в углу.
 
-            В новой оболочке приложения у Nur есть своя вкладка в нижнем баре — там
+            В новой оболочке приложения у Luna есть своя вкладка в нижнем баре — там
             кнопка не нужна (и stylistAvailable там не запрашивается). */}
         {stylistAvailable && !shellTab && (
           <button
@@ -2802,10 +2802,10 @@ export default function ClosetPage() {
             }}
             className="flex items-center gap-2 pl-4 pr-5 rounded-full text-[15px] font-bold shadow-xl active:scale-[0.96] transition-transform"
             style={{ background: '#141014', color: '#fff', height: 48 }}
-            aria-label="Nur — AI-стилист"
+            aria-label="Luna — AI-стилист"
           >
             <Sparkles size={18} strokeWidth={2.4} color="#C8A882" />
-            Спросить Nur
+            Спросить Luna
           </button>
         )}
 
@@ -3297,6 +3297,18 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
   // Hardware Back closes the full-screen look viewer instead of leaving the page.
   useOverlayBackClose(viewingJob !== null, () => setViewingJob(null));
 
+  /**
+   * «Уже в ленте» → мои посты.
+   *
+   * В нативной оболочке гардероб — это долгоживущий WebView вкладки: обычный
+   * router.push увёл бы САМУ вкладку на ленту, и она осталась бы там до
+   * перезапуска приложения. Просим оболочку открыть вкладку «Лента»; в браузере
+   * и в старых сборках сообщение не доходит — тогда переходим сами.
+   */
+  const openMyPosts = useCallback(() => {
+    if (!openNativeTab('feed', '/feed/me')) router.push('/feed/me');
+  }, [router]);
+
   useEffect(() => {
     let cancelled = false;
     getMyPosts(0, 60)
@@ -3435,7 +3447,7 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
               {/* Публикация — главное действие вкладки, поэтому кнопка видна на
                   каждой карточке, а не спрятана внутри просмотра. */}
               <button
-                onClick={() => (shared ? router.push('/feed/me') : setSharingJob(job))}
+                onClick={() => (shared ? openMyPosts() : setSharingJob(job))}
                 className="w-full h-9 mt-2 px-1.5 rounded-full flex items-center justify-center gap-1.5 text-[12.5px] font-bold whitespace-nowrap active:scale-[0.97] transition-transform"
                 style={shared
                   ? { background: theme === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(20,16,20,0.06)', color: theme === 'dark' ? '#cfcfcf' : '#4b5563' }
@@ -3502,7 +3514,7 @@ function TryOnGallery({ jobs, loading, error, hasMore, onRetry, onLoadMore, onDe
           {/* «В ленту» — основное действие; сохранение в галерею ушло в иконку. */}
           <div className="shrink-0 px-5 pb-10 pt-4 flex gap-2.5">
             <button
-              onClick={() => (sharedIds.has(viewingJob.id) ? router.push('/feed/me') : setSharingJob(viewingJob))}
+              onClick={() => (sharedIds.has(viewingJob.id) ? openMyPosts() : setSharingJob(viewingJob))}
               className="flex-1 h-12 rounded-full bg-white text-black text-[14px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
             >
               {sharedIds.has(viewingJob.id) ? <Check size={15} strokeWidth={3} /> : <Send size={15} strokeWidth={2.4} />}

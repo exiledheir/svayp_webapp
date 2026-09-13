@@ -13,7 +13,7 @@ export const Events = {
   CLOSET_GUIDE_VIDEO_PLAYED: 'closet_guide_video_played',
   CLOSET_FEEDBACK_CTA_TAPPED: 'closet_feedback_cta_tapped',
 
-  // ── AI-стилист «Nur» ───────────────────────────────────────────────────────
+  // ── AI-стилист «Luna» ──────────────────────────────────────────────────────
   // Кнопка видна только бете, поэтому показ логируем отдельно от нажатия:
   // без события показа конверсия входа в чат считается от всей аудитории и врёт.
   STYLIST_ENTRY_SHOWN: 'stylist_entry_shown',

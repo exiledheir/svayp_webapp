@@ -19,7 +19,7 @@ import { useEffect } from 'react';
  * it and did nothing. Cloning the live state keeps the entry a valid Next route.
  *
  * Use only on genuine root/entry pages where Back should not leave the app.
- * Pages that are a tab root only sometimes (e.g. /stylist, which is the Nur
+ * Pages that are a tab root only sometimes (e.g. /stylist, which is the Luna
  * tab in the native shell but a pushed page elsewhere) pass `enabled`.
  */
 export function useRootBackGuard(enabled = true): void {

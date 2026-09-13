@@ -28,7 +28,11 @@ export interface OnboardingStep {
 
 export interface OnboardingStrings {
   hello: string;
+  /** Что Luna ДЕЛАЕТ — первый экран единственное место, где это можно объяснить.
+   *  Не про значение имени: человеку нужно понять функцию, а не этимологию. */
   tagline: string;
+  /** Приветствие ждёт нажатия — раньше оно само уходило через 2.6 с. */
+  start: string;
   showYourself: string;
   photoPitch: string;
   pickPhoto: string;
@@ -109,7 +113,7 @@ export interface StylistStrings {
 
   unavailableTitle: string;
   unavailableText: string;
-  /** Chip on the "not available yet" screen — the Nur tab is visible to everyone. */
+  /** Chip on the "not available yet" screen — the Luna tab is visible to everyone. */
   comingSoon: string;
   goBack: string;
 
@@ -138,11 +142,11 @@ export interface StylistStrings {
 }
 
 const RU: StylistStrings = {
-  title: 'Nur',
+  title: 'Luna',
   beta: 'бета',
-  greeting: 'Привет! Я Nur, твой стилист ✨',
+  greeting: 'Привет! Я Luna, твой стилист ✨',
   greetingHint: 'Спроси что угодно про стиль — или пришли фото вещи, и я соберу образ вокруг неё.',
-  inputPlaceholder: 'Напиши Nur…',
+  inputPlaceholder: 'Напиши Luna…',
   thinking: 'Работаю над этим…',
   send: 'Отправить',
   attachPhoto: 'Прикрепить фото',
@@ -151,8 +155,8 @@ const RU: StylistStrings = {
   photoMany: (n) => `📷 ${n} фото`,
 
   errorGeneric: 'Не получилось ответить. Попробуй ещё раз',
-  errorTimeout: 'Nur думает слишком долго. Попробуй ещё раз',
-  errorBusy: 'Nur сейчас перегружена — попробуй через минуту',
+  errorTimeout: 'Luna думает слишком долго. Попробуй ещё раз',
+  errorBusy: 'Luna сейчас перегружена — попробуй через минуту',
   errorFiltered: 'Не смогла ответить на это сообщение — перефразируй, пожалуйста',
   profileFields: {
     name: 'Имя',
@@ -166,9 +170,9 @@ const RU: StylistStrings = {
     avoid: 'Не предлагать',
   },
   profileHints: {
-    PHOTO: 'Пришли Nur фото в полный рост — она определит цветотип и фигуру, и советы станут точнее',
-    LIFESTYLE: 'Расскажи Nur про свой обычный день — она подберёт образы под него, а не наугад',
-    DONE: 'Профиль собран. Если что-то не так — поправь, Nur учтёт это в следующих ответах',
+    PHOTO: 'Пришли Luna фото в полный рост — она определит цветотип и фигуру, и советы станут точнее',
+    LIFESTYLE: 'Расскажи Luna про свой обычный день — она подберёт образы под него, а не наугад',
+    DONE: 'Профиль собран. Если что-то не так — поправь, Luna учтёт это в следующих ответах',
   },
   errorPhoto: 'Не получилось загрузить фото. Попробуй ещё раз',
   errorCoins: 'Не хватает монет на это действие',
@@ -204,8 +208,9 @@ const RU: StylistStrings = {
     ACCESSORY: 'Аксессуары',
   },
   onboarding: {
-    hello: 'Привет, я Nur',
-    tagline: 'Твой личный стилист. «Nur» значит «свет» — помогу увидеть, что тебе идёт.',
+    hello: 'Привет, я Luna',
+    tagline: 'Твой личный AI-стилист. Соберу образы из твоего гардероба и объясню, что тебе идёт и почему.',
+    start: 'Начать',
     showYourself: 'Покажи себя',
     photoPitch:
       'По фото в полный рост я определю цветотип, пропорции и подберу оттенки — советы станут точными, а не общими. Фото видно только тебе.',
@@ -241,7 +246,7 @@ const RU: StylistStrings = {
   },
   openSource: 'Открыть источник',
 
-  unavailableTitle: 'Nur пока недоступна',
+  unavailableTitle: 'Luna пока недоступна',
   unavailableText: 'Стилист открыт ограниченному кругу. Мы включим его для всех чуть позже.',
   comingSoon: 'Скоро',
   goBack: 'Вернуться',
@@ -267,7 +272,7 @@ const RU: StylistStrings = {
   profileFilled: 'Заполнен на',
   profileUnknown: 'пока не знаю',
   profileEditHint:
-    'Nur иногда ошибается — например, в цветотипе. Поправленное вручную она больше не перезапишет, даже если ты пришлёшь новое фото.',
+    'Luna иногда ошибается — например, в цветотипе. Поправленное вручную она больше не перезапишет, даже если ты пришлёшь новое фото.',
   profileDeleteHint: 'Оставь пустым, чтобы удалить',
   editField: (label) => `Изменить: ${label}`,
 
@@ -289,12 +294,12 @@ const RU: StylistStrings = {
 };
 
 const UZ: StylistStrings = {
-  title: 'Nur',
+  title: 'Luna',
   beta: 'beta',
-  greeting: 'Salom! Men Nur, sening stilistingman ✨',
+  greeting: 'Salom! Men Luna, sening stilistingman ✨',
   greetingHint:
     'Uslub haqida istalgan narsani so‘ra — yoki kiyim suratini yubor, men uning atrofida obraz yig‘aman.',
-  inputPlaceholder: 'Nur’ga yozing…',
+  inputPlaceholder: 'Lunaga yozing…',
   thinking: 'Ustida ishlayapman…',
   send: 'Yuborish',
   attachPhoto: 'Surat biriktirish',
@@ -303,8 +308,8 @@ const UZ: StylistStrings = {
   photoMany: (n) => `📷 ${n} ta surat`,
 
   errorGeneric: 'Javob bera olmadim. Yana urinib ko‘ring',
-  errorTimeout: 'Nur juda uzoq o‘ylayapti. Yana urinib ko‘ring',
-  errorBusy: 'Nur hozir band — bir daqiqadan keyin urinib ko‘ring',
+  errorTimeout: 'Luna juda uzoq o‘ylayapti. Yana urinib ko‘ring',
+  errorBusy: 'Luna hozir band — bir daqiqadan keyin urinib ko‘ring',
   errorFiltered: 'Bu xabarga javob bera olmadim — iltimos, boshqacha yozib ko‘ring',
   profileFields: {
     name: 'Ism',
@@ -318,9 +323,9 @@ const UZ: StylistStrings = {
     avoid: 'Taklif qilmaslik',
   },
   profileHints: {
-    PHOTO: 'Nurga to‘liq bo‘yli surat yubor — u rang tipi va qomatni aniqlaydi, maslahatlar aniqroq bo‘ladi',
-    LIFESTYLE: 'Nurga oddiy kuning qanday o‘tishini ayt — obrazlarni taxminan emas, shunga qarab tanlaydi',
-    DONE: 'Profil to‘ldirildi. Biror narsa to‘g‘ri bo‘lmasa — tuzat, Nur keyingi javoblarda hisobga oladi',
+    PHOTO: 'Lunaga to‘liq bo‘yli surat yubor — u rang tipi va qomatni aniqlaydi, maslahatlar aniqroq bo‘ladi',
+    LIFESTYLE: 'Lunaga oddiy kuning qanday o‘tishini ayt — obrazlarni taxminan emas, shunga qarab tanlaydi',
+    DONE: 'Profil to‘ldirildi. Biror narsa to‘g‘ri bo‘lmasa — tuzat, Luna keyingi javoblarda hisobga oladi',
   },
   errorPhoto: 'Suratni yuklab bo‘lmadi. Yana urinib ko‘ring',
   errorCoins: 'Bu amal uchun tanga yetarli emas',
@@ -356,8 +361,9 @@ const UZ: StylistStrings = {
     ACCESSORY: 'Aksessuarlar',
   },
   onboarding: {
-    hello: 'Salom, men Nur',
-    tagline: 'Shaxsiy stilistingiz. «Nur» — yorug‘lik degani: sizga nima yarashishini ko‘rishga yordam beraman.',
+    hello: 'Salom, men Luna',
+    tagline: 'Shaxsiy AI-stilistingiz. Garderobingizdan obrazlar yig‘aman va nima yarashishini tushuntiraman.',
+    start: 'Boshlash',
     showYourself: 'O‘zingizni ko‘rsating',
     photoPitch:
       'To‘liq bo‘yli rasmingizdan rang tipingiz va proporsiyalaringizni aniqlayman, mos ranglarni tanlayman — maslahatlar umumiy emas, aniq bo‘ladi. Rasmni faqat siz ko‘rasiz.',
@@ -397,7 +403,7 @@ const UZ: StylistStrings = {
   },
   openSource: 'Manbani ochish',
 
-  unavailableTitle: 'Nur hozircha mavjud emas',
+  unavailableTitle: 'Luna hozircha mavjud emas',
   unavailableText: 'Stilist cheklangan doiraga ochilgan. Tez orada hamma uchun yoqamiz.',
   comingSoon: 'Tez orada',
   goBack: 'Orqaga',
@@ -423,7 +429,7 @@ const UZ: StylistStrings = {
   profileFilled: 'To‘ldirilgan',
   profileUnknown: 'hali bilmayman',
   profileEditHint:
-    'Nur ba’zan xato qiladi — masalan, rang turida. Qo‘lda tuzatilganini u boshqa qayta yozmaydi, hatto yangi surat yuborsangiz ham.',
+    'Luna ba’zan xato qiladi — masalan, rang turida. Qo‘lda tuzatilganini u boshqa qayta yozmaydi, hatto yangi surat yuborsangiz ham.',
   profileDeleteHint: 'O‘chirish uchun bo‘sh qoldiring',
   editField: (label) => `O‘zgartirish: ${label}`,
 
@@ -445,11 +451,11 @@ const UZ: StylistStrings = {
 };
 
 const EN: StylistStrings = {
-  title: 'Nur',
+  title: 'Luna',
   beta: 'beta',
-  greeting: 'Hi! I’m Nur, your stylist ✨',
+  greeting: 'Hi! I’m Luna, your stylist ✨',
   greetingHint: 'Ask me anything about style — or send a photo of an item and I’ll build an outfit around it.',
-  inputPlaceholder: 'Message Nur…',
+  inputPlaceholder: 'Message Luna…',
   thinking: 'Working on it…',
   send: 'Send',
   attachPhoto: 'Attach photo',
@@ -458,8 +464,8 @@ const EN: StylistStrings = {
   photoMany: (n) => `📷 ${n} photos`,
 
   errorGeneric: 'Couldn’t answer. Please try again',
-  errorTimeout: 'Nur is taking too long. Please try again',
-  errorBusy: 'Nur is busy right now — try again in a minute',
+  errorTimeout: 'Luna is taking too long. Please try again',
+  errorBusy: 'Luna is busy right now — try again in a minute',
   errorFiltered: 'I couldn’t answer that message — could you rephrase it?',
   profileFields: {
     name: 'Name',
@@ -473,9 +479,9 @@ const EN: StylistStrings = {
     avoid: 'Never suggest',
   },
   profileHints: {
-    PHOTO: 'Send Nur a full-length photo — she’ll work out your colour type and shape, and the advice gets sharper',
-    LIFESTYLE: 'Tell Nur about your usual day — she’ll build outfits for it instead of guessing',
-    DONE: 'Profile is complete. If something looks off, fix it and Nur will use that next time',
+    PHOTO: 'Send Luna a full-length photo — she’ll work out your colour type and shape, and the advice gets sharper',
+    LIFESTYLE: 'Tell Luna about your usual day — she’ll build outfits for it instead of guessing',
+    DONE: 'Profile is complete. If something looks off, fix it and Luna will use that next time',
   },
   errorPhoto: 'Couldn’t upload the photo. Please try again',
   errorCoins: 'Not enough coins for this action',
@@ -511,8 +517,9 @@ const EN: StylistStrings = {
     ACCESSORY: 'Accessories',
   },
   onboarding: {
-    hello: 'Hi, I’m Nur',
-    tagline: 'Your personal stylist. “Nur” means “light” — I’ll help you see what suits you.',
+    hello: 'Hi, I’m Luna',
+    tagline: 'Your personal AI stylist. I’ll build outfits from your wardrobe and explain what suits you and why.',
+    start: 'Start',
     showYourself: 'Show me you',
     photoPitch:
       'From a full-length photo I’ll work out your colour type and proportions and pick your shades — so the advice gets specific, not generic. Only you can see the photo.',
@@ -548,7 +555,7 @@ const EN: StylistStrings = {
   },
   openSource: 'Open source',
 
-  unavailableTitle: 'Nur isn’t available yet',
+  unavailableTitle: 'Luna isn’t available yet',
   unavailableText: 'The stylist is open to a limited group. We’ll turn it on for everyone soon.',
   comingSoon: 'Coming soon',
   goBack: 'Go back',
@@ -574,7 +581,7 @@ const EN: StylistStrings = {
   profileFilled: 'Complete',
   profileUnknown: 'not known yet',
   profileEditHint:
-    'Nur sometimes gets things wrong — colour type, for instance. Anything you fix by hand stays fixed, even if you send a new photo.',
+    'Luna sometimes gets things wrong — colour type, for instance. Anything you fix by hand stays fixed, even if you send a new photo.',
   profileDeleteHint: 'Leave empty to remove',
   editField: (label) => `Edit: ${label}`,
 

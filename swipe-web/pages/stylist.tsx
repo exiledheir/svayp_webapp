@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import NurOnboarding from '@/components/stylist/NurOnboarding';
-import NurMark from '@/components/stylist/NurMark';
+import LunaOnboarding from '@/components/stylist/NurOnboarding';
+import LunaMark from '@/components/stylist/NurMark';
 import {
   ArrowLeft,
   Send,
@@ -49,7 +49,7 @@ import {
 } from '@/lib/stylist';
 
 /**
- * Чат с AI-стилистом «Nur».
+ * Чат с AI-стилистом «Luna».
  *
  * Доступ проверяется на сервере при каждом запросе, но экран проверяет его и на входе:
  * без этого пользователь, зашедший по прямой ссылке, упёрся бы в 403 уже после отправки
@@ -128,7 +128,7 @@ function parseAnswer(text: string): AnswerBlock[] {
 /**
  * Вопрос предполагает конкретную вещь («к этим брюкам», «эту блузку»)?
  *
- * <p>Тап по такому чипу без фото вёл в тупик: Nur по правилам просила прислать снимок,
+ * <p>Тап по такому чипу без фото вёл в тупик: Luna по правилам просила прислать снимок,
  * и человек делал лишний круг. Теперь такой чип сразу открывает выбор фото, а текст
  * ложится в поле ввода — отправка одним касанием после выбора.
  */
@@ -138,6 +138,9 @@ function parseAnswer(text: string): AnswerBlock[] {
  * <p>Раньше после F5 открывался «активный» тред сервера — самый свежий, а не тот, где
  * человек только что был. Хранилище может быть недоступно (приватный режим, запрет
  * данных сайта), поэтому каждое обращение в try: без него чат просто откроет свежий тред.
+ *
+ * <p>Ключ остался с прежнего имени стилиста (Nur): переименовать его — значит у всех, кто
+ * уже пользуется чатом, обнулить «где я был» при первом же обновлении.
  */
 const THREAD_KEY = 'nur_thread_id';
 
@@ -160,7 +163,7 @@ function rememberedThread(): string | null {
 
 function chipNeedsPhoto(text: string): boolean {
   // Три языка: на узбекском чип «Shu kiyim atrofida obraz yig'» уходил текстом без фото,
-  // и Nur собирала образ вокруг вещи, которой не видела.
+  // и Luna собирала образ вокруг вещи, которой не видела.
   return (
     /\bэт(?:а|у|о|и|ой|им|ому|ими|их)\b|скинь фото|мой образ\b/i.test(text) ||
     /\b(?:shu|bu)\s+(?:kiyim|obraz|yubka|ko[’'`ʼ]?ylak)|suratini yubor|rasm(?:ini)? yubor|mening obrazim/i.test(text) ||
@@ -227,7 +230,7 @@ export default function StylistPage() {
     previews?: string[];
     followups?: string[];
     constraints?: string | null;
-    /** Nur ждёт фото или выбор вещи: пока ждёт, подсказки с другими темами прячем. */
+    /** Luna ждёт фото или выбор вещи: пока ждёт, подсказки с другими темами прячем. */
     awaitingItem?: boolean;
   };
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -253,7 +256,7 @@ export default function StylistPage() {
   const [importErrors, setImportErrors] = useState<Record<string, string>>({});
   /** Картинка, открытая на весь экран: превью 44×44 не разглядеть. */
   const [zoomed, setZoomed] = useState<string | null>(null);
-  /** Знакомство с Nur вместо пустого чата при первом заходе. null — ещё не решили. */
+  /** Знакомство с Luna вместо пустого чата при первом заходе. null — ещё не решили. */
   const [needsIntro, setNeedsIntro] = useState<boolean | null>(null);
 
   // Оценки: id сообщения → вердикт. Тоже локально — чтобы не тянуть историю
@@ -273,7 +276,7 @@ export default function StylistPage() {
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   // ── Режим вкладки ────────────────────────────────────────────────────────
-  // Эта страница — вкладка «Nur» нижнего бара нового приложения (/stylist?nav=tab):
+  // Эта страница — вкладка «Luna» нижнего бара нового приложения (/stylist?nav=tab):
   // стрелки «назад» нет (она увела бы вебвью вкладки на /closet), системный Back
   // перехватывается, чтобы оболочка переключила вкладку, а не вышла из вебвью, и
   // экрану «недоступно» некуда возвращаться. Флаг живёт в sessionStorage вебвью,
@@ -684,7 +687,7 @@ export default function StylistPage() {
             // «собери образ вокруг этой вещи». Что на снимке, разбирает бэкенд.
             text: body || undefined,
             imageKeys: keys.length > 0 ? keys : undefined,
-            // Nur обязана отвечать на языке приложения: узбекоязычному пользователю
+            // Luna обязана отвечать на языке приложения: узбекоязычному пользователю
             // русский ответ бесполезен.
             locale,
             threadId: tid,
@@ -793,13 +796,13 @@ export default function StylistPage() {
   // разговаривает с ассистентом, который о нём ничего не знает.
   if (allowed && needsIntro) {
     return (
-      <NurOnboarding
+      <LunaOnboarding
         S={S}
         dark={dark}
         onFinish={(photoKey) => {
           setNeedsIntro(false);
           // Фото уходит первым сообщением: разбирает его тот же путь, что и обычно,
-          // и ответ Nur сразу оказывается персональным.
+          // и ответ Luna сразу оказывается персональным.
           if (photoKey) sendWithPhoto(photoKey);
         }}
       />
@@ -807,7 +810,7 @@ export default function StylistPage() {
   }
 
   if (!allowed) {
-    // «Скоро»: вкладка Nur видна всем, а сервер открыл стилиста не каждому —
+    // «Скоро»: вкладка Luna видна всем, а сервер открыл стилиста не каждому —
     // экран должен выглядеть как анонс, а не как ошибка. В режиме вкладки
     // возвращаться некуда, поэтому кнопки нет.
     return (
@@ -818,7 +821,7 @@ export default function StylistPage() {
           className="w-16 h-16 rounded-2xl flex items-center justify-center"
           style={{ background: accentGradient, boxShadow: '0 8px 24px rgba(243,112,167,0.28)' }}
         >
-          <NurMark size={30} color="#fff" />
+          <LunaMark size={30} color="#fff" />
         </div>
         <span
           className="mt-4 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
@@ -856,7 +859,7 @@ export default function StylistPage() {
       >
         {/* push, а не back(): внутри WebView история может быть пустой — тогда back()
             молча ничего не делает, и кнопка выглядит сломанной. Во вкладке стрелки
-            нет: она увела бы вебвью вкладки Nur на гардероб. */}
+            нет: она увела бы вебвью вкладки Luna на гардероб. */}
         {!tabMode && (
           <button
             onClick={() => router.push('/closet')}
@@ -903,7 +906,7 @@ export default function StylistPage() {
             <History size={22} strokeWidth={1.9} />
           </button>
           {/* Вход в профиль — по ТЗ 3.4 он живёт в шапке чата: онбординга нет, и это
-              единственное место, где видно, что Nur о тебе знает. */}
+              единственное место, где видно, что Luna о тебе знает. */}
           <button
             onClick={() => router.push('/stylist/profile')}
             aria-label={S.profileTitle}
@@ -1460,7 +1463,7 @@ export default function StylistPage() {
               </div>
             ))}
 
-            {/* Оценка только под ответами Nur и только для сохранённых сообщений:
+            {/* Оценка только под ответами Luna и только для сохранённых сообщений:
                 у оптимистичной реплики id локальный, сервер о ней не знает. */}
             {m.role === 'ASSISTANT' && !m.id.startsWith('local-') && (
               <div className="flex items-center gap-1 mt-1.5 pl-1">
@@ -1542,7 +1545,7 @@ export default function StylistPage() {
 
         {sending && (
           // Точки, а не фраза: «Работаю над этим…» читалось как готовый ответ,
-          // и человек не понимал, что Nur ещё думает.
+          // и человек не понимал, что Luna ещё думает.
           <div
             className="self-start px-4 py-3 rounded-2xl flex items-center gap-1.5"
             aria-label={S.thinking}

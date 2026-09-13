@@ -53,7 +53,13 @@ export default function ShareSheet({ onExternal, onClose, feedSeed }: Props) {
         <button
           onClick={() => {
             onClose();
-            router.push(feedSeed ? `/feed/create?seed=${feedSeed}` : '/feed/create');
+            // `from` — страница, с которой открыли композер. В нативной оболочке
+            // каждая вкладка живёт в своём WebView: без возврата на неё вкладка
+            // (обычно гардероб) остаётся на ленте до перезапуска приложения.
+            const params = new URLSearchParams();
+            if (feedSeed) params.set('seed', feedSeed);
+            params.set('from', router.asPath);
+            router.push(`/feed/create?${params}`);
           }}
           className={rowClass}
         >

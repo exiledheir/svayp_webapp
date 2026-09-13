@@ -20,6 +20,7 @@ export type BridgeMessageType =
   | 'share_image'
   | 'open_chat'
   | 'open_chat_list'
+  | 'open_tab'
   | 'open_external';
 
 export interface AuthCompletePayload {
@@ -156,6 +157,27 @@ export interface OpenChatListPayload {
   type: 'open_chat_list';
 }
 
+/** Bottom-bar tabs the shell can be asked to show. Must match `MainScreen.tabNames`. */
+export type ShellTabName = 'feed' | 'closet' | 'market' | 'discover' | 'nur';
+
+/**
+ * Sent when a page needs the shell to show a DIFFERENT bottom-bar tab.
+ *
+ * Every tab is a long-lived WebView inside the shell's IndexedStack, so a plain
+ * `router.push` into another section navigates the CURRENT tab's WebView and
+ * leaves it there for the rest of the app's life — that is how publishing a post
+ * from the closet left the closet tab showing the feed until the app was killed.
+ * The shell owns tab switching; the page only asks.
+ *
+ * {@link path} optionally points that tab's WebView at a deeper page
+ * (e.g. `/feed/me`); omit it to land on the tab's own root.
+ */
+export interface OpenTabPayload {
+  type: 'open_tab';
+  tab: ShellTabName;
+  path?: string;
+}
+
 export type BridgePayload =
   | AuthCompletePayload
   | OnboardingCompletePayload
@@ -169,7 +191,8 @@ export type BridgePayload =
   | SaveImagePayload
   | ShareImagePayload
   | OpenChatPayload
-  | OpenChatListPayload;
+  | OpenChatListPayload
+  | OpenTabPayload;
 
 type FlutterBridgeChannel = {
   postMessage: (message: string) => void;
@@ -219,7 +242,7 @@ const SHELL_TAB_STORAGE_KEY = 'svayp_shell_tab';
  * The shell loads every tab URL with `?nav=tab`; the flag is persisted per
  * WebView (sessionStorage) so pushed pages and same-WebView navigations keep it.
  * Old app builds (no param) and browsers return false and keep the in-page nav
- * that the bar now replaces (closet Nur FAB, "Lenta" pill, feed strip) — so the
+ * that the bar now replaces (closet Luna FAB, "Lenta" pill, feed strip) — so the
  * web can deploy before or after the app without stranding either build.
  */
 export function isShellTab(): boolean {
@@ -280,6 +303,22 @@ export function openNativeChatList(): boolean {
   const channel = getChannel();
   if (!channel) return false;
   channel.postMessage(JSON.stringify({ type: 'open_chat_list' }));
+  return true;
+}
+
+/**
+ * Ask the shell to show bottom-bar tab {@link tab}, optionally pointing that
+ * tab's WebView at {@link path}.
+ *
+ * Returns true when the message reached the host — the caller must then NOT
+ * navigate itself, or it drags its own tab into the other section (see
+ * {@link OpenTabPayload}). Returns false in a browser and in app builds that
+ * predate the message, where the caller falls back to its own navigation.
+ */
+export function openNativeTab(tab: ShellTabName, path?: string): boolean {
+  const channel = getChannel();
+  if (!channel) return false;
+  channel.postMessage(JSON.stringify({ type: 'open_tab', tab, path }));
   return true;
 }
 

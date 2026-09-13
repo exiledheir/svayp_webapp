@@ -1,4 +1,4 @@
-// ── AI-стилист «Nur» ─────────────────────────────────────────────────────────
+// ── AI-стилист «Luna» ─────────────────────────────────────────────────────────
 // Доступ к фиче решает сервер: пара флагов feature.stylist.* плюс вайтлист беты
 // (uz.svayp.svayp.stylist.StylistAccessService). На клиенте НЕТ списка телефонов —
 // иначе состав беты уехал бы в бандл и менялся только редеплоем.
@@ -108,7 +108,7 @@ export interface StylistAnswer {
   constraints?: string | null;
   coinsSpent: number;
   chargedSource: ChargedSource;
-  /** Nur ждёт вещь — фото или выбор из гардероба. Пока ждёт, подсказки не показываем. */
+  /** Luna ждёт вещь — фото или выбор из гардероба. Пока ждёт, подсказки не показываем. */
   awaitingItem?: boolean;
 }
 
@@ -273,7 +273,7 @@ export async function sendStylistMessage(payload: {
   wardrobeItemIds?: string[];
   chosenStyle?: string;
   threadId?: string;
-  /** Язык ответа Nur. Берётся из текущей локали приложения. */
+  /** Язык ответа Luna. Берётся из текущей локали приложения. */
   locale?: string;
 }): Promise<StylistAnswer> {
   // Потолок ожидания. Без него при зависшем бэкенде точки «печатает» крутились вечно.
@@ -306,7 +306,7 @@ export class StylistHttpError extends Error {
 export class StylistTimeoutError extends Error {}
 
 /**
- * Потоковый ответ Nur.
+ * Потоковый ответ Luna.
  *
  * <p>Не `EventSource`: тот умеет только GET и не носит заголовки, а нам нужен POST с
  * телом и `Authorization`. Поэтому обычный fetch и ручной разбор SSE из тела ответа.
@@ -449,7 +449,7 @@ export async function fetchStyleProfile(): Promise<StyleProfile> {
   return unwrap<StyleProfile>(res);
 }
 
-/** Пустое значение стирает поле — после этого Nur снова сможет вывести его из фото. */
+/** Пустое значение стирает поле — после этого Luna снова сможет вывести его из фото. */
 export async function editStyleProfileField(field: string, value: string): Promise<StyleProfile> {
   const res = await api.put(`/stylist/profile/${field}`, { value });
   return unwrap<StyleProfile>(res);

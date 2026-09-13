@@ -12,6 +12,7 @@ import { getMyProfile as getFeedProfile, fileToCompressedDataUrl } from '@/lib/f
 import { loadCached, clearCache } from '@/lib/feed-cache';
 import { clearPageCache } from '@/lib/page-cache';
 import { logAnalyticsEvent } from '@/lib/analytics';
+import { openNativeTab, isShellTab } from '@/lib/flutter-bridge';
 import { Events, Params } from '@/lib/analytics-events';
 import type { FeedPost, FeedProfile } from '@/types/feed';
 import FeedGuard from '@/components/feed/FeedGuard';
@@ -68,6 +69,38 @@ function CreateFeedPost() {
   // Ref, а не state: cleanup эффекта замкнулся бы на значение с момента монтирования.
   const publishedRef = React.useRef(false);
   const pickerRef = React.useRef<SourcePickerHandle>(null);
+
+  /**
+   * Страница, с которой открыли композер (`?from=/closet`), — её ставит ShareSheet.
+   *
+   * Композер живёт в том же WebView, что и открывшая его вкладка. Уйти из него
+   * «в ленту» значит оставить ЧУЖУЮ вкладку на ленте навсегда: гардероб
+   * превращался в ленту до перезапуска приложения. Поэтому выход всегда
+   * возвращает WebView сюда, а саму ленту показывает оболочка своей вкладкой.
+   */
+  const from = typeof router.query.from === 'string' ? router.query.from : null;
+
+  /**
+   * Уйти из композера на страницу ленты `target`.
+   *
+   * Открыт из другой вкладки — просим оболочку показать вкладку «Лента», а свой
+   * WebView возвращаем на `from`. В старых сборках приложения сообщение уходит в
+   * никуда: тогда всё равно возвращаемся на `from`, иначе вкладка застрянет.
+   * В обычном браузере вкладок нет — просто переходим на `target`.
+   */
+  const leaveFor = React.useCallback(
+    (target: string) => {
+      if (from) {
+        const handed = openNativeTab('feed', target === '/feed' ? undefined : target);
+        if (handed || isShellTab()) {
+          router.replace(from);
+          return;
+        }
+      }
+      router.replace(target);
+    },
+    [from, router],
+  );
 
   // Auth gate (FeedGuard handles the feature flag; this handles sign-in).
   React.useEffect(() => {
@@ -273,16 +306,17 @@ function CreateFeedPost() {
   }
 
   // Back navigation. From COMPOSE this just rewinds to the picker (keeping the
-  // current selection). Otherwise leave the flow for the feed — NOT router.back():
-  // inside the native app's WebView the initial about:blank→url load inflates
-  // window.history.length, so router.back() steps to a blank entry instead of the
-  // feed and the button appears dead (same fix as /market/[id] & /market/chat/[id]).
+  // current selection). Otherwise leave the flow — NOT router.back(): inside the
+  // native app's WebView the initial about:blank→url load inflates
+  // window.history.length, so router.back() steps to a blank entry instead and the
+  // button appears dead (same fix as /market/[id] & /market/chat/[id]). Отмена
+  // возвращает туда, откуда пришли: пост не создан, показывать ленту незачем.
   function handleBack() {
     if (step === COMPOSE) {
       setStep(PICK);
       return;
     }
-    router.push('/feed');
+    router.replace(from ?? '/feed');
   }
 
   async function handlePublish() {
@@ -411,14 +445,14 @@ function CreateFeedPost() {
             <p className="text-[14px] text-black/55 dark:text-white/55 mt-1">{t.feed_published_body}</p>
             <div className="flex flex-col gap-2.5 w-full mt-7">
               <button
-                onClick={() => router.replace('/feed')}
+                onClick={() => leaveFor('/feed')}
                 className="w-full py-3.5 rounded-2xl text-white font-semibold text-[15px]"
                 style={{ background: '#F370A7' }}
               >
                 {t.feed_go_to_feed}
               </button>
               <button
-                onClick={() => router.replace('/feed/me')}
+                onClick={() => leaveFor('/feed/me')}
                 className="w-full py-3.5 rounded-2xl font-semibold text-[15px] text-black dark:text-white bg-black/5 dark:bg-white/10"
               >
                 {t.feed_go_to_profile}

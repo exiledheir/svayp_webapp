@@ -14,7 +14,14 @@ export const SNAPSHOT_HEIGHT = 533 * SNAPSHOT_SCALE;
 
 /**
  * Render a flat-lay canvas layout to a PNG blob (used as the try-on snapshot input).
- * Mirrors the on-screen 3:4 canvas geometry (35% item width, % positions, scale).
+ *
+ * Mirrors the on-screen canvas EXACTLY, because this is the image the feed
+ * publishes: every editor and preview draws an item as a SQUARE box —
+ * `left:x% top:y% width:35% aspect-ratio:1 transform:scale(s)` — with the
+ * picture `object-contain`ed inside it (InteractiveCanvas, the closet board
+ * card, TryOnFlow, the onboarding steps). This used to stretch each picture to
+ * fill that square instead of fitting it, so published boards came out with
+ * skirts squashed and bags stretched — nothing like the board the user built.
  */
 export async function captureCanvasSnapshot(layout: SavedCanvasLayout, allItems: ClosetItem[]): Promise<Blob> {
   const W = SNAPSHOT_WIDTH, H = SNAPSHOT_HEIGHT;
@@ -30,24 +37,38 @@ export async function captureCanvasSnapshot(layout: SavedCanvasLayout, allItems:
   const sorted = [...layout].sort((a, b) => a.zIndex - b.zIndex);
   for (const entry of sorted) {
     const closetItem = allItems.find((i) => i.id === entry.id);
-    if (!closetItem?.imageData) continue;
+    // fullImage first: imageData is a 400px grid thumbnail, and each item box
+    // here is ~420px on a 1200px canvas, so the thumbnail alone renders soft —
+    // same reason the on-screen canvas upgrades to fullImage once it loads.
+    const source = closetItem?.fullImage || closetItem?.imageData;
+    if (!source) continue;
     const img = new window.Image();
     img.crossOrigin = 'anonymous';
     const src =
-      closetItem.imageData.startsWith('blob:') || closetItem.imageData.startsWith('data:')
-        ? closetItem.imageData
-        : `/api/proxy-image?url=${encodeURIComponent(closetItem.imageData)}`;
+      source.startsWith('blob:') || source.startsWith('data:')
+        ? source
+        : `/api/proxy-image?url=${encodeURIComponent(source)}`;
     await new Promise<void>((res, rej) => {
       img.onload = () => res();
       img.onerror = () => rej(new Error(`Failed to load image for item ${entry.id}`));
       img.src = src;
     });
-    const itemW = W * 0.35;
-    const itemH = itemW;
-    const drawW = itemW * entry.scale;
-    const drawH = itemH * entry.scale;
-    const cx = W * (entry.x / 100) + itemW / 2;
-    const cy = H * (entry.y / 100) + itemH / 2;
+
+    // The item's box: a square 35% of the FRAME WIDTH (`width:35%` +
+    // `aspect-ratio:1`), positioned by its top-left corner and scaled about its
+    // centre — so the centre is where it would be at scale 1.
+    const boxSide = W * 0.35;
+    const cx = W * (entry.x / 100) + boxSide / 2;
+    const cy = H * (entry.y / 100) + boxSide / 2;
+
+    // `object-contain` inside that scaled box: fit the picture's own aspect
+    // ratio, centred, never stretched to the square.
+    const scaledSide = boxSide * entry.scale;
+    const nw = img.naturalWidth || scaledSide;
+    const nh = img.naturalHeight || scaledSide;
+    const fit = Math.min(scaledSide / nw, scaledSide / nh);
+    const drawW = nw * fit;
+    const drawH = nh * fit;
     ctx.drawImage(img, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
   }
 

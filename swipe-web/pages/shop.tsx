@@ -39,7 +39,7 @@ export default function ShopPage() {
 
 
   // Поисковый запрос из адреса: по нему в магазин ведёт «подобрать» из карточки
-  // образа у Nur — иначе кнопка вела бы в общий каталог, где искать вручную.
+  // образа у Luna — иначе кнопка вела бы в общий каталог, где искать вручную.
   const searchQuery = typeof router.query.q === 'string' ? router.query.q : '';
 
   const fetchProducts = useCallback(async (pageNum: number, idx: number, append = false) => {
