@@ -79,8 +79,15 @@ export interface StylistStrings {
   /** Модель перегружена (429): говорим прямо и сразу, а не общим «не получилось». */
   errorBusy: string;
   errorFiltered: string;
+  errorDailyLimit: string;
   profileFields: Record<string, string>;
   profileHints: Record<string, string>;
+  pickFromCloset: string;
+  closetPickTitle: string;
+  closetPickHint: string;
+  closetEmpty: string;
+  closetPickDone: string;
+  removeItem: string;
   errorPhoto: string;
   errorCoins: string;
   errorSaveOutfit: string;
@@ -158,6 +165,7 @@ const RU: StylistStrings = {
   errorTimeout: 'Luna думает слишком долго. Попробуй ещё раз',
   errorBusy: 'Luna сейчас перегружена — попробуй через минуту',
   errorFiltered: 'Не смогла ответить на это сообщение — перефразируй, пожалуйста',
+  errorDailyLimit: 'На сегодня образы закончились — продолжим завтра. Вопросы про стиль без ограничений',
   profileFields: {
     name: 'Имя',
     age: 'Возраст',
@@ -174,6 +182,12 @@ const RU: StylistStrings = {
     LIFESTYLE: 'Расскажи Luna про свой обычный день — она подберёт образы под него, а не наугад',
     DONE: 'Профиль собран. Если что-то не так — поправь, Luna учтёт это в следующих ответах',
   },
+  pickFromCloset: 'Выбрать вещь из гардероба',
+  closetPickTitle: 'Вещи из гардероба',
+  closetPickHint: 'Выбери до трёх вещей — Luna соберёт образ вокруг них',
+  closetEmpty: 'В гардеробе пока пусто. Загрузи вещь в гардеробе или пришли фото.',
+  closetPickDone: 'Готово',
+  removeItem: 'Убрать вещь',
   errorPhoto: 'Не получилось загрузить фото. Попробуй ещё раз',
   errorCoins: 'Не хватает монет на это действие',
   errorSaveOutfit: 'Не получилось сохранить образ',
@@ -311,6 +325,7 @@ const UZ: StylistStrings = {
   errorTimeout: 'Luna juda uzoq o‘ylayapti. Yana urinib ko‘ring',
   errorBusy: 'Luna hozir band — bir daqiqadan keyin urinib ko‘ring',
   errorFiltered: 'Bu xabarga javob bera olmadim — iltimos, boshqacha yozib ko‘ring',
+  errorDailyLimit: 'Bugunga obrazlar tugadi — ertaga davom etamiz. Uslub savollari cheksiz',
   profileFields: {
     name: 'Ism',
     age: 'Yosh',
@@ -327,6 +342,12 @@ const UZ: StylistStrings = {
     LIFESTYLE: 'Lunaga oddiy kuning qanday o‘tishini ayt — obrazlarni taxminan emas, shunga qarab tanlaydi',
     DONE: 'Profil to‘ldirildi. Biror narsa to‘g‘ri bo‘lmasa — tuzat, Luna keyingi javoblarda hisobga oladi',
   },
+  pickFromCloset: 'Garderobdan kiyim tanlash',
+  closetPickTitle: 'Garderobdagi kiyimlar',
+  closetPickHint: 'Uchtagacha kiyim tanla — Luna ular atrofida obraz yig‘adi',
+  closetEmpty: 'Garderob hozircha bo‘sh. Garderobga kiyim yuklab qo‘y yoki surat yubor.',
+  closetPickDone: 'Tayyor',
+  removeItem: 'Kiyimni olib tashlash',
   errorPhoto: 'Suratni yuklab bo‘lmadi. Yana urinib ko‘ring',
   errorCoins: 'Bu amal uchun tanga yetarli emas',
   errorSaveOutfit: 'Obrazni saqlab bo‘lmadi',
@@ -467,6 +488,7 @@ const EN: StylistStrings = {
   errorTimeout: 'Luna is taking too long. Please try again',
   errorBusy: 'Luna is busy right now — try again in a minute',
   errorFiltered: 'I couldn’t answer that message — could you rephrase it?',
+  errorDailyLimit: 'No more looks for today — let’s continue tomorrow. Style questions are unlimited',
   profileFields: {
     name: 'Name',
     age: 'Age',
@@ -483,6 +505,12 @@ const EN: StylistStrings = {
     LIFESTYLE: 'Tell Luna about your usual day — she’ll build outfits for it instead of guessing',
     DONE: 'Profile is complete. If something looks off, fix it and Luna will use that next time',
   },
+  pickFromCloset: 'Pick an item from your wardrobe',
+  closetPickTitle: 'Items in your wardrobe',
+  closetPickHint: 'Pick up to three items — Luna will build a look around them',
+  closetEmpty: 'Your wardrobe is empty so far. Add an item there, or send a photo.',
+  closetPickDone: 'Done',
+  removeItem: 'Remove item',
   errorPhoto: 'Couldn’t upload the photo. Please try again',
   errorCoins: 'Not enough coins for this action',
   errorSaveOutfit: 'Couldn’t save the outfit',

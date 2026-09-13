@@ -12,6 +12,7 @@ import {
   MessageSquarePlus,
   History,
   Trash2,
+  Shirt,
 } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { useI18n } from '@/lib/i18n';
@@ -23,6 +24,7 @@ import { stylistTheme } from '@/lib/stylist-theme';
 import { logAnalyticsEvent } from '@/lib/analytics';
 import { Events, Params } from '@/lib/analytics-events';
 import { uploadModelPhoto } from '@/lib/wardrobe-api';
+import { fetchClosetItems, type ClosetItem } from '@/lib/closet-storage';
 import {
   fetchStylistAccess,
   fetchStylistThread,
@@ -215,6 +217,7 @@ export default function StylistPage() {
     if (code === 'INSUFFICIENT_COINS') return S.errorCoins;
     if (code === 'STYLIST_BUSY') return S.errorBusy;
     if (code === 'STYLIST_CONTENT_FILTERED') return S.errorFiltered;
+    if (code === 'STYLIST_DAILY_LIMIT') return S.errorDailyLimit;
     return S.errorGeneric;
   };
   const dark = theme === 'dark';
@@ -241,6 +244,13 @@ export default function StylistPage() {
   // Прикреплённые фото: ключ блоба для отправки + локальный превью для показа.
   // URL наружу не отдаём — сервер сам резолвит ключ, проверив владельца.
   const [attachments, setAttachments] = useState<{ key: string; preview: string }[]>([]);
+  // Вещи, выбранные из гардероба. Luna сама предлагает «пришли фото или выбери вещь
+  // из гардероба», а выбрать было нечем: бэкенд принимал wardrobeItemIds, интерфейса
+  // не было — и человек переснимал вещь, которая у него уже загружена.
+  const [picked, setPicked] = useState<{ id: string; preview: string }[]>([]);
+  const [closetOpen, setClosetOpen] = useState(false);
+  const [closetItems, setClosetItems] = useState<ClosetItem[] | null>(null);
+  const [closetFailed, setClosetFailed] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   // Сохранённые образы: ключ «id сообщения — номер образа». Держим локально, чтобы
@@ -287,6 +297,7 @@ export default function StylistPage() {
   // Оверлеи закрываются системным Back вместо переключения вкладки.
   useOverlayBackClose(showThreads, () => setShowThreads(false));
   useOverlayBackClose(zoomed !== null, () => setZoomed(null));
+  useOverlayBackClose(closetOpen, () => setClosetOpen(false));
 
   // ── Доступ и история ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -613,18 +624,32 @@ export default function StylistPage() {
     }
   }, []);
 
+  /** Гардероб для выбора вещи. Читаем по открытию листа, а не заранее: список нужен
+   *  редко, а запрос не бесплатный. */
+  const openCloset = useCallback(async () => {
+    setClosetOpen(true);
+    if (closetItems || closetFailed) return;
+    try {
+      setClosetItems(await fetchClosetItems());
+    } catch {
+      setClosetFailed(true);
+    }
+  }, [closetItems, closetFailed]);
+
   const send = useCallback(
     async (text: string) => {
       const body = text.trim();
       // Фото без текста — рабочий сценарий: «скинула вещь, собери образ».
-      if ((!body && attachments.length === 0) || sending) return;
+      if ((!body && attachments.length === 0 && picked.length === 0) || sending) return;
 
       setError(null);
       setSending(true);
       setDraft('');
       const keys = attachments.map((a) => a.key);
-      const previews = attachments.map((a) => a.preview);
+      const itemIds = picked.map((p) => p.id);
+      const previews = [...attachments.map((a) => a.preview), ...picked.map((p) => p.preview)];
       setAttachments([]);
+      setPicked([]);
 
       // Оптимистично показываем свою реплику: ждать ответа модели молча — плохой UX.
       const optimistic: ChatMessage = {
@@ -648,7 +673,9 @@ export default function StylistPage() {
         let answer: StylistAnswer;
         // Поток пробуем только для текста: у сборки образа и списка покупок ответ —
         // структура, её нечем показывать по кускам, и бэкенд отвечает на такое 409.
-        if (keys.length === 0 && body) {
+        // Поток только для чистого текста: с фото или выбранной вещью ответ приходит
+        // карточками, а их нечем показывать по кускам.
+        if (keys.length === 0 && itemIds.length === 0 && body) {
           try {
             let acc = '';
             answer = await streamStylistMessage(
@@ -687,6 +714,7 @@ export default function StylistPage() {
             // «собери образ вокруг этой вещи». Что на снимке, разбирает бэкенд.
             text: body || undefined,
             imageKeys: keys.length > 0 ? keys : undefined,
+            wardrobeItemIds: itemIds.length > 0 ? itemIds : undefined,
             // Luna обязана отвечать на языке приложения: узбекоязычному пользователю
             // русский ответ бесполезен.
             locale,
@@ -724,7 +752,7 @@ export default function StylistPage() {
         setSending(false);
       }
     },
-    [sending, attachments, locale, S, ensureThread],
+    [sending, attachments, picked, locale, S, ensureThread],
   );
 
   /**
@@ -782,7 +810,9 @@ export default function StylistPage() {
   // Send is the page's primary action, so it carries the pink the app gives
   // every primary action; greyed out while there is nothing to send.
   const canSend =
-    (draft.trim().length > 0 || attachments.length > 0) && !sending && !uploading;
+    (draft.trim().length > 0 || attachments.length > 0 || picked.length > 0) &&
+    !sending &&
+    !uploading;
 
   if (checking) {
     return (
@@ -917,6 +947,84 @@ export default function StylistPage() {
           </button>
         </div>
       </header>
+
+      {/* Выбор вещи из гардероба. Оверлеем на том же экране: Luna просит вещь в ответ
+          на реплику, и уход в гардероб потерял бы разговор. */}
+      {closetOpen && (
+        <div className="fixed inset-0 z-40 flex flex-col" style={{ background: bg }}>
+          <div
+            className="flex items-center gap-3 px-4 h-14 shrink-0"
+            style={{ borderBottom: `1px solid ${line}` }}
+          >
+            <button onClick={() => setClosetOpen(false)} aria-label={S.goBack}>
+              <ArrowLeft size={22} style={{ color: ink }} />
+            </button>
+            <span className="text-[20px] font-bold tracking-[-0.3px]" style={{ color: ink }}>
+              {S.closetPickTitle}
+            </span>
+            <button
+              onClick={() => setClosetOpen(false)}
+              className="ml-auto px-3 h-8 rounded-full text-[13px] font-bold"
+              style={{ background: picked.length > 0 ? accent : card, color: picked.length > 0 ? '#fff' : muted }}
+            >
+              {S.closetPickDone}
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 py-3">
+            <p className="text-[13px] mb-3" style={{ color: muted }}>
+              {S.closetPickHint}
+            </p>
+            {closetItems === null && !closetFailed && (
+              <div className="flex justify-center py-10">
+                <Loader2 size={20} className="animate-spin" style={{ color: muted }} />
+              </div>
+            )}
+            {(closetFailed || (closetItems && closetItems.length === 0)) && (
+              <p className="text-[14px]" style={{ color: muted }}>
+                {closetFailed ? S.errorGeneric : S.closetEmpty}
+              </p>
+            )}
+            <div className="grid grid-cols-3 gap-2">
+              {(closetItems ?? []).map((item) => {
+                const chosen = picked.some((p) => p.id === item.id);
+                const preview = item.thumbnailUrl || item.imageData;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() =>
+                      setPicked((prev) =>
+                        prev.some((p) => p.id === item.id)
+                          ? prev.filter((p) => p.id !== item.id)
+                          : // Больше трёх вещей за раз — это уже готовый образ, а не просьба
+                            // собрать его: модель начинает пересказывать присланное.
+                            prev.length >= 3
+                            ? prev
+                            : [...prev, { id: item.id, preview }],
+                      )
+                    }
+                    aria-label={item.displayName ?? S.pickFromCloset}
+                    aria-pressed={chosen}
+                    className="relative aspect-square rounded-xl overflow-hidden active:scale-95 transition-transform"
+                    style={{ border: `2px solid ${chosen ? accent : line}`, background: card }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={preview} alt="" className="w-full h-full object-cover" />
+                    {chosen && (
+                      <span
+                        className="absolute top-1 right-1 flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-bold"
+                        style={{ background: accent, color: '#fff' }}
+                      >
+                        {picked.findIndex((p) => p.id === item.id) + 1}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Панель разговоров. Оверлеем, а не отдельной страницей: переключение между
           темами — короткое действие, ради него уходить с экрана чата незачем. */}
@@ -1598,6 +1706,32 @@ export default function StylistPage() {
           </div>
         )}
 
+        {/* Превью выбранных вещей гардероба: человек должен видеть, вокруг чего
+            собирается образ, и иметь возможность убрать вещь до отправки. */}
+        {picked.length > 0 && (
+          <div className="flex gap-2 mb-2 overflow-x-auto">
+            {picked.map((it) => (
+              <div key={it.id} className="relative shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={it.preview}
+                  alt={S.pickFromCloset}
+                  className="w-14 h-14 rounded-xl object-cover"
+                  style={{ border: `1px solid ${accent}` }}
+                />
+                <button
+                  onClick={() => setPicked((prev) => prev.filter((x) => x.id !== it.id))}
+                  aria-label={S.removeItem}
+                  className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-5 h-5 rounded-full"
+                  style={{ background: ink, color: bg }}
+                >
+                  <X size={11} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <input
           ref={fileRef}
           type="file"
@@ -1620,6 +1754,15 @@ export default function StylistPage() {
             style={{ background: card, color: ink }}
           >
             {uploading ? <Loader2 size={18} className="animate-spin" /> : <ImagePlus size={18} />}
+          </button>
+          <button
+            onClick={openCloset}
+            disabled={sending}
+            aria-label={S.pickFromCloset}
+            className="flex items-center justify-center w-11 h-11 rounded-full shrink-0 active:scale-95 transition-transform disabled:opacity-40"
+            style={{ background: card, color: ink }}
+          >
+            <Shirt size={18} />
           </button>
           <textarea
             value={draft}
