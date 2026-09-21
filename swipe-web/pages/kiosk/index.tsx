@@ -60,6 +60,7 @@ export default function KioskPage() {
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [storeLabel, setStoreLabel] = useState<string | null>(null);
+  const [menswearAvailable, setMenswearAvailable] = useState(true);
   const [demo, setDemo] = useState(false);
 
   const [gender, setGender] = useState<'FEMALE' | 'MALE' | null>(null);
@@ -153,6 +154,7 @@ export default function KioskPage() {
       setSessionId(null);
       attemptRef.current = 0;
       setStoreLabel((label) => label); // подпись магазина переживает сброс
+      setMenswearAvailable(true);
       setGender(null);
       setShape(null);
       setStyles([]);
@@ -224,6 +226,7 @@ export default function KioskPage() {
       }
       setSessionId(session.sessionId);
       setStoreLabel(session.storeLabel);
+      setMenswearAvailable(session.menswearAvailable !== false);
       trackKiosk('kiosk_session_start', session.sessionId, { storeLabel: session.storeLabel, demo: isDemoMode() });
       trackKiosk('kiosk_path_selected', session.sessionId, { path: nextPath });
       if (nextPath === 'create') {
@@ -429,6 +432,7 @@ export default function KioskPage() {
             <BodyScreen
               lang={lang}
               t={t}
+              menswearAvailable={menswearAvailable}
               gender={gender}
               shape={shape}
               onGender={(g) => {

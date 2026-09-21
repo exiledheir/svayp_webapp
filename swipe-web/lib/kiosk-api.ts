@@ -23,6 +23,8 @@ export interface KioskSession {
   sessionId: string;
   storeLabel: string;
   catalogSize: number;
+  /** Собирается ли в зале мужской образ; старый бэкенд поля не шлёт — считаем, что да. */
+  menswearAvailable?: boolean;
 }
 
 export interface KioskCatalogItem {

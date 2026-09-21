@@ -60,6 +60,7 @@ export const KIOSK_TEXT = {
   qShape: ['Тип фигуры', 'Tana tuzilishi'],
   female: ['Женский', 'Ayol'],
   male: ['Мужской', 'Erkak'],
+  womenOnly: ['Сейчас в зале женская коллекция', 'Hozir zalda ayollar kolleksiyasi'],
   dontKnow: ['Не знаю', 'Bilmayman'],
   next: ['Дальше', 'Keyingisi'],
 

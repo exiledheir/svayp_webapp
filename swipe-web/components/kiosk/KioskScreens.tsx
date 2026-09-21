@@ -239,6 +239,7 @@ export function BodyScreen({
   onShape,
   onNext,
   nextLabel,
+  menswearAvailable = true,
 }: {
   lang: KioskLang;
   t: T;
@@ -248,16 +249,19 @@ export function BodyScreen({
   onShape: (code: string) => void;
   onNext: () => void;
   nextLabel: string;
+  /** Нет мужской одежды в зале — кнопку «Мужской» не показываем. */
+  menswearAvailable?: boolean;
 }) {
   const shapes = KIOSK_SHAPES[gender ?? 'FEMALE'];
+  const genders = menswearAvailable ? (['FEMALE', 'MALE'] as const) : (['FEMALE'] as const);
   return (
     <div className="body">
       <h2>{t('bodyTitle')}</h2>
-      <p className="sub">{t('bodySubtitle')}</p>
+      <p className="sub">{menswearAvailable ? t('bodySubtitle') : t('womenOnly')}</p>
 
       <div className="qlabel">{t('qGender')}</div>
       <div className="gender">
-        {(['FEMALE', 'MALE'] as const).map((g) => (
+        {genders.map((g) => (
           <button
             key={g}
             className={`gcell ${gender === g ? 'sel' : ''}`}
