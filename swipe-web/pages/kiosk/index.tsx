@@ -174,6 +174,9 @@ export default function KioskPage() {
   // ── таймер бездействия ───────────────────────────────────────────────────
   useEffect(() => {
     if (screen === 'idle') return;
+    // Генерация идёт около минуты, и человек в это время экран не трогает: без этой
+    // паузы «вы ещё здесь?» всплывало посреди ожидания и сбрасывало сессию.
+    if (screen === 'generating' && !genFailed) return;
 
     let warnTimer: ReturnType<typeof setTimeout>;
     const arm = () => {
@@ -193,7 +196,7 @@ export default function KioskPage() {
       clearTimeout(warnTimer);
       events.forEach((e) => window.removeEventListener(e, arm));
     };
-  }, [screen]);
+  }, [screen, genFailed]);
 
   useEffect(() => {
     if (!idleWarning) return;
