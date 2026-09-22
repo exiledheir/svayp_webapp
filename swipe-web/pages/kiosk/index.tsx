@@ -52,6 +52,19 @@ type Screen =
 /** 45 секунд без касаний → предупреждение, ещё 10 → полный сброс (ТЗ, раздел 2). */
 const IDLE_TIMEOUT_MS = 45_000;
 const IDLE_GRACE_S = 10;
+/**
+ * Клиентский дедлайн генерации. Бюджет ML — 75 c (плюс очередь); если ответа нет и после него
+ * (ML перезапускался, коллбэк потерялся), человек видит ошибку, а не полосу на 90%
+ * до вотчдога бэкенда через 5–7 минут.
+ */
+const GEN_DEADLINE_S = 90;
+
+/** Нет ответа от сервера вовсе (сеть, бэкенд не поднят) или бэкенд упал — тогда демо уместно. */
+const backendUnreachable = (err: unknown) => {
+  const status = (err as any)?.response?.status as number | undefined;
+  return status === undefined || status === 404 || status >= 500;
+};
+const isOfflineNow = () => typeof navigator !== 'undefined' && navigator.onLine === false;
 
 export default function KioskPage() {
   const [lang, setLang] = useState<KioskLang>('ru');
@@ -84,6 +97,11 @@ export default function KioskPage() {
   const [idleLeft, setIdleLeft] = useState(IDLE_GRACE_S);
 
   const watchRef = useRef<{ close: () => void } | null>(null);
+  /**
+   * Номер текущей генерации. Отмена, сброс и новая генерация его меняют — запоздавший
+   * ответ прошлой генерации сверяет номер и молча уходит, а не открывает чужой результат.
+   */
+  const genIdRef = useRef(0);
   /** Номер попытки: с ним пересборка даёт другой образ. */
   const attemptRef = useRef(0);
   /** Номер загрузки каталога: ответы прошлого фильтра не должны перетирать текущий. */
@@ -143,6 +161,8 @@ export default function KioskPage() {
   // ── сброс сессии ─────────────────────────────────────────────────────────
   const hardReset = useCallback(
     (reason: 'timeout' | 'manual') => {
+      genIdRef.current += 1;
+      catalogRequestRef.current += 1; // каталог прошлого человека не догружается в пустую сессию
       watchRef.current?.close();
       watchRef.current = null;
       if (sessionId) {
@@ -164,8 +184,14 @@ export default function KioskPage() {
       setCode(null);
       setShareUrl(null);
       setGenFailed(false);
+      setGenReason(null);
       setElapsed(0);
       setIdleWarning(false);
+      // Следующий покупатель не наследует язык и ветку предыдущего.
+      setLang('ru');
+      setPath('create');
+      // Экран «нет связи» не должен запирать планшет навсегда: снимаем, если сеть есть.
+      setOffline(isOfflineNow());
       setScreen('idle');
     },
     [screen, sessionId, track],
@@ -213,6 +239,9 @@ export default function KioskPage() {
     setPath(nextPath);
     try {
       let session;
+      // Флаг демо от прошлого сбоя снимаем ДО запроса: иначе startSession отдаёт
+      // демо-сессию, не спрашивая бэкенд, и фото потом уходит с фейковым sessionId.
+      if (!isDemoForced()) disableDemo();
       try {
         session = await startSession(lang, nextPath);
         // Бэкенд ответил — значит имитация больше не нужна.
@@ -221,6 +250,9 @@ export default function KioskPage() {
           setDemo(false);
         }
       } catch (err) {
+        // В демо «образом» становится само фото — уходим туда только когда бэкенд
+        // действительно недоступен, а не на любой отказ (429 и т.п.).
+        if (!backendUnreachable(err)) throw err;
         // Бэкенд киоска ещё не раскатан (или планшет не подключён к магазину) —
         // переходим в демо вместо экрана «нет связи»: показ важнее.
         enableDemo();
@@ -239,7 +271,8 @@ export default function KioskPage() {
         loadCatalog();
       }
     } catch {
-      setOffline(true);
+      // Сессия не открылась, но сеть есть — остаёмся на заставке, следующее касание повторит.
+      setOffline(isOfflineNow());
     }
   };
 
@@ -260,7 +293,8 @@ export default function KioskPage() {
         isCurrent,
       );
     } catch {
-      if (isCurrent()) setOffline(true);
+      // Сбой одной страницы — не повод запирать киоск: показываем то, что успело прийти.
+      if (isCurrent()) setOffline(isOfflineNow());
     } finally {
       if (isCurrent()) setCatalogLoading(false);
     }
@@ -269,10 +303,17 @@ export default function KioskPage() {
   // ── генерация ────────────────────────────────────────────────────────────
   const startGeneration = useCallback(async () => {
     if (!sessionId || !gender || !shape) return;
+    const genId = ++genIdRef.current;
+    const current = () => genIdRef.current === genId;
+    watchRef.current?.close();
+    watchRef.current = null;
     setScreen('generating');
     setGenFailed(false);
     setGenReason(null);
     setElapsed(0);
+    // QR и код продавца — от прошлого образа: после пересборки они вели бы на старый.
+    setShareUrl(null);
+    setCode(null);
     track('kiosk_generation_started', { path, styles, picked: picked.length });
 
     try {
@@ -284,11 +325,12 @@ export default function KioskPage() {
         productIds: picked,
         attempt: attemptRef.current,
       });
+      if (!current()) return;
       setLook(created);
 
-      watchRef.current?.close();
       watchRef.current = watchLook(created.lookId, {
         onDone: (finished) => {
+          if (!current()) return;
           setLook(finished);
           if (finished.status === 'COMPLETED') {
             track('kiosk_generation_completed', { lookId: finished.lookId });
@@ -301,11 +343,13 @@ export default function KioskPage() {
           }
         },
         onError: (err) => {
+          if (!current()) return;
           setGenReason(err?.message ?? 'STREAM_ERROR');
           setGenFailed(true);
         },
       });
     } catch (err) {
+      if (!current()) return;
       const errorCode = kioskErrorCode(err);
       track('kiosk_generation_failed', { reason: errorCode ?? 'REQUEST_FAILED' });
       setGenReason(errorCode ?? 'REQUEST_FAILED');
@@ -320,6 +364,16 @@ export default function KioskPage() {
     return () => clearInterval(timer);
   }, [screen, genFailed]);
 
+  useEffect(() => {
+    if (screen !== 'generating' || genFailed || elapsed < GEN_DEADLINE_S) return;
+    genIdRef.current += 1; // поздний ответ этой генерации уже не нужен
+    watchRef.current?.close();
+    watchRef.current = null;
+    track('kiosk_generation_failed', { reason: 'TIMEOUT', elapsed });
+    setGenReason('TIMEOUT');
+    setGenFailed(true);
+  }, [screen, genFailed, elapsed, track]);
+
   // ── забрать образ ────────────────────────────────────────────────────────
   const collect = async () => {
     if (!sessionId) return;
@@ -329,20 +383,35 @@ export default function KioskPage() {
       setShareUrl(finish.shareUrl);
       track('kiosk_buy_opened', { code: finish.code });
       setScreen('buy');
-    } catch {
-      setOffline(true);
+    } catch (err) {
+      // Код не выдали — остаёмся на результате (QR там же), а не запираем киоск.
+      track('kiosk_finish_failed', { reason: kioskErrorCode(err) ?? 'REQUEST_FAILED' });
+      setOffline(isOfflineNow());
     }
   };
 
   // Код и ссылка нужны уже на экране результата — там висит QR.
   useEffect(() => {
     if (screen !== 'result' || !sessionId || shareUrl) return;
-    finishSession(sessionId)
-      .then((finish) => {
-        setCode(finish.code);
-        setShareUrl(finish.shareUrl);
-      })
-      .catch(() => {});
+    let cancelled = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    // Без повтора один сбой оставлял место под QR пустым до конца сессии.
+    const attempt = (left: number) => {
+      finishSession(sessionId)
+        .then((finish) => {
+          if (cancelled) return;
+          setCode(finish.code);
+          setShareUrl(finish.shareUrl);
+        })
+        .catch(() => {
+          if (!cancelled && left > 0) retry = setTimeout(() => attempt(left - 1), 4000);
+        });
+    };
+    attempt(3);
+    return () => {
+      cancelled = true;
+      if (retry) clearTimeout(retry);
+    };
   }, [screen, sessionId, shareUrl]);
 
   const regenerate = () => {
@@ -439,8 +508,10 @@ export default function KioskPage() {
               gender={gender}
               shape={shape}
               onGender={(g) => {
+                if (g === gender) return; // повторный тап не стирает уже выбранное
                 setGender(g);
                 setShape(null); // списки фигур для мужчин и женщин разные
+                setStyles([]); // и списки стилей тоже
               }}
               onShape={setShape}
               nextLabel={path === 'create' ? t('next') : t('ctaCreate')}
@@ -457,6 +528,7 @@ export default function KioskPage() {
               lang={lang}
               t={t}
               selected={styles}
+              gender={gender}
               onToggle={(code) => setStyles((list) => toggle(list, code))}
               onNext={() => {
                 track('kiosk_style_selected', { styles });
@@ -492,7 +564,9 @@ export default function KioskPage() {
               failed={genFailed}
               reason={genReason}
               onCancel={() => {
+                genIdRef.current += 1; // запоздавший ответ отменённой генерации не откроет результат
                 watchRef.current?.close();
+                watchRef.current = null;
                 track('kiosk_generation_cancelled', { elapsed });
                 setScreen(path === 'create' ? 'style' : 'catalog');
               }}

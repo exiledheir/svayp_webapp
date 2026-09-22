@@ -89,6 +89,14 @@ export const KIOSK_TEXT = {
   genRetry: ['Попробовать снова', 'Qayta urinib koʻrish'],
   genContinueInApp: ['Или продолжите в приложении по QR', 'Yoki QR orqali ilovada davom eting'],
   cancel: ['Отмена', 'Bekor qilish'],
+  genTimeout: [
+    'Генерация заняла слишком долго. Попробуйте ещё раз',
+    'Yaratish juda uzoq davom etdi. Qayta urinib koʻring',
+  ],
+  genLimit: [
+    'Попытки на этом стенде закончились — продолжите в приложении',
+    'Bu stenddagi urinishlar tugadi — ilovada davom eting',
+  ],
   lookUnavailable: [
     'Из того, что сейчас в наличии, полный образ не собрать',
     'Hozir mavjud mahsulotlardan toʻliq uslub yigʻib boʻlmaydi',
@@ -153,6 +161,13 @@ export const KIOSK_STYLES: ReadonlyArray<{ code: string; label: Pair }> = [
   { code: 'OFFICE_SMART', label: ['Деловой', 'Ishbop'] },
   { code: 'SPORTY', label: ['Спорт-шик', 'Sport-shik'] },
 ];
+
+/** «Модест» и «Вечерний» подобраны под женскую коллекцию — мужчине их не показываем. */
+const WOMEN_ONLY_STYLES = new Set(['MODEST_CHIC', 'EVENING']);
+
+export function kioskStylesFor(gender: 'FEMALE' | 'MALE' | null) {
+  return gender === 'MALE' ? KIOSK_STYLES.filter((s) => !WOMEN_ONLY_STYLES.has(s.code)) : KIOSK_STYLES;
+}
 
 /**
  * Фильтры каталога. `code: null` — «Все»; остальные значения совпадают с enum

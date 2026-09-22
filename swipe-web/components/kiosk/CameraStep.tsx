@@ -28,6 +28,21 @@ export default function CameraStep({ lang, sessionId, onConfirmed, onEvent }: Pr
   const [cameraError, setCameraError] = useState(false);
   const [validation, setValidation] = useState<KioskPhotoValidation | null>(null);
   const [uploadError, setUploadError] = useState(false);
+  /** Экран уже закрыт: запоздавший ответ загрузки не должен переключать экраны. */
+  const aliveRef = useRef(true);
+  useEffect(
+    () => () => {
+      aliveRef.current = false;
+    },
+    [],
+  );
+
+  // После «Переснять» <video> создаётся заново: поток подключаем к каждому новому
+  // элементу, иначе живое превью чёрное, а снимок не получается.
+  const attachVideo = useCallback((el: HTMLVideoElement | null) => {
+    videoRef.current = el;
+    if (el && streamRef.current && el.srcObject !== streamRef.current) el.srcObject = streamRef.current;
+  }, []);
 
   const t = (key: Parameters<typeof kioskText>[0]) => kioskText(key, lang);
 
@@ -59,7 +74,11 @@ export default function CameraStep({ lang, sessionId, onConfirmed, onEvent }: Pr
   // ── съёмка ────────────────────────────────────────────────────────────────
   const capture = useCallback(() => {
     const video = videoRef.current;
-    if (!video || !video.videoWidth) return;
+    if (!video || !video.videoWidth) {
+      // Камера ещё не дала кадр — возвращаем кнопку «Снять», а не зависаем на отсчёте.
+      setPhase('live');
+      return;
+    }
 
     // Кадрируем в квадрат по центру — ровно то, что человек видел в круге.
     const side = Math.min(video.videoWidth, video.videoHeight);
@@ -67,7 +86,10 @@ export default function CameraStep({ lang, sessionId, onConfirmed, onEvent }: Pr
     canvas.width = side;
     canvas.height = side;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      setPhase('live');
+      return;
+    }
     ctx.drawImage(
       video,
       (video.videoWidth - side) / 2,
@@ -82,7 +104,10 @@ export default function CameraStep({ lang, sessionId, onConfirmed, onEvent }: Pr
 
     canvas.toBlob(
       (blob) => {
-        if (!blob) return;
+        if (!blob) {
+          setPhase('live');
+          return;
+        }
         setShot({ url: URL.createObjectURL(blob), blob });
         setPhase('captured');
         onEvent('kiosk_photo_taken');
@@ -122,7 +147,9 @@ export default function CameraStep({ lang, sessionId, onConfirmed, onEvent }: Pr
     setUploadError(false);
     try {
       const blobKey = await uploadPhoto(sessionId, shot.blob);
+      if (!aliveRef.current) return;
       const result = await confirmPhoto(sessionId, blobKey);
+      if (!aliveRef.current) return;
       setValidation(result);
       // Единственная блокирующая проверка — лица нет вообще. Остальное подсказка:
       // человек стоит у стенда, и придираться к его снимку мы не вправе.
@@ -133,6 +160,7 @@ export default function CameraStep({ lang, sessionId, onConfirmed, onEvent }: Pr
       onEvent('kiosk_photo_confirmed', { faceRatio: result.faceRatio, tooDark: result.tooDark });
       onConfirmed();
     } catch {
+      if (!aliveRef.current) return;
       setUploadError(true);
       setPhase('captured');
     }
@@ -173,7 +201,7 @@ export default function CameraStep({ lang, sessionId, onConfirmed, onEvent }: Pr
           </div>
         ) : (
           <>
-            <video ref={videoRef} autoPlay playsInline muted />
+            <video ref={attachVideo} autoPlay playsInline muted />
             <div className="faceRing" />
             {phase === 'countdown' && countdown > 0 && <div className="countdown">{countdown}</div>}
           </>

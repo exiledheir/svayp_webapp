@@ -84,6 +84,10 @@ export function getDeviceKey(): string | null {
   if (fromUrl) {
     try {
       localStorage.setItem(KEY_STORAGE, fromUrl);
+      // Ключ сохранён — убираем его из адреса, чтобы он не светился на экране и в истории.
+      const url = new URL(window.location.href);
+      url.searchParams.delete('device_key');
+      window.history.replaceState(window.history.state, '', url.toString());
     } catch {
       /* приватный режим — ключ проживёт до перезагрузки */
     }

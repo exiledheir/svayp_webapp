@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import {
   KIOSK_CATEGORIES,
   KIOSK_SHAPES,
-  KIOSK_STYLES,
+  kioskStylesFor,
   kioskMoney,
   kioskText,
   type KioskLang,
@@ -395,12 +395,14 @@ export function StyleScreen({
   lang,
   t,
   selected,
+  gender,
   onToggle,
   onNext,
 }: {
   lang: KioskLang;
   t: T;
   selected: string[];
+  gender: 'FEMALE' | 'MALE' | null;
   onToggle: (code: string) => void;
   onNext: () => void;
 }) {
@@ -409,7 +411,7 @@ export function StyleScreen({
       <h2>{t('styleTitle')}</h2>
       <p className="sub">{t('styleSubtitle')}</p>
       <div className="grid">
-        {KIOSK_STYLES.map((style) => {
+        {kioskStylesFor(gender).map((style) => {
           const on = selected.includes(style.code);
           return (
             <button
@@ -730,25 +732,35 @@ export function GeneratingScreen({
   onCancel: () => void;
   onRetry: () => void;
 }) {
-  // Медиана замера — 27 c, максимум 34 c (docs/kiosk-benchmark.md). Прогресс идёт
-  // к 90% за 30 секунд и там притормаживает, чтобы не врать «почти готово».
-  // Замер на quality=medium: 45–60 c до кадра.
-  const progress = failed ? 100 : Math.min(90, Math.round((elapsed / 55) * 90));
+  // Медиана замера на quality=low — 27 c, максимум 34 c (docs/kiosk-benchmark.md).
+  // Прогресс идёт к 90% за 30 секунд и там притормаживает, чтобы не врать «почти готово».
+  const progress = failed ? 100 : Math.min(90, Math.round((elapsed / 30) * 90));
   const stages = [t('gen1'), t('gen2'), t('gen3'), t('gen4')];
-  const stage = stages[Math.min(stages.length - 1, Math.floor(elapsed / 14))];
+  const stage = stages[Math.min(stages.length - 1, Math.floor(elapsed / 8))];
+
+  // Человеку у стенда — понятный текст, а не код ошибки; код уходит в аналитику.
+  const code = (reason ?? '').replace(/^KIOSK_/, '');
+  const limited = code === 'REGENERATE_LIMIT' || code === 'RATE_LIMIT';
+  const failText =
+    code === 'LOOK_UNAVAILABLE'
+      ? t('lookUnavailable')
+      : limited
+        ? t('genLimit')
+        : code === 'TIMEOUT'
+          ? t('genTimeout')
+          : t('genContinueInApp');
 
   return (
     <div className="body">
       <div className="center">
         <h2>{failed ? t('genFailed') : t('genTitle')}</h2>
-        <div className="stat">{failed ? t('genContinueInApp') : elapsed > 60 ? t('genAlmost') : stage}</div>
+        <div className="stat">{failed ? failText : elapsed > 35 ? t('genAlmost') : stage}</div>
         <div className="progress">
           <i style={{ width: `${progress}%` }} />
         </div>
-        {failed && reason && <div className="reason">{reason}</div>}
       </div>
       <div className="foot">
-        {failed ? (
+        {failed && !limited && code !== 'LOOK_UNAVAILABLE' ? (
           <button className="btn" onClick={onRetry}>
             {t('genRetry')}
           </button>
