@@ -171,6 +171,17 @@ export const Events = {
   FEED_SCROLL_DEPTH: 'feed_scroll_depth',
   FEED_POST_SAVED: 'feed_post_saved',
   FEED_POST_SHARED: 'feed_post_shared',
+
+  // ── Опросы (surveys) ───────────────────────────────────────────────────────
+  // Воронка: показ приглашения → старт → ответы → завершение / уход. Показ пишем
+  // отдельно от старта, иначе конверсия приглашения считается от всех и врёт.
+  SURVEY_SHOWN: 'survey_shown',
+  SURVEY_DISMISSED: 'survey_dismissed',
+  SURVEY_STARTED: 'survey_started',
+  SURVEY_QUESTION_ANSWERED: 'survey_question_answered',
+  SURVEY_ABANDONED: 'survey_abandoned',
+  SURVEY_COMPLETED: 'survey_completed',
+  SURVEY_REWARD_GRANTED: 'survey_reward_granted',
 } as const;
 
 export const Params = {
@@ -227,4 +238,11 @@ export const Params = {
   FIELD: 'field',
   RATING: 'rating',
   HAS_COMMENT: 'has_comment',
+  // Опросы
+  SURVEY_ID: 'survey_id',
+  QUESTION_ID: 'question_id',
+  QUESTION_INDEX: 'question_index',
+  QUESTION_TYPE: 'question_type',
+  REWARD_COINS: 'reward_coins',
+  VISIT_NO: 'visit_no',
 } as const;

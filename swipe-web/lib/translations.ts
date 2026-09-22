@@ -475,6 +475,39 @@ export interface Translations {
   promo_success_bonus: string;
   promo_success_discount: string;
   promo_success_ok: string;
+  // ── Опросы (surveys) ──
+  sv_questions_one: string;
+  sv_questions_few: string;
+  sv_questions_many: string;
+  sv_minutes: string;
+  sv_reward: string;
+  sv_take: string;
+  sv_continue: string;
+  sv_later: string;
+  sv_q_of: string;
+  sv_next: string;
+  sv_finish: string;
+  sv_skip: string;
+  sv_text_placeholder: string;
+  sv_selected_of: string;
+  sv_rate_low: string;
+  sv_rate_high: string;
+  sv_exit_title: string;
+  sv_exit_body: string;
+  sv_exit_stay: string;
+  sv_exit_confirm: string;
+  sv_save_error: string;
+  sv_load_error: string;
+  sv_retry: string;
+  sv_done_title: string;
+  sv_done_expires: string;
+  sv_done_saved: string;
+  sv_done_ok: string;
+  sv_list_title: string;
+  sv_list_subtitle: string;
+  sv_list_empty: string;
+  sv_badge_continue: string;
+  sv_profile_row: string;
   promo_err_not_found: string;
   promo_err_expired: string;
   promo_err_limit: string;
@@ -1403,6 +1436,38 @@ const en: Translations = {
   promo_success_bonus: '+{n} diamonds on your balance',
   promo_success_discount: '−{n}% off your first purchase',
   promo_success_ok: 'Great',
+  sv_questions_one: '{n} question',
+  sv_questions_few: '{n} questions',
+  sv_questions_many: '{n} questions',
+  sv_minutes: '~{n} min',
+  sv_reward: '+{n} diamonds',
+  sv_take: 'Take the survey',
+  sv_continue: 'Continue survey',
+  sv_later: 'Later',
+  sv_q_of: 'Question {n} of {total}',
+  sv_next: 'Next',
+  sv_finish: 'Finish',
+  sv_skip: 'Skip',
+  sv_text_placeholder: 'Write here…',
+  sv_selected_of: 'Selected {n} of {max}',
+  sv_rate_low: 'Poor',
+  sv_rate_high: 'Excellent',
+  sv_exit_title: 'Leave the survey?',
+  sv_exit_body: 'Your answers are saved. You can continue from your Profile.',
+  sv_exit_stay: 'Continue',
+  sv_exit_confirm: 'Leave',
+  sv_save_error: 'Could not save. Retry',
+  sv_load_error: 'Could not load the survey',
+  sv_retry: 'Retry',
+  sv_done_title: 'Thank you!',
+  sv_done_expires: 'Bonus diamonds expire in {n} days',
+  sv_done_saved: 'Your answers are saved',
+  sv_done_ok: 'Done',
+  sv_list_title: 'Surveys',
+  sv_list_subtitle: 'Answer and get diamonds on your balance',
+  sv_list_empty: 'No surveys available yet',
+  sv_badge_continue: 'Continue',
+  sv_profile_row: 'Surveys',
   promo_err_not_found: 'No such promo code',
   promo_err_expired: 'This promo code has expired',
   promo_err_limit: 'This promo code is no longer valid',
@@ -2318,6 +2383,38 @@ const ru: Translations = {
   promo_success_bonus: '+{n} алмазов на баланс',
   promo_success_discount: '−{n}% на первую покупку',
   promo_success_ok: 'Отлично',
+  sv_questions_one: '{n} вопрос',
+  sv_questions_few: '{n} вопроса',
+  sv_questions_many: '{n} вопросов',
+  sv_minutes: '~{n} мин',
+  sv_reward: '+{n} алмазов',
+  sv_take: 'Пройти',
+  sv_continue: 'Продолжить опрос',
+  sv_later: 'Позже',
+  sv_q_of: 'Вопрос {n} из {total}',
+  sv_next: 'Далее',
+  sv_finish: 'Завершить',
+  sv_skip: 'Пропустить',
+  sv_text_placeholder: 'Напишите здесь…',
+  sv_selected_of: 'Выбрано {n} из {max}',
+  sv_rate_low: 'Плохо',
+  sv_rate_high: 'Отлично',
+  sv_exit_title: 'Выйти из опроса?',
+  sv_exit_body: 'Ответы сохранены. Продолжить можно из Профиля.',
+  sv_exit_stay: 'Продолжить',
+  sv_exit_confirm: 'Выйти',
+  sv_save_error: 'Не удалось сохранить. Повторить',
+  sv_load_error: 'Не удалось загрузить опрос',
+  sv_retry: 'Повторить',
+  sv_done_title: 'Спасибо!',
+  sv_done_expires: 'Бонусные алмазы сгорают через {n} дней',
+  sv_done_saved: 'Ваши ответы сохранены',
+  sv_done_ok: 'Готово',
+  sv_list_title: 'Опросы',
+  sv_list_subtitle: 'Ответьте и получите алмазы на баланс',
+  sv_list_empty: 'Пока нет доступных опросов',
+  sv_badge_continue: 'Продолжить',
+  sv_profile_row: 'Опросы',
   promo_err_not_found: 'Такого промокода не существует',
   promo_err_expired: 'Срок действия промокода истёк',
   promo_err_limit: 'Промокод больше не действует',
@@ -3232,6 +3329,38 @@ const uz: Translations = {
   promo_success_bonus: 'Balansingizga +{n} olmos',
   promo_success_discount: 'Birinchi xaridga −{n}% chegirma',
   promo_success_ok: 'Ajoyib',
+  sv_questions_one: '{n} ta savol',
+  sv_questions_few: '{n} ta savol',
+  sv_questions_many: '{n} ta savol',
+  sv_minutes: '~{n} daqiqa',
+  sv_reward: '+{n} olmos',
+  sv_take: 'So\'rovnomadan o\'tish',
+  sv_continue: 'So\'rovnomani davom ettirish',
+  sv_later: 'Keyinroq',
+  sv_q_of: '{total} tadan {n}-savol',
+  sv_next: 'Keyingi',
+  sv_finish: 'Yakunlash',
+  sv_skip: 'O\'tkazib yuborish',
+  sv_text_placeholder: 'Shu yerga yozing…',
+  sv_selected_of: '{max} tadan {n} tasi tanlandi',
+  sv_rate_low: 'Yomon',
+  sv_rate_high: 'A\'lo',
+  sv_exit_title: 'So\'rovnomadan chiqasizmi?',
+  sv_exit_body: 'Javoblar saqlandi. Profil orqali davom ettirishingiz mumkin.',
+  sv_exit_stay: 'Davom etish',
+  sv_exit_confirm: 'Chiqish',
+  sv_save_error: 'Saqlab bo\'lmadi. Qayta urinish',
+  sv_load_error: 'So\'rovnomani yuklab bo\'lmadi',
+  sv_retry: 'Qayta urinish',
+  sv_done_title: 'Rahmat!',
+  sv_done_expires: 'Bonus olmoslar {n} kundan keyin kuyib ketadi',
+  sv_done_saved: 'Javoblaringiz saqlandi',
+  sv_done_ok: 'Tayyor',
+  sv_list_title: 'So\'rovnomalar',
+  sv_list_subtitle: 'Javob bering va balansingizga olmos oling',
+  sv_list_empty: 'Hozircha mavjud so\'rovnomalar yo\'q',
+  sv_badge_continue: 'Davom etish',
+  sv_profile_row: 'So\'rovnomalar',
   promo_err_not_found: 'Bunday promokod mavjud emas',
   promo_err_expired: 'Promokod muddati tugagan',
   promo_err_limit: 'Promokod endi amal qilmaydi',

@@ -2,7 +2,7 @@ import { needsUnoptimized } from '@/lib/img';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
-import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2, ArrowUpRight, BookOpen, Share2, Check, ChevronDown, Send, Pencil } from 'lucide-react';
+import { Plus, X, Sparkles, Sun, Moon, CalendarDays, TreePine, Camera, Loader2, Crown, Lock, RefreshCw, User, Images, Trash2, ArrowUpRight, BookOpen, Share2, Check, ChevronDown, Send, Pencil, ClipboardList } from 'lucide-react';
 import { getUser, clearTokens } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags-context';
 import { FEATURES } from '@/lib/feature-flags';
@@ -66,6 +66,12 @@ import PhotoSourceSheet from '@/components/PhotoSourceSheet';
 import PhotoTipsSheet from '@/components/PhotoTipsSheet';
 import ClosetGuide from '@/components/closet/ClosetGuide';
 import { getGuideStrings } from '@/lib/closet-guide';
+import { useSurveyPrompt } from '@/components/closet/survey/useSurveyPrompt';
+import SurveyInviteSheet from '@/components/closet/survey/SurveyInviteSheet';
+import SurveyFlow from '@/components/closet/survey/SurveyFlow';
+import SurveyDoneSheet from '@/components/closet/survey/SurveyDoneSheet';
+import SurveyListSheet from '@/components/closet/survey/SurveyListSheet';
+import { markSurveyShown, type CompleteResult } from '@/lib/surveys';
 
 // The precise taxonomy subcategory of an item — its stored subcategory when set
 // (new items), otherwise derived from the legacy local category.
@@ -290,6 +296,10 @@ export default function ClosetPage() {
     // WITHOUT it is a legacy account, which we never drag into setup.
     if (realItems.length === 0 || wasSetupEntered()) router.replace('/closet/setup');
   }, [firstLoadDone, realItems, router]);
+  // Тот же критерий, что у редиректа выше: пока он может увести на /closet/setup,
+  // приглашение к опросу не показываем.
+  const setupGateActive =
+    firstLoadDone && !(isSetupSatisfied(realItems) || isSetupDone()) && (realItems.length === 0 || wasSetupEntered());
   // ── Гардероб = ОДНА сетка на 3 колонки с фильтрами ──────────────────────
   // Раньше это были шесть горизонтальных лент по разделам: вещи было видно
   // только «по три штуки в окошко», и до нижних разделов приходилось листать
@@ -738,6 +748,43 @@ export default function ClosetPage() {
   const [pullDistance, setPullDistance] = useState(0);
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
   const PULL_THRESHOLD = 72;
+
+  // ── Опросы: приглашение по номеру визита, флоу поверх гардероба ──────────────
+  // Кому и какой опрос — решает сервер; здесь только «когда удобно показать».
+  const surveyUid = useMemo(() => {
+    const u = getUser();
+    const id = u?.id ?? u?.userId ?? u?.user_id;
+    return id ? String(id) : null;
+  }, []);
+  const [surveyFlowId, setSurveyFlowId] = useState<string | null>(null);
+  const [surveyDone, setSurveyDone] = useState<CompleteResult | null>(null);
+  const [showSurveyList, setShowSurveyList] = useState(false);
+  const surveyOverlayBusy =
+    showProfile || showGuide || showLangPicker || showItemTips || showBeautifyIntro || showTryOnConfirm ||
+    showAddPicker || batchReviewOpen || sortMenu || !!tryOnState || !!showPremiumGate || !!canvasData ||
+    !!editItem || !!beautifyItem || !!outfitBlockedModal || !!addCroppedPreview ||
+    !!surveyFlowId || !!surveyDone || showSurveyList;
+  const surveyPrompt = useSurveyPrompt({
+    enabled: firstLoadDone && !isLoading && !setupGateActive,
+    uid: surveyUid,
+    lang: locale,
+    overlayOpen: surveyOverlayBusy,
+    onRoute: router.pathname === '/closet',
+  });
+  const refreshSurveys = surveyPrompt.refresh;
+  const onSurveyCompleted = useCallback(
+    (r: CompleteResult) => {
+      setSurveyFlowId(null);
+      setSurveyDone(r);
+      // События survey_completed / survey_reward_granted пишет сам флоу — он знает id опроса.
+      if (r.rewardCoins > 0 && !r.alreadyCompleted) {
+        setCoinsState(r.newBalance);
+        void refreshCoins();
+      }
+      void refreshSurveys();
+    },
+    [refreshCoins, refreshSurveys],
+  );
 
   function handlePullTouchStart(e: React.TouchEvent<HTMLElement>) {
     if (mainScrollRef.current && mainScrollRef.current.scrollTop === 0) {
@@ -2834,6 +2881,48 @@ export default function ClosetPage() {
       {/* ── How-to-use guide ── */}
       <ClosetGuide open={showGuide} onClose={() => setShowGuide(false)} />
 
+      {/* ── Опросы ── */}
+      {surveyPrompt.invite && !surveyFlowId && (
+        <SurveyInviteSheet
+          survey={surveyPrompt.invite}
+          dark={theme === 'dark'}
+          onStart={() => setSurveyFlowId(surveyPrompt.acceptInvite())}
+          onDismiss={surveyPrompt.dismissInvite}
+        />
+      )}
+      {showSurveyList && (
+        <SurveyListSheet
+          surveys={surveyPrompt.surveys}
+          dark={theme === 'dark'}
+          onClose={() => setShowSurveyList(false)}
+          onPick={(s) => {
+            setShowSurveyList(false);
+            setSurveyFlowId(s.id);
+            markSurveyShown(s.id, 'LIST').catch(() => {});
+            logAnalyticsEvent(Events.SURVEY_SHOWN, { [Params.SURVEY_ID]: s.id, [Params.TRIGGER]: 'list' });
+          }}
+        />
+      )}
+      {surveyFlowId && (
+        <SurveyFlow
+          surveyId={surveyFlowId}
+          dark={theme === 'dark'}
+          onCompleted={onSurveyCompleted}
+          onExit={() => {
+            setSurveyFlowId(null);
+            void surveyPrompt.refresh();
+          }}
+        />
+      )}
+      {surveyDone && (
+        <SurveyDoneSheet
+          result={surveyDone}
+          dark={theme === 'dark'}
+          fallbackTtlDays={coinPricing?.freeCoinTtlDays}
+          onClose={() => setSurveyDone(null)}
+        />
+      )}
+
       {/* ── "Perfect photo" tips for adding an item ── */}
       <PhotoTipsSheet open={showItemTips} kind="item" position="fixed" onClose={() => setShowItemTips(false)} />
 
@@ -2991,6 +3080,30 @@ export default function ClosetPage() {
                   {plan === 'free' ? 'Free plan' : plan === 'pro' ? 'Plus' : 'Premium'}
                 </span>
               </div>
+
+              {/* Опросы — только если есть доступные: пустой пункт меню хуже его отсутствия */}
+              {surveyPrompt.hasSurveys && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowProfile(false);
+                    setShowSurveyList(true);
+                  }}
+                  className="mt-3 w-full flex items-center gap-2.5 px-4 rounded-2xl active:scale-[0.98] transition-transform"
+                  style={{ height: 52, background: theme === 'dark' ? '#2a2a2a' : '#F5F5F5' }}
+                >
+                  <ClipboardList size={17} strokeWidth={2} color="#F370A7" />
+                  <span className="flex-1 text-left text-[14px] font-semibold text-gray-900 dark:text-white">
+                    {t.sv_profile_row}
+                  </span>
+                  <span
+                    className="min-w-[22px] h-[22px] px-1.5 rounded-full text-[12px] font-bold text-white flex items-center justify-center"
+                    style={{ background: '#F370A7' }}
+                  >
+                    {surveyPrompt.surveys.length}
+                  </span>
+                </button>
+              )}
 
               {/* Language & Theme selector */}
               <div className="mt-4">

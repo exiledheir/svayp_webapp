@@ -103,8 +103,13 @@ export function getAnonId(): string {
   return id;
 }
 
-/** Session UUID with 30-minute idle rotation (same semantics as mobile SessionManager). */
-function getSessionId(): string {
+/**
+ * Session UUID with 30-minute idle rotation (same semantics as mobile SessionManager).
+ * Экспортируется для «раз за сессию»-логики опросов: WebView гардероба живёт в
+ * IndexedStack без перезагрузки, и «сессия» там — именно эта, а не жизнь страницы.
+ * Побочный эффект один — продление/создание записи в localStorage.
+ */
+export function getSessionId(): string {
   const now = Date.now();
   const saved = readJson<{ id: string; last: number }>(SESSION_KEY);
   if (saved && now - saved.last < SESSION_IDLE_MS) {
