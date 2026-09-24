@@ -8,6 +8,7 @@
 // глотает всё молча, флоу показывает «Повторить»).
 
 import { api } from '@/lib/api';
+import { getSessionId } from '@/lib/app-events';
 
 export type SurveyQuestionType = 'SINGLE_CHOICE' | 'MULTI_CHOICE' | 'TEXT' | 'RATING';
 export type SurveyImpressionTrigger = 'AUTO' | 'LIST';
@@ -43,7 +44,10 @@ export interface SurveyCard {
 }
 
 export interface AvailableSurveys {
+  /** Номер дня с заходом. */
   visitNo: number;
+  /** Номер захода (сессии приложения). */
+  sessionNo: number;
   promptDelaySeconds: number;
   surveys: SurveyCard[];
 }
@@ -96,12 +100,16 @@ function unwrap<T>(res: { data: unknown }): T {
   return (d.data ?? d) as T;
 }
 
-/** Доступные пользователю опросы. Вызов фиксирует визит (день активности) на сервере. */
+/**
+ * Доступные пользователю опросы. Вызов фиксирует на сервере и день, и заход: id сессии — та же
+ * сессия аналитики (новая после 30 минут простоя), по ней считаются опросы «на N-й заход».
+ */
 export async function fetchAvailableSurveys(lang: string): Promise<AvailableSurveys> {
-  const res = await api.get('/surveys/available', { params: { lang } });
+  const res = await api.get('/surveys/available', { params: { lang, sessionId: getSessionId() } });
   const data = unwrap<Partial<AvailableSurveys>>(res);
   return {
     visitNo: data.visitNo ?? 1,
+    sessionNo: data.sessionNo ?? 1,
     promptDelaySeconds: data.promptDelaySeconds ?? 30,
     surveys: Array.isArray(data.surveys) ? data.surveys : [],
   };
