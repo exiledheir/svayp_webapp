@@ -732,11 +732,11 @@ export function GeneratingScreen({
   onCancel: () => void;
   onRetry: () => void;
 }) {
-  // Медиана замера на quality=low — 27 c, максимум 34 c (docs/kiosk-benchmark.md).
-  // Прогресс идёт к 90% за 30 секунд и там притормаживает, чтобы не врать «почти готово».
-  const progress = failed ? 100 : Math.min(90, Math.round((elapsed / 30) * 90));
+  // FASHN собирает образ по шагам: замер на проде ≈105 c на 3 вещи (gpt-image — ~30 c).
+  // Прогресс идёт к 90% за 100 секунд и там притормаживает, чтобы не врать «почти готово».
+  const progress = failed ? 100 : Math.min(90, Math.round((elapsed / 100) * 90));
   const stages = [t('gen1'), t('gen2'), t('gen3'), t('gen4')];
-  const stage = stages[Math.min(stages.length - 1, Math.floor(elapsed / 8))];
+  const stage = stages[Math.min(stages.length - 1, Math.floor(elapsed / 25))];
 
   // Человеку у стенда — понятный текст, а не код ошибки; код уходит в аналитику.
   const code = (reason ?? '').replace(/^KIOSK_/, '');
@@ -754,7 +754,7 @@ export function GeneratingScreen({
     <div className="body">
       <div className="center">
         <h2>{failed ? t('genFailed') : t('genTitle')}</h2>
-        <div className="stat">{failed ? failText : elapsed > 35 ? t('genAlmost') : stage}</div>
+        <div className="stat">{failed ? failText : elapsed > 105 ? t('genAlmost') : stage}</div>
         <div className="progress">
           <i style={{ width: `${progress}%` }} />
         </div>
