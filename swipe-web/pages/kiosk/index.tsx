@@ -65,7 +65,19 @@ const backendUnreachable = (err: unknown) => {
   const status = (err as any)?.response?.status as number | undefined;
   return status === undefined || status === 404 || status >= 500;
 };
-const isOfflineNow = () => typeof navigator !== 'undefined' && navigator.onLine === false;
+/**
+ * Есть ли связь с сервером — проверяем запросом, а не флагом браузера: navigator.onLine
+ * бывает false при живой сети (VPN, режим Offline в DevTools, сетевой адаптер), и киоск
+ * застревал на «Нет связи». fetch отклоняется только при настоящем сетевом сбое.
+ */
+const serverReachable = async () => {
+  try {
+    await fetch('/proxy/kiosk/catalog?page=0&size=1', { cache: 'no-store' });
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 export default function KioskPage() {
   const [lang, setLang] = useState<KioskLang>('ru');
@@ -140,10 +152,13 @@ export default function KioskPage() {
     document.addEventListener('selectstart', block);
 
     const online = () => setOffline(false);
-    const gone = () => setOffline(true);
+    // Браузер говорит «сети нет» — верим только после проверки запросом.
+    const gone = () => {
+      serverReachable().then((ok) => setOffline(!ok));
+    };
     window.addEventListener('online', online);
     window.addEventListener('offline', gone);
-    setOffline(typeof navigator !== 'undefined' && navigator.onLine === false);
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) gone();
 
     // Экран не должен гаснуть посреди зала.
     let release: any = null;
@@ -158,6 +173,18 @@ export default function KioskPage() {
       release?.release?.().catch?.(() => {});
     };
   }, []);
+
+  // «Нет связи» не должен запирать планшет: пока экран висит, каждые 5 секунд проверяем
+  // сервер и снимаем экран, как только он ответил.
+  useEffect(() => {
+    if (!offline) return;
+    const timer = setInterval(() => {
+      serverReachable().then((ok) => {
+        if (ok) setOffline(false);
+      });
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [offline]);
 
   // ── сброс сессии ─────────────────────────────────────────────────────────
   const hardReset = useCallback(
@@ -192,7 +219,7 @@ export default function KioskPage() {
       setLang('ru');
       setPath('create');
       // Экран «нет связи» не должен запирать планшет навсегда: снимаем, если сеть есть.
-      setOffline(isOfflineNow());
+      serverReachable().then((ok) => setOffline(!ok));
       setScreen('idle');
     },
     [screen, sessionId, track],
@@ -273,7 +300,7 @@ export default function KioskPage() {
       }
     } catch {
       // Сессия не открылась, но сеть есть — остаёмся на заставке, следующее касание повторит.
-      setOffline(isOfflineNow());
+      serverReachable().then((ok) => setOffline(!ok));
     }
   };
 
@@ -295,7 +322,7 @@ export default function KioskPage() {
       );
     } catch {
       // Сбой одной страницы — не повод запирать киоск: показываем то, что успело прийти.
-      if (isCurrent()) setOffline(isOfflineNow());
+      if (isCurrent()) serverReachable().then((ok) => setOffline(!ok));
     } finally {
       if (isCurrent()) setCatalogLoading(false);
     }
@@ -387,7 +414,7 @@ export default function KioskPage() {
     } catch (err) {
       // Код не выдали — остаёмся на результате (QR там же), а не запираем киоск.
       track('kiosk_finish_failed', { reason: kioskErrorCode(err) ?? 'REQUEST_FAILED' });
-      setOffline(isOfflineNow());
+      serverReachable().then((ok) => setOffline(!ok));
     }
   };
 
