@@ -100,7 +100,9 @@ export default function CameraStep({ lang, sessionId, onConfirmed, onEvent }: Pr
       return;
     }
 
-    // Весь кадр без обрезки — ровно то, что человек видел в рамке.
+    // Весь кадр без обрезки и ЗЕРКАЛЬНО — ровно то, что человек видел в рамке.
+    // Без отражения на образ попадала его настоящая голова, развёрнутая наоборот
+    // относительно превью: пробор и причёска «на другой стороне».
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -109,6 +111,8 @@ export default function CameraStep({ lang, sessionId, onConfirmed, onEvent }: Pr
       setPhase('live');
       return;
     }
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     canvas.toBlob(
@@ -297,8 +301,11 @@ export default function CameraStep({ lang, sessionId, onConfirmed, onEvent }: Pr
           width: 100%;
           height: 100%;
           object-fit: cover;
+        }
+        video {
           transform: scaleX(-1); /* зеркало: человек видит себя как в зеркале, иначе движения путают */
         }
+        /* Снимок уже отражён при съёмке — показываем как есть. */
         .faceGuide {
           position: absolute;
           left: 50%;
