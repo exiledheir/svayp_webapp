@@ -854,7 +854,10 @@ export function ResultScreen({
   return (
     <div className="body">
       <div className="stage">
-        {look.resultImageUrl && <img src={look.resultImageUrl} alt="" />}
+        {/* Образ целиком (contain): cover срезал голову и обувь у вертикальной
+            генерации. Поля закрывает размытая копия той же картинки — как в мобилке. */}
+        {look.resultImageUrl && <img className="bg" src={look.resultImageUrl} alt="" aria-hidden />}
+        {look.resultImageUrl && <img className="fg" src={look.resultImageUrl} alt="" />}
         <div className="tag">{t('resultTag')}</div>
         <div className="meta">
           {look.items.length} {t('itemsCount')} · {kioskMoney(look.totalPrice, lang)}
@@ -900,9 +903,18 @@ export function ResultScreen({
           min-height: 0;
         }
         .stage img {
+          position: absolute;
+          inset: 0;
           width: 100%;
           height: 100%;
+        }
+        .stage img.bg {
           object-fit: cover;
+          filter: blur(24px) brightness(0.9);
+          transform: scale(1.1);
+        }
+        .stage img.fg {
+          object-fit: contain;
         }
         .tag {
           position: absolute;

@@ -3,8 +3,9 @@ import { kioskText, type KioskLang } from '@/lib/kiosk-i18n';
 import { confirmPhoto, uploadPhoto, type KioskPhotoValidation } from '@/lib/kiosk-api';
 
 /**
- * Экран камеры. Снимаем ТОЛЬКО лицо: в полный рост у стойки не сфотографируешь,
- * да и не нужно — фигуру человек выбирает сам на следующем шаге.
+ * Экран камеры. Снимаем кадр камеры ЦЕЛИКОМ, без обрезки: квадрат «под круг»
+ * срезал плечи и волосы, а модели нужен весь человек, какой попал в кадр. Превью
+ * показывает ровно тот кадр, что уйдёт на генерацию; овал — подсказка, где лицо.
  *
  * Живого потока камеры в проекте раньше не было нигде (везде нативный файловый
  * пикер), поэтому getUserMedia здесь написан с нуля.
@@ -28,6 +29,10 @@ export default function CameraStep({ lang, sessionId, onConfirmed, onEvent }: Pr
   const [cameraError, setCameraError] = useState(false);
   const [validation, setValidation] = useState<KioskPhotoValidation | null>(null);
   const [uploadError, setUploadError] = useState(false);
+  /** Пропорции кадра камеры (ш/в) и размер области под превью — рамка вписывается без обрезки. */
+  const [ratio, setRatio] = useState(3 / 4);
+  const [stageBox, setStageBox] = useState({ w: 0, h: 0 });
+  const stageRef = useRef<HTMLDivElement | null>(null);
   /** Экран уже закрыт: запоздавший ответ загрузки не должен переключать экраны. */
   const aliveRef = useRef(true);
   useEffect(
@@ -45,6 +50,21 @@ export default function CameraStep({ lang, sessionId, onConfirmed, onEvent }: Pr
   }, []);
 
   const t = (key: Parameters<typeof kioskText>[0]) => kioskText(key, lang);
+
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setStageBox({ w: width, h: height });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Рамка превью = пропорции камеры, вписанные в свободное место (как object-fit: contain).
+  const frameW = stageBox.w && stageBox.h ? Math.min(stageBox.w, stageBox.h * ratio) : 0;
+  const frameH = frameW ? frameW / ratio : 0;
 
   // ── поток камеры ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -80,27 +100,16 @@ export default function CameraStep({ lang, sessionId, onConfirmed, onEvent }: Pr
       return;
     }
 
-    // Кадрируем в квадрат по центру — ровно то, что человек видел в круге.
-    const side = Math.min(video.videoWidth, video.videoHeight);
+    // Весь кадр без обрезки — ровно то, что человек видел в рамке.
     const canvas = document.createElement('canvas');
-    canvas.width = side;
-    canvas.height = side;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       setPhase('live');
       return;
     }
-    ctx.drawImage(
-      video,
-      (video.videoWidth - side) / 2,
-      (video.videoHeight - side) / 2,
-      side,
-      side,
-      0,
-      0,
-      side,
-      side,
-    );
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     canvas.toBlob(
       (blob) => {
@@ -192,19 +201,30 @@ export default function CameraStep({ lang, sessionId, onConfirmed, onEvent }: Pr
         <span>{hintText() ?? (captured ? t('camDoneHint') : t('camLook'))}</span>
       </div>
 
-      <div className="camStage">
+      <div className="camStage" ref={stageRef}>
         {cameraError ? (
           <div className="camError">{t('camNoAccess')}</div>
-        ) : captured && shot ? (
-          <div className="shotCircle">
-            <img src={shot.url} alt="" />
-          </div>
         ) : (
-          <>
-            <video ref={attachVideo} autoPlay playsInline muted />
-            <div className="faceRing" />
-            {phase === 'countdown' && countdown > 0 && <div className="countdown">{countdown}</div>}
-          </>
+          <div className="frame" style={{ width: frameW || undefined, height: frameH || undefined }}>
+            {captured && shot ? (
+              <img src={shot.url} alt="" />
+            ) : (
+              <>
+                <video
+                  ref={attachVideo}
+                  autoPlay
+                  playsInline
+                  muted
+                  onLoadedMetadata={(e) => {
+                    const v = e.currentTarget;
+                    if (v.videoWidth && v.videoHeight) setRatio(v.videoWidth / v.videoHeight);
+                  }}
+                />
+                <div className="faceGuide" />
+                {phase === 'countdown' && countdown > 0 && <div className="countdown">{countdown}</div>}
+              </>
+            )}
+          </div>
         )}
       </div>
 
@@ -255,12 +275,23 @@ export default function CameraStep({ lang, sessionId, onConfirmed, onEvent }: Pr
         }
         .camStage {
           flex: 1;
+          min-height: 0;
+          margin: 26px 64px;
           position: relative;
           display: grid;
           place-items: center;
-          overflow: hidden;
         }
-        video {
+        .frame {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          border-radius: 36px;
+          overflow: hidden;
+          background: var(--card);
+        }
+        /* Рамка повторяет пропорции камеры, поэтому cover здесь ничего не срезает. */
+        video,
+        .frame img {
           position: absolute;
           inset: 0;
           width: 100%;
@@ -268,32 +299,27 @@ export default function CameraStep({ lang, sessionId, onConfirmed, onEvent }: Pr
           object-fit: cover;
           transform: scaleX(-1); /* зеркало: человек видит себя как в зеркале, иначе движения путают */
         }
-        .faceRing {
-          position: relative;
-          width: 560px;
-          height: 560px;
+        .faceGuide {
+          position: absolute;
+          left: 50%;
+          top: 8%;
+          width: 30%;
+          aspect-ratio: 3 / 4;
+          transform: translateX(-50%);
           border-radius: 50%;
-          border: 7px dashed var(--pink);
-          box-shadow: 0 0 0 9999px rgba(255, 255, 255, 0.74);
+          border: 6px dashed var(--pink);
+          opacity: 0.85;
+          pointer-events: none;
         }
         .countdown {
           position: absolute;
+          inset: 0;
+          display: grid;
+          place-items: center;
           font-size: 300px;
           font-weight: 800;
           color: var(--pink);
-        }
-        .shotCircle {
-          width: 560px;
-          height: 560px;
-          border-radius: 50%;
-          overflow: hidden;
-          border: 7px solid var(--pink);
-        }
-        .shotCircle img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          transform: scaleX(-1);
+          text-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
         }
         .camError {
           font-size: 32px;

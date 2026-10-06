@@ -36,8 +36,8 @@ export const KIOSK_TEXT = {
 
   // Камера
   privacyShort: ['Фото удалится через 15 минут', 'Surat 15 daqiqadan soʻng oʻchiriladi'],
-  camAim: ['Поместите лицо в круг', 'Yuzingizni doira ichiga joylang'],
-  camLook: ['Смотрите прямо в камеру', 'Toʻgʻridan-toʻgʻri kameraga qarang'],
+  camAim: ['Встаньте перед камерой', 'Kamera qarshisida turing'],
+  camLook: ['Лицо — в овале, плечи в кадре, смотрите прямо', 'Yuz — ovalda, yelkalar kadrda, toʻgʻri qarang'],
   camDone: ['Хорошо получилось?', 'Yaxshi chiqdimi?'],
   camDoneHint: ['Лицо видно чётко, без теней', 'Yuz aniq koʻrinadi, soyasiz'],
   shoot: ['Снять', 'Suratga olish'],
