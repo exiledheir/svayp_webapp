@@ -65,6 +65,13 @@ export default function KioskSharePage() {
   // Файл образа качаем сразу, как пришли данные: на iPhone окно «Поделиться»
   // открывается только прямо по нажатию, ждать сеть внутри обработчика нельзя.
   const [file, setFile] = useState<File | null>(null);
+  const filePromise = useRef<Promise<File | null> | null>(null);
+  // «Скачать» нажали раньше, чем файл докачался (PNG ~2,5 МБ, по мобильной
+  // сети — секунды): кнопка крутит спиннер и ждёт, а не открывает картинку.
+  const [waiting, setWaiting] = useState(false);
+  // Пропорции картинки образа: рамка подстраивается под них, и ничего не
+  // обрезается (раньше рамка 3:4 срезала верх и низ у картинки 2:3).
+  const [ratio, setRatio] = useState(2 / 3);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -82,17 +89,27 @@ export default function KioskSharePage() {
       });
   }, [code]);
 
+  /** Файл образа: одна загрузка на всех; упала — следующий вызов пробует снова. */
+  const loadFile = (): Promise<File | null> => {
+    if (!share?.resultImageUrl) return Promise.resolve(null);
+    if (!filePromise.current) {
+      filePromise.current = fetchLookFile(share.resultImageUrl, share.code)
+        .then((f) => {
+          setFile(f);
+          return f;
+        })
+        .catch(() => {
+          filePromise.current = null;
+          return null;
+        });
+    }
+    return filePromise.current;
+  };
+
   useEffect(() => {
-    if (!share?.resultImageUrl) return;
-    let cancelled = false;
-    fetchLookFile(share.resultImageUrl, share.code)
-      .then((f) => !cancelled && setFile(f))
-      .catch(() => {
-        // Не скачалось — кнопки работают запасным путём (см. ниже).
-      });
-    return () => {
-      cancelled = true;
-    };
+    void loadFile();
+    // loadFile читает share — перезапуск ровно при смене образа.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [share]);
 
   useEffect(() => () => clearTimeout(toastTimer.current), []);
@@ -103,35 +120,54 @@ export default function KioskSharePage() {
     toastTimer.current = setTimeout(() => setToast(null), 2600);
   };
 
+  /** Android и компьютер: файл сразу в «Загрузки» — Галерея его видит. */
+  const saveFile = (f: File) => {
+    const href = URL.createObjectURL(f);
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = f.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 10_000);
+    showToast('Фото сохранено');
+  };
+
   /**
-   * «Скачать». Android: файл сразу в «Загрузки» — Галерея его видит. iPhone:
-   * Safari не умеет класть в «Фото» напрямую, поэтому открываем системное окно
-   * с картинкой — там «Сохранить изображение» кладёт её в «Фото».
+   * iPhone: Safari не кладёт в «Фото» напрямую — открываем системное окно с
+   * картинкой, там «Сохранить изображение». Окно открывается только прямо по
+   * нажатию: если ждали загрузку, Safari откажет — тогда просим нажать ещё раз.
    */
+  const saveFileIos = async (f: File) => {
+    try {
+      await navigator.share({ files: [f] });
+    } catch (err) {
+      if (isAbort(err)) return;
+      showToast(
+        err instanceof DOMException && err.name === 'NotAllowedError'
+          ? 'Фото готово — нажмите «Скачать» ещё раз'
+          : 'Не получилось сохранить фото',
+      );
+    }
+  };
+
   const onDownload = async () => {
-    if (!share?.resultImageUrl) return;
-    if (file && isIos() && canShareFile(file)) {
-      try {
-        await navigator.share({ files: [file] });
-      } catch (err) {
-        if (!isAbort(err)) showToast('Не получилось сохранить фото');
-      }
-      return;
-    }
+    if (!share?.resultImageUrl || waiting) return;
+    const ios = isIos();
     if (file) {
-      const href = URL.createObjectURL(file);
-      const a = document.createElement('a');
-      a.href = href;
-      a.download = file.name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(href), 10_000);
-      showToast('Фото сохранено');
+      if (ios && canShareFile(file)) await saveFileIos(file);
+      else saveFile(file);
       return;
     }
-    // Файл не скачался: открываем картинку — сохранить можно долгим нажатием.
-    window.open(share.resultImageUrl, '_blank', 'noopener');
+    setWaiting(true);
+    const f = await loadFile();
+    setWaiting(false);
+    if (!f) {
+      showToast('Не удалось загрузить фото — попробуйте ещё раз');
+      return;
+    }
+    if (ios && canShareFile(f)) await saveFileIos(f);
+    else saveFile(f);
   };
 
   /** «Поделиться»: системное окно с картинкой; без неё — со ссылкой на страницу. */
@@ -184,7 +220,15 @@ export default function KioskSharePage() {
           <>
             {share.resultImageUrl && (
               <div className="hero">
-                <img src={share.resultImageUrl} alt="Ваш образ" />
+                <img
+                  src={share.resultImageUrl}
+                  alt="Ваш образ"
+                  style={{ aspectRatio: ratio }}
+                  onLoad={(e) => {
+                    const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+                    if (w && h) setRatio(w / h);
+                  }}
+                />
               </div>
             )}
 
@@ -215,11 +259,15 @@ export default function KioskSharePage() {
 
             {share.resultImageUrl && (
               <div className="actions">
-                <button className="cta" onClick={onDownload}>
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19h14" />
-                  </svg>
-                  Скачать
+                <button className="cta" onClick={onDownload} aria-busy={waiting}>
+                  {waiting ? (
+                    <span className="spinner" aria-hidden="true" />
+                  ) : (
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 4v11m0 0l-4.5-4.5M12 15l4.5-4.5M5 19h14" />
+                    </svg>
+                  )}
+                  {waiting ? 'Готовим фото…' : 'Скачать'}
                 </button>
                 <button className="cta ghost" onClick={onShare}>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -251,12 +299,11 @@ export default function KioskSharePage() {
           border-radius: 24px;
           overflow: hidden;
           background: #f8f7fa;
-          aspect-ratio: 3 / 4;
         }
         .hero img {
           width: 100%;
-          height: 100%;
-          object-fit: cover;
+          height: auto;
+          object-fit: contain;
           display: block;
         }
         .head {
@@ -368,6 +415,19 @@ export default function KioskSharePage() {
           stroke-width: 2.2;
           stroke-linecap: round;
           stroke-linejoin: round;
+        }
+        .spinner {
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          border: 2.5px solid rgba(255, 255, 255, 0.4);
+          border-top-color: #fff;
+          animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
+          }
         }
         .toast {
           position: fixed;
